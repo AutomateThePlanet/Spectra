@@ -126,19 +126,19 @@ Based on plan.md structure:
 
 ### Tests for User Story 3
 
-- [ ] T049 [P] [US3] Write unit tests for TestValidator in `tests/Spectra.Core.Tests/Validation/TestValidatorTests.cs`
-- [ ] T050 [P] [US3] Write integration test for validate command in `tests/Spectra.CLI.Tests/Commands/ValidateCommandTests.cs`
+- [X] T049 [P] [US3] Write unit tests for TestValidator in `tests/Spectra.Core.Tests/Validation/TestValidatorTests.cs`
+- [X] T050 [P] [US3] Write integration test for validate command in `tests/Spectra.CLI.Tests/Commands/ValidateCommandTests.cs`
 
 ### Implementation for User Story 3
 
-- [ ] T051 [US3] Implement TestValidator (schema, ID uniqueness, priority enum) in `src/Spectra.Core/Validation/TestValidator.cs`
-- [ ] T052 [US3] Implement IdUniquenessValidator in `src/Spectra.Core/Validation/IdUniquenessValidator.cs`
-- [ ] T053 [US3] Implement DependsOnValidator in `src/Spectra.Core/Validation/DependsOnValidator.cs`
-- [ ] T054 [US3] Implement IndexFreshnessValidator in `src/Spectra.Core/Validation/IndexFreshnessValidator.cs`
-- [ ] T055 [US3] Implement ValidationOrchestrator (combines all validators) in `src/Spectra.Core/Validation/ValidationOrchestrator.cs`
-- [ ] T056 [US3] Implement ValidateHandler in `src/Spectra.CLI/Commands/Validate/ValidateHandler.cs`
-- [ ] T057 [US3] Implement ValidateCommand with --suite option in `src/Spectra.CLI/Commands/Validate/ValidateCommand.cs`
-- [ ] T058 [US3] Add validate command to Program.cs
+- [X] T051 [US3] Implement TestValidator (schema, ID uniqueness, priority enum) in `src/Spectra.Core/Validation/TestValidator.cs`
+- [X] T052 [US3] Implement IdUniquenessValidator in `src/Spectra.Core/Validation/IdUniquenessValidator.cs`
+- [X] T053 [US3] Implement DependsOnValidator in `src/Spectra.Core/Validation/DependsOnValidator.cs`
+- [X] T054 [US3] Implement IndexFreshnessValidator in `src/Spectra.Core/Validation/IndexFreshnessValidator.cs`
+- [X] T055 [US3] Implement ValidationOrchestrator (combines all validators) in `src/Spectra.Core/Validation/ValidationOrchestrator.cs`
+- [X] T056 [US3] Implement ValidateHandler in `src/Spectra.CLI/Commands/Validate/ValidateHandler.cs`
+- [X] T057 [US3] Implement ValidateCommand with --suite option in `src/Spectra.CLI/Commands/Validate/ValidateCommand.cs`
+- [X] T058 [US3] Add validate command to Program.cs
 
 **Checkpoint**: User Story 3 complete - `spectra validate` works with exit code 0/1
 
@@ -152,18 +152,18 @@ Based on plan.md structure:
 
 ### Tests for User Story 4
 
-- [ ] T059 [P] [US4] Write unit tests for IndexBuilder in `tests/Spectra.Core.Tests/Index/IndexBuilderTests.cs`
-- [ ] T060 [P] [US4] Write integration test for index command in `tests/Spectra.CLI.Tests/Commands/IndexCommandTests.cs`
+- [X] T059 [P] [US4] Write unit tests for IndexBuilder in `tests/Spectra.Core.Tests/Index/IndexGeneratorTests.cs`
+- [X] T060 [P] [US4] Write integration test for index command in `tests/Spectra.CLI.Tests/Commands/IndexCommandTests.cs`
 
 ### Implementation for User Story 4
 
-- [ ] T061 [P] [US4] Implement IndexReader (load _index.json) in `src/Spectra.Core/Index/IndexReader.cs`
-- [ ] T062 [P] [US4] Implement IndexWriter (write _index.json) in `src/Spectra.Core/Index/IndexWriter.cs`
-- [ ] T063 [US4] Implement IndexBuilder (parse tests, build index) in `src/Spectra.Core/Index/IndexBuilder.cs`
-- [ ] T064 [US4] Implement SuiteDiscovery (find all suite folders) in `src/Spectra.Core/Index/SuiteDiscovery.cs`
-- [ ] T065 [US4] Implement IndexHandler in `src/Spectra.CLI/Commands/Index/IndexHandler.cs`
-- [ ] T066 [US4] Implement IndexCommand with --suite option in `src/Spectra.CLI/Commands/Index/IndexCommand.cs`
-- [ ] T067 [US4] Add index command to Program.cs
+- [X] T061 [P] [US4] Implement IndexReader (load _index.json) in `src/Spectra.Core/Index/IndexWriter.cs` (combined)
+- [X] T062 [P] [US4] Implement IndexWriter (write _index.json) in `src/Spectra.Core/Index/IndexWriter.cs`
+- [X] T063 [US4] Implement IndexBuilder (parse tests, build index) in `src/Spectra.Core/Index/IndexGenerator.cs`
+- [X] T064 [US4] Implement SuiteDiscovery (find all suite folders) in `src/Spectra.CLI/Commands/Index/IndexHandler.cs` (integrated)
+- [X] T065 [US4] Implement IndexHandler in `src/Spectra.CLI/Commands/Index/IndexHandler.cs`
+- [X] T066 [US4] Implement IndexCommand with --suite option in `src/Spectra.CLI/Commands/Index/IndexCommand.cs`
+- [X] T067 [US4] Add index command to Program.cs
 
 **Checkpoint**: User Story 4 complete - `spectra index` rebuilds all indexes
 
@@ -179,57 +179,57 @@ Based on plan.md structure:
 
 ### Tests for User Story 2
 
-- [ ] T068 [P] [US2] Write unit tests for DocumentMapBuilder in `tests/Spectra.Core.Tests/Source/DocumentMapBuilderTests.cs`
-- [ ] T069 [P] [US2] Write unit tests for DuplicateDetector in `tests/Spectra.Core.Tests/Validation/DuplicateDetectorTests.cs`
-- [ ] T070 [P] [US2] Write integration test for generate command in `tests/Spectra.CLI.Tests/Commands/GenerateCommandTests.cs`
+- [X] T068 [P] [US2] Write unit tests for DocumentMapBuilder in `tests/Spectra.CLI.Tests/Source/DocumentMapBuilderTests.cs`
+- [X] T069 [P] [US2] Write unit tests for DuplicateDetector in `tests/Spectra.Core.Tests/Validation/DuplicateDetectorTests.cs`
+- [X] T070 [P] [US2] Write integration test for generate command in `tests/Spectra.CLI.Tests/Commands/GenerateCommandTests.cs`
 
 ### Source Document Handling
 
-- [ ] T071 [P] [US2] Implement DocumentMapBuilder in `src/Spectra.CLI/Source/DocumentMapBuilder.cs`
-- [ ] T072 [P] [US2] Implement SourceDocumentReader (load doc content with truncation) in `src/Spectra.CLI/Source/SourceDocumentReader.cs`
-- [ ] T073 [US2] Implement DocumentSearcher (keyword search across docs) in `src/Spectra.CLI/Source/DocumentSearcher.cs`
+- [X] T071 [P] [US2] Implement DocumentMapBuilder in `src/Spectra.CLI/Source/DocumentMapBuilder.cs`
+- [X] T072 [P] [US2] Implement SourceDocumentReader (load doc content with truncation) in `src/Spectra.CLI/Source/SourceDocumentReader.cs`
+- [X] T073 [US2] Implement DocumentSearcher (keyword search across docs) in `src/Spectra.CLI/Source/DocumentSearcher.cs`
 
 ### AI Agent Tools
 
 - [ ] T074 Add GitHub.Copilot.SDK and Microsoft.Extensions.AI NuGet packages
-- [ ] T075 [P] [US2] Implement get_document_map tool in `src/Spectra.CLI/Agent/Tools/GetDocumentMapTool.cs`
-- [ ] T076 [P] [US2] Implement load_source_document tool in `src/Spectra.CLI/Agent/Tools/LoadSourceDocumentTool.cs`
-- [ ] T077 [P] [US2] Implement search_source_docs tool in `src/Spectra.CLI/Agent/Tools/SearchSourceDocsTool.cs`
-- [ ] T078 [P] [US2] Implement read_test_index tool in `src/Spectra.CLI/Agent/Tools/ReadTestIndexTool.cs`
-- [ ] T079 [P] [US2] Implement get_next_test_ids tool in `src/Spectra.CLI/Agent/Tools/GetNextTestIdsTool.cs`
-- [ ] T080 [P] [US2] Implement check_duplicates_batch tool in `src/Spectra.CLI/Agent/Tools/CheckDuplicatesBatchTool.cs`
-- [ ] T081 [P] [US2] Implement batch_write_tests tool in `src/Spectra.CLI/Agent/Tools/BatchWriteTestsTool.cs`
-- [ ] T082 [US2] Create ToolRegistry (register all tools) in `src/Spectra.CLI/Agent/Tools/ToolRegistry.cs`
+- [X] T075 [P] [US2] Implement get_document_map tool in `src/Spectra.CLI/Agent/Tools/GetDocumentMapTool.cs`
+- [X] T076 [P] [US2] Implement load_source_document tool in `src/Spectra.CLI/Agent/Tools/LoadSourceDocumentTool.cs`
+- [X] T077 [P] [US2] Implement search_source_docs tool in `src/Spectra.CLI/Agent/Tools/SearchSourceDocsTool.cs`
+- [X] T078 [P] [US2] Implement read_test_index tool in `src/Spectra.CLI/Agent/Tools/ReadTestIndexTool.cs`
+- [X] T079 [P] [US2] Implement get_next_test_ids tool in `src/Spectra.CLI/Agent/Tools/GetNextTestIdsTool.cs`
+- [X] T080 [P] [US2] Implement check_duplicates_batch tool in `src/Spectra.CLI/Agent/Tools/CheckDuplicatesBatchTool.cs`
+- [X] T081 [P] [US2] Implement batch_write_tests tool in `src/Spectra.CLI/Agent/Tools/BatchWriteTestsTool.cs`
+- [X] T082 [US2] Create ToolRegistry (register all tools) in `src/Spectra.CLI/Agent/Tools/ToolRegistry.cs`
 
 ### Test Generation Core
 
-- [ ] T083 [US2] Implement DuplicateDetector (title/step similarity) in `src/Spectra.Core/Validation/DuplicateDetector.cs`
-- [ ] T084 [US2] Implement TestIdAllocator (sequential IDs) in `src/Spectra.Core/Index/TestIdAllocator.cs`
-- [ ] T085 [US2] Implement TestCaseWriter (write test Markdown files) in `src/Spectra.CLI/IO/TestCaseWriter.cs`
-- [ ] T086 [US2] Implement PendingTestQueue (hold tests for review) in `src/Spectra.CLI/Review/PendingTestQueue.cs`
+- [X] T083 [US2] Implement DuplicateDetector (title/step similarity) in `src/Spectra.Core/Validation/DuplicateDetector.cs`
+- [X] T084 [US2] Implement TestIdAllocator (sequential IDs) in `src/Spectra.Core/Index/TestIdAllocator.cs`
+- [X] T085 [US2] Implement TestCaseWriter (write test Markdown files) in `src/Spectra.CLI/IO/TestFileWriter.cs`
+- [X] T086 [US2] Implement PendingTestQueue (hold tests for review) in `src/Spectra.CLI/Review/PendingTestQueue.cs`
 
 ### AI Session Management
 
-- [ ] T087 [US2] Implement CopilotSessionFactory in `src/Spectra.CLI/Agent/CopilotSessionFactory.cs`
-- [ ] T088 [US2] Implement SkillLoader (load SKILL.md) in `src/Spectra.CLI/Agent/Skills/SkillLoader.cs`
+- [X] T087 [US2] Implement CopilotSessionFactory in `src/Spectra.CLI/Agent/AgentFactory.cs`
+- [X] T088 [US2] Implement SkillLoader (load SKILL.md) in `src/Spectra.CLI/Agent/Skills/SkillLoader.cs`
 
 ### Lock File Support
 
-- [ ] T089 [US2] Implement LockManager (acquire, release, expire) in `src/Spectra.CLI/IO/LockManager.cs`
+- [X] T089 [US2] Implement LockManager (acquire, release, expire) in `src/Spectra.CLI/IO/LockManager.cs`
 
 ### Interactive Review UI
 
-- [ ] T090 Add Spectre.Console NuGet package
-- [ ] T091 [US2] Implement ReviewPresenter (show summary, options) in `src/Spectra.CLI/Review/ReviewPresenter.cs`
-- [ ] T092 [US2] Implement TestReviewer (one-by-one review flow) in `src/Spectra.CLI/Review/TestReviewer.cs`
-- [ ] T093 [US2] Implement StreamingRenderer (display AI streaming output) in `src/Spectra.CLI/Review/StreamingRenderer.cs`
+- [X] T090 Add Spectre.Console NuGet package
+- [X] T091 [US2] Implement ReviewPresenter (show summary, options) in `src/Spectra.CLI/Review/ReviewPresenter.cs`
+- [X] T092 [US2] Implement TestReviewer (one-by-one review flow) in `src/Spectra.CLI/Review/TestReviewer.cs`
+- [X] T093 [US2] Implement StreamingRenderer (display AI streaming output) in `src/Spectra.CLI/Review/StreamingRenderer.cs`
 
 ### Generate Command
 
-- [ ] T094 [US2] Implement GenerateHandler (orchestrate full flow) in `src/Spectra.CLI/Commands/Generate/GenerateHandler.cs`
-- [ ] T095 [US2] Implement GenerateCommand with all options in `src/Spectra.CLI/Commands/Generate/GenerateCommand.cs`
-- [ ] T096 [US2] Create AiCommand parent (groups ai subcommands) in `src/Spectra.CLI/Commands/Ai/AiCommand.cs`
-- [ ] T097 [US2] Add ai generate command to Program.cs
+- [X] T094 [US2] Implement GenerateHandler (orchestrate full flow) in `src/Spectra.CLI/Commands/Generate/GenerateHandler.cs`
+- [X] T095 [US2] Implement GenerateCommand with all options in `src/Spectra.CLI/Commands/Generate/GenerateCommand.cs`
+- [X] T096 [US2] Create AiCommand parent (groups ai subcommands) in `src/Spectra.CLI/Commands/Ai/AiCommand.cs`
+- [X] T097 [US2] Add ai generate command to Program.cs
 
 **Checkpoint**: User Story 2 complete - core value proposition works
 
@@ -243,21 +243,21 @@ Based on plan.md structure:
 
 ### Tests for User Story 5
 
-- [ ] T098 [P] [US5] Write unit tests for TestClassifier in `tests/Spectra.Core.Tests/Update/TestClassifierTests.cs`
-- [ ] T099 [P] [US5] Write integration test for update command in `tests/Spectra.CLI.Tests/Commands/UpdateCommandTests.cs`
+- [X] T098 [P] [US5] Write unit tests for TestClassifier in `tests/Spectra.Core.Tests/Update/TestClassifierTests.cs`
+- [X] T099 [P] [US5] Write integration test for update command in `tests/Spectra.CLI.Tests/Commands/UpdateCommandTests.cs`
 
 ### Implementation for User Story 5
 
-- [ ] T100 [P] [US5] Create UpdateClassification enum (UP_TO_DATE, OUTDATED, ORPHANED, REDUNDANT) in `src/Spectra.Core/Models/UpdateClassification.cs`
-- [ ] T101 [P] [US5] Create UpdateProposal record in `src/Spectra.Core/Models/UpdateProposal.cs`
-- [ ] T102 [US5] Implement batch_read_tests tool in `src/Spectra.CLI/Agent/Tools/BatchReadTestsTool.cs`
-- [ ] T103 [US5] Implement batch_propose_updates tool in `src/Spectra.CLI/Agent/Tools/BatchProposeUpdatesTool.cs`
-- [ ] T104 [US5] Implement TestClassifier (compare tests vs docs) in `src/Spectra.Core/Update/TestClassifier.cs`
-- [ ] T105 [US5] Implement DiffPresenter (show test changes) in `src/Spectra.CLI/Review/DiffPresenter.cs`
-- [ ] T106 [US5] Implement UpdateReviewer (batch update review flow) in `src/Spectra.CLI/Review/UpdateReviewer.cs`
-- [ ] T107 [US5] Implement UpdateHandler in `src/Spectra.CLI/Commands/Update/UpdateHandler.cs`
-- [ ] T108 [US5] Implement UpdateCommand with --all, --diff options in `src/Spectra.CLI/Commands/Update/UpdateCommand.cs`
-- [ ] T109 [US5] Add ai update command to Program.cs
+- [X] T100 [P] [US5] Create UpdateClassification enum (UP_TO_DATE, OUTDATED, ORPHANED, REDUNDANT) in `src/Spectra.Core/Models/UpdateClassification.cs`
+- [X] T101 [P] [US5] Create UpdateProposal record in `src/Spectra.Core/Models/UpdateProposal.cs`
+- [X] T102 [US5] Implement batch_read_tests tool in `src/Spectra.CLI/Agent/Tools/BatchReadTestsTool.cs`
+- [X] T103 [US5] Implement batch_propose_updates tool in `src/Spectra.CLI/Agent/Tools/BatchProposeUpdatesTool.cs`
+- [X] T104 [US5] Implement TestClassifier (compare tests vs docs) in `src/Spectra.Core/Update/TestClassifier.cs`
+- [X] T105 [US5] Implement DiffPresenter (show test changes) in `src/Spectra.CLI/Review/DiffPresenter.cs`
+- [X] T106 [US5] Implement UpdateReviewer (batch update review flow) in `src/Spectra.CLI/Review/UpdateReviewer.cs`
+- [X] T107 [US5] Implement UpdateHandler in `src/Spectra.CLI/Commands/Update/UpdateHandler.cs`
+- [X] T108 [US5] Implement UpdateCommand with --all, --diff options in `src/Spectra.CLI/Commands/Update/UpdateCommand.cs`
+- [X] T109 [US5] Add ai update command to Program.cs
 
 **Checkpoint**: User Story 5 complete - tests can be synced with documentation
 
@@ -271,15 +271,15 @@ Based on plan.md structure:
 
 ### Tests for User Story 7
 
-- [ ] T110 [P] [US7] Write unit tests for ProviderChain in `tests/Spectra.CLI.Tests/Provider/ProviderChainTests.cs`
+- [X] T110 [P] [US7] Write unit tests for ProviderChain in `tests/Spectra.CLI.Tests/Provider/ProviderChainTests.cs`
 
 ### Implementation for User Story 7
 
-- [ ] T111 [P] [US7] Implement ProviderResolver (select provider from config) in `src/Spectra.CLI/Provider/ProviderResolver.cs`
-- [ ] T112 [US7] Implement ProviderChain (fallback logic) in `src/Spectra.CLI/Provider/ProviderChain.cs`
-- [ ] T113 [US7] Implement RecoverableErrorDetector (rate limit, quota, auth) in `src/Spectra.CLI/Provider/RecoverableErrorDetector.cs`
-- [ ] T114 [US7] Update CopilotSessionFactory to use ProviderChain
-- [ ] T115 [US7] Add --provider flag to all AI commands
+- [X] T111 [P] [US7] Implement ProviderResolver (select provider from config) in `src/Spectra.CLI/Provider/ProviderResolver.cs`
+- [X] T112 [US7] Implement ProviderChain (fallback logic) in `src/Spectra.CLI/Provider/ProviderChain.cs`
+- [X] T113 [US7] Implement RecoverableErrorDetector (rate limit, quota, auth) in `src/Spectra.CLI/Provider/RecoverableErrorDetector.cs`
+- [X] T114 [US7] Update CopilotSessionFactory to use ProviderChain
+- [X] T115 [US7] Add --provider flag to all AI commands
 
 **Checkpoint**: User Story 7 complete - multi-provider fallback works
 
@@ -293,15 +293,15 @@ Based on plan.md structure:
 
 ### Tests for User Story 6
 
-- [ ] T116 [P] [US6] Write integration test for analyze command in `tests/Spectra.CLI.Tests/Commands/AnalyzeCommandTests.cs`
+- [X] T116 [P] [US6] Write integration test for analyze command in `tests/Spectra.CLI.Tests/Commands/AnalyzeCommandTests.cs`
 
 ### Implementation for User Story 6
 
-- [ ] T117 [P] [US6] Create CoverageReport record in `src/Spectra.Core/Models/CoverageReport.cs`
-- [ ] T118 [US6] Implement AnalyzeHandler in `src/Spectra.CLI/Commands/Analyze/AnalyzeHandler.cs`
-- [ ] T119 [US6] Implement AnalyzeCommand with --format, --output options in `src/Spectra.CLI/Commands/Analyze/AnalyzeCommand.cs`
-- [ ] T120 [US6] Implement ReportWriter (markdown, JSON formats) in `src/Spectra.CLI/IO/ReportWriter.cs`
-- [ ] T121 [US6] Add ai analyze command to Program.cs
+- [X] T117 [P] [US6] Create CoverageReport record in `src/Spectra.Core/Models/CoverageReport.cs`
+- [X] T118 [US6] Implement AnalyzeHandler in `src/Spectra.CLI/Commands/Analyze/AnalyzeHandler.cs`
+- [X] T119 [US6] Implement AnalyzeCommand with --format, --output options in `src/Spectra.CLI/Commands/Analyze/AnalyzeCommand.cs`
+- [X] T120 [US6] Implement ReportWriter (markdown, JSON formats) in `src/Spectra.CLI/IO/ReportWriter.cs`
+- [X] T121 [US6] Add ai analyze command to Program.cs
 
 **Checkpoint**: User Story 6 complete - coverage analysis available
 
@@ -313,13 +313,13 @@ Based on plan.md structure:
 
 ### Implementation
 
-- [ ] T122 [P] Implement ListHandler in `src/Spectra.CLI/Commands/List/ListHandler.cs`
-- [ ] T123 [P] Implement ListCommand in `src/Spectra.CLI/Commands/List/ListCommand.cs`
-- [ ] T124 [P] Implement ShowHandler in `src/Spectra.CLI/Commands/Show/ShowHandler.cs`
-- [ ] T125 [P] Implement ShowCommand with <test-id> argument in `src/Spectra.CLI/Commands/Show/ShowCommand.cs`
-- [ ] T126 [P] Implement ConfigHandler in `src/Spectra.CLI/Commands/Config/ConfigHandler.cs`
-- [ ] T127 [P] Implement ConfigCommand in `src/Spectra.CLI/Commands/Config/ConfigCommand.cs`
-- [ ] T128 Add list, show, config commands to Program.cs
+- [X] T122 [P] Implement ListHandler in `src/Spectra.CLI/Commands/List/ListHandler.cs`
+- [X] T123 [P] Implement ListCommand in `src/Spectra.CLI/Commands/List/ListCommand.cs`
+- [X] T124 [P] Implement ShowHandler in `src/Spectra.CLI/Commands/Show/ShowHandler.cs`
+- [X] T125 [P] Implement ShowCommand with <test-id> argument in `src/Spectra.CLI/Commands/Show/ShowCommand.cs`
+- [X] T126 [P] Implement ConfigHandler in `src/Spectra.CLI/Commands/Config/ConfigHandler.cs`
+- [X] T127 [P] Implement ConfigCommand in `src/Spectra.CLI/Commands/Config/ConfigCommand.cs`
+- [X] T128 Add list, show, config commands to Program.cs
 
 ---
 

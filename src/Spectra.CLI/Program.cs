@@ -1,7 +1,10 @@
 using System.CommandLine;
-using Spectra.CLI.Commands.Generate;
+using Spectra.CLI.Commands.Ai;
+using Spectra.CLI.Commands.Config;
 using Spectra.CLI.Commands.Index;
 using Spectra.CLI.Commands.Init;
+using Spectra.CLI.Commands.List;
+using Spectra.CLI.Commands.Show;
 using Spectra.CLI.Commands.Validate;
 using Spectra.CLI.Options;
 
@@ -35,11 +38,10 @@ public class Program
         rootCommand.AddCommand(InitCommand.Create());
         rootCommand.AddCommand(new ValidateCommand());
         rootCommand.AddCommand(new IndexCommand());
-        rootCommand.AddCommand(new GenerateCommand());
-        // rootCommand.AddCommand(ListCommand.Create());
-        // rootCommand.AddCommand(ShowCommand.Create());
-        // rootCommand.AddCommand(ConfigCommand.Create());
-        // rootCommand.AddCommand(AiCommand.Create());
+        rootCommand.AddCommand(AiCommand.Create());
+        rootCommand.AddCommand(new ListCommand());
+        rootCommand.AddCommand(new ShowCommand());
+        rootCommand.AddCommand(new ConfigCommand());
 
         return rootCommand;
     }

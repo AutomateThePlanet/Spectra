@@ -24,6 +24,24 @@ public static class AgentFactory
     }
 
     /// <summary>
+    /// Creates an agent from a specific provider configuration.
+    /// </summary>
+    public static IAgentRuntime CreateFromProvider(ProviderConfig provider)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+
+        return provider.Name.ToLowerInvariant() switch
+        {
+            "github-copilot" or "copilot" => new CopilotAgent(new AiConfig
+            {
+                Providers = [provider]
+            }),
+            "mock" => new MockAgent(),
+            _ => new MockAgent() // Default to mock for unknown providers
+        };
+    }
+
+    /// <summary>
     /// Gets all available provider names.
     /// </summary>
     public static IReadOnlyList<string> GetAvailableProviders()

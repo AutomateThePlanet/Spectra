@@ -1,0 +1,123 @@
+using System.Text.Json;
+using Spectra.CLI.Infrastructure;
+using Spectra.Core.Index;
+using Spectra.Core.Models.Config;
+
+namespace Spectra.CLI.Commands.List;
+
+/// <summary>
+/// Handles the list command execution.
+/// </summary>
+public sealed class ListHandler
+{
+    private readonly VerbosityLevel _verbosity;
+
+    public ListHandler(VerbosityLevel verbosity = VerbosityLevel.Normal)
+    {
+        _verbosity = verbosity;
+    }
+
+    /// <summary>
+    /// Executes the list command.
+    /// </summary>
+    public async Task<int> ExecuteAsync(
+        string? suite,
+        bool showAll,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var basePath = Directory.GetCurrentDirectory();
+            var configPath = Path.Combine(basePath, "spectra.config.json");
+
+            // Load configuration
+            SpectraConfig? config = null;
+            if (File.Exists(configPath))
+            {
+                var configJson = await File.ReadAllTextAsync(configPath, ct);
+                config = JsonSerializer.Deserialize<SpectraConfig>(configJson, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            }
+
+            var testsDir = Path.Combine(basePath, config?.Tests?.Dir ?? "tests");
+
+            if (!Directory.Exists(testsDir))
+            {
+                Console.Error.WriteLine($"Tests directory not found: {testsDir}");
+                Console.Error.WriteLine("Run 'spectra init' first.");
+                return ExitCodes.Error;
+            }
+
+            var indexReader = new IndexWriter();
+
+            // Get suites to list
+            var suiteDirs = suite is not null
+                ? new[] { Path.Combine(testsDir, suite) }.Where(Directory.Exists).ToList()
+                : Directory.GetDirectories(testsDir)
+                    .Where(d => !Path.GetFileName(d).StartsWith("_"))
+                    .ToList();
+
+            if (suiteDirs.Count == 0)
+            {
+                if (suite is not null)
+                {
+                    Console.Error.WriteLine($"Suite not found: {suite}");
+                    return ExitCodes.Error;
+                }
+                Console.WriteLine("No test suites found.");
+                return ExitCodes.Success;
+            }
+
+            var totalTests = 0;
+
+            foreach (var suiteDir in suiteDirs)
+            {
+                var suiteName = Path.GetFileName(suiteDir);
+                var indexPath = IndexWriter.GetIndexPath(suiteDir);
+
+                if (!File.Exists(indexPath))
+                {
+                    Console.WriteLine($"{suiteName}/ (no index - run 'spectra index')");
+                    continue;
+                }
+
+                var index = await indexReader.ReadAsync(indexPath, ct);
+                if (index is null)
+                {
+                    Console.WriteLine($"{suiteName}/ (invalid index)");
+                    continue;
+                }
+
+                Console.WriteLine($"{suiteName}/ ({index.TestCount} tests)");
+
+                if (showAll || _verbosity >= VerbosityLevel.Detailed)
+                {
+                    foreach (var test in index.Tests)
+                    {
+                        var priority = test.Priority.ToString().ToLowerInvariant();
+                        Console.WriteLine($"  {test.Id}: {test.Title} [{priority}]");
+                    }
+                }
+
+                totalTests += index.TestCount;
+            }
+
+            Console.WriteLine();
+            Console.WriteLine($"Total: {totalTests} test(s) in {suiteDirs.Count} suite(s)");
+
+            return ExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine("\nOperation cancelled.");
+            return ExitCodes.Cancelled;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            return ExitCodes.Error;
+        }
+    }
+}
