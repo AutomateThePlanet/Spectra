@@ -26,15 +26,15 @@ Based on plan.md structure:
 
 **Purpose**: Project initialization and .NET solution structure
 
-- [ ] T001 Create .NET solution file at `Spectra.sln`
-- [ ] T002 [P] Create Spectra.Core class library project at `src/Spectra.Core/Spectra.Core.csproj`
-- [ ] T003 [P] Create Spectra.CLI console project at `src/Spectra.CLI/Spectra.CLI.csproj`
-- [ ] T004 [P] Create Spectra.Core.Tests xUnit project at `tests/Spectra.Core.Tests/Spectra.Core.Tests.csproj`
-- [ ] T005 [P] Create Spectra.CLI.Tests xUnit project at `tests/Spectra.CLI.Tests/Spectra.CLI.Tests.csproj`
-- [ ] T006 Add NuGet dependencies: System.CommandLine, Markdig, YamlDotNet, Microsoft.Extensions.Logging
-- [ ] T007 [P] Create TestFixtures folder with sample docs at `tests/TestFixtures/docs/`
-- [ ] T008 [P] Create TestFixtures folder with sample tests at `tests/TestFixtures/tests/`
-- [ ] T009 Configure .editorconfig and Directory.Build.props for nullable reference types and C# 12
+- [X] T001 Create .NET solution file at `Spectra.sln`
+- [X] T002 [P] Create Spectra.Core class library project at `src/Spectra.Core/Spectra.Core.csproj`
+- [X] T003 [P] Create Spectra.CLI console project at `src/Spectra.CLI/Spectra.CLI.csproj`
+- [X] T004 [P] Create Spectra.Core.Tests xUnit project at `tests/Spectra.Core.Tests/Spectra.Core.Tests.csproj`
+- [X] T005 [P] Create Spectra.CLI.Tests xUnit project at `tests/Spectra.CLI.Tests/Spectra.CLI.Tests.csproj`
+- [X] T006 Add NuGet dependencies: System.CommandLine, Markdig, YamlDotNet, Microsoft.Extensions.Logging
+- [X] T007 [P] Create TestFixtures folder with sample docs at `tests/TestFixtures/docs/`
+- [X] T008 [P] Create TestFixtures folder with sample tests at `tests/TestFixtures/tests/`
+- [X] T009 Configure .editorconfig and Directory.Build.props for nullable reference types and C# 12
 
 ---
 
@@ -46,51 +46,51 @@ Based on plan.md structure:
 
 ### Core Models
 
-- [ ] T010 [P] Create Priority enum in `src/Spectra.Core/Models/Priority.cs`
-- [ ] T011 [P] Create ParseError record in `src/Spectra.Core/Models/ParseError.cs`
-- [ ] T012 [P] Create ParseResult<T> types in `src/Spectra.Core/Models/ParseResult.cs`
-- [ ] T013 [P] Create ValidationError and ValidationWarning records in `src/Spectra.Core/Models/ValidationResult.cs`
-- [ ] T014 [P] Create ValidationResult record in `src/Spectra.Core/Models/ValidationResult.cs`
-- [ ] T015 Create TestCaseFrontmatter class (YamlDotNet DTO) in `src/Spectra.Core/Models/TestCaseFrontmatter.cs`
-- [ ] T016 Create TestCase class in `src/Spectra.Core/Models/TestCase.cs`
-- [ ] T017 [P] Create TestIndexEntry record in `src/Spectra.Core/Models/TestIndexEntry.cs`
-- [ ] T018 [P] Create MetadataIndex record in `src/Spectra.Core/Models/MetadataIndex.cs`
-- [ ] T019 [P] Create TestSuite class in `src/Spectra.Core/Models/TestSuite.cs`
-- [ ] T020 [P] Create DocumentEntry record in `src/Spectra.Core/Models/DocumentEntry.cs`
-- [ ] T021 [P] Create DocumentMap record in `src/Spectra.Core/Models/DocumentMap.cs`
+- [X] T010 [P] Create Priority enum in `src/Spectra.Core/Models/Priority.cs`
+- [X] T011 [P] Create ParseError record in `src/Spectra.Core/Models/ParseError.cs`
+- [X] T012 [P] Create ParseResult<T> types in `src/Spectra.Core/Models/ParseResult.cs`
+- [X] T013 [P] Create ValidationError and ValidationWarning records in `src/Spectra.Core/Models/ValidationResult.cs`
+- [X] T014 [P] Create ValidationResult record in `src/Spectra.Core/Models/ValidationResult.cs`
+- [X] T015 Create TestCaseFrontmatter class (YamlDotNet DTO) in `src/Spectra.Core/Models/TestCaseFrontmatter.cs`
+- [X] T016 Create TestCase class in `src/Spectra.Core/Models/TestCase.cs`
+- [X] T017 [P] Create TestIndexEntry record in `src/Spectra.Core/Models/TestIndexEntry.cs`
+- [X] T018 [P] Create MetadataIndex record in `src/Spectra.Core/Models/MetadataIndex.cs`
+- [X] T019 [P] Create TestSuite class in `src/Spectra.Core/Models/TestSuite.cs`
+- [X] T020 [P] Create DocumentEntry record in `src/Spectra.Core/Models/DocumentEntry.cs`
+- [X] T021 [P] Create DocumentMap record in `src/Spectra.Core/Models/DocumentMap.cs`
 
 ### Configuration Models
 
-- [ ] T022 [P] Create SourceConfig class in `src/Spectra.Core/Models/Config/SourceConfig.cs`
-- [ ] T023 [P] Create TestsConfig class in `src/Spectra.Core/Models/Config/TestsConfig.cs`
-- [ ] T024 [P] Create ProviderConfig class in `src/Spectra.Core/Models/Config/ProviderConfig.cs`
-- [ ] T025 [P] Create AiConfig class in `src/Spectra.Core/Models/Config/AiConfig.cs`
-- [ ] T026 [P] Create GenerationConfig class in `src/Spectra.Core/Models/Config/GenerationConfig.cs`
-- [ ] T027 [P] Create ValidationConfig class in `src/Spectra.Core/Models/Config/ValidationConfig.cs`
-- [ ] T028 [P] Create SuiteConfig class in `src/Spectra.Core/Models/Config/SuiteConfig.cs`
-- [ ] T029 [P] Create GitConfig class in `src/Spectra.Core/Models/Config/GitConfig.cs`
-- [ ] T030 Create SpectraConfig root class in `src/Spectra.Core/Models/Config/SpectraConfig.cs`
+- [X] T022 [P] Create SourceConfig class in `src/Spectra.Core/Models/Config/SourceConfig.cs`
+- [X] T023 [P] Create TestsConfig class in `src/Spectra.Core/Models/Config/TestsConfig.cs`
+- [X] T024 [P] Create ProviderConfig class in `src/Spectra.Core/Models/Config/ProviderConfig.cs`
+- [X] T025 [P] Create AiConfig class in `src/Spectra.Core/Models/Config/AiConfig.cs`
+- [X] T026 [P] Create GenerationConfig class in `src/Spectra.Core/Models/Config/GenerationConfig.cs`
+- [X] T027 [P] Create ValidationConfig class in `src/Spectra.Core/Models/Config/ValidationConfig.cs`
+- [X] T028 [P] Create SuiteConfig class in `src/Spectra.Core/Models/Config/SuiteConfig.cs`
+- [X] T029 [P] Create GitConfig class in `src/Spectra.Core/Models/Config/GitConfig.cs`
+- [X] T030 Create SpectraConfig root class in `src/Spectra.Core/Models/Config/SpectraConfig.cs`
 
 ### Core Parsing
 
-- [ ] T031 Implement MarkdownFrontmatterParser (extract YAML, return ParseResult) in `src/Spectra.Core/Parsing/MarkdownFrontmatterParser.cs`
-- [ ] T032 Implement TestCaseParser (parse full test file to TestCase) in `src/Spectra.Core/Parsing/TestCaseParser.cs`
-- [ ] T033 Implement DocumentMapExtractor (extract headings, preview) in `src/Spectra.Core/Parsing/DocumentMapExtractor.cs`
-- [ ] T034 Write unit tests for MarkdownFrontmatterParser in `tests/Spectra.Core.Tests/Parsing/MarkdownFrontmatterParserTests.cs`
-- [ ] T035 Write unit tests for TestCaseParser in `tests/Spectra.Core.Tests/Parsing/TestCaseParserTests.cs`
+- [X] T031 Implement MarkdownFrontmatterParser (extract YAML, return ParseResult) in `src/Spectra.Core/Parsing/MarkdownFrontmatterParser.cs`
+- [X] T032 Implement TestCaseParser (parse full test file to TestCase) in `src/Spectra.Core/Parsing/TestCaseParser.cs`
+- [X] T033 Implement DocumentMapExtractor (extract headings, preview) in `src/Spectra.Core/Parsing/DocumentMapExtractor.cs`
+- [X] T034 Write unit tests for MarkdownFrontmatterParser in `tests/Spectra.Core.Tests/Parsing/MarkdownFrontmatterParserTests.cs`
+- [X] T035 Write unit tests for TestCaseParser in `tests/Spectra.Core.Tests/Parsing/TestCaseParserTests.cs`
 
 ### Configuration Loading
 
-- [ ] T036 Implement ConfigLoader (load spectra.config.json) in `src/Spectra.Core/Config/ConfigLoader.cs`
-- [ ] T037 Write unit tests for ConfigLoader in `tests/Spectra.Core.Tests/Config/ConfigLoaderTests.cs`
+- [X] T036 Implement ConfigLoader (load spectra.config.json) in `src/Spectra.Core/Config/ConfigLoader.cs`
+- [X] T037 Write unit tests for ConfigLoader in `tests/Spectra.Core.Tests/Config/ConfigLoaderTests.cs`
 
 ### CLI Infrastructure
 
-- [ ] T038 Create GlobalOptions class (verbosity, dry-run, no-review) in `src/Spectra.CLI/Options/GlobalOptions.cs`
-- [ ] T039 Create ExitCodes class (0 success, 1 error, 130 cancelled) in `src/Spectra.CLI/Infrastructure/ExitCodes.cs`
-- [ ] T040 Create VerbosityLevel enum in `src/Spectra.CLI/Infrastructure/VerbosityLevel.cs`
-- [ ] T041 Create RootCommand with global options in `src/Spectra.CLI/Program.cs`
-- [ ] T042 Setup Microsoft.Extensions.Logging with verbosity support in `src/Spectra.CLI/Infrastructure/LoggingSetup.cs`
+- [X] T038 Create GlobalOptions class (verbosity, dry-run, no-review) in `src/Spectra.CLI/Options/GlobalOptions.cs`
+- [X] T039 Create ExitCodes class (0 success, 1 error, 130 cancelled) in `src/Spectra.CLI/Infrastructure/ExitCodes.cs`
+- [X] T040 Create VerbosityLevel enum in `src/Spectra.CLI/Infrastructure/VerbosityLevel.cs`
+- [X] T041 Create RootCommand with global options in `src/Spectra.CLI/Program.cs`
+- [X] T042 Setup Microsoft.Extensions.Logging with verbosity support in `src/Spectra.CLI/Infrastructure/LoggingSetup.cs`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 
@@ -104,15 +104,15 @@ Based on plan.md structure:
 
 ### Tests for User Story 1
 
-- [ ] T043 [P] [US1] Write integration test for init command in `tests/Spectra.CLI.Tests/Commands/InitCommandTests.cs`
+- [X] T043 [P] [US1] Write integration test for init command in `tests/Spectra.CLI.Tests/Commands/InitCommandTests.cs`
 
 ### Implementation for User Story 1
 
-- [ ] T044 [US1] Create default spectra.config.json template in `src/Spectra.CLI/Templates/spectra.config.json`
-- [ ] T045 [US1] Create default SKILL.md template in `src/Spectra.CLI/Templates/test-generation-skill.md`
-- [ ] T046 [US1] Implement InitHandler (create folders, config, skill) in `src/Spectra.CLI/Commands/Init/InitHandler.cs`
-- [ ] T047 [US1] Implement InitCommand with --force option in `src/Spectra.CLI/Commands/Init/InitCommand.cs`
-- [ ] T048 [US1] Add init command to Program.cs root command registration
+- [X] T044 [US1] Create default spectra.config.json template in `src/Spectra.CLI/Templates/spectra.config.json`
+- [X] T045 [US1] Create default SKILL.md template in `src/Spectra.CLI/Templates/test-generation-skill.md`
+- [X] T046 [US1] Implement InitHandler (create folders, config, skill) in `src/Spectra.CLI/Commands/Init/InitHandler.cs`
+- [X] T047 [US1] Implement InitCommand with --force option in `src/Spectra.CLI/Commands/Init/InitCommand.cs`
+- [X] T048 [US1] Add init command to Program.cs root command registration
 
 **Checkpoint**: User Story 1 complete - `spectra init` works independently
 

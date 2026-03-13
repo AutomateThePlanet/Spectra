@@ -12,7 +12,18 @@
       "WebFetch(domain:nikiforovall.blog)",
       "WebFetch(domain:www.devleader.ca)",
       "WebFetch(domain:deepwiki.com)",
-      "Bash(.specify/scripts/bash/update-agent-context.sh:*)"
+      "Bash(.specify/scripts/bash/update-agent-context.sh:*)",
+      "Bash(bash:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(dotnet new:*)",
+      "Bash(dotnet sln:*)",
+      "Bash(dotnet sln add:*)",
+      "Bash(dotnet add:*)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet list:*)",
+      "Bash(dotnet remove:*)",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet run:*)"
     ]
   }
 }

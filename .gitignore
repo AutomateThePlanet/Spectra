@@ -28,6 +28,9 @@ packages/
 # Test results
 TestResults/
 
+# SPECTRA lock files
+.spectra.lock
+
 # Node (for runner-ui)
 node_modules/
 dist/
