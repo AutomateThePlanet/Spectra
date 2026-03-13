@@ -26,7 +26,12 @@
       "Bash(dotnet run:*)",
       "Bash(ls -la \"C:\\\\SourceCode\\\\Spectra\\\\src\\\\Spectra.CLI\"\" | grep -E \"^d \")",
       "Bash(ls -la \"C:\\\\SourceCode\\\\Spectra\\\\src\\\\Spectra.Core\"\" | grep -E \"^d \")",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(Get-ChildItem -Path \"C:\\\\SourceCode\\\\Spectra\\\\TestResults\" -Recurse -Filter \"coverage.cobertura.xml\")",
+      "Bash(Get-Content $_ -Raw)",
+      "Bash(Select-String -Pattern 'line-rate=\"\"[^\"\"]+\"\"' -AllMatches)",
+      "Bash(ForEach-Object { $_Matches.Value })",
+      "Bash(Select-Object -First 5 })"
     ]
   }
 }

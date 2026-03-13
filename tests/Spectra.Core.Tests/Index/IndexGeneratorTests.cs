@@ -80,7 +80,7 @@ public class IndexGeneratorTests
         var entry = _generator.CreateEntry(test);
 
         Assert.Equal("TC-001", entry.Id);
-        Assert.Equal("TC-001.md", entry.File);
+        Assert.Equal("checkout/TC-001.md", entry.File);
         Assert.Equal("Test checkout", entry.Title);
         Assert.Equal("high", entry.Priority);
         Assert.Equal(["smoke", "checkout"], entry.Tags);

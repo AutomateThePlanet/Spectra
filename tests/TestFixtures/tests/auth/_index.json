@@ -1,0 +1,31 @@
+{
+  "suite": "auth",
+  "generated_at": "2026-03-13T12:00:00Z",
+  "test_count": 3,
+  "tests": [
+    {
+      "id": "TC-201",
+      "title": "Login with valid credentials",
+      "priority": "high",
+      "file": "auth/TC-201.md",
+      "tags": ["smoke", "auth"],
+      "source_refs": ["docs/features/auth/user-authentication.md"]
+    },
+    {
+      "id": "TC-202",
+      "title": "Login with invalid password",
+      "priority": "high",
+      "file": "auth/TC-202.md",
+      "tags": ["negative", "auth"],
+      "source_refs": ["docs/features/auth/user-authentication.md"]
+    },
+    {
+      "id": "TC-203",
+      "title": "Account lockout after failed attempts",
+      "priority": "medium",
+      "file": "auth/TC-203.md",
+      "tags": ["security", "auth"],
+      "source_refs": ["docs/features/auth/user-authentication.md"]
+    }
+  ]
+}

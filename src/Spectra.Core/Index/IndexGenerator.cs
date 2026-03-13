@@ -37,7 +37,7 @@ public sealed class IndexGenerator
         return new TestIndexEntry
         {
             Id = testCase.Id,
-            File = Path.GetFileName(testCase.FilePath),
+            File = testCase.FilePath,
             Title = testCase.Title,
             Priority = testCase.Priority.ToString().ToLowerInvariant(),
             Tags = testCase.Tags.ToList(),
