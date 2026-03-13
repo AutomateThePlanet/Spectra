@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.specify/scripts/bash/check-prerequisites.sh:*)",
+      "Bash(.specify/scripts/bash/setup-plan.sh:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:intellitect.com)",
+      "WebFetch(domain:khalidabuhakmeh.com)",
+      "WebFetch(domain:andrewlock.net)",
+      "WebFetch(domain:markheath.net)",
+      "WebFetch(domain:nikiforovall.blog)",
+      "WebFetch(domain:www.devleader.ca)",
+      "WebFetch(domain:deepwiki.com)",
+      "Bash(.specify/scripts/bash/update-agent-context.sh:*)"
+    ]
+  }
+}
