@@ -19,11 +19,11 @@
 
 **Purpose**: Project initialization and Spectra.MCP project structure
 
-- [ ] T001 Create Spectra.MCP project in src/Spectra.MCP/Spectra.MCP.csproj with ASP.NET Core dependencies
-- [ ] T002 Add project reference from Spectra.MCP to Spectra.Core in Spectra.slnx
-- [ ] T003 Create Spectra.MCP.Tests project in tests/Spectra.MCP.Tests/Spectra.MCP.Tests.csproj
-- [ ] T004 [P] Create directory structure: Server/, Tools/, Execution/, Storage/, Reports/, Identity/, Infrastructure/
-- [ ] T005 [P] Configure .gitignore for .execution/ directory and reports/ if not already present
+- [X] T001 Create Spectra.MCP project in src/Spectra.MCP/Spectra.MCP.csproj with ASP.NET Core dependencies
+- [X] T002 Add project reference from Spectra.MCP to Spectra.Core in Spectra.slnx
+- [X] T003 Create Spectra.MCP.Tests project in tests/Spectra.MCP.Tests/Spectra.MCP.Tests.csproj
+- [X] T004 [P] Create directory structure: Server/, Tools/, Execution/, Storage/, Reports/, Identity/, Infrastructure/
+- [X] T005 [P] Configure .gitignore for .execution/ directory and reports/ if not already present
 
 ---
 
@@ -35,43 +35,43 @@
 
 ### Core Models (in Spectra.Core)
 
-- [ ] T006 [P] Create RunStatus enum in src/Spectra.Core/Models/Execution/RunStatus.cs
-- [ ] T007 [P] Create TestStatus enum in src/Spectra.Core/Models/Execution/TestStatus.cs
-- [ ] T008 [P] Create Run model in src/Spectra.Core/Models/Execution/Run.cs
-- [ ] T009 [P] Create RunFilters record in src/Spectra.Core/Models/Execution/RunFilters.cs
-- [ ] T010 [P] Create TestResult model in src/Spectra.Core/Models/Execution/TestResult.cs
-- [ ] T011 [P] Create TestHandle static class in src/Spectra.Core/Models/Execution/TestHandle.cs
-- [ ] T012 [P] Create QueuedTest record in src/Spectra.Core/Models/Execution/QueuedTest.cs
-- [ ] T013 [P] Create McpToolResponse wrapper in src/Spectra.Core/Models/Execution/McpToolResponse.cs
-- [ ] T014 [P] Create ErrorInfo record in src/Spectra.Core/Models/Execution/ErrorInfo.cs
+- [X] T006 [P] Create RunStatus enum in src/Spectra.Core/Models/Execution/RunStatus.cs
+- [X] T007 [P] Create TestStatus enum in src/Spectra.Core/Models/Execution/TestStatus.cs
+- [X] T008 [P] Create Run model in src/Spectra.Core/Models/Execution/Run.cs
+- [X] T009 [P] Create RunFilters record in src/Spectra.Core/Models/Execution/RunFilters.cs
+- [X] T010 [P] Create TestResult model in src/Spectra.Core/Models/Execution/TestResult.cs
+- [X] T011 [P] Create TestHandle static class in src/Spectra.Core/Models/Execution/TestHandle.cs
+- [X] T012 [P] Create QueuedTest record in src/Spectra.Core/Models/Execution/QueuedTest.cs
+- [X] T013 [P] Create McpToolResponse wrapper in src/Spectra.Core/Models/Execution/McpToolResponse.cs
+- [X] T014 [P] Create ErrorInfo record in src/Spectra.Core/Models/Execution/ErrorInfo.cs
 
 ### SQLite Storage Infrastructure
 
-- [ ] T015 Create ExecutionDb class with connection management in src/Spectra.MCP/Storage/ExecutionDb.cs
-- [ ] T016 Implement schema initialization (runs, test_results tables) in src/Spectra.MCP/Storage/ExecutionDb.cs
-- [ ] T017 [P] Create RunRepository with CRUD operations in src/Spectra.MCP/Storage/RunRepository.cs
-- [ ] T018 [P] Create ResultRepository with CRUD operations in src/Spectra.MCP/Storage/ResultRepository.cs
+- [X] T015 Create ExecutionDb class with connection management in src/Spectra.MCP/Storage/ExecutionDb.cs
+- [X] T016 Implement schema initialization (runs, test_results tables) in src/Spectra.MCP/Storage/ExecutionDb.cs
+- [X] T017 [P] Create RunRepository with CRUD operations in src/Spectra.MCP/Storage/RunRepository.cs
+- [X] T018 [P] Create ResultRepository with CRUD operations in src/Spectra.MCP/Storage/ResultRepository.cs
 
 ### State Machine
 
-- [ ] T019 Create StateMachine class with transition validation in src/Spectra.MCP/Execution/StateMachine.cs
-- [ ] T020 Implement RunStatus transitions (Created→Running→Paused→Completed/Cancelled) in StateMachine.cs
-- [ ] T021 Implement TestStatus transitions (Pending→InProgress→Passed/Failed/Skipped/Blocked) in StateMachine.cs
+- [X] T019 Create StateMachine class with transition validation in src/Spectra.MCP/Execution/StateMachine.cs
+- [X] T020 Implement RunStatus transitions (Created→Running→Paused→Completed/Cancelled) in StateMachine.cs
+- [X] T021 Implement TestStatus transitions (Pending→InProgress→Passed/Failed/Skipped/Blocked) in StateMachine.cs
 
 ### MCP Server Infrastructure
 
-- [ ] T022 Create McpServer host with JSON-RPC handling in src/Spectra.MCP/Server/McpServer.cs
-- [ ] T023 Create McpProtocol for request/response parsing in src/Spectra.MCP/Server/McpProtocol.cs
-- [ ] T024 Create tool registration system in src/Spectra.MCP/Server/ToolRegistry.cs
-- [ ] T025 [P] Create UserIdentityResolver in src/Spectra.MCP/Identity/UserIdentityResolver.cs
-- [ ] T026 [P] Create McpConfig for configuration loading in src/Spectra.MCP/Infrastructure/McpConfig.cs
-- [ ] T027 [P] Create McpLogging with verbosity levels in src/Spectra.MCP/Infrastructure/McpLogging.cs
+- [X] T022 Create McpServer host with JSON-RPC handling in src/Spectra.MCP/Server/McpServer.cs
+- [X] T023 Create McpProtocol for request/response parsing in src/Spectra.MCP/Server/McpProtocol.cs
+- [X] T024 Create tool registration system in src/Spectra.MCP/Server/ToolRegistry.cs
+- [X] T025 [P] Create UserIdentityResolver in src/Spectra.MCP/Identity/UserIdentityResolver.cs
+- [X] T026 [P] Create McpConfig for configuration loading in src/Spectra.MCP/Infrastructure/McpConfig.cs
+- [X] T027 [P] Create McpLogging with verbosity levels in src/Spectra.MCP/Infrastructure/McpLogging.cs
 
 ### Foundational Tests
 
-- [ ] T028 [P] Create StateMachineTests in tests/Spectra.MCP.Tests/Execution/StateMachineTests.cs
-- [ ] T029 [P] Create TestHandleTests in tests/Spectra.MCP.Tests/Models/TestHandleTests.cs
-- [ ] T030 [P] Create ExecutionDbTests in tests/Spectra.MCP.Tests/Storage/ExecutionDbTests.cs
+- [X] T028 [P] Create StateMachineTests in tests/Spectra.MCP.Tests/Execution/StateMachineTests.cs
+- [X] T029 [P] Create TestHandleTests in tests/Spectra.MCP.Tests/Models/TestHandleTests.cs
+- [X] T030 [P] Create ExecutionDbTests in tests/Spectra.MCP.Tests/Storage/ExecutionDbTests.cs
 
 **Checkpoint**: Foundation ready - user story implementation can begin
 
@@ -93,28 +93,28 @@
 
 ### Core Execution Engine
 
-- [ ] T036 [US1] Create ExecutionEngine orchestrator in src/Spectra.MCP/Execution/ExecutionEngine.cs
-- [ ] T037 [US1] Create TestQueue with ordering logic in src/Spectra.MCP/Execution/TestQueue.cs
-- [ ] T038 [US1] Implement dependency ordering in TestQueue (by depends_on, priority, ID)
-- [ ] T039 [US1] Create DependencyResolver for cascade blocking in src/Spectra.MCP/Execution/DependencyResolver.cs
+- [X] T036 [US1] Create ExecutionEngine orchestrator in src/Spectra.MCP/Execution/ExecutionEngine.cs
+- [X] T037 [US1] Create TestQueue with ordering logic in src/Spectra.MCP/Execution/TestQueue.cs
+- [X] T038 [US1] Implement dependency ordering in TestQueue (by depends_on, priority, ID)
+- [X] T039 [US1] Create DependencyResolver for cascade blocking in src/Spectra.MCP/Execution/DependencyResolver.cs
 
 ### Run Management Tools (US1 subset)
 
-- [ ] T040 [US1] Implement start_execution_run tool in src/Spectra.MCP/Tools/RunManagement/StartExecutionRunTool.cs
-- [ ] T041 [US1] Implement get_execution_status tool in src/Spectra.MCP/Tools/RunManagement/GetExecutionStatusTool.cs
-- [ ] T042 [US1] Implement finalize_execution_run tool in src/Spectra.MCP/Tools/RunManagement/FinalizeExecutionRunTool.cs
+- [X] T040 [US1] Implement start_execution_run tool in src/Spectra.MCP/Tools/RunManagement/StartExecutionRunTool.cs
+- [X] T041 [US1] Implement get_execution_status tool in src/Spectra.MCP/Tools/RunManagement/GetExecutionStatusTool.cs
+- [X] T042 [US1] Implement finalize_execution_run tool in src/Spectra.MCP/Tools/RunManagement/FinalizeExecutionRunTool.cs
 
 ### Test Execution Tools (US1 subset)
 
-- [ ] T043 [US1] Implement get_test_case_details tool in src/Spectra.MCP/Tools/TestExecution/GetTestCaseDetailsTool.cs
-- [ ] T044 [US1] Implement advance_test_case tool in src/Spectra.MCP/Tools/TestExecution/AdvanceTestCaseTool.cs
+- [X] T043 [US1] Implement get_test_case_details tool in src/Spectra.MCP/Tools/TestExecution/GetTestCaseDetailsTool.cs
+- [X] T044 [US1] Implement advance_test_case tool in src/Spectra.MCP/Tools/TestExecution/AdvanceTestCaseTool.cs
 
 ### Report Generation
 
-- [ ] T045 [P] [US1] Create ExecutionReport model in src/Spectra.Core/Models/Execution/ExecutionReport.cs
-- [ ] T046 [P] [US1] Create ReportSummary record in src/Spectra.Core/Models/Execution/ReportSummary.cs
-- [ ] T047 [US1] Create ReportGenerator in src/Spectra.MCP/Reports/ReportGenerator.cs
-- [ ] T048 [US1] Create ReportWriter (JSON + Markdown) in src/Spectra.MCP/Reports/ReportWriter.cs
+- [X] T045 [P] [US1] Create ExecutionReport model in src/Spectra.Core/Models/Execution/ExecutionReport.cs
+- [X] T046 [P] [US1] Create ReportSummary record in src/Spectra.Core/Models/Execution/ReportSummary.cs
+- [X] T047 [US1] Create ReportGenerator in src/Spectra.MCP/Reports/ReportGenerator.cs
+- [X] T048 [US1] Create ReportWriter (JSON + Markdown) in src/Spectra.MCP/Reports/ReportWriter.cs
 - [ ] T049 [P] [US1] Create ReportGeneratorTests in tests/Spectra.MCP.Tests/Reports/ReportGeneratorTests.cs
 
 **Checkpoint**: User Story 1 complete - basic test execution flow works end-to-end

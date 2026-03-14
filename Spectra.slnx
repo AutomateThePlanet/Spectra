@@ -2,9 +2,11 @@
   <Folder Name="/src/">
     <Project Path="src/Spectra.CLI/Spectra.CLI.csproj" />
     <Project Path="src/Spectra.Core/Spectra.Core.csproj" />
+    <Project Path="src/Spectra.MCP/Spectra.MCP.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Spectra.CLI.Tests/Spectra.CLI.Tests.csproj" />
     <Project Path="tests/Spectra.Core.Tests/Spectra.Core.Tests.csproj" />
+    <Project Path="tests/Spectra.MCP.Tests/Spectra.MCP.Tests.csproj" />
   </Folder>
 </Solution>
