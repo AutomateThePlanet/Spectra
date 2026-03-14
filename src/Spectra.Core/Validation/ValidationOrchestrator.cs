@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 
@@ -5,6 +6,7 @@ namespace Spectra.Core.Validation;
 
 /// <summary>
 /// Orchestrates all validation steps for test suites.
+/// Optimized for large test suites (500+ files) with parallel processing.
 /// </summary>
 public sealed class ValidationOrchestrator
 {
@@ -12,6 +14,16 @@ public sealed class ValidationOrchestrator
     private readonly IdUniquenessValidator _idUniquenessValidator;
     private readonly DependsOnValidator _dependsOnValidator;
     private readonly IndexFreshnessValidator _indexFreshnessValidator;
+
+    /// <summary>
+    /// Threshold for enabling parallel processing.
+    /// </summary>
+    private const int ParallelThreshold = 50;
+
+    /// <summary>
+    /// Maximum degree of parallelism for validation operations.
+    /// </summary>
+    public int MaxDegreeOfParallelism { get; set; } = Environment.ProcessorCount;
 
     public ValidationOrchestrator(ValidationConfig? config = null)
     {
@@ -53,25 +65,49 @@ public sealed class ValidationOrchestrator
 
     /// <summary>
     /// Validates multiple test suites.
+    /// Uses parallel processing for large suites (50+ suites).
     /// </summary>
     public ValidationResult ValidateAll(IEnumerable<TestSuite> suites)
     {
         ArgumentNullException.ThrowIfNull(suites);
 
         var suiteList = suites.ToList();
-        var results = new List<ValidationResult>();
 
-        // Validate each suite individually
-        foreach (var suite in suiteList)
-        {
-            results.Add(ValidateSuite(suite));
-        }
+        // Use parallel validation for large numbers of suites
+        var suiteResults = suiteList.Count >= ParallelThreshold
+            ? ValidateSuitesParallel(suiteList)
+            : ValidateSuitesSequential(suiteList);
+
+        var results = new List<ValidationResult>(suiteResults);
 
         // Validate ID uniqueness across all suites
         var allTests = suiteList.SelectMany(s => s.Tests).ToList();
         results.Add(_idUniquenessValidator.Validate(allTests));
 
         return ValidationResult.Combine(results);
+    }
+
+    private List<ValidationResult> ValidateSuitesSequential(List<TestSuite> suites)
+    {
+        var results = new List<ValidationResult>();
+        foreach (var suite in suites)
+        {
+            results.Add(ValidateSuite(suite));
+        }
+        return results;
+    }
+
+    private List<ValidationResult> ValidateSuitesParallel(List<TestSuite> suites)
+    {
+        var results = new ConcurrentBag<ValidationResult>();
+        var options = new ParallelOptions { MaxDegreeOfParallelism = MaxDegreeOfParallelism };
+
+        Parallel.ForEach(suites, options, suite =>
+        {
+            results.Add(ValidateSuite(suite));
+        });
+
+        return results.ToList();
     }
 
     /// <summary>

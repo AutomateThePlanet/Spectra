@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Spectra.CLI.Infrastructure;
 using Spectra.Core.Index;
@@ -9,11 +10,17 @@ namespace Spectra.CLI.Commands.Index;
 
 /// <summary>
 /// Handles the index command execution.
+/// Optimized for large suites (500+ files) with parallel processing.
 /// </summary>
 public sealed class IndexHandler
 {
     private readonly VerbosityLevel _verbosity;
     private readonly bool _dryRun;
+
+    /// <summary>
+    /// Threshold for enabling parallel file processing.
+    /// </summary>
+    private const int ParallelThreshold = 50;
 
     public IndexHandler(VerbosityLevel verbosity = VerbosityLevel.Normal, bool dryRun = false)
     {
@@ -117,26 +124,12 @@ public sealed class IndexHandler
                 continue;
             }
 
-            var tests = new List<TestCase>();
-            foreach (var file in testFiles2)
-            {
-                var content = await File.ReadAllTextAsync(file, ct);
-                var relativePath = Path.GetRelativePath(testsPath, file);
-                var parseResult = parser.Parse(content, relativePath);
+            // Use parallel processing for large suites
+            var (tests, parseErrors) = testFiles2.Count >= ParallelThreshold
+                ? await ParseFilesParallelAsync(testFiles2, testsPath, parser, ct)
+                : await ParseFilesSequentialAsync(testFiles2, testsPath, parser, ct);
 
-                if (!parseResult.IsSuccess)
-                {
-                    Console.Error.WriteLine($"Parse error in {relativePath}:");
-                    foreach (var error in parseResult.Errors)
-                    {
-                        Console.Error.WriteLine($"  [{error.Code}] {error.Message}");
-                    }
-                    errors++;
-                    continue;
-                }
-
-                tests.Add(parseResult.Value!);
-            }
+            errors += parseErrors;
 
             // Generate index
             var index = generator.Generate(suiteName, tests);
@@ -183,5 +176,81 @@ public sealed class IndexHandler
         return Directory.GetDirectories(testsPath)
             .Where(d => !Path.GetFileName(d).StartsWith("_"))
             .ToList();
+    }
+
+    private async Task<(List<TestCase> Tests, int Errors)> ParseFilesSequentialAsync(
+        List<string> files,
+        string testsPath,
+        TestCaseParser parser,
+        CancellationToken ct)
+    {
+        var tests = new List<TestCase>();
+        var errors = 0;
+
+        foreach (var file in files)
+        {
+            var content = await File.ReadAllTextAsync(file, ct);
+            var relativePath = Path.GetRelativePath(testsPath, file);
+            var parseResult = parser.Parse(content, relativePath);
+
+            if (!parseResult.IsSuccess)
+            {
+                Console.Error.WriteLine($"Parse error in {relativePath}:");
+                foreach (var error in parseResult.Errors)
+                {
+                    Console.Error.WriteLine($"  [{error.Code}] {error.Message}");
+                }
+                errors++;
+                continue;
+            }
+
+            tests.Add(parseResult.Value!);
+        }
+
+        return (tests, errors);
+    }
+
+    private async Task<(List<TestCase> Tests, int Errors)> ParseFilesParallelAsync(
+        List<string> files,
+        string testsPath,
+        TestCaseParser parser,
+        CancellationToken ct)
+    {
+        var tests = new ConcurrentBag<TestCase>();
+        var errorMessages = new ConcurrentBag<string>();
+        var errorCount = 0;
+
+        var options = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = Environment.ProcessorCount,
+            CancellationToken = ct
+        };
+
+        await Parallel.ForEachAsync(files, options, async (file, token) =>
+        {
+            var content = await File.ReadAllTextAsync(file, token);
+            var relativePath = Path.GetRelativePath(testsPath, file);
+            var parseResult = parser.Parse(content, relativePath);
+
+            if (!parseResult.IsSuccess)
+            {
+                foreach (var error in parseResult.Errors)
+                {
+                    errorMessages.Add($"  [{error.Code}] {error.Message} in {relativePath}");
+                }
+                Interlocked.Increment(ref errorCount);
+                return;
+            }
+
+            tests.Add(parseResult.Value!);
+        });
+
+        // Output errors after parallel processing (to avoid interleaved output)
+        foreach (var errorMsg in errorMessages)
+        {
+            Console.Error.WriteLine(errorMsg);
+        }
+
+        return (tests.ToList(), errorCount);
     }
 }

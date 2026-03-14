@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
@@ -6,10 +7,16 @@ namespace Spectra.Core.Validation;
 
 /// <summary>
 /// Validates individual test cases against schema rules.
+/// Optimized for large batches (500+ tests) with parallel processing.
 /// </summary>
 public sealed partial class TestValidator
 {
     private readonly ValidationConfig _config;
+
+    /// <summary>
+    /// Threshold for enabling parallel processing.
+    /// </summary>
+    private const int ParallelThreshold = 100;
 
     [GeneratedRegex(@"^TC-\d{3,}$")]
     private static partial Regex DefaultIdPatternRegex();
@@ -53,10 +60,34 @@ public sealed partial class TestValidator
 
     /// <summary>
     /// Validates multiple test cases.
+    /// Uses parallel processing for large batches (100+ tests).
     /// </summary>
     public ValidationResult ValidateAll(IEnumerable<TestCase> testCases)
     {
-        var results = testCases.Select(Validate).ToList();
+        ArgumentNullException.ThrowIfNull(testCases);
+
+        var testList = testCases.ToList();
+
+        // Use parallel processing for large batches
+        if (testList.Count >= ParallelThreshold)
+        {
+            return ValidateAllParallel(testList);
+        }
+
+        var results = testList.Select(Validate).ToList();
+        return ValidationResult.Combine(results);
+    }
+
+    private ValidationResult ValidateAllParallel(List<TestCase> testCases)
+    {
+        var results = new ConcurrentBag<ValidationResult>();
+        var options = new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount };
+
+        Parallel.ForEach(testCases, options, testCase =>
+        {
+            results.Add(Validate(testCase));
+        });
+
         return ValidationResult.Combine(results);
     }
 
