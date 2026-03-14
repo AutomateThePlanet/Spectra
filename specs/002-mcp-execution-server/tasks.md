@@ -177,19 +177,19 @@
 
 ### Tests for User Story 4
 
-- [ ] T066 [P] [US4] Unit test for filter by priority in tests/Spectra.MCP.Tests/Execution/TestQueueFilterTests.cs
-- [ ] T067 [P] [US4] Unit test for filter by tags in tests/Spectra.MCP.Tests/Execution/TestQueueFilterTests.cs
-- [ ] T068 [P] [US4] Unit test for filter by component in tests/Spectra.MCP.Tests/Execution/TestQueueFilterTests.cs
-- [ ] T069 [P] [US4] Unit test for filter by test IDs in tests/Spectra.MCP.Tests/Execution/TestQueueFilterTests.cs
-- [ ] T070 [P] [US4] Integration test for filtered execution in tests/Spectra.MCP.Tests/Integration/FilteredExecutionTests.cs
+- [X] T066 [P] [US4] Unit test for filter by priority in tests/Spectra.MCP.Tests/Execution/TestQueueFilterTests.cs
+- [X] T067 [P] [US4] Unit test for filter by tags in tests/Spectra.MCP.Tests/Execution/TestQueueFilterTests.cs
+- [X] T068 [P] [US4] Unit test for filter by component in tests/Spectra.MCP.Tests/Execution/TestQueueFilterTests.cs
+- [X] T069 [P] [US4] Unit test for filter by test IDs in tests/Spectra.MCP.Tests/Execution/TestQueueFilterTests.cs
+- [X] T070 [P] [US4] Integration test for filtered execution in tests/Spectra.MCP.Tests/Integration/FilteredExecutionTests.cs
 
 ### Implementation
 
-- [ ] T071 [US4] Implement priority filter in TestQueue.BuildQueue()
-- [ ] T072 [US4] Implement tags filter (AND logic) in TestQueue.BuildQueue()
-- [ ] T073 [US4] Implement component filter in TestQueue.BuildQueue()
-- [ ] T074 [US4] Implement test IDs filter with dependency inclusion in TestQueue.BuildQueue()
-- [ ] T075 [US4] Add NO_TESTS_MATCH error handling in start_execution_run
+- [X] T071 [US4] Implement priority filter in TestQueue.BuildQueue()
+- [X] T072 [US4] Implement tags filter (AND logic) in TestQueue.BuildQueue()
+- [X] T073 [US4] Implement component filter in TestQueue.BuildQueue()
+- [X] T074 [US4] Implement test IDs filter with dependency inclusion in TestQueue.BuildQueue()
+- [X] T075 [US4] Add NO_TESTS_MATCH error handling in start_execution_run
 
 **Checkpoint**: User Story 4 complete - filtered runs work
 
@@ -203,13 +203,13 @@
 
 ### Tests for User Story 5
 
-- [ ] T076 [P] [US5] Contract test for list_available_suites in tests/Spectra.MCP.Tests/Tools/ListAvailableSuitesTests.cs
+- [X] T076 [P] [US5] Contract test for list_available_suites in tests/Spectra.MCP.Tests/Tools/ListAvailableSuitesTests.cs
 
 ### Implementation
 
-- [ ] T077 [US5] Implement list_available_suites tool in src/Spectra.MCP/Tools/RunManagement/ListAvailableSuitesTool.cs
-- [ ] T078 [US5] Integrate with Spectra.Core index reading for suite discovery
-- [ ] T079 [US5] Add INDEX_STALE and NO_SUITES_FOUND error handling
+- [X] T077 [US5] Implement list_available_suites tool in src/Spectra.MCP/Tools/RunManagement/ListAvailableSuitesTool.cs
+- [X] T078 [US5] Integrate with Spectra.Core index reading for suite discovery
+- [X] T079 [US5] Add INDEX_STALE and NO_SUITES_FOUND error handling
 
 **Checkpoint**: User Story 5 complete - suite discovery works
 
@@ -223,15 +223,15 @@
 
 ### Tests for User Story 6
 
-- [ ] T080 [P] [US6] Contract test for retest_test_case in tests/Spectra.MCP.Tests/Tools/RetestTestCaseTests.cs
-- [ ] T081 [P] [US6] Integration test for retest flow in tests/Spectra.MCP.Tests/Integration/RetestFlowTests.cs
+- [X] T080 [P] [US6] Contract test for retest_test_case in tests/Spectra.MCP.Tests/Tools/RetestTestCaseTests.cs
+- [X] T081 [P] [US6] Integration test for retest flow in tests/Spectra.MCP.Tests/Integration/RetestFlowTests.cs
 
 ### Implementation
 
-- [ ] T082 [US6] Implement retest_test_case tool in src/Spectra.MCP/Tools/TestExecution/RetestTestCaseTool.cs
-- [ ] T083 [US6] Implement Requeue operation in TestQueue with attempt increment
-- [ ] T084 [US6] Generate new handle for retested test
-- [ ] T085 [US6] Update report to show all attempts per test
+- [X] T082 [US6] Implement retest_test_case tool in src/Spectra.MCP/Tools/TestExecution/RetestTestCaseTool.cs
+- [X] T083 [US6] Implement Requeue operation in TestQueue with attempt increment
+- [X] T084 [US6] Generate new handle for retested test
+- [X] T085 [US6] Update report to show all attempts per test
 
 **Checkpoint**: User Story 6 complete - retest functionality works
 

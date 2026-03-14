@@ -51,10 +51,22 @@ public sealed class TestQueue
 
     /// <summary>
     /// Gets the next pending test, or null if none remain.
+    /// Scans the entire queue to handle cases where tests are retested out of order.
     /// </summary>
     public QueuedTest? GetNext()
     {
+        // First try from current position forward
         for (var i = _currentIndex; i < _tests.Count; i++)
+        {
+            var test = _tests[i];
+            if (test.Status == TestStatus.Pending)
+            {
+                return test;
+            }
+        }
+
+        // Then check from beginning (in case retest jumped past pending tests)
+        for (var i = 0; i < _currentIndex && i < _tests.Count; i++)
         {
             var test = _tests[i];
             if (test.Status == TestStatus.Pending)

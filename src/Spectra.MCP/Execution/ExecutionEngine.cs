@@ -104,6 +104,22 @@ public sealed class ExecutionEngine
     }
 
     /// <summary>
+    /// Gets run and queue status.
+    /// </summary>
+    public async Task<(Run Run, TestQueue Queue)?> GetStatusAsync(string runId)
+    {
+        var run = await _runRepo.GetByIdAsync(runId);
+        if (run is null) return null;
+
+        if (!_queues.TryGetValue(runId, out var queue))
+        {
+            return null;
+        }
+
+        return (run, queue);
+    }
+
+    /// <summary>
     /// Gets the test queue for a run, loading from DB if needed.
     /// </summary>
     public async Task<TestQueue?> GetQueueAsync(string runId)
