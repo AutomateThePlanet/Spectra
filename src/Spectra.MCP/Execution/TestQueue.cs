@@ -113,6 +113,18 @@ public sealed class TestQueue
     }
 
     /// <summary>
+    /// Marks a specific test as blocked by another test.
+    /// </summary>
+    public void MarkBlocked(string testId, string blockedBy)
+    {
+        var index = _tests.FindIndex(t => t.TestId == testId);
+        if (index >= 0 && _tests[index].Status == TestStatus.Pending)
+        {
+            _tests[index] = _tests[index] with { Status = TestStatus.Blocked };
+        }
+    }
+
+    /// <summary>
     /// Blocks tests that depend on the given test.
     /// </summary>
     public IReadOnlyList<string> BlockDependents(string testId)

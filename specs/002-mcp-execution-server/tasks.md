@@ -129,16 +129,16 @@
 
 ### Tests for User Story 2
 
-- [ ] T050 [P] [US2] Contract test for pause_execution_run in tests/Spectra.MCP.Tests/Tools/PauseExecutionRunTests.cs
-- [ ] T051 [P] [US2] Contract test for resume_execution_run in tests/Spectra.MCP.Tests/Tools/ResumeExecutionRunTests.cs
-- [ ] T052 [P] [US2] Integration test for pause/resume flow in tests/Spectra.MCP.Tests/Integration/PauseResumeTests.cs
+- [X] T050 [P] [US2] Contract test for pause_execution_run in tests/Spectra.MCP.Tests/Tools/PauseExecutionRunTests.cs
+- [X] T051 [P] [US2] Contract test for resume_execution_run in tests/Spectra.MCP.Tests/Tools/ResumeExecutionRunTests.cs
+- [X] T052 [P] [US2] Integration test for pause/resume flow in tests/Spectra.MCP.Tests/Integration/PauseResumeTests.cs
 
 ### Implementation
 
-- [ ] T053 [US2] Implement pause_execution_run tool in src/Spectra.MCP/Tools/RunManagement/PauseExecutionRunTool.cs
-- [ ] T054 [US2] Implement resume_execution_run tool in src/Spectra.MCP/Tools/RunManagement/ResumeExecutionRunTool.cs
-- [ ] T055 [US2] Add state preservation logic in ExecutionEngine for pause/resume
-- [ ] T056 [US2] Implement queue position tracking on resume in TestQueue.cs
+- [X] T053 [US2] Implement pause_execution_run tool in src/Spectra.MCP/Tools/RunManagement/PauseExecutionRunTool.cs
+- [X] T054 [US2] Implement resume_execution_run tool in src/Spectra.MCP/Tools/RunManagement/ResumeExecutionRunTool.cs
+- [X] T055 [US2] Add state preservation logic in ExecutionEngine for pause/resume
+- [X] T056 [US2] Implement queue position tracking on resume in TestQueue.cs
 
 **Checkpoint**: User Story 2 complete - pause/resume preserves progress
 
@@ -152,18 +152,18 @@
 
 ### Tests for User Story 3
 
-- [ ] T057 [P] [US3] Contract test for skip_test_case in tests/Spectra.MCP.Tests/Tools/SkipTestCaseTests.cs
-- [ ] T058 [P] [US3] Contract test for add_test_note in tests/Spectra.MCP.Tests/Tools/AddTestNoteTests.cs
-- [ ] T059 [P] [US3] Unit test for transitive blocking in tests/Spectra.MCP.Tests/Execution/DependencyResolverTests.cs
-- [ ] T060 [P] [US3] Integration test for cascade blocking in tests/Spectra.MCP.Tests/Integration/BlockingCascadeTests.cs
+- [X] T057 [P] [US3] Contract test for skip_test_case in tests/Spectra.MCP.Tests/Tools/SkipTestCaseTests.cs
+- [X] T058 [P] [US3] Contract test for add_test_note in tests/Spectra.MCP.Tests/Tools/AddTestNoteTests.cs
+- [X] T059 [P] [US3] Unit test for transitive blocking in tests/Spectra.MCP.Tests/Execution/DependencyResolverTests.cs
+- [X] T060 [P] [US3] Integration test for cascade blocking in tests/Spectra.MCP.Tests/Integration/BlockingCascadeTests.cs
 
 ### Implementation
 
-- [ ] T061 [US3] Implement skip_test_case tool in src/Spectra.MCP/Tools/TestExecution/SkipTestCaseTool.cs
-- [ ] T062 [US3] Implement add_test_note tool in src/Spectra.MCP/Tools/TestExecution/AddTestNoteTool.cs
-- [ ] T063 [US3] Implement transitive cascade blocking in DependencyResolver.PropagateBlocks()
-- [ ] T064 [US3] Update advance_test_case to trigger blocking on failure
-- [ ] T065 [US3] Add blocked_by tracking in TestResult and reports
+- [X] T061 [US3] Implement skip_test_case tool in src/Spectra.MCP/Tools/TestExecution/SkipTestCaseTool.cs
+- [X] T062 [US3] Implement add_test_note tool in src/Spectra.MCP/Tools/TestExecution/AddTestNoteTool.cs
+- [X] T063 [US3] Implement transitive cascade blocking in DependencyResolver.PropagateBlocks()
+- [X] T064 [US3] Update advance_test_case to trigger blocking on failure
+- [X] T065 [US3] Add blocked_by tracking in TestResult and reports
 
 **Checkpoint**: User Story 3 complete - skip/block with transitive cascade works
 
