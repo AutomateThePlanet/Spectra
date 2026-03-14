@@ -1,0 +1,234 @@
+using System.Text.Json;
+using Spectra.CLI.Infrastructure;
+using Spectra.Core.Models.Config;
+
+namespace Spectra.CLI.Commands.Config;
+
+/// <summary>
+/// Handles the config command execution.
+/// </summary>
+public sealed class ConfigHandler
+{
+    private readonly VerbosityLevel _verbosity;
+
+    public ConfigHandler(VerbosityLevel verbosity = VerbosityLevel.Normal)
+    {
+        _verbosity = verbosity;
+    }
+
+    /// <summary>
+    /// Executes the config command.
+    /// </summary>
+    public async Task<int> ExecuteAsync(
+        string? key,
+        string? value,
+        bool showAll,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var basePath = Directory.GetCurrentDirectory();
+            var configPath = Path.Combine(basePath, "spectra.config.json");
+
+            if (!File.Exists(configPath))
+            {
+                Console.Error.WriteLine("No spectra.config.json found. Run 'spectra init' first.");
+                return ExitCodes.Error;
+            }
+
+            var configJson = await File.ReadAllTextAsync(configPath, ct);
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                WriteIndented = true
+            };
+
+            // If value is provided, this is a set operation
+            if (key is not null && value is not null)
+            {
+                return await SetConfigValueAsync(configPath, configJson, key, value, jsonOptions, ct);
+            }
+
+            // If key is provided without value, show that key
+            if (key is not null)
+            {
+                return ShowConfigValue(configJson, key, jsonOptions);
+            }
+
+            // Show all config
+            return ShowAllConfig(configJson, showAll, jsonOptions);
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine("\nOperation cancelled.");
+            return ExitCodes.Cancelled;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            return ExitCodes.Error;
+        }
+    }
+
+    private async Task<int> SetConfigValueAsync(
+        string configPath,
+        string configJson,
+        string key,
+        string value,
+        JsonSerializerOptions options,
+        CancellationToken ct)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(configJson);
+            var root = doc.RootElement;
+
+            // Parse the JSON into a mutable dictionary
+            var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(configJson, options)
+                ?? new Dictionary<string, object>();
+
+            // Support nested keys like "source.dir"
+            var keys = key.Split('.');
+            SetNestedValue(dict, keys, value);
+
+            var newJson = JsonSerializer.Serialize(dict, options);
+            await File.WriteAllTextAsync(configPath, newJson, ct);
+
+            Console.WriteLine($"Set {key} = {value}");
+            return ExitCodes.Success;
+        }
+        catch (JsonException ex)
+        {
+            Console.Error.WriteLine($"Invalid JSON: {ex.Message}");
+            return ExitCodes.Error;
+        }
+    }
+
+    private static void SetNestedValue(Dictionary<string, object> dict, string[] keys, string value)
+    {
+        if (keys.Length == 1)
+        {
+            dict[keys[0]] = value;
+            return;
+        }
+
+        var current = dict;
+        for (var i = 0; i < keys.Length - 1; i++)
+        {
+            if (!current.ContainsKey(keys[i]) || current[keys[i]] is not Dictionary<string, object>)
+            {
+                current[keys[i]] = new Dictionary<string, object>();
+            }
+            current = (Dictionary<string, object>)current[keys[i]];
+        }
+        current[keys[^1]] = value;
+    }
+
+    private int ShowConfigValue(string configJson, string key, JsonSerializerOptions options)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(configJson);
+            var element = doc.RootElement;
+
+            // Navigate nested keys
+            var keys = key.Split('.');
+            foreach (var k in keys)
+            {
+                if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(k, out var prop))
+                {
+                    Console.Error.WriteLine($"Key not found: {key}");
+                    return ExitCodes.Error;
+                }
+                element = prop;
+            }
+
+            var value = element.ValueKind switch
+            {
+                JsonValueKind.String => element.GetString(),
+                JsonValueKind.Number => element.GetRawText(),
+                JsonValueKind.True => "true",
+                JsonValueKind.False => "false",
+                JsonValueKind.Null => "null",
+                _ => element.GetRawText()
+            };
+
+            Console.WriteLine($"{key} = {value}");
+            return ExitCodes.Success;
+        }
+        catch (JsonException ex)
+        {
+            Console.Error.WriteLine($"Error parsing config: {ex.Message}");
+            return ExitCodes.Error;
+        }
+    }
+
+    private int ShowAllConfig(string configJson, bool showRaw, JsonSerializerOptions options)
+    {
+        if (showRaw)
+        {
+            Console.WriteLine(configJson);
+            return ExitCodes.Success;
+        }
+
+        try
+        {
+            var config = JsonSerializer.Deserialize<SpectraConfig>(configJson, options);
+            if (config is null)
+            {
+                Console.Error.WriteLine("Invalid config file.");
+                return ExitCodes.Error;
+            }
+
+            Console.WriteLine("SPECTRA Configuration");
+            Console.WriteLine(new string('-', 40));
+
+            Console.WriteLine();
+            Console.WriteLine("Source:");
+            Console.WriteLine($"  Mode:      {config.Source?.Mode ?? "local"}");
+            Console.WriteLine($"  Directory: {config.Source?.LocalDir ?? "docs/"}");
+            Console.WriteLine($"  Patterns:  {string.Join(", ", config.Source?.IncludePatterns ?? ["**/*.md"])}");
+
+            Console.WriteLine();
+            Console.WriteLine("Tests:");
+            Console.WriteLine($"  Directory: {config.Tests?.Dir ?? "tests/"}");
+            Console.WriteLine($"  ID Prefix: {config.Tests?.IdPrefix ?? "TC"}");
+            Console.WriteLine($"  ID Start:  {config.Tests?.IdStart ?? 100}");
+
+            Console.WriteLine();
+            Console.WriteLine("AI:");
+            if (config.Ai?.Providers is { Count: > 0 })
+            {
+                Console.WriteLine("  Providers:");
+                foreach (var provider in config.Ai.Providers)
+                {
+                    Console.WriteLine($"    - {provider.Name}: {provider.Model ?? "(default model)"}");
+                }
+                Console.WriteLine($"  Fallback: {config.Ai.FallbackStrategy}");
+            }
+            else
+            {
+                Console.WriteLine("  Providers: (not configured)");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("Generation:");
+            Console.WriteLine($"  Default count:   {config.Generation?.DefaultCount ?? 15}");
+            Console.WriteLine($"  Require review:  {config.Generation?.RequireReview ?? true}");
+            Console.WriteLine($"  Dup threshold:   {config.Generation?.DuplicateThreshold ?? 0.6}");
+
+            Console.WriteLine();
+            Console.WriteLine("Validation:");
+            Console.WriteLine($"  Required fields: {string.Join(", ", config.Validation?.RequiredFields ?? ["id", "priority"])}");
+            Console.WriteLine($"  ID pattern:      {config.Validation?.IdPattern ?? @"^TC-\d{3,}$"}");
+            Console.WriteLine($"  Max steps:       {config.Validation?.MaxSteps ?? 20}");
+
+            return ExitCodes.Success;
+        }
+        catch (JsonException ex)
+        {
+            Console.Error.WriteLine($"Error parsing config: {ex.Message}");
+            return ExitCodes.Error;
+        }
+    }
+}

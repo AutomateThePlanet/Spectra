@@ -1,0 +1,17 @@
+{
+  "suite": "checkout",
+  "generated_at": "2026-03-13T10:00:00Z",
+  "test_count": 1,
+  "tests": [
+    {
+      "id": "TC-101",
+      "file": "checkout-happy-path.md",
+      "title": "Checkout with valid Visa card",
+      "priority": "high",
+      "tags": ["smoke", "payments"],
+      "component": "checkout",
+      "depends_on": null,
+      "source_refs": ["docs/features/checkout/checkout-flow.md"]
+    }
+  ]
+}
