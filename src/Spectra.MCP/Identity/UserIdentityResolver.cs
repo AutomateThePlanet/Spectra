@@ -3,10 +3,21 @@ using System.Diagnostics;
 namespace Spectra.MCP.Identity;
 
 /// <summary>
+/// Interface for resolving user identity.
+/// </summary>
+public interface IUserIdentityResolver
+{
+    /// <summary>
+    /// Gets the current user identity.
+    /// </summary>
+    string GetCurrentUser();
+}
+
+/// <summary>
 /// Resolves user identity from git config or OS username.
 /// Priority: git config user.name > OS username
 /// </summary>
-public sealed class UserIdentityResolver
+public sealed class UserIdentityResolver : IUserIdentityResolver
 {
     private string? _cachedIdentity;
 

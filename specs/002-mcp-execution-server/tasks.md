@@ -245,15 +245,15 @@
 
 ### Tests for User Story 7
 
-- [ ] T086 [P] [US7] Contract test for get_run_history in tests/Spectra.MCP.Tests/Tools/GetRunHistoryTests.cs
-- [ ] T087 [P] [US7] Contract test for get_execution_summary in tests/Spectra.MCP.Tests/Tools/GetExecutionSummaryTests.cs
+- [X] T086 [P] [US7] Contract test for get_run_history in tests/Spectra.MCP.Tests/Tools/GetRunHistoryTests.cs
+- [X] T087 [P] [US7] Contract test for get_execution_summary in tests/Spectra.MCP.Tests/Tools/GetExecutionSummaryTests.cs
 
 ### Implementation
 
-- [ ] T088 [US7] Implement get_run_history tool in src/Spectra.MCP/Tools/Reporting/GetRunHistoryTool.cs
-- [ ] T089 [US7] Implement get_execution_summary tool in src/Spectra.MCP/Tools/Reporting/GetExecutionSummaryTool.cs
-- [ ] T090 [US7] Add user filter to get_run_history
-- [ ] T091 [US7] Add limit parameter handling in get_run_history
+- [X] T088 [US7] Implement get_run_history tool in src/Spectra.MCP/Tools/Reporting/GetRunHistoryTool.cs
+- [X] T089 [US7] Implement get_execution_summary tool in src/Spectra.MCP/Tools/Reporting/GetExecutionSummaryTool.cs
+- [X] T090 [US7] Add user filter to get_run_history
+- [X] T091 [US7] Add limit parameter handling in get_run_history
 
 **Checkpoint**: User Story 7 complete - history and summary reporting works
 
@@ -267,17 +267,17 @@
 
 ### Tests for User Story 8
 
-- [ ] T092 [P] [US8] Unit test for active run check in tests/Spectra.MCP.Tests/Storage/RunRepositoryTests.cs
-- [ ] T093 [P] [US8] Contract test for cancel_execution_run in tests/Spectra.MCP.Tests/Tools/CancelExecutionRunTests.cs
-- [ ] T094 [P] [US8] Integration test for concurrent users in tests/Spectra.MCP.Tests/Integration/ConcurrentUsersTests.cs
+- [X] T092 [P] [US8] Unit test for active run check in tests/Spectra.MCP.Tests/Storage/RunRepositoryTests.cs
+- [X] T093 [P] [US8] Contract test for cancel_execution_run in tests/Spectra.MCP.Tests/Tools/CancelExecutionRunTests.cs
+- [X] T094 [P] [US8] Integration test for concurrent users in tests/Spectra.MCP.Tests/Integration/ConcurrentUsersTests.cs
 
 ### Implementation
 
-- [ ] T095 [US8] Implement cancel_execution_run tool in src/Spectra.MCP/Tools/RunManagement/CancelExecutionRunTool.cs
-- [ ] T096 [US8] Add GetActiveRunAsync(suite, user) to RunRepository
-- [ ] T097 [US8] Implement ACTIVE_RUN_EXISTS check in start_execution_run
-- [ ] T098 [US8] Add user validation (NOT_OWNER) to pause/resume/cancel tools
-- [ ] T099 [US8] Implement run timeout for ABANDONED status (72h default)
+- [X] T095 [US8] Implement cancel_execution_run tool in src/Spectra.MCP/Tools/RunManagement/CancelExecutionRunTool.cs
+- [X] T096 [US8] Add GetActiveRunAsync(suite, user) to RunRepository
+- [X] T097 [US8] Implement ACTIVE_RUN_EXISTS check in start_execution_run
+- [X] T098 [US8] Add user validation (NOT_OWNER) to pause/resume/cancel tools
+- [X] T099 [US8] Implement run timeout for ABANDONED status (72h default)
 
 **Checkpoint**: User Story 8 complete - concurrent execution with user isolation works
 
@@ -287,14 +287,14 @@
 
 **Purpose**: Final improvements across all user stories
 
-- [ ] T100 [P] Add XML documentation to all public APIs in src/Spectra.MCP/
-- [ ] T101 [P] Add XML documentation to new models in src/Spectra.Core/Models/Execution/
-- [ ] T102 Review and ensure all tools return self-contained responses with next_expected_action
-- [ ] T103 Verify all error codes match contracts/mcp-tools.md specification
-- [ ] T104 [P] Create Program.cs entry point in src/Spectra.MCP/Program.cs
-- [ ] T105 Performance: verify tool responses <100ms for local operations
-- [ ] T106 Run full test suite and ensure 80%+ coverage on Core, 60%+ on MCP
-- [ ] T107 Validate quickstart.md workflow works end-to-end with real MCP server
+- [X] T100 [P] Add XML documentation to all public APIs in src/Spectra.MCP/
+- [X] T101 [P] Add XML documentation to new models in src/Spectra.Core/Models/Execution/
+- [X] T102 Review and ensure all tools return self-contained responses with next_expected_action
+- [X] T103 Verify all error codes match contracts/mcp-tools.md specification
+- [X] T104 [P] Create Program.cs entry point in src/Spectra.MCP/Program.cs
+- [X] T105 Performance: verify tool responses <100ms for local operations
+- [X] T106 Run full test suite and ensure 80%+ coverage on Core, 60%+ on MCP
+- [X] T107 Validate quickstart.md workflow works end-to-end with real MCP server
 
 ---
 

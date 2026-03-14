@@ -147,6 +147,47 @@ public sealed class RunRepository
     }
 
     /// <summary>
+    /// Gets all runs with optional filters.
+    /// </summary>
+    public async Task<IReadOnlyList<Run>> GetAllAsync(string? suite = null, string? user = null, int limit = 50)
+    {
+        var connection = await _db.GetConnectionAsync();
+        await using var command = connection.CreateCommand();
+
+        var conditions = new List<string>();
+        if (!string.IsNullOrEmpty(suite))
+        {
+            conditions.Add("suite = @suite");
+        }
+        if (!string.IsNullOrEmpty(user))
+        {
+            conditions.Add("started_by = @user");
+        }
+
+        var whereClause = conditions.Count > 0 ? $"WHERE {string.Join(" AND ", conditions)}" : "";
+        command.CommandText = $"SELECT * FROM runs {whereClause} ORDER BY started_at DESC LIMIT @limit";
+
+        command.Parameters.AddWithValue("@limit", limit);
+        if (!string.IsNullOrEmpty(suite))
+        {
+            command.Parameters.AddWithValue("@suite", suite);
+        }
+        if (!string.IsNullOrEmpty(user))
+        {
+            command.Parameters.AddWithValue("@user", user);
+        }
+
+        var runs = new List<Run>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            runs.Add(MapRun(reader));
+        }
+
+        return runs;
+    }
+
+    /// <summary>
     /// Gets runs that have been paused longer than the timeout.
     /// </summary>
     public async Task<IReadOnlyList<Run>> GetAbandonedRunsAsync(TimeSpan timeout)

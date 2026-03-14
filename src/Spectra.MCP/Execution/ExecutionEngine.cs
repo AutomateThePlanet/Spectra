@@ -14,7 +14,7 @@ public sealed class ExecutionEngine
 {
     private readonly RunRepository _runRepo;
     private readonly ResultRepository _resultRepo;
-    private readonly UserIdentityResolver _identity;
+    private readonly IUserIdentityResolver _identity;
     private readonly McpConfig _config;
     private readonly DependencyResolver _dependencyResolver;
 
@@ -24,7 +24,7 @@ public sealed class ExecutionEngine
     public ExecutionEngine(
         RunRepository runRepo,
         ResultRepository resultRepo,
-        UserIdentityResolver identity,
+        IUserIdentityResolver identity,
         McpConfig config)
     {
         _runRepo = runRepo;
