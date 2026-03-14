@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2026-03-13
 
 ## Active Technologies
+- C# 12, .NET 8+ + ASP.NET Core (MCP server), Microsoft.Data.Sqlite (state storage), System.Text.Json (serialization) (002-mcp-execution-server)
+- SQLite database (`.execution/spectra.db`) for execution state; file system for reports (002-mcp-execution-server)
 
 - C# 12, .NET 8+ + System.CommandLine (CLI), Microsoft.Extensions.AI (AI tools), Markdig (Markdown parsing), YamlDotNet (frontmatter), GitHub Copilot SDK (AI runtime) (001-ai-test-generation-cli)
 
@@ -55,6 +57,7 @@ dotnet run --project src/Spectra.CLI -- <command>
 - **Tests:** xUnit with structured results (never throw on validation errors)
 
 ## Recent Changes
+- 002-mcp-execution-server: Added C# 12, .NET 8+ + ASP.NET Core (MCP server), Microsoft.Data.Sqlite (state storage), System.Text.Json (serialization)
 
 - 001-ai-test-generation-cli: Added C# 12, .NET 8+ + System.CommandLine (CLI), Microsoft.Extensions.AI (AI tools), Markdig (Markdown parsing), YamlDotNet (frontmatter), GitHub Copilot SDK (AI runtime)
 

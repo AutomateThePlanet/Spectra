@@ -32,7 +32,7 @@
 ## Notes
 
 - Spec validated successfully on 2026-03-14
-- All items pass - ready for `/speckit.plan`
+- All items pass - ready for `/speckit.tasks`
 - The spec builds on existing architecture from `final-architecture-v3.md` which informed the user stories and requirements
 - Dependencies on Phase 1 (CLI) are clearly documented
 - Out of scope items (Phase 3 features) are explicitly listed
@@ -45,3 +45,12 @@
 3. Dependency cascade → Transitive blocking enabled
 4. History retention → Indefinite (manual purge)
 5. Observability → Structured logging with verbosity levels
+
+### Planning Session 2026-03-14
+
+Plan completed with the following artifacts:
+- [plan.md](../plan.md) - Implementation plan with technical context and constitution check
+- [research.md](../research.md) - Phase 0 research (10 technical decisions)
+- [data-model.md](../data-model.md) - Phase 1 data model (9 entities)
+- [contracts/mcp-tools.md](../contracts/mcp-tools.md) - Phase 1 contracts (14 MCP tools)
+- [quickstart.md](../quickstart.md) - Phase 1 user guide
