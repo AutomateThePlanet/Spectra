@@ -85,11 +85,11 @@
 
 ### Tests for User Story 1
 
-- [ ] T031 [P] [US1] Contract test for start_execution_run in tests/Spectra.MCP.Tests/Tools/StartExecutionRunTests.cs
-- [ ] T032 [P] [US1] Contract test for get_test_case_details in tests/Spectra.MCP.Tests/Tools/GetTestCaseDetailsTests.cs
-- [ ] T033 [P] [US1] Contract test for advance_test_case in tests/Spectra.MCP.Tests/Tools/AdvanceTestCaseTests.cs
-- [ ] T034 [P] [US1] Contract test for finalize_execution_run in tests/Spectra.MCP.Tests/Tools/FinalizeExecutionRunTests.cs
-- [ ] T035 [P] [US1] Integration test for full execution flow in tests/Spectra.MCP.Tests/Integration/ExecutionFlowTests.cs
+- [X] T031 [P] [US1] Contract test for start_execution_run in tests/Spectra.MCP.Tests/Tools/StartExecutionRunTests.cs
+- [X] T032 [P] [US1] Contract test for get_test_case_details in tests/Spectra.MCP.Tests/Tools/GetTestCaseDetailsTests.cs
+- [X] T033 [P] [US1] Contract test for advance_test_case in tests/Spectra.MCP.Tests/Tools/AdvanceTestCaseTests.cs
+- [X] T034 [P] [US1] Contract test for finalize_execution_run in tests/Spectra.MCP.Tests/Tools/FinalizeExecutionRunTests.cs
+- [X] T035 [P] [US1] Integration test for full execution flow in tests/Spectra.MCP.Tests/Integration/ExecutionFlowTests.cs
 
 ### Core Execution Engine
 
@@ -115,7 +115,7 @@
 - [X] T046 [P] [US1] Create ReportSummary record in src/Spectra.Core/Models/Execution/ReportSummary.cs
 - [X] T047 [US1] Create ReportGenerator in src/Spectra.MCP/Reports/ReportGenerator.cs
 - [X] T048 [US1] Create ReportWriter (JSON + Markdown) in src/Spectra.MCP/Reports/ReportWriter.cs
-- [ ] T049 [P] [US1] Create ReportGeneratorTests in tests/Spectra.MCP.Tests/Reports/ReportGeneratorTests.cs
+- [X] T049 [P] [US1] Create ReportGeneratorTests in tests/Spectra.MCP.Tests/Reports/ReportGeneratorTests.cs
 
 **Checkpoint**: User Story 1 complete - basic test execution flow works end-to-end
 

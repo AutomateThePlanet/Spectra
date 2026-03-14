@@ -16,6 +16,7 @@ public sealed record McpToolResponse<T>
     /// <summary>Current run state (when run exists).</summary>
     [JsonPropertyName("run_status")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public RunStatus? RunStatus { get; init; }
 
     /// <summary>Progress in "completed/total" format.</summary>
@@ -36,6 +37,7 @@ public sealed record McpToolResponse<T>
     /// <summary>Current run status for error responses.</summary>
     [JsonPropertyName("current_run_status")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public RunStatus? CurrentRunStatus { get; init; }
 
     /// <summary>
