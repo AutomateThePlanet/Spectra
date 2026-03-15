@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Spectra.Core.Models;
+using Spectra.Core.Models.Coverage;
 using Spectra.Core.Models.Dashboard;
 using Spectra.Core.Storage;
 
@@ -32,6 +33,8 @@ public sealed class DataCollector
         var runSummaries = await CollectRunHistoryAsync();
         var testEntries = BuildTestEntries(suiteIndexes);
         var suiteStats = BuildSuiteStats(suiteIndexes, runSummaries);
+        var trends = CalculateTrends(runSummaries);
+        var coverage = BuildCoverageData(testEntries);
 
         return new DashboardData
         {
@@ -39,7 +42,9 @@ public sealed class DataCollector
             Repository = Path.GetFileName(_basePath),
             Suites = suiteStats,
             Runs = runSummaries,
-            Tests = testEntries
+            Tests = testEntries,
+            Coverage = coverage,
+            Trends = trends
         };
     }
 
@@ -224,6 +229,234 @@ public sealed class DataCollector
             Skipped = report.Skipped,
             Blocked = report.Blocked
         };
+    }
+
+    /// <summary>
+    /// Calculates trend data from run history.
+    /// </summary>
+    private static TrendData CalculateTrends(IReadOnlyList<RunSummary> runs)
+    {
+        if (runs.Count == 0)
+        {
+            return new TrendData();
+        }
+
+        // Calculate overall pass rate
+        var totalPassed = runs.Sum(r => r.Passed);
+        var totalTests = runs.Sum(r => r.Total);
+        var overallPassRate = totalTests > 0 ? (totalPassed * 100m) / totalTests : 0m;
+
+        // Group runs by date for trend points (aggregate by day)
+        var pointsByDate = runs
+            .GroupBy(r => r.StartedAt.Date)
+            .OrderBy(g => g.Key)
+            .Select(g =>
+            {
+                var dayPassed = g.Sum(r => r.Passed);
+                var dayTotal = g.Sum(r => r.Total);
+                var dayFailed = g.Sum(r => r.Failed);
+                return new TrendPoint
+                {
+                    Date = g.Key,
+                    PassRate = dayTotal > 0 ? Math.Round((dayPassed * 100m) / dayTotal, 2) : 0m,
+                    Total = dayTotal,
+                    Passed = dayPassed,
+                    Failed = dayFailed
+                };
+            })
+            .ToList();
+
+        // Calculate trend direction (compare first half to second half)
+        var direction = "stable";
+        if (pointsByDate.Count >= 2)
+        {
+            var midpoint = pointsByDate.Count / 2;
+            var firstHalfAvg = pointsByDate.Take(midpoint).Average(p => p.PassRate);
+            var secondHalfAvg = pointsByDate.Skip(midpoint).Average(p => p.PassRate);
+            var diff = secondHalfAvg - firstHalfAvg;
+
+            if (diff > 5) direction = "improving";
+            else if (diff < -5) direction = "declining";
+        }
+
+        // Calculate trends by suite
+        var suiteTrends = runs
+            .GroupBy(r => r.Suite, StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
+            {
+                var suiteRuns = g.OrderByDescending(r => r.StartedAt).ToList();
+                var suitePassed = suiteRuns.Sum(r => r.Passed);
+                var suiteTotal = suiteRuns.Sum(r => r.Total);
+                var currentRate = suiteTotal > 0 ? Math.Round((suitePassed * 100m) / suiteTotal, 2) : 0m;
+
+                // Calculate change from previous runs
+                decimal change = 0m;
+                if (suiteRuns.Count >= 2)
+                {
+                    var recentRuns = suiteRuns.Take(suiteRuns.Count / 2 + 1).ToList();
+                    var olderRuns = suiteRuns.Skip(suiteRuns.Count / 2 + 1).ToList();
+
+                    if (olderRuns.Count > 0)
+                    {
+                        var recentPassed = recentRuns.Sum(r => r.Passed);
+                        var recentTotal = recentRuns.Sum(r => r.Total);
+                        var recentRate = recentTotal > 0 ? (recentPassed * 100m) / recentTotal : 0m;
+
+                        var olderPassed = olderRuns.Sum(r => r.Passed);
+                        var olderTotal = olderRuns.Sum(r => r.Total);
+                        var olderRate = olderTotal > 0 ? (olderPassed * 100m) / olderTotal : 0m;
+
+                        change = Math.Round(recentRate - olderRate, 2);
+                    }
+                }
+
+                return new SuiteTrend
+                {
+                    Suite = g.Key,
+                    PassRate = currentRate,
+                    RunCount = suiteRuns.Count,
+                    Change = change
+                };
+            })
+            .OrderBy(s => s.Suite)
+            .ToList();
+
+        return new TrendData
+        {
+            Points = pointsByDate,
+            OverallPassRate = Math.Round(overallPassRate, 2),
+            Direction = direction,
+            BySuite = suiteTrends
+        };
+    }
+
+    /// <summary>
+    /// Builds coverage data for visualization from test entries.
+    /// </summary>
+    private static CoverageData BuildCoverageData(IReadOnlyList<TestEntry> testEntries)
+    {
+        var nodes = new List<CoverageNode>();
+        var links = new List<CoverageLink>();
+        var documentNodes = new Dictionary<string, CoverageNode>();
+        var automationNodes = new Dictionary<string, CoverageNode>();
+
+        // Build test nodes and extract document/automation references
+        foreach (var test in testEntries)
+        {
+            var testNodeId = $"test:{test.Id}";
+            var testStatus = test.HasAutomation ? CoverageStatus.Covered : CoverageStatus.Partial;
+
+            nodes.Add(new CoverageNode
+            {
+                Id = testNodeId,
+                Type = NodeType.Test,
+                Name = test.Title,
+                Path = test.File,
+                Status = testStatus
+            });
+
+            // Process source_refs -> document nodes
+            foreach (var sourceRef in test.SourceRefs)
+            {
+                var docNodeId = $"doc:{NormalizeDocPath(sourceRef)}";
+
+                if (!documentNodes.ContainsKey(docNodeId))
+                {
+                    documentNodes[docNodeId] = new CoverageNode
+                    {
+                        Id = docNodeId,
+                        Type = NodeType.Document,
+                        Name = Path.GetFileName(sourceRef),
+                        Path = sourceRef,
+                        Status = CoverageStatus.Covered // Has at least one test
+                    };
+                }
+
+                // Document -> Test link
+                links.Add(new CoverageLink
+                {
+                    Source = docNodeId,
+                    Target = testNodeId,
+                    Type = LinkType.DocumentToTest,
+                    Status = LinkStatus.Valid
+                });
+            }
+
+            // Process automated_by -> automation nodes
+            if (!string.IsNullOrEmpty(test.AutomatedBy))
+            {
+                var automationNodeId = $"auto:{NormalizeDocPath(test.AutomatedBy)}";
+
+                if (!automationNodes.ContainsKey(automationNodeId))
+                {
+                    automationNodes[automationNodeId] = new CoverageNode
+                    {
+                        Id = automationNodeId,
+                        Type = NodeType.Automation,
+                        Name = Path.GetFileName(test.AutomatedBy),
+                        Path = test.AutomatedBy,
+                        Status = CoverageStatus.Covered
+                    };
+                }
+
+                // Test -> Automation link
+                links.Add(new CoverageLink
+                {
+                    Source = testNodeId,
+                    Target = automationNodeId,
+                    Type = LinkType.TestToAutomation,
+                    Status = LinkStatus.Valid
+                });
+            }
+        }
+
+        // Add document nodes
+        nodes.AddRange(documentNodes.Values);
+
+        // Add automation nodes
+        nodes.AddRange(automationNodes.Values);
+
+        // Update document status based on whether all linked tests have automation
+        foreach (var docNode in documentNodes.Values)
+        {
+            var docLinks = links
+                .Where(l => l.Source == docNode.Id && l.Type == LinkType.DocumentToTest)
+                .ToList();
+
+            var linkedTestIds = docLinks.Select(l => l.Target).ToHashSet();
+            var allTestsAutomated = testEntries
+                .Where(t => linkedTestIds.Contains($"test:{t.Id}"))
+                .All(t => t.HasAutomation);
+
+            if (!allTestsAutomated)
+            {
+                // Update to partial since not all tests are automated
+                var index = nodes.IndexOf(docNode);
+                nodes[index] = new CoverageNode
+                {
+                    Id = docNode.Id,
+                    Type = docNode.Type,
+                    Name = docNode.Name,
+                    Path = docNode.Path,
+                    Status = CoverageStatus.Partial,
+                    Children = docNode.Children
+                };
+            }
+        }
+
+        return new CoverageData
+        {
+            Nodes = nodes.OrderBy(n => n.Type).ThenBy(n => n.Id).ToList(),
+            Links = links.OrderBy(l => l.Source).ThenBy(l => l.Target).ToList()
+        };
+    }
+
+    /// <summary>
+    /// Normalizes a document path for use as an ID.
+    /// </summary>
+    private static string NormalizeDocPath(string path)
+    {
+        return path.Replace('\\', '/').Replace('/', '_').Replace('.', '_');
     }
 
     /// <summary>

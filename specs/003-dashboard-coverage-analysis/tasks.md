@@ -119,14 +119,14 @@
 
 ### Implementation for User Story 3
 
-- [ ] T055 [US3] Extend DataCollector to aggregate run history with pass/fail counts
-- [ ] T056 [US3] Create run history page template in dashboard-site/index.html
-- [ ] T057 [US3] Implement run history list rendering (sorted by date) in dashboard-site/scripts/app.js
-- [ ] T058 [US3] Implement run detail view with individual test outcomes in dashboard-site/scripts/app.js
-- [ ] T059 [US3] Implement trend calculation (pass rate over time) in DataCollector
-- [ ] T060 [US3] Render trend visualization (simple chart) in dashboard-site/scripts/app.js
-- [ ] T061 [US3] Style run history and detail views in dashboard-site/styles/main.css
-- [ ] T062 [US3] Add tests for run history aggregation in tests/Spectra.CLI.Tests/Dashboard/DataCollectorTests.cs
+- [X] T055 [US3] Extend DataCollector to aggregate run history with pass/fail counts
+- [X] T056 [US3] Create run history page template in dashboard-site/index.html
+- [X] T057 [US3] Implement run history list rendering (sorted by date) in dashboard-site/scripts/app.js
+- [X] T058 [US3] Implement run detail view with individual test outcomes in dashboard-site/scripts/app.js
+- [X] T059 [US3] Implement trend calculation (pass rate over time) in DataCollector
+- [X] T060 [US3] Render trend visualization (simple chart) in dashboard-site/scripts/app.js
+- [X] T061 [US3] Style run history and detail views in dashboard-site/styles/main.css
+- [X] T062 [US3] Add tests for run history aggregation in tests/Spectra.CLI.Tests/Dashboard/DataCollectorTests.cs
 
 **Checkpoint**: Run history displays correctly with drill-down
 
@@ -173,12 +173,12 @@
 
 ### Implementation for User Story 7
 
-- [ ] T083 [US7] Create CoverageReportWriter in src/Spectra.CLI/Coverage/CoverageReportWriter.cs
-- [ ] T084 [US7] Implement JSON report generation in CoverageReportWriter
-- [ ] T085 [US7] Implement Markdown report generation in CoverageReportWriter
-- [ ] T086 [US7] Add --format flag (json/markdown) to AnalyzeCommand
-- [ ] T087 [US7] Add --output flag for file path to AnalyzeCommand
-- [ ] T088 [US7] Add unit tests for CoverageReportWriter in tests/Spectra.CLI.Tests/Coverage/CoverageReportWriterTests.cs
+- [X] T083 [US7] Create CoverageReportWriter in src/Spectra.CLI/Coverage/CoverageReportWriter.cs
+- [X] T084 [US7] Implement JSON report generation in CoverageReportWriter
+- [X] T085 [US7] Implement Markdown report generation in CoverageReportWriter
+- [X] T086 [US7] Add --format flag (json/markdown) to AnalyzeCommand
+- [X] T087 [US7] Add --output flag for file path to AnalyzeCommand
+- [X] T088 [US7] Add unit tests for CoverageReportWriter in tests/Spectra.CLI.Tests/Coverage/CoverageReportWriterTests.cs
 
 **Checkpoint**: Coverage reports export in both formats to file or stdout
 
@@ -192,16 +192,16 @@
 
 ### Implementation for User Story 4
 
-- [ ] T089 [US4] Extend DataCollector to build CoverageData with nodes and links
-- [ ] T090 [US4] Implement document node extraction from document map in DataCollector
-- [ ] T091 [US4] Implement link building from source_refs and automated_by in DataCollector
-- [ ] T092 [US4] Create coverage map page template in dashboard-site/index.html
-- [ ] T093 [US4] Add D3.js library reference (CDN) to dashboard-site/index.html
-- [ ] T094 [US4] Implement D3.js tree visualization in dashboard-site/scripts/coverage-map.js
-- [ ] T095 [US4] Implement node color coding (green/yellow/red) in coverage-map.js
-- [ ] T096 [US4] Implement node click handler for detail view in coverage-map.js
-- [ ] T097 [US4] Style coverage map visualization in dashboard-site/styles/main.css
-- [ ] T098 [US4] Add tests for coverage data generation in tests/Spectra.CLI.Tests/Dashboard/CoverageDataTests.cs
+- [X] T089 [US4] Extend DataCollector to build CoverageData with nodes and links
+- [X] T090 [US4] Implement document node extraction from document map in DataCollector
+- [X] T091 [US4] Implement link building from source_refs and automated_by in DataCollector
+- [X] T092 [US4] Create coverage map page template in dashboard-site/index.html
+- [X] T093 [US4] Add D3.js library reference (CDN) to dashboard-site/index.html
+- [X] T094 [US4] Implement D3.js tree visualization in dashboard-site/scripts/coverage-map.js
+- [X] T095 [US4] Implement node color coding (green/yellow/red) in coverage-map.js
+- [X] T096 [US4] Implement node click handler for detail view in coverage-map.js
+- [X] T097 [US4] Style coverage map visualization in dashboard-site/styles/main.css
+- [X] T098 [US4] Add tests for coverage data generation in tests/Spectra.CLI.Tests/Dashboard/CoverageDataTests.cs
 
 **Checkpoint**: Coverage mind map renders with correct relationships and colors
 

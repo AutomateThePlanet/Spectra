@@ -251,6 +251,226 @@ public class DataCollectorTests : IDisposable
         Assert.Contains("api", suite.Tags);
     }
 
+    #region Trend Calculation Tests
+
+    [Fact]
+    public async Task CollectAsync_WithNoRuns_ReturnsEmptyTrends()
+    {
+        var collector = new DataCollector(_testDir);
+
+        var data = await collector.CollectAsync();
+
+        Assert.NotNull(data.Trends);
+        Assert.Empty(data.Trends.Points);
+        Assert.Equal(0m, data.Trends.OverallPassRate);
+        Assert.Equal("stable", data.Trends.Direction);
+    }
+
+    [Fact]
+    public async Task CollectAsync_WithSingleRun_CalculatesPassRate()
+    {
+        await CreateRunReportAsync("run-001", "checkout", DateTime.UtcNow, 10, 8, 1, 1, 0);
+        var collector = new DataCollector(_testDir);
+
+        var data = await collector.CollectAsync();
+
+        Assert.NotNull(data.Trends);
+        Assert.Equal(80m, data.Trends.OverallPassRate);
+        Assert.Equal("stable", data.Trends.Direction);
+    }
+
+    [Fact]
+    public async Task CollectAsync_WithMultipleRuns_AggregatesByDate()
+    {
+        var baseDate = DateTime.UtcNow.Date;
+        await CreateRunReportAsync("run-001", "checkout", baseDate.AddHours(9), 10, 8, 2, 0, 0);
+        await CreateRunReportAsync("run-002", "checkout", baseDate.AddHours(14), 10, 9, 1, 0, 0);
+        var collector = new DataCollector(_testDir);
+
+        var data = await collector.CollectAsync();
+
+        Assert.NotNull(data.Trends);
+        Assert.Single(data.Trends.Points); // Same day, should aggregate
+        var point = data.Trends.Points[0];
+        Assert.Equal(baseDate, point.Date);
+        Assert.Equal(20, point.Total);
+        Assert.Equal(17, point.Passed);
+        Assert.Equal(3, point.Failed);
+        Assert.Equal(85m, point.PassRate);
+    }
+
+    [Fact]
+    public async Task CollectAsync_WithMultipleDays_CreatesTrendPoints()
+    {
+        var baseDate = DateTime.UtcNow.Date;
+        await CreateRunReportAsync("run-001", "checkout", baseDate.AddDays(-2), 10, 6, 4, 0, 0);
+        await CreateRunReportAsync("run-002", "checkout", baseDate.AddDays(-1), 10, 8, 2, 0, 0);
+        await CreateRunReportAsync("run-003", "checkout", baseDate, 10, 9, 1, 0, 0);
+        var collector = new DataCollector(_testDir);
+
+        var data = await collector.CollectAsync();
+
+        Assert.NotNull(data.Trends);
+        Assert.Equal(3, data.Trends.Points.Count);
+        // Points should be ordered by date ascending
+        Assert.Equal(baseDate.AddDays(-2), data.Trends.Points[0].Date);
+        Assert.Equal(baseDate.AddDays(-1), data.Trends.Points[1].Date);
+        Assert.Equal(baseDate, data.Trends.Points[2].Date);
+    }
+
+    [Fact]
+    public async Task CollectAsync_WithImprovingTrend_DetectsImprovement()
+    {
+        var baseDate = DateTime.UtcNow.Date;
+        // First half: 50% pass rate
+        await CreateRunReportAsync("run-001", "checkout", baseDate.AddDays(-4), 10, 5, 5, 0, 0);
+        await CreateRunReportAsync("run-002", "checkout", baseDate.AddDays(-3), 10, 5, 5, 0, 0);
+        // Second half: 90% pass rate (improvement > 5%)
+        await CreateRunReportAsync("run-003", "checkout", baseDate.AddDays(-1), 10, 9, 1, 0, 0);
+        await CreateRunReportAsync("run-004", "checkout", baseDate, 10, 9, 1, 0, 0);
+        var collector = new DataCollector(_testDir);
+
+        var data = await collector.CollectAsync();
+
+        Assert.NotNull(data.Trends);
+        Assert.Equal("improving", data.Trends.Direction);
+    }
+
+    [Fact]
+    public async Task CollectAsync_WithDecliningTrend_DetectsDecline()
+    {
+        var baseDate = DateTime.UtcNow.Date;
+        // First half: 90% pass rate
+        await CreateRunReportAsync("run-001", "checkout", baseDate.AddDays(-4), 10, 9, 1, 0, 0);
+        await CreateRunReportAsync("run-002", "checkout", baseDate.AddDays(-3), 10, 9, 1, 0, 0);
+        // Second half: 50% pass rate (decline > 5%)
+        await CreateRunReportAsync("run-003", "checkout", baseDate.AddDays(-1), 10, 5, 5, 0, 0);
+        await CreateRunReportAsync("run-004", "checkout", baseDate, 10, 5, 5, 0, 0);
+        var collector = new DataCollector(_testDir);
+
+        var data = await collector.CollectAsync();
+
+        Assert.NotNull(data.Trends);
+        Assert.Equal("declining", data.Trends.Direction);
+    }
+
+    [Fact]
+    public async Task CollectAsync_WithStableTrend_DetectsStable()
+    {
+        var baseDate = DateTime.UtcNow.Date;
+        // Consistent pass rate (within 5%)
+        await CreateRunReportAsync("run-001", "checkout", baseDate.AddDays(-3), 10, 8, 2, 0, 0);
+        await CreateRunReportAsync("run-002", "checkout", baseDate.AddDays(-2), 10, 8, 2, 0, 0);
+        await CreateRunReportAsync("run-003", "checkout", baseDate.AddDays(-1), 10, 8, 2, 0, 0);
+        await CreateRunReportAsync("run-004", "checkout", baseDate, 10, 8, 2, 0, 0);
+        var collector = new DataCollector(_testDir);
+
+        var data = await collector.CollectAsync();
+
+        Assert.NotNull(data.Trends);
+        Assert.Equal("stable", data.Trends.Direction);
+    }
+
+    [Fact]
+    public async Task CollectAsync_WithMultipleSuites_CalculatesSuiteTrends()
+    {
+        var baseDate = DateTime.UtcNow.Date;
+        await CreateRunReportAsync("run-001", "checkout", baseDate, 10, 9, 1, 0, 0);
+        await CreateRunReportAsync("run-002", "payments", baseDate, 10, 7, 3, 0, 0);
+        var collector = new DataCollector(_testDir);
+
+        var data = await collector.CollectAsync();
+
+        Assert.NotNull(data.Trends);
+        Assert.Equal(2, data.Trends.BySuite.Count);
+        var checkoutTrend = data.Trends.BySuite.First(s => s.Suite == "checkout");
+        var paymentsTrend = data.Trends.BySuite.First(s => s.Suite == "payments");
+        Assert.Equal(90m, checkoutTrend.PassRate);
+        Assert.Equal(70m, paymentsTrend.PassRate);
+    }
+
+    [Fact]
+    public async Task CollectAsync_SuiteTrend_CalculatesRunCount()
+    {
+        var baseDate = DateTime.UtcNow.Date;
+        await CreateRunReportAsync("run-001", "checkout", baseDate.AddDays(-2), 10, 8, 2, 0, 0);
+        await CreateRunReportAsync("run-002", "checkout", baseDate.AddDays(-1), 10, 9, 1, 0, 0);
+        await CreateRunReportAsync("run-003", "checkout", baseDate, 10, 9, 1, 0, 0);
+        var collector = new DataCollector(_testDir);
+
+        var data = await collector.CollectAsync();
+
+        Assert.NotNull(data.Trends);
+        var checkoutTrend = data.Trends.BySuite.First(s => s.Suite == "checkout");
+        Assert.Equal(3, checkoutTrend.RunCount);
+    }
+
+    [Fact]
+    public async Task CollectAsync_SuiteTrend_CalculatesChange()
+    {
+        var baseDate = DateTime.UtcNow.Date;
+        // Older runs: 70% pass rate
+        await CreateRunReportAsync("run-001", "checkout", baseDate.AddDays(-3), 10, 7, 3, 0, 0);
+        await CreateRunReportAsync("run-002", "checkout", baseDate.AddDays(-2), 10, 7, 3, 0, 0);
+        // Recent runs: 90% pass rate
+        await CreateRunReportAsync("run-003", "checkout", baseDate.AddDays(-1), 10, 9, 1, 0, 0);
+        await CreateRunReportAsync("run-004", "checkout", baseDate, 10, 9, 1, 0, 0);
+        var collector = new DataCollector(_testDir);
+
+        var data = await collector.CollectAsync();
+
+        Assert.NotNull(data.Trends);
+        var checkoutTrend = data.Trends.BySuite.First(s => s.Suite == "checkout");
+        Assert.True(checkoutTrend.Change > 0); // Should show improvement
+    }
+
+    [Fact]
+    public async Task CollectAsync_SortedRunsDescending()
+    {
+        var baseDate = DateTime.UtcNow.Date;
+        await CreateRunReportAsync("run-001", "checkout", baseDate.AddDays(-2), 10, 8, 2, 0, 0);
+        await CreateRunReportAsync("run-002", "checkout", baseDate, 10, 9, 1, 0, 0);
+        await CreateRunReportAsync("run-003", "checkout", baseDate.AddDays(-1), 10, 7, 3, 0, 0);
+        var collector = new DataCollector(_testDir);
+
+        var data = await collector.CollectAsync();
+
+        // Runs should be sorted by date descending (most recent first)
+        Assert.Equal("run-002", data.Runs[0].RunId);
+        Assert.Equal("run-003", data.Runs[1].RunId);
+        Assert.Equal("run-001", data.Runs[2].RunId);
+    }
+
+    [Fact]
+    public async Task CollectAsync_MatchesLastRunToSuite()
+    {
+        await CreateSuiteIndexAsync("checkout", ["TC-001", "TC-002"]);
+        var baseDate = DateTime.UtcNow.Date;
+        await CreateRunReportAsync("run-001", "checkout", baseDate.AddDays(-1), 10, 8, 2, 0, 0);
+        await CreateRunReportAsync("run-002", "checkout", baseDate, 10, 9, 1, 0, 0);
+        var collector = new DataCollector(_testDir);
+
+        var data = await collector.CollectAsync();
+
+        var suite = data.Suites.First(s => s.Name == "checkout");
+        Assert.NotNull(suite.LastRun);
+        Assert.Equal("run-002", suite.LastRun.RunId);
+    }
+
+    [Fact]
+    public async Task CollectAsync_WithZeroTests_ReturnsZeroPassRate()
+    {
+        await CreateRunReportAsync("run-001", "checkout", DateTime.UtcNow, 0, 0, 0, 0, 0);
+        var collector = new DataCollector(_testDir);
+
+        var data = await collector.CollectAsync();
+
+        Assert.NotNull(data.Trends);
+        Assert.Equal(0m, data.Trends.OverallPassRate);
+    }
+
+    #endregion
+
     private async Task CreateSuiteIndexAsync(string suiteName, string[] testIds)
     {
         var index = new MetadataIndex
@@ -280,5 +500,38 @@ public class DataCollectorTests : IDisposable
         {
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
         }));
+    }
+
+    private async Task CreateRunReportAsync(
+        string runId,
+        string suite,
+        DateTime startedAt,
+        int total,
+        int passed,
+        int failed,
+        int skipped,
+        int blocked)
+    {
+        var reportsPath = Path.Combine(_testDir, "reports");
+        Directory.CreateDirectory(reportsPath);
+
+        var report = new
+        {
+            RunId = runId,
+            Suite = suite,
+            Status = "completed",
+            StartedAt = startedAt,
+            CompletedAt = startedAt.AddMinutes(5),
+            StartedBy = "tester",
+            Total = total,
+            Passed = passed,
+            Failed = failed,
+            Skipped = skipped,
+            Blocked = blocked
+        };
+
+        await File.WriteAllTextAsync(
+            Path.Combine(reportsPath, $"{runId}.json"),
+            JsonSerializer.Serialize(report));
     }
 }

@@ -186,6 +186,10 @@ function render() {
             break;
         case 'coverage':
             content.innerHTML = renderCoverage();
+            // Initialize D3 visualization after DOM is updated
+            if (typeof window.initCoverageMap === 'function') {
+                setTimeout(() => window.initCoverageMap(), 0);
+            }
             break;
     }
 }
@@ -283,7 +287,7 @@ function renderTests() {
 }
 
 /**
- * Render execution run history
+ * Render execution run history with trend chart
  */
 function renderRuns() {
     if (!data.runs.length) {
@@ -295,15 +299,30 @@ function renderRuns() {
         `;
     }
 
+    const trendChart = renderTrendChart();
+    const trendSummary = renderTrendSummary();
+
     return `
+        ${trendChart}
+        ${trendSummary}
+        <h3 class="section-title">Run History</h3>
         <div class="run-list">
-            ${data.runs.map(r => `
-                <div class="run-row">
+            ${data.runs.map(r => {
+                const passRate = r.total > 0 ? ((r.passed / r.total) * 100).toFixed(1) : 0;
+                return `
+                <div class="run-row clickable" onclick="showRunDetail('${escapeHtml(r.run_id)}')">
                     <div class="run-info">
                         <span class="run-suite">${escapeHtml(r.suite)}</span>
+                        <span class="run-id">${escapeHtml(r.run_id)}</span>
                         <span class="run-date">
                             ${new Date(r.started_at).toLocaleString()} by ${escapeHtml(r.started_by)}
                         </span>
+                    </div>
+                    <div class="run-progress">
+                        <div class="run-progress-bar">
+                            <div class="run-progress-passed" style="width: ${passRate}%"></div>
+                        </div>
+                        <span class="run-progress-label">${passRate}%</span>
                     </div>
                     <div class="run-stats">
                         <div class="run-stat passed">
@@ -324,16 +343,204 @@ function renderRuns() {
                         </div>
                     </div>
                 </div>
-            `).join('')}
+            `}).join('')}
         </div>
     `;
 }
 
 /**
- * Render coverage visualization placeholder
+ * Render trend chart (simple SVG bar chart)
+ */
+function renderTrendChart() {
+    const trends = data.trends;
+    if (!trends || !trends.points || trends.points.length === 0) {
+        return '';
+    }
+
+    const points = trends.points.slice(-14); // Last 14 days
+    const maxRate = 100;
+    const chartHeight = 120;
+    const chartWidth = 100;
+    const barWidth = chartWidth / points.length;
+
+    const bars = points.map((p, i) => {
+        const height = (p.pass_rate / maxRate) * chartHeight;
+        const x = i * barWidth;
+        const y = chartHeight - height;
+        const color = p.pass_rate >= 80 ? 'var(--color-success)' :
+                      p.pass_rate >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
+        const dateStr = new Date(p.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return `
+            <g class="trend-bar" data-date="${dateStr}" data-rate="${p.pass_rate}%">
+                <rect x="${x}%" y="${y}" width="${barWidth - 1}%" height="${height}"
+                      fill="${color}" rx="2"/>
+            </g>
+        `;
+    }).join('');
+
+    return `
+        <div class="trend-chart-container">
+            <h3 class="section-title">Pass Rate Trend (Last 14 Days)</h3>
+            <div class="trend-chart">
+                <svg viewBox="0 0 100 ${chartHeight}" preserveAspectRatio="none" class="trend-svg">
+                    ${bars}
+                </svg>
+                <div class="trend-chart-labels">
+                    ${points.length > 0 ? `
+                        <span>${new Date(points[0].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                        <span>${new Date(points[points.length - 1].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Render trend summary with direction indicator
+ */
+function renderTrendSummary() {
+    const trends = data.trends;
+    if (!trends) return '';
+
+    const directionIcon = trends.direction === 'improving' ? '↑' :
+                          trends.direction === 'declining' ? '↓' : '→';
+    const directionClass = trends.direction === 'improving' ? 'trend-up' :
+                           trends.direction === 'declining' ? 'trend-down' : 'trend-stable';
+
+    return `
+        <div class="trend-summary">
+            <div class="trend-overall">
+                <span class="trend-label">Overall Pass Rate</span>
+                <span class="trend-value">${trends.overall_pass_rate}%</span>
+                <span class="trend-direction ${directionClass}">${directionIcon} ${trends.direction}</span>
+            </div>
+            ${trends.by_suite && trends.by_suite.length > 0 ? `
+                <div class="trend-by-suite">
+                    ${trends.by_suite.map(s => {
+                        const changeIcon = s.change > 0 ? '↑' : s.change < 0 ? '↓' : '→';
+                        const changeClass = s.change > 0 ? 'trend-up' : s.change < 0 ? 'trend-down' : 'trend-stable';
+                        return `
+                            <div class="suite-trend">
+                                <span class="suite-trend-name">${escapeHtml(s.suite)}</span>
+                                <span class="suite-trend-rate">${s.pass_rate}%</span>
+                                <span class="suite-trend-change ${changeClass}">${changeIcon} ${Math.abs(s.change).toFixed(1)}%</span>
+                                <span class="suite-trend-runs">${s.run_count} runs</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+/**
+ * Show detailed run view with individual test results
+ */
+function showRunDetail(runId) {
+    const run = data.runs.find(r => r.run_id === runId);
+    if (!run) return;
+
+    const passRate = run.total > 0 ? ((run.passed / run.total) * 100).toFixed(1) : 0;
+    const duration = run.duration_seconds ? formatDuration(run.duration_seconds) : 'N/A';
+
+    const content = document.getElementById('content');
+    content.innerHTML = `
+        <div class="card run-detail">
+            <button class="back-btn" onclick="render()">← Back to Runs</button>
+            <h2>Run: ${escapeHtml(run.run_id)}</h2>
+            <div class="run-detail-meta">
+                <div class="stat">
+                    <span class="stat-label">Suite</span>
+                    <span class="stat-value">${escapeHtml(run.suite)}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Status</span>
+                    <span class="stat-value badge ${run.status}">${escapeHtml(run.status)}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Started</span>
+                    <span class="stat-value">${new Date(run.started_at).toLocaleString()}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Duration</span>
+                    <span class="stat-value">${duration}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Executed By</span>
+                    <span class="stat-value">${escapeHtml(run.started_by)}</span>
+                </div>
+            </div>
+            <div class="run-detail-summary">
+                <div class="run-progress large">
+                    <div class="run-progress-bar">
+                        <div class="run-progress-passed" style="width: ${passRate}%"></div>
+                    </div>
+                    <span class="run-progress-label">${passRate}% Pass Rate</span>
+                </div>
+                <div class="run-detail-stats">
+                    <div class="run-stat large passed">
+                        <div class="run-stat-value">${run.passed}</div>
+                        <div class="run-stat-label">Passed</div>
+                    </div>
+                    <div class="run-stat large failed">
+                        <div class="run-stat-value">${run.failed}</div>
+                        <div class="run-stat-label">Failed</div>
+                    </div>
+                    <div class="run-stat large">
+                        <div class="run-stat-value">${run.skipped}</div>
+                        <div class="run-stat-label">Skipped</div>
+                    </div>
+                    <div class="run-stat large">
+                        <div class="run-stat-value">${run.blocked}</div>
+                        <div class="run-stat-label">Blocked</div>
+                    </div>
+                    <div class="run-stat large">
+                        <div class="run-stat-value">${run.total}</div>
+                        <div class="run-stat-label">Total</div>
+                    </div>
+                </div>
+            </div>
+            ${run.results && run.results.length > 0 ? `
+                <h3 class="section-title">Test Results</h3>
+                <div class="result-list">
+                    ${run.results.map(r => `
+                        <div class="result-row ${r.status}">
+                            <span class="result-status badge ${r.status}">${r.status}</span>
+                            <span class="result-id">${escapeHtml(r.test_id)}</span>
+                            <span class="result-title">${escapeHtml(r.title || '')}</span>
+                            ${r.duration_ms ? `<span class="result-duration">${r.duration_ms}ms</span>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            ` : `
+                <div class="empty-state small">
+                    <p>Detailed test results not available for this run.</p>
+                </div>
+            `}
+        </div>
+    `;
+}
+
+/**
+ * Format duration in seconds to human readable string
+ */
+function formatDuration(seconds) {
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (minutes < 60) return `${minutes}m ${secs}s`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h ${mins}m`;
+}
+
+/**
+ * Render coverage visualization
  */
 function renderCoverage() {
-    if (!data.coverage || !data.coverage.nodes) {
+    if (!data.coverage || !data.coverage.nodes || data.coverage.nodes.length === 0) {
         return `
             <div class="empty-state">
                 <h2>No coverage data</h2>
@@ -342,11 +549,16 @@ function renderCoverage() {
         `;
     }
 
-    // Placeholder for D3.js visualization (Phase 8)
+    // Use the coverage map visualization from coverage-map.js
+    if (typeof window.renderCoverageMap === 'function') {
+        return window.renderCoverageMap();
+    }
+
+    // Fallback if coverage-map.js not loaded
     return `
         <div class="empty-state">
             <h2>Coverage Visualization</h2>
-            <p>D3.js visualization will be loaded here.</p>
+            <p>Coverage map script not loaded.</p>
         </div>
     `;
 }

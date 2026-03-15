@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Spectra.CLI.Agent.Tools;
+using Spectra.CLI.Coverage;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.IO;
 using Spectra.CLI.Source;
@@ -379,15 +380,27 @@ public sealed class AnalyzeHandler
             }
         }
 
-        // Write JSON report if output specified and format is JSON
-        if (outputPath is not null && format == ReportFormat.Json)
+        // Write report to file if output specified
+        if (outputPath is not null)
         {
-            var json = JsonSerializer.Serialize(report, new JsonSerializerOptions
+            var writer = new CoverageReportWriter();
+            var coverageFormat = format switch
             {
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            });
-            File.WriteAllText(outputPath.Replace(".txt", "-automation.json"), json);
+                ReportFormat.Json => CoverageReportFormat.Json,
+                ReportFormat.Markdown => CoverageReportFormat.Markdown,
+                _ => CoverageReportFormat.Json
+            };
+
+            // Ensure proper file extension
+            var extension = coverageFormat == CoverageReportFormat.Markdown ? ".md" : ".json";
+            var finalPath = outputPath;
+            if (!Path.HasExtension(outputPath))
+            {
+                finalPath = outputPath + extension;
+            }
+
+            writer.WriteAsync(finalPath, report, coverageFormat).GetAwaiter().GetResult();
+            Console.WriteLine($"Report written to: {finalPath}");
         }
     }
 }

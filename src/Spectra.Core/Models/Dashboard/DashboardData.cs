@@ -34,4 +34,8 @@ public sealed record DashboardData
     /// <summary>Coverage visualization data.</summary>
     [JsonPropertyName("coverage")]
     public CoverageData? Coverage { get; init; }
+
+    /// <summary>Trend data for pass rate over time.</summary>
+    [JsonPropertyName("trends")]
+    public TrendData? Trends { get; init; }
 }
