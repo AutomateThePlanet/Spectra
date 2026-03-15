@@ -40,7 +40,8 @@
       "Bash(git checkout:*)",
       "Bash(git stash:*)",
       "Bash(git merge 001-ai-test-generation-cli --no-ff -m \"$\\(cat <<''EOF''\nMerge 001-ai-test-generation-cli: AI Test Generation CLI\n\nPhase 1 complete - AI-native test generation framework:\n- CLI commands: init, validate, index, list, show, config, ai generate/update/analyze\n- Core library: parsing, validation, models, indexing\n- AI agent tools with GitHub Copilot SDK integration\n- Multi-provider chain with fallback support\n- 203 tests passing\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(git merge:*)"
     ]
   }
 }
