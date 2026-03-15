@@ -236,13 +236,22 @@ Manual test cases are stored as Markdown files in `tests/{suite}/*.md`.
 ---
 id: TC-102
 priority: high
+type: manual
 tags: [payments, negative]
 component: checkout
 preconditions: User is logged in with a valid account
 environment: [staging, uat]
 estimated_duration: 5m
 depends_on: TC-101
+requirements:
+  - REQ-042: "Payment with expired card must be rejected"
+  - US-15: "As a user, I want clear error messages on payment failure"
+acceptance_criteria:
+  - "Error message contains reason for rejection"
+  - "User remains on checkout page"
+  - "No charge is created"
 source_refs: [docs/features/checkout/payment-methods.md]
+automated_by: []
 related_work_items: [AB#1234]
 ---
 
@@ -277,6 +286,7 @@ related_work_items: [AB#1234]
 | -------- | -------- | -------- | -------------------------------- |
 | id       | string   | yes      | Unique identifier (e.g., TC-102) |
 | priority | enum     | yes      | high, medium, low                |
+| type     | enum     | yes      | manual, automated, both (default: manual) |
 | tags     | string[] | no       | Filterable labels                |
 | component| string   | no       | System component under test      |
 
@@ -288,8 +298,31 @@ related_work_items: [AB#1234]
 | environment        | string[] | Valid environments (staging, uat, prod)         |
 | estimated_duration | string   | Estimated execution time (e.g., 5m, 1h)       |
 | depends_on         | string   | Test ID that must pass before this one         |
+| requirements       | string[] | Traced requirement/story IDs (e.g., REQ-042, US-15) |
+| acceptance_criteria| string[] | Acceptance criteria from the requirement       |
 | source_refs        | string[] | Doc files this test was generated from         |
+| automated_by       | string[] | Paths to automation test files that cover this test case |
 | related_work_items | string[] | Azure DevOps/Jira IDs (e.g., AB#1234)         |
+
+### Traceability Model
+
+The metadata fields create a full traceability chain:
+
+```
+Documentation (docs/)
+  → source_refs: which doc this test was generated from
+  → requirements: which requirement/story this test validates
+  → acceptance_criteria: specific criteria being verified
+
+Test Case (tests/)
+  → type: manual, automated, or both
+  → automated_by: paths to automation code covering this test
+
+Automation Code (e.g., BELLATRIX tests)
+  → [TestCase("TC-102")] attribute links back to manual test
+```
+
+Bidirectional linking: `automated_by` in the Markdown points to automation code; `[TestCase("TC-102")]` in the automation code points back. `spectra ai analyze --coverage` scans both directions and reports mismatches.
 
 ### Extension Mechanism
 
@@ -314,16 +347,24 @@ Each suite folder contains an auto-generated `_index.json`.
   "suite": "checkout",
   "generated_at": "2026-03-13T10:00:00Z",
   "test_count": 42,
+  "summary": {
+    "manual": 28,
+    "automated": 10,
+    "both": 4
+  },
   "tests": [
     {
       "id": "TC-101",
       "file": "checkout-happy-path.md",
       "title": "Checkout with valid Visa card",
       "priority": "high",
+      "type": "both",
       "tags": ["smoke", "payments"],
       "component": "checkout",
       "depends_on": null,
-      "source_refs": ["docs/features/checkout/checkout-flow.md"]
+      "requirements": ["REQ-041"],
+      "source_refs": ["docs/features/checkout/checkout-flow.md"],
+      "automated_by": ["tests/automation/checkout/HappyPathTest.cs"]
     }
   ]
 }
@@ -369,7 +410,94 @@ Process:
 
 ---
 
-## 9. CLI Architecture
+## 9. Test Generation Profile
+
+A `spectra.profile.md` file at the repo root provides natural language instructions that customize how the AI generates test cases. The profile is optional — if absent, generation uses built-in defaults.
+
+### Why Markdown
+
+The profile is instructions for an AI agent. Natural language is the most effective format. JSON schema for "how detailed should steps be" is either too rigid or too complex. Markdown allows both structure and free-form guidance.
+
+### Location
+
+```
+repo/
+├── spectra.profile.md              ← repo-wide generation profile
+├── spectra.config.json
+└── tests/
+    ├── checkout/
+    │   ├── _profile.md             ← optional suite-level override
+    │   ├── _index.json
+    │   └── *.md
+    └── auth/
+        └── *.md                    ← uses repo-wide profile
+```
+
+Suite-level `_profile.md` overrides the repo-wide profile for that suite only. If neither exists, built-in defaults apply.
+
+### Profile Content
+
+The profile can customize any aspect of test generation:
+
+- **Detail level**: how granular test steps should be
+- **Scenario coverage**: minimum negative scenarios, security scenarios, boundary tests per feature
+- **Domain-specific rules**: extra scenarios for payments, auth, PII/GDPR
+- **Formatting**: bullet points vs paragraphs, action verb requirements, test data requirements
+- **Priority rules**: which categories get which priority
+- **Tag conventions**: required tags, naming patterns
+- **Exclusions**: what NOT to generate
+
+### `spectra init-profile` Command
+
+Interactive questionnaire that generates `spectra.profile.md`:
+
+```bash
+spectra init-profile
+
+? How detailed should test steps be?
+  (1) High-level  (2) Detailed  (3) Very detailed
+
+? Minimum negative scenarios per feature? > 3
+
+? Do you handle payments? (y/n)
+? Do you handle authentication? (y/n)
+? Do you handle personal data (GDPR/PII)? (y/n)
+
+? Default priority? (1) high  (2) medium  (3) low
+
+? Expected Result format? (1) Bullet points  (2) Paragraphs
+
+? Areas to EXCLUDE from generation?
+  > third-party integrations, load testing
+
+✓ Generated spectra.profile.md
+```
+
+### How It's Used
+
+The `spectra ai generate` command automatically loads the profile:
+
+1. Load `spectra.profile.md` (repo-wide)
+2. If suite has `_profile.md`, use it instead
+3. Include profile content in the AI session system context alongside the SKILL.md
+4. Agent follows both SKILL.md (format, tools, process) and profile (content, quality, style rules)
+
+The profile applies only to generation. `spectra ai update` does not use it — updates compare existing tests against documentation, not generate from scratch.
+
+### Configuration
+
+```json
+{
+  "generation": {
+    "profile": "spectra.profile.md",
+    "suite_profile_name": "_profile.md"
+  }
+}
+```
+
+---
+
+## 10. CLI Architecture
 
 ### Design: Deterministic Workflow Shell + Copilot SDK Agent Steps
 
@@ -395,7 +523,7 @@ Where human judgment is needed, the CLI enters a structured review flow — guid
 
 ---
 
-## 10. Source Document Discovery
+## 11. Source Document Discovery
 
 The agent doesn't load all documentation files at once. It uses a two-phase discovery pattern.
 
@@ -442,7 +570,7 @@ If present, the agent uses this as a guide instead of discovering from the raw f
 
 ---
 
-## 11. Provider Chain
+## 12. Provider Chain
 
 ### Problem
 
@@ -491,7 +619,7 @@ testrunner ai generate --suite checkout --provider anthropic
 
 ---
 
-## 12. Batch Generation
+## 13. Batch Generation
 
 ### `testrunner ai generate`
 
@@ -581,7 +709,7 @@ Options:
 
 ---
 
-## 13. Batch Update
+## 14. Batch Update
 
 ### `testrunner ai update`
 
@@ -623,7 +751,7 @@ The update command sweeps all tests in a suite folder, compares against current 
 
 ---
 
-## 14. Coverage Analysis
+## 15. Coverage Analysis
 
 ### `testrunner ai analyze`
 
@@ -640,7 +768,7 @@ Produces a coverage report: uncovered areas, redundant tests, priority suggestio
 
 ---
 
-## 15. CLI Tool Registry
+## 16. CLI Tool Registry
 
 ### Source Navigation Tools
 
@@ -668,7 +796,7 @@ Produces a coverage report: uncovered areas, redundant tests, priority suggestio
 
 ---
 
-## 16. Agent Skills
+## 17. Agent Skills
 
 The CLI ships with Copilot Agent Skills in `.github/skills/`. Skills are loaded into the agent's context per the Agent Skills standard — they work across Copilot CLI, VS Code, and the SDK.
 
@@ -708,26 +836,27 @@ Use `batch_write_tests` to submit all tests. NEVER write files directly.
 
 ---
 
-## 17. CLI Commands (Complete)
+## 18. CLI Commands (Complete)
 
 ### Core
 
 ```
-testrunner init              Initialize repo (config, folders, skills, .gitignore)
-testrunner validate          Validate all test files and indexes
-testrunner index             Rebuild _index.json for all suites
-testrunner list              List suites and test counts
-testrunner show <test-id>    Display a test case
-testrunner config            Show effective configuration
+spectra init                 Initialize repo (config, folders, skills, .gitignore)
+spectra init-profile         Interactive questionnaire to generate spectra.profile.md
+spectra validate             Validate all test files and indexes
+spectra index                Rebuild _index.json for all suites
+spectra list                 List suites and test counts
+spectra show <test-id>       Display a test case
+spectra config               Show effective configuration
 ```
 
 ### AI Generation and Maintenance
 
 ```
-testrunner ai generate       Batch generate tests for a suite
-testrunner ai update         Batch update tests against current docs
-testrunner ai analyze        Coverage and quality analysis
-testrunner ai chat           Interactive exploratory chat (Phase 3)
+spectra ai generate          Batch generate tests for a suite
+spectra ai update            Batch update tests against current docs
+spectra ai analyze           Coverage and quality analysis
+spectra ai chat              Interactive exploratory chat (Phase 3)
 ```
 
 ### Validation Rules (`testrunner validate`)
@@ -745,7 +874,7 @@ testrunner ai chat           Interactive exploratory chat (Phase 3)
 
 ---
 
-## 18. Execution Engine
+## 19. Execution Engine
 
 The execution engine is a deterministic state machine with explicit states and validated transitions.
 
@@ -783,7 +912,7 @@ The MCP server rejects any tool call that violates state transitions:
 
 ---
 
-## 19. Execution State Storage
+## 20. Execution State Storage
 
 SQLite database at `.execution/testrunner.db`.
 
@@ -822,7 +951,7 @@ Run IDs are UUIDs.
 
 ---
 
-## 20. Test Handle Pattern
+## 21. Test Handle Pattern
 
 Opaque, non-guessable handles prevent context explosion and handle forgery.
 
@@ -858,7 +987,7 @@ Validated on every tool call. Rejected if:
 
 ---
 
-## 21. MCP Server
+## 22. MCP Server
 
 ### Responsibilities
 
@@ -882,7 +1011,7 @@ Every response includes context the orchestrator needs without remembering histo
 
 ---
 
-## 22. MCP Tool API
+## 23. MCP Tool API
 
 ### Run Management
 
@@ -965,7 +1094,7 @@ When no more tests:
 
 ---
 
-## 23. Execution Flow
+## 24. Execution Flow
 
 ### Happy Path
 
@@ -1023,12 +1152,18 @@ No sync between systems. The orchestrator calls each MCP server as needed.
 
 ---
 
-## 24. Reports
+## 25. Reports
 
 ### Storage
 
 ```
-reports/{run_id}.json
+reports/
+├── {run_id}.json              # Machine-readable report
+├── {run_id}.html              # Self-contained HTML report (inline CSS, no external assets)
+└── {run_id}/
+    └── attachments/           # Screenshots and other files
+        ├── TC-102-failure.png
+        └── TC-105-screenshot.png
 ```
 
 Gitignored by default. Configurable persistence:
@@ -1037,14 +1172,29 @@ Gitignored by default. Configurable persistence:
 {
   "reports": {
     "persistence": "local",
-    "export_path": null
+    "export_path": null,
+    "formats": ["json", "html"],
+    "attachments": {
+      "storage": "local"
+    }
   }
 }
 ```
 
-Options: `local` (default), `export` (copy to configured path after finalization).
+Options for `persistence`: `local` (default), `export` (copy to configured path after finalization).
+Options for `attachments.storage`: `local` (default, filesystem), `azure-blob` (Phase 3).
 
-### Report Structure
+### Report Generation
+
+`finalize_execution_run` generates both JSON and HTML reports automatically:
+- **JSON**: Machine-readable, used by dashboard and CI integrations
+- **HTML**: Self-contained, opens directly in any browser, no server needed. Uses inline CSS and embedded data. Includes pass/fail summary, per-test results with notes, duration, and links to attachments.
+
+### Attachments
+
+MCP tool `attach_file` accepts a local file path and associates it with the current test in the active run. Files are copied to `reports/{run_id}/attachments/` with a name prefix of the test ID.
+
+### Report Structure (JSON)
 
 ```json
 {
@@ -1068,7 +1218,16 @@ Options: `local` (default), `export` (copy to configured path after finalization
       "status": "PASSED",
       "attempt": 1,
       "duration_seconds": 120,
-      "notes": null
+      "notes": null,
+      "attachments": []
+    },
+    {
+      "test_id": "TC-102",
+      "status": "FAILED",
+      "attempt": 1,
+      "duration_seconds": 95,
+      "notes": "Error message shows generic text instead of 'card expired'",
+      "attachments": ["reports/a3f7c291/attachments/TC-102-failure.png"]
     }
   ]
 }
@@ -1076,7 +1235,7 @@ Options: `local` (default), `export` (copy to configured path after finalization
 
 ---
 
-## 25. User Identity
+## 26. User Identity
 
 ### Resolution (priority order)
 
@@ -1088,7 +1247,7 @@ Recorded on the run and on each test result.
 
 ---
 
-## 26. Concurrency Model
+## 27. Concurrency Model
 
 - Same user, different suites: Allowed
 - Same user, same suite: Blocked (must finalize/cancel/timeout first)
@@ -1096,7 +1255,7 @@ Recorded on the run and on each test result.
 
 ---
 
-## 27. Security
+## 28. Security
 
 ### Path Sanitization
 
@@ -1122,7 +1281,7 @@ Handles contain a random component. Single-use per attempt. Expired or foreign h
 
 ---
 
-## 28. Configuration File
+## 29. Configuration File
 
 ### `testrunner.config.json`
 
@@ -1167,7 +1326,9 @@ Handles contain a random component. Single-use per attempt. Expired or foreign h
     "default_count": 15,
     "require_review": true,
     "duplicate_threshold": 0.6,
-    "categories": ["happy_path", "negative", "boundary", "integration"]
+    "categories": ["happy_path", "negative", "boundary", "integration"],
+    "profile": "spectra.profile.md",
+    "suite_profile_name": "_profile.md"
   },
 
   "update": {
@@ -1211,7 +1372,7 @@ Handles contain a random component. Single-use per attempt. Expired or foreign h
 
 ---
 
-## 29. Non-Functional Requirements
+## 30. Non-Functional Requirements
 
 | Requirement           | Detail                                                    |
 | --------------------- | --------------------------------------------------------- |
@@ -1231,27 +1392,28 @@ Handles contain a random component. Single-use per attempt. Expired or foreign h
 
 ---
 
-## 30. Development Phases
+## 31. Development Phases
 
 ### Phase 1: AI Test Generation CLI
 
 The core product. Ship this first, get it used, iterate.
 
 **Deliverables:**
-- Markdown test format with full metadata schema
-- `_index.json` per suite, `testrunner validate`, `testrunner index`
-- `testrunner init` (scaffolds config, folders, skills, .gitignore)
+- Markdown test format with full metadata schema (including type, requirements, acceptance_criteria, automated_by)
+- `_index.json` per suite, `spectra validate`, `spectra index`
+- `spectra init` (scaffolds config, folders, skills, .gitignore)
+- `spectra init-profile` (interactive questionnaire → `spectra.profile.md`)
 - Two-folder model (`docs/` → `tests/`)
 - Document map builder + selective loading
-- `testrunner ai generate` with batch workflow
-- `testrunner ai update` with suite-sweep
-- `testrunner ai analyze`
+- `spectra ai generate` with batch workflow (loads profile before generation)
+- `spectra ai update` with suite-sweep
+- `spectra ai analyze`
 - Provider chain with auto-fallback (Copilot + BYOK)
 - Batch review UX (summary-first)
 - test-generation + test-update SKILL.md files
 - `source_refs` auto-population in frontmatter
 - GitHub Actions workflow for validation on PR
-- `testrunner list`, `testrunner show`, `testrunner config`
+- `spectra list`, `spectra show`, `spectra config`
 
 **Exit criteria:** A team can install the CLI, point it at their docs folder, and generate a complete test suite with one command.
 
@@ -1266,34 +1428,53 @@ Only after the CLI is stable and useful on its own.
 - SQLite execution storage
 - Test handles with validation
 - Dependency-based auto-skip
-- JSON reports with configurable persistence
+- JSON + HTML report generation at finalize
+- Screenshot/attachment support (local filesystem)
 - Run history
 - User identity integration
 - Concurrency rules enforcement
+- Test filtering by `type` (run only manual tests, skip automated)
 
-**Exit criteria:** A tester can execute a full test suite from Copilot Chat or Claude using only MCP tool calls.
+**Exit criteria:** A tester can execute a full test suite from Copilot Chat or Claude using only MCP tool calls, and receive both JSON and HTML reports with attached screenshots.
 
-### Phase 3: Integrations and Ecosystem
+### Phase 3: Dashboard, Coverage, and Integrations
 
 **Deliverables:**
-- Document cross-MCP patterns (Azure DevOps + TestRunner + Teams)
+
+*Dashboard:*
+- `spectra dashboard` CLI command generates static HTML site from indexes + reports
+- Suite browser: navigate suites, filter by priority/tags/component/type
+- Test case viewer: rendered Markdown with traceability metadata
+- Run history: past runs with pass/fail summary and drill-down
+- Coverage mind map: tree visualization showing docs → requirements → tests → automation, color-coded by coverage status (green=automated, yellow=manual only, red=no tests)
+- GitHub OAuth authentication: only users with repo access can view the dashboard
+- Deployment via GitHub Action to Cloudflare Pages (serverless OAuth callback function)
+
+*Coverage Analysis:*
+- `spectra ai analyze --coverage`: scans both test Markdown (`automated_by` field) and automation code (`[TestCase("TC-xxx")]` attributes) for bidirectional link verification
+- Reports: unlinked manual tests (no automation), unlinked automation tests (no manual test), broken links (file references that don't exist), coverage percentage per suite/component
+
+*Integrations:*
+- Document cross-MCP patterns (Azure DevOps + SPECTRA + Teams)
 - Copilot Spaces as knowledge source (`--space` flag)
-- `testrunner ai chat` interactive mode
-- Optional Runner UI for non-VS Code users
+- `spectra ai chat` interactive mode
+- Azure Blob Storage for attachments (`attachments.storage: azure-blob`)
 - Report export targets
 - Notification patterns (Teams/Slack via orchestrator)
 
-**Exit criteria:** A team can run tests, log bugs in Azure DevOps, and post results to Teams — all from one chat session.
+**Exit criteria:** A team can browse tests and run results in a web dashboard, see automation coverage gaps in a mind map, and deploy the dashboard with one GitHub Action.
 
 ---
 
-## 31. Future Extensions
+## 32. Future Extensions
 
 - Risk-based test selection
 - AI coverage analysis against production usage data
 - Change impact analysis (code change → affected tests)
 - Test flakiness detection (pass/fail history tracking)
 - Parallel execution support (split suite across testers)
-- Screenshot/attachment handling via Runner UI
 - Embedding-based dedup for suites with 500+ tests
 - CI mode for automated generation pipelines
+- Automation code generation from manual test cases (manual → BELLATRIX test stub)
+- Requirements import from Azure DevOps/Jira (populate requirements field automatically)
+- Coverage trend tracking over time (historical mind maps)
