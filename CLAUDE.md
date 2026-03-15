@@ -18,6 +18,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-13
 src/
 ├── Spectra.CLI/              # .NET CLI application
 │   ├── Commands/             # Command handlers
+│   │   ├── Analyze/          # Coverage analysis command
+│   │   └── Dashboard/        # Dashboard generation command
 │   ├── Agent/                # Copilot SDK integration
 │   ├── Source/               # Document map builder
 │   ├── Index/                # _index.json operations
@@ -25,17 +27,37 @@ src/
 │   ├── Review/               # Interactive terminal UI
 │   ├── Provider/             # Multi-provider chain
 │   ├── Config/               # Configuration loader
+│   ├── Dashboard/            # Dashboard data collection and generation
+│   ├── Coverage/             # Coverage report writing
 │   └── IO/                   # File writers
 ├── Spectra.Core/             # Shared library
 │   ├── Models/               # TestCase, Suite, Config models
+│   │   ├── Dashboard/        # DashboardData, SuiteStats, TestEntry, etc.
+│   │   └── Coverage/         # CoverageReport, CoverageLink, etc.
+│   ├── Coverage/             # AutomationScanner, LinkReconciler, CoverageCalculator
+│   ├── Storage/              # ExecutionDbReader
 │   ├── Parsing/              # Markdown + YAML parser
 │   ├── Validation/           # Schema validation
 │   └── Index/                # Index read/write
 └── Spectra.GitHub/           # GitHub integration (future)
 
+dashboard-site/               # Static dashboard template
+├── index.html                # Main template with {{DASHBOARD_DATA}} placeholder
+├── styles/main.css           # Dashboard styles
+├── scripts/
+│   ├── app.js                # Main dashboard JavaScript
+│   └── coverage-map.js       # D3.js coverage visualization
+├── functions/                # Cloudflare Pages functions (auth)
+│   ├── _middleware.js        # OAuth middleware
+│   └── auth/callback.js      # OAuth callback handler
+└── access-denied.html        # Auth error page
+
 tests/
 ├── Spectra.Core.Tests/       # Unit tests
+│   └── Coverage/             # AutomationScanner, LinkReconciler, Calculator tests
 ├── Spectra.CLI.Tests/        # Integration tests
+│   ├── Dashboard/            # DataCollector, Generator tests
+│   └── Coverage/             # CoverageReportWriter tests
 └── TestFixtures/             # Sample data
 ```
 
@@ -50,6 +72,17 @@ dotnet test
 
 # Run CLI
 dotnet run --project src/Spectra.CLI -- <command>
+
+# Dashboard Generation (003)
+spectra dashboard --output ./site
+spectra dashboard --output ./site --title "My Dashboard"
+spectra dashboard --dry-run  # Preview without generating
+
+# Coverage Analysis (003)
+spectra ai analyze --coverage
+spectra ai analyze --coverage --format json --output coverage.json
+spectra ai analyze --coverage --format markdown --output coverage.md
+spectra ai analyze --coverage --verbosity detailed
 ```
 
 ## Code Style

@@ -1,0 +1,131 @@
+# SPECTRA Dashboard Deployment Workflow
+#
+# This workflow automatically regenerates and deploys the SPECTRA dashboard
+# whenever test files or execution reports change.
+#
+# Setup Instructions:
+# 1. Copy this file to .github/workflows/dashboard.yml
+# 2. Create a Cloudflare Pages project for your dashboard
+# 3. Add the following secrets to your GitHub repository:
+#    - CF_API_TOKEN: Cloudflare API token with Pages permissions
+#    - CF_ACCOUNT_ID: Your Cloudflare account ID
+# 4. Update the 'projectName' below to match your Cloudflare Pages project
+#
+# For authentication setup, see the dashboard quickstart guide.
+
+name: Deploy SPECTRA Dashboard
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      # Trigger on test file changes
+      - 'tests/**'
+      # Trigger on execution report changes
+      - 'reports/**'
+      # Trigger on index changes
+      - '**/index.json'
+      # Trigger on configuration changes
+      - 'spectra.config.json'
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+# Prevent concurrent deployments
+concurrency:
+  group: dashboard-deploy
+  cancel-in-progress: true
+
+jobs:
+  generate-and-deploy:
+    runs-on: ubuntu-latest
+    name: Generate and Deploy Dashboard
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for accurate generation
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0'
+
+      - name: Install SPECTRA CLI
+        run: dotnet tool install -g spectra-cli
+
+      - name: Rebuild test indexes
+        run: spectra index --all
+
+      - name: Generate dashboard
+        run: spectra dashboard --output ./dashboard-output
+
+      - name: Run coverage analysis
+        run: |
+          spectra ai analyze --coverage --format json --output ./dashboard-output/coverage-report.json
+        continue-on-error: true  # Don't fail if no automation configured
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          projectName: spectra-dashboard  # TODO: Update to your project name
+          directory: ./dashboard-output
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post deployment summary
+        run: |
+          echo "## Dashboard Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The SPECTRA dashboard has been updated and deployed." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+  # Optional: Run coverage analysis and post to PR
+  coverage-check:
+    runs-on: ubuntu-latest
+    name: Coverage Analysis
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0'
+
+      - name: Install SPECTRA CLI
+        run: dotnet tool install -g spectra-cli
+
+      - name: Run coverage analysis
+        run: |
+          spectra ai analyze --coverage --format markdown > coverage.md
+          cat coverage.md >> $GITHUB_STEP_SUMMARY
+        continue-on-error: true
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        if: always()
+        with:
+          script: |
+            const fs = require('fs');
+            let body = '## SPECTRA Coverage Analysis\n\n';
+
+            try {
+              body += fs.readFileSync('coverage.md', 'utf8');
+            } catch {
+              body += '_Coverage analysis not available._';
+            }
+
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });

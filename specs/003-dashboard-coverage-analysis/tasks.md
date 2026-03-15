@@ -215,13 +215,13 @@
 
 ### Implementation for User Story 6
 
-- [ ] T099 [US6] Create Cloudflare Pages middleware template in dashboard-site/functions/_middleware.js
-- [ ] T100 [US6] Implement session cookie checking in middleware
-- [ ] T101 [US6] Implement GitHub OAuth redirect flow in middleware
-- [ ] T102 [US6] Create OAuth callback handler in dashboard-site/functions/auth/callback.js
-- [ ] T103 [US6] Implement repository access verification in callback handler
-- [ ] T104 [US6] Implement access denied page template in dashboard-site/access-denied.html
-- [ ] T105 [US6] Add auth configuration documentation to quickstart.md
+- [X] T099 [US6] Create Cloudflare Pages middleware template in dashboard-site/functions/_middleware.js
+- [X] T100 [US6] Implement session cookie checking in middleware
+- [X] T101 [US6] Implement GitHub OAuth redirect flow in middleware
+- [X] T102 [US6] Create OAuth callback handler in dashboard-site/functions/auth/callback.js
+- [X] T103 [US6] Implement repository access verification in callback handler
+- [X] T104 [US6] Implement access denied page template in dashboard-site/access-denied.html
+- [X] T105 [US6] Add auth configuration documentation to quickstart.md
 
 **Checkpoint**: Authentication blocks unauthorized users, allows authorized users
 
@@ -235,11 +235,11 @@
 
 ### Implementation for User Story 8
 
-- [ ] T106 [US8] Create GitHub Action workflow template in .github/workflows/dashboard.yml.template
-- [ ] T107 [US8] Implement workflow triggers for tests/** and reports/** paths
-- [ ] T108 [US8] Add dashboard generation step using spectra CLI
-- [ ] T109 [US8] Add Cloudflare Pages deployment step
-- [ ] T110 [US8] Document workflow setup in quickstart.md
+- [X] T106 [US8] Create GitHub Action workflow template in .github/workflows/dashboard.yml.template
+- [X] T107 [US8] Implement workflow triggers for tests/** and reports/** paths
+- [X] T108 [US8] Add dashboard generation step using spectra CLI
+- [X] T109 [US8] Add Cloudflare Pages deployment step
+- [X] T110 [US8] Document workflow setup in quickstart.md
 
 **Checkpoint**: Dashboard auto-deploys on test/report changes
 
@@ -249,14 +249,14 @@
 
 **Purpose**: Edge cases, error handling, and documentation
 
-- [ ] T111 Handle empty repository state (no suites) with helpful message in DashboardGenerator
-- [ ] T112 Handle missing/stale indexes with warnings in DataCollector
-- [ ] T113 Handle missing automation directories gracefully in AutomationScanner
-- [ ] T114 Handle malformed report files with skip and warn in DataCollector
-- [ ] T115 [P] Add --dry-run flag to DashboardCommand for CI compatibility
-- [ ] T116 [P] Add --verbose flag to coverage analysis for detailed output
-- [ ] T117 Update CLAUDE.md with Phase 3 commands and patterns
-- [ ] T118 Run quickstart.md validation manually
+- [X] T111 Handle empty repository state (no suites) with helpful message in DashboardGenerator
+- [X] T112 Handle missing/stale indexes with warnings in DataCollector
+- [X] T113 Handle missing automation directories gracefully in AutomationScanner
+- [X] T114 Handle malformed report files with skip and warn in DataCollector
+- [X] T115 [P] Add --dry-run flag to DashboardCommand for CI compatibility
+- [X] T116 [P] Add --verbose flag to coverage analysis for detailed output
+- [X] T117 Update CLAUDE.md with Phase 3 commands and patterns
+- [X] T118 Run quickstart.md validation manually
 
 ---
 

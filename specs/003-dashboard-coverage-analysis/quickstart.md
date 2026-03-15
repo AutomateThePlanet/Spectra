@@ -155,7 +155,38 @@ The coverage analysis reconciles both directions and reports mismatches.
 
 ## CI/CD Integration
 
-### GitHub Actions Example
+### Using the Workflow Template
+
+A complete GitHub Actions workflow template is provided at `.github/workflows/dashboard.yml.template`.
+
+**Setup Steps:**
+
+1. Copy the template to your repository:
+   ```bash
+   cp .github/workflows/dashboard.yml.template .github/workflows/dashboard.yml
+   ```
+
+2. Create a Cloudflare Pages project:
+   - Go to Cloudflare Dashboard > Pages > Create a project
+   - Connect to your GitHub repository
+   - Note your project name
+
+3. Add GitHub Secrets:
+   - `CF_API_TOKEN`: Cloudflare API token with Pages edit permissions
+   - `CF_ACCOUNT_ID`: Your Cloudflare account ID (found in the sidebar)
+
+4. Update the workflow:
+   - Edit `projectName` to match your Cloudflare Pages project
+
+The workflow triggers automatically when files change in:
+- `tests/**` - Test case files
+- `reports/**` - Execution reports
+- `**/index.json` - Index files
+- `spectra.config.json` - Configuration
+
+### Quick Start Example
+
+For a simpler setup without the template:
 
 ```yaml
 name: Generate Dashboard
@@ -193,6 +224,8 @@ jobs:
 ```
 
 ### Coverage Analysis in PR
+
+Add coverage reports to pull requests:
 
 ```yaml
 - name: Coverage Analysis
@@ -232,8 +265,51 @@ spectra dashboard --output ./site
 
 Dashboard is static; regenerate when tests or reports change.
 
+## Dashboard Authentication (Optional)
+
+The dashboard supports GitHub OAuth authentication to restrict access to authorized users. This is useful when hosting the dashboard publicly on Cloudflare Pages.
+
+### Setup Steps
+
+1. **Create a GitHub OAuth App**
+   - Go to GitHub Settings > Developer settings > OAuth Apps > New OAuth App
+   - Set Authorization callback URL to: `https://your-dashboard.pages.dev/auth/callback`
+   - Note the Client ID and generate a Client Secret
+
+2. **Configure Cloudflare Pages Environment Variables**
+
+   In your Cloudflare Pages project settings, add:
+
+   | Variable | Description | Required |
+   |----------|-------------|----------|
+   | `AUTH_ENABLED` | Set to `true` to enable auth | Yes |
+   | `GITHUB_CLIENT_ID` | Your OAuth App Client ID | Yes |
+   | `GITHUB_CLIENT_SECRET` | Your OAuth App Client Secret | Yes |
+   | `ALLOWED_REPO` | Repository slug (e.g., `owner/repo`) | Optional |
+   | `SESSION_SECRET` | Random string for signing cookies | Yes |
+
+3. **Generate a Session Secret**
+
+   ```bash
+   openssl rand -base64 32
+   ```
+
+### How It Works
+
+- Users visiting the dashboard are redirected to GitHub OAuth
+- After authorization, their repository access is verified
+- If `ALLOWED_REPO` is set, only users with access to that repo can view the dashboard
+- Sessions are stored in secure HTTP-only cookies (7-day duration)
+
+### Logout
+
+Users can sign out by visiting `/auth/logout`, which clears the session cookie.
+
+### Disabling Authentication
+
+Set `AUTH_ENABLED` to `false` or remove it to allow public access.
+
 ## Next Steps
 
-- Configure authentication for hosted dashboard (see User Story 6 in spec)
 - Set up automated deployment workflow
 - Customize attribute patterns for your test framework
