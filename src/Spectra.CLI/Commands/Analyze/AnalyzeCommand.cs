@@ -21,19 +21,26 @@ public sealed class AnalyzeCommand : Command
             () => ReportFormat.Text,
             "Report format (text, json, markdown)");
 
+        var coverageOption = new Option<bool>(
+            ["--coverage", "-c"],
+            "Analyze automation coverage (test-to-automation linking)");
+
         AddOption(outputOption);
         AddOption(formatOption);
+        AddOption(coverageOption);
 
         this.SetHandler(async (context) =>
         {
             var output = context.ParseResult.GetValueForOption(outputOption);
             var format = context.ParseResult.GetValueForOption(formatOption);
+            var coverage = context.ParseResult.GetValueForOption(coverageOption);
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
 
             var handler = new AnalyzeHandler(verbosity);
             context.ExitCode = await handler.ExecuteAsync(
                 output,
                 format,
+                coverage,
                 context.GetCancellationToken());
         });
     }

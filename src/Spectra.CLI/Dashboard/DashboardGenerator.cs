@@ -219,6 +219,10 @@ public sealed class DashboardGenerator
                                 <label>Search</label>
                                 <input type="text" id="filter-search" placeholder="Search by ID or title...">
                             </div>
+                            <div class="filter-group">
+                                <label>Tags</label>
+                                <div id="filter-tags" class="tag-filter"></div>
+                            </div>
                         </div>
                     </aside>
                     <section class="content" id="content">
@@ -331,6 +335,35 @@ public sealed class DashboardGenerator
             font-size: 0.9rem;
         }
 
+        .tag-filter {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            max-height: 150px;
+            overflow-y: auto;
+            padding: 0.5rem;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .tag-filter-item {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .tag-filter-item input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+
+        .tag-filter-item label {
+            font-size: 0.8rem;
+            cursor: pointer;
+            margin: 0;
+        }
+
         .content {
             flex: 1;
             padding: 2rem;
@@ -428,14 +461,16 @@ public sealed class DashboardGenerator
     private static string GetDefaultJs() => """
         // Load dashboard data
         const data = JSON.parse(document.getElementById('dashboard-data').textContent);
+        const allTests = [...data.tests];
         let currentView = 'suites';
-        let filters = { priority: '', component: '', search: '' };
+        let filters = { priority: '', component: '', search: '', tags: [] };
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             setupNavigation();
             setupFilters();
             populateComponentFilter();
+            populateTagFilter();
             render();
         });
 
@@ -467,7 +502,7 @@ public sealed class DashboardGenerator
 
         function populateComponentFilter() {
             const components = new Set();
-            data.tests.forEach(t => t.component && components.add(t.component));
+            allTests.forEach(t => t.component && components.add(t.component));
             const select = document.getElementById('filter-component');
             [...components].sort().forEach(c => {
                 const option = document.createElement('option');
@@ -475,6 +510,25 @@ public sealed class DashboardGenerator
                 option.textContent = c;
                 select.appendChild(option);
             });
+        }
+
+        function populateTagFilter() {
+            const tags = new Set();
+            allTests.forEach(t => (t.tags || []).forEach(tag => tags.add(tag)));
+            const container = document.getElementById('filter-tags');
+            if (!container || tags.size === 0) return;
+            container.innerHTML = [...tags].sort().map(tag => `
+                <div class="tag-filter-item">
+                    <input type="checkbox" id="tag-${tag}" value="${tag}" onchange="handleTagFilter(this)">
+                    <label for="tag-${tag}">${tag}</label>
+                </div>
+            `).join('');
+        }
+
+        function handleTagFilter(cb) {
+            if (cb.checked) { if (!filters.tags.includes(cb.value)) filters.tags.push(cb.value); }
+            else { filters.tags = filters.tags.filter(t => t !== cb.value); }
+            render();
         }
 
         function render() {
@@ -512,11 +566,12 @@ public sealed class DashboardGenerator
         }
 
         function renderTests() {
-            let tests = data.tests.filter(t => {
+            let tests = allTests.filter(t => {
                 if (filters.priority && t.priority !== filters.priority) return false;
                 if (filters.component && t.component !== filters.component) return false;
                 if (filters.search && !t.id.toLowerCase().includes(filters.search) &&
                     !t.title.toLowerCase().includes(filters.search)) return false;
+                if (filters.tags.length > 0 && !filters.tags.every(tag => (t.tags || []).includes(tag))) return false;
                 return true;
             });
             if (!tests.length) {
@@ -563,20 +618,23 @@ public sealed class DashboardGenerator
         }
 
         function showSuiteTests(suite) {
-            filters.search = '';
+            filters = { priority: '', component: '', search: '', tags: [] };
+            document.getElementById('filter-priority').value = '';
+            document.getElementById('filter-component').value = '';
             document.getElementById('filter-search').value = '';
+            document.querySelectorAll('#filter-tags input').forEach(cb => cb.checked = false);
             currentView = 'tests';
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
             document.querySelector('[data-view="tests"]').classList.add('active');
             // Filter to this suite only
-            data.tests = data.tests.filter(t => t.suite === suite);
+            data.tests = allTests.filter(t => t.suite === suite);
             render();
             // Reset filter
-            data.tests = JSON.parse(document.getElementById('dashboard-data').textContent).tests;
+            data.tests = allTests;
         }
 
         function showTestDetail(id) {
-            const test = data.tests.find(t => t.id === id);
+            const test = allTests.find(t => t.id === id);
             if (!test) return;
             const content = document.getElementById('content');
             content.innerHTML = `

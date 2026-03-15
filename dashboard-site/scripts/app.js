@@ -11,7 +11,8 @@ let currentView = 'suites';
 let filters = {
     priority: '',
     component: '',
-    search: ''
+    search: '',
+    tags: [] // Multi-select with AND logic
 };
 
 // Cache original tests for filtering
@@ -24,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupNavigation();
     setupFilters();
     populateComponentFilter();
+    populateTagFilter();
     updateSummary();
     updateGeneratedAt();
     render();
@@ -81,6 +83,45 @@ function populateComponentFilter() {
         option.textContent = c;
         select.appendChild(option);
     });
+}
+
+/**
+ * Populate tag filter with checkboxes (multi-select, AND logic)
+ */
+function populateTagFilter() {
+    const tags = new Set();
+    allTests.forEach(t => {
+        (t.tags || []).forEach(tag => tags.add(tag));
+    });
+
+    const container = document.getElementById('filter-tags');
+    if (!container) return;
+
+    if (tags.size === 0) {
+        container.innerHTML = '<span class="tag-filter-empty">No tags available</span>';
+        return;
+    }
+
+    container.innerHTML = [...tags].sort().map(tag => `
+        <div class="tag-filter-item">
+            <input type="checkbox" id="tag-${escapeHtml(tag)}" value="${escapeHtml(tag)}" onchange="handleTagFilter(this)">
+            <label for="tag-${escapeHtml(tag)}">${escapeHtml(tag)}</label>
+        </div>
+    `).join('');
+}
+
+/**
+ * Handle tag checkbox change (AND logic - all selected tags must be present)
+ */
+function handleTagFilter(checkbox) {
+    if (checkbox.checked) {
+        if (!filters.tags.includes(checkbox.value)) {
+            filters.tags.push(checkbox.value);
+        }
+    } else {
+        filters.tags = filters.tags.filter(t => t !== checkbox.value);
+    }
+    render();
 }
 
 /**
@@ -203,6 +244,13 @@ function renderTests() {
                 return false;
             }
         }
+        // Tag filtering with AND logic - all selected tags must be present
+        if (filters.tags.length > 0) {
+            const testTags = t.tags || [];
+            if (!filters.tags.every(tag => testTags.includes(tag))) {
+                return false;
+            }
+        }
         return true;
     });
 
@@ -308,10 +356,12 @@ function renderCoverage() {
  */
 function showSuiteTests(suite) {
     // Reset filters
-    filters = { priority: '', component: '', search: '' };
+    filters = { priority: '', component: '', search: '', tags: [] };
     document.getElementById('filter-priority').value = '';
     document.getElementById('filter-component').value = '';
     document.getElementById('filter-search').value = '';
+    // Reset tag checkboxes
+    document.querySelectorAll('#filter-tags input[type="checkbox"]').forEach(cb => cb.checked = false);
 
     // Switch to tests view
     currentView = 'tests';

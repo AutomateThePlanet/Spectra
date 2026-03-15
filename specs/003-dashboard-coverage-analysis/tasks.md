@@ -98,14 +98,14 @@
 
 ### Implementation for User Story 2
 
-- [ ] T047 [US2] Implement client-side priority filtering in dashboard-site/scripts/app.js
-- [ ] T048 [US2] Implement client-side tag filtering (multi-select, AND logic) in dashboard-site/scripts/app.js
-- [ ] T049 [US2] Implement client-side component filtering in dashboard-site/scripts/app.js
-- [ ] T050 [US2] Implement client-side text search (ID and title) in dashboard-site/scripts/app.js
-- [ ] T051 [US2] Create filter UI components in dashboard-site/index.html
-- [ ] T052 [US2] Style filter UI in dashboard-site/styles/main.css
-- [ ] T053 [US2] Implement test card click navigation to detail view in dashboard-site/scripts/app.js
-- [ ] T054 [US2] Implement test detail view rendering with metadata in dashboard-site/scripts/app.js
+- [X] T047 [US2] Implement client-side priority filtering in dashboard-site/scripts/app.js
+- [X] T048 [US2] Implement client-side tag filtering (multi-select, AND logic) in dashboard-site/scripts/app.js
+- [X] T049 [US2] Implement client-side component filtering in dashboard-site/scripts/app.js
+- [X] T050 [US2] Implement client-side text search (ID and title) in dashboard-site/scripts/app.js
+- [X] T051 [US2] Create filter UI components in dashboard-site/index.html
+- [X] T052 [US2] Style filter UI in dashboard-site/styles/main.css
+- [X] T053 [US2] Implement test card click navigation to detail view in dashboard-site/scripts/app.js
+- [X] T054 [US2] Implement test detail view rendering with metadata in dashboard-site/scripts/app.js
 
 **Checkpoint**: Dashboard filters work correctly, test navigation works
 
@@ -140,26 +140,26 @@
 
 ### Implementation for User Story 5
 
-- [ ] T063 [US5] Create AutomationScanner in src/Spectra.Core/Coverage/AutomationScanner.cs
-- [ ] T064 [US5] Implement regex-based attribute pattern matching in AutomationScanner
-- [ ] T065 [US5] Implement file scanning with configurable directories in AutomationScanner
-- [ ] T066 [US5] Create LinkReconciler in src/Spectra.Core/Coverage/LinkReconciler.cs
-- [ ] T067 [US5] Implement test→automation map building (from automated_by) in LinkReconciler
-- [ ] T068 [US5] Implement automation→test map building (from attributes) in LinkReconciler
-- [ ] T069 [US5] Implement bidirectional link reconciliation algorithm in LinkReconciler
-- [ ] T070 [US5] Implement unlinked test detection in LinkReconciler
-- [ ] T071 [US5] Implement orphaned automation detection in LinkReconciler
-- [ ] T072 [US5] Implement broken link detection in LinkReconciler
-- [ ] T073 [US5] Implement mismatch detection in LinkReconciler
-- [ ] T074 [US5] Create CoverageCalculator in src/Spectra.Core/Coverage/CoverageCalculator.cs
-- [ ] T075 [US5] Implement coverage percentage calculation per suite in CoverageCalculator
-- [ ] T076 [US5] Implement coverage percentage calculation per component in CoverageCalculator
-- [ ] T077 [US5] Add --coverage flag to AnalyzeCommand in src/Spectra.CLI/Commands/AnalyzeCommand.cs
-- [ ] T078 [US5] Implement coverage analysis orchestration in AnalyzeCommand
-- [ ] T079 [US5] Add unit tests for AutomationScanner in tests/Spectra.Core.Tests/Coverage/AutomationScannerTests.cs
-- [ ] T080 [US5] Add unit tests for LinkReconciler in tests/Spectra.Core.Tests/Coverage/LinkReconcilerTests.cs
-- [ ] T081 [US5] Add unit tests for CoverageCalculator in tests/Spectra.Core.Tests/Coverage/CoverageCalculatorTests.cs
-- [ ] T082 [US5] Add integration test for coverage analysis in tests/Spectra.CLI.Tests/Coverage/CoverageAnalysisTests.cs
+- [X] T063 [US5] Create AutomationScanner in src/Spectra.Core/Coverage/AutomationScanner.cs
+- [X] T064 [US5] Implement regex-based attribute pattern matching in AutomationScanner
+- [X] T065 [US5] Implement file scanning with configurable directories in AutomationScanner
+- [X] T066 [US5] Create LinkReconciler in src/Spectra.Core/Coverage/LinkReconciler.cs
+- [X] T067 [US5] Implement test→automation map building (from automated_by) in LinkReconciler
+- [X] T068 [US5] Implement automation→test map building (from attributes) in LinkReconciler
+- [X] T069 [US5] Implement bidirectional link reconciliation algorithm in LinkReconciler
+- [X] T070 [US5] Implement unlinked test detection in LinkReconciler
+- [X] T071 [US5] Implement orphaned automation detection in LinkReconciler
+- [X] T072 [US5] Implement broken link detection in LinkReconciler
+- [X] T073 [US5] Implement mismatch detection in LinkReconciler
+- [X] T074 [US5] Create CoverageCalculator in src/Spectra.Core/Coverage/CoverageCalculator.cs
+- [X] T075 [US5] Implement coverage percentage calculation per suite in CoverageCalculator
+- [X] T076 [US5] Implement coverage percentage calculation per component in CoverageCalculator
+- [X] T077 [US5] Add --coverage flag to AnalyzeCommand in src/Spectra.CLI/Commands/AnalyzeCommand.cs
+- [X] T078 [US5] Implement coverage analysis orchestration in AnalyzeCommand
+- [X] T079 [US5] Add unit tests for AutomationScanner in tests/Spectra.Core.Tests/Coverage/AutomationScannerTests.cs
+- [X] T080 [US5] Add unit tests for LinkReconciler in tests/Spectra.Core.Tests/Coverage/LinkReconcilerTests.cs
+- [X] T081 [US5] Add unit tests for CoverageCalculator in tests/Spectra.Core.Tests/Coverage/CoverageCalculatorTests.cs
+- [X] T082 [US5] Add integration test for coverage analysis in tests/Spectra.CLI.Tests/Coverage/CoverageAnalysisTests.cs
 
 **Checkpoint**: `spectra ai analyze --coverage` produces accurate coverage report
 
