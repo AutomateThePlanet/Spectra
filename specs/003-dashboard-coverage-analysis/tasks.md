@@ -18,8 +18,8 @@
 **Purpose**: Project initialization and configuration structure
 
 - [X] T001 Create dashboard-site/ directory structure per plan (index.html, styles/, scripts/)
-- [ ] T002 [P] Add dashboard configuration section to spectra.config.json schema in src/Spectra.Core/Config/
-- [ ] T003 [P] Add coverage configuration section to spectra.config.json schema in src/Spectra.Core/Config/
+- [X] T002 [P] Add dashboard configuration section to spectra.config.json schema in src/Spectra.Core/Config/
+- [X] T003 [P] Add coverage configuration section to spectra.config.json schema in src/Spectra.Core/Config/
 - [X] T004 [P] Create src/Spectra.Core/Models/Dashboard/ directory for dashboard models
 - [X] T005 [P] Create src/Spectra.Core/Models/Coverage/ directory for coverage models
 - [X] T006 [P] Create src/Spectra.Core/Coverage/ directory for coverage analysis logic
