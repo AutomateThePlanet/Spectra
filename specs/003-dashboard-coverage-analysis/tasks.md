@@ -17,16 +17,16 @@
 
 **Purpose**: Project initialization and configuration structure
 
-- [ ] T001 Create dashboard-site/ directory structure per plan (index.html, styles/, scripts/)
+- [X] T001 Create dashboard-site/ directory structure per plan (index.html, styles/, scripts/)
 - [ ] T002 [P] Add dashboard configuration section to spectra.config.json schema in src/Spectra.Core/Config/
 - [ ] T003 [P] Add coverage configuration section to spectra.config.json schema in src/Spectra.Core/Config/
-- [ ] T004 [P] Create src/Spectra.Core/Models/Dashboard/ directory for dashboard models
-- [ ] T005 [P] Create src/Spectra.Core/Models/Coverage/ directory for coverage models
-- [ ] T006 [P] Create src/Spectra.Core/Coverage/ directory for coverage analysis logic
-- [ ] T007 [P] Create src/Spectra.CLI/Dashboard/ directory for dashboard generation
-- [ ] T008 [P] Create src/Spectra.CLI/Coverage/ directory for coverage CLI output
-- [ ] T009 [P] Create tests/Spectra.Core.Tests/Coverage/ directory for coverage tests
-- [ ] T010 [P] Create tests/Spectra.CLI.Tests/Dashboard/ directory for dashboard tests
+- [X] T004 [P] Create src/Spectra.Core/Models/Dashboard/ directory for dashboard models
+- [X] T005 [P] Create src/Spectra.Core/Models/Coverage/ directory for coverage models
+- [X] T006 [P] Create src/Spectra.Core/Coverage/ directory for coverage analysis logic
+- [X] T007 [P] Create src/Spectra.CLI/Dashboard/ directory for dashboard generation
+- [X] T008 [P] Create src/Spectra.CLI/Coverage/ directory for coverage CLI output
+- [X] T009 [P] Create tests/Spectra.Core.Tests/Coverage/ directory for coverage tests
+- [X] T010 [P] Create tests/Spectra.CLI.Tests/Dashboard/ directory for dashboard tests
 
 ---
 
@@ -36,24 +36,24 @@
 
 **CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T011 Create DashboardData model in src/Spectra.Core/Models/Dashboard/DashboardData.cs
-- [ ] T012 [P] Create SuiteStats model in src/Spectra.Core/Models/Dashboard/SuiteStats.cs
-- [ ] T013 [P] Create TestEntry model in src/Spectra.Core/Models/Dashboard/TestEntry.cs
-- [ ] T014 [P] Create RunSummary model in src/Spectra.Core/Models/Dashboard/RunSummary.cs
-- [ ] T015 [P] Create CoverageData model in src/Spectra.Core/Models/Dashboard/CoverageData.cs
-- [ ] T016 [P] Create CoverageNode model in src/Spectra.Core/Models/Dashboard/CoverageNode.cs
-- [ ] T017 [P] Create CoverageLink model in src/Spectra.Core/Models/Coverage/CoverageLink.cs
-- [ ] T018 [P] Create LinkStatus enum in src/Spectra.Core/Models/Coverage/LinkStatus.cs
-- [ ] T019 [P] Create CoverageReport model in src/Spectra.Core/Models/Coverage/CoverageReport.cs
-- [ ] T020 [P] Create CoverageSummary model in src/Spectra.Core/Models/Coverage/CoverageSummary.cs
-- [ ] T021 [P] Create SuiteCoverage model in src/Spectra.Core/Models/Coverage/SuiteCoverage.cs
-- [ ] T022 [P] Create ComponentCoverage model in src/Spectra.Core/Models/Coverage/ComponentCoverage.cs
-- [ ] T023 [P] Create UnlinkedTest model in src/Spectra.Core/Models/Coverage/UnlinkedTest.cs
-- [ ] T024 [P] Create OrphanedAutomation model in src/Spectra.Core/Models/Coverage/OrphanedAutomation.cs
-- [ ] T025 [P] Create BrokenLink model in src/Spectra.Core/Models/Coverage/BrokenLink.cs
-- [ ] T026 [P] Create LinkMismatch model in src/Spectra.Core/Models/Coverage/LinkMismatch.cs
-- [ ] T027 Create ExecutionDbReader for reading .execution/spectra.db in src/Spectra.Core/Storage/ExecutionDbReader.cs
-- [ ] T028 Add unit tests for ExecutionDbReader in tests/Spectra.Core.Tests/Storage/ExecutionDbReaderTests.cs
+- [X] T011 Create DashboardData model in src/Spectra.Core/Models/Dashboard/DashboardData.cs
+- [X] T012 [P] Create SuiteStats model in src/Spectra.Core/Models/Dashboard/SuiteStats.cs
+- [X] T013 [P] Create TestEntry model in src/Spectra.Core/Models/Dashboard/TestEntry.cs
+- [X] T014 [P] Create RunSummary model in src/Spectra.Core/Models/Dashboard/RunSummary.cs
+- [X] T015 [P] Create CoverageData model in src/Spectra.Core/Models/Dashboard/CoverageData.cs
+- [X] T016 [P] Create CoverageNode model in src/Spectra.Core/Models/Dashboard/CoverageNode.cs
+- [X] T017 [P] Create CoverageLink model in src/Spectra.Core/Models/Coverage/CoverageLink.cs
+- [X] T018 [P] Create LinkStatus enum in src/Spectra.Core/Models/Coverage/LinkStatus.cs
+- [X] T019 [P] Create CoverageReport model in src/Spectra.Core/Models/Coverage/CoverageReport.cs
+- [X] T020 [P] Create CoverageSummary model in src/Spectra.Core/Models/Coverage/CoverageSummary.cs
+- [X] T021 [P] Create SuiteCoverage model in src/Spectra.Core/Models/Coverage/SuiteCoverage.cs
+- [X] T022 [P] Create ComponentCoverage model in src/Spectra.Core/Models/Coverage/ComponentCoverage.cs
+- [X] T023 [P] Create UnlinkedTest model in src/Spectra.Core/Models/Coverage/UnlinkedTest.cs
+- [X] T024 [P] Create OrphanedAutomation model in src/Spectra.Core/Models/Coverage/OrphanedAutomation.cs
+- [X] T025 [P] Create BrokenLink model in src/Spectra.Core/Models/Coverage/BrokenLink.cs
+- [X] T026 [P] Create LinkMismatch model in src/Spectra.Core/Models/Coverage/LinkMismatch.cs
+- [X] T027 Create ExecutionDbReader for reading .execution/spectra.db in src/Spectra.Core/Storage/ExecutionDbReader.cs
+- [X] T028 Add unit tests for ExecutionDbReader in tests/Spectra.Core.Tests/Storage/ExecutionDbReaderTests.cs
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 
@@ -67,24 +67,24 @@
 
 ### Implementation for User Story 1
 
-- [ ] T029 [US1] Create DataCollector service in src/Spectra.CLI/Dashboard/DataCollector.cs
-- [ ] T030 [US1] Implement suite index reading in DataCollector (read all _index.json files)
-- [ ] T031 [US1] Implement execution report reading from reports/ directory in DataCollector
-- [ ] T032 [US1] Implement execution data reading from .execution/ database in DataCollector
-- [ ] T033 [US1] Create DashboardGenerator service in src/Spectra.CLI/Dashboard/DashboardGenerator.cs
-- [ ] T034 [US1] Implement HTML template loading from dashboard-site/ in DashboardGenerator
-- [ ] T035 [US1] Implement JSON data embedding in HTML output in DashboardGenerator
-- [ ] T036 [US1] Create HtmlRenderer service in src/Spectra.CLI/Dashboard/HtmlRenderer.cs
-- [ ] T037 [US1] Implement suite browser page generation in HtmlRenderer
-- [ ] T038 [US1] Implement test case page rendering with Markdown content in HtmlRenderer
-- [ ] T039 [US1] Create DashboardCommand CLI handler in src/Spectra.CLI/Commands/DashboardCommand.cs
-- [ ] T040 [US1] Register DashboardCommand with CLI root in src/Spectra.CLI/Program.cs
-- [ ] T041 [US1] Create base dashboard HTML template in dashboard-site/index.html
-- [ ] T042 [P] [US1] Create dashboard CSS styles in dashboard-site/styles/main.css
-- [ ] T043 [P] [US1] Create dashboard JavaScript (data loading) in dashboard-site/scripts/app.js
-- [ ] T044 [US1] Add unit tests for DataCollector in tests/Spectra.CLI.Tests/Dashboard/DataCollectorTests.cs
-- [ ] T045 [US1] Add unit tests for DashboardGenerator in tests/Spectra.CLI.Tests/Dashboard/DashboardGeneratorTests.cs
-- [ ] T046 [US1] Add integration test for dashboard command in tests/Spectra.CLI.Tests/Dashboard/DashboardCommandTests.cs
+- [X] T029 [US1] Create DataCollector service in src/Spectra.CLI/Dashboard/DataCollector.cs
+- [X] T030 [US1] Implement suite index reading in DataCollector (read all _index.json files)
+- [X] T031 [US1] Implement execution report reading from reports/ directory in DataCollector
+- [X] T032 [US1] Implement execution data reading from .execution/ database in DataCollector
+- [X] T033 [US1] Create DashboardGenerator service in src/Spectra.CLI/Dashboard/DashboardGenerator.cs
+- [X] T034 [US1] Implement HTML template loading from dashboard-site/ in DashboardGenerator
+- [X] T035 [US1] Implement JSON data embedding in HTML output in DashboardGenerator
+- [X] T036 [US1] Create HtmlRenderer service in src/Spectra.CLI/Dashboard/HtmlRenderer.cs (embedded in DashboardGenerator)
+- [X] T037 [US1] Implement suite browser page generation in HtmlRenderer (embedded in DashboardGenerator)
+- [X] T038 [US1] Implement test case page rendering with Markdown content in HtmlRenderer (embedded in DashboardGenerator)
+- [X] T039 [US1] Create DashboardCommand CLI handler in src/Spectra.CLI/Commands/DashboardCommand.cs
+- [X] T040 [US1] Register DashboardCommand with CLI root in src/Spectra.CLI/Program.cs
+- [X] T041 [US1] Create base dashboard HTML template in dashboard-site/index.html
+- [X] T042 [P] [US1] Create dashboard CSS styles in dashboard-site/styles/main.css
+- [X] T043 [P] [US1] Create dashboard JavaScript (data loading) in dashboard-site/scripts/app.js
+- [X] T044 [US1] Add unit tests for DataCollector in tests/Spectra.CLI.Tests/Dashboard/DataCollectorTests.cs
+- [X] T045 [US1] Add unit tests for DashboardGenerator in tests/Spectra.CLI.Tests/Dashboard/DashboardGeneratorTests.cs
+- [X] T046 [US1] Add integration test for dashboard command in tests/Spectra.CLI.Tests/Dashboard/DashboardCommandTests.cs
 
 **Checkpoint**: `spectra dashboard --output ./site` generates working static site
 

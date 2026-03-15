@@ -1,6 +1,7 @@
 using System.CommandLine;
 using Spectra.CLI.Commands.Ai;
 using Spectra.CLI.Commands.Config;
+using Spectra.CLI.Commands.Dashboard;
 using Spectra.CLI.Commands.Index;
 using Spectra.CLI.Commands.Init;
 using Spectra.CLI.Commands.List;
@@ -38,6 +39,7 @@ public class Program
         rootCommand.AddCommand(InitCommand.Create());
         rootCommand.AddCommand(new ValidateCommand());
         rootCommand.AddCommand(new IndexCommand());
+        rootCommand.AddCommand(new DashboardCommand());
         rootCommand.AddCommand(AiCommand.Create());
         rootCommand.AddCommand(new ListCommand());
         rootCommand.AddCommand(new ShowCommand());
