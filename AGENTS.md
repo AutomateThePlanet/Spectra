@@ -102,3 +102,10 @@ This project uses [GitHub Spec Kit](https://github.com/github/spec-kit) for spec
 - State machine transitions must be validated before executing
 - SQLite access goes through a repository pattern
 - Every response includes run_status, progress, and next_expected_action
+
+## Active Technologies
+- C# 12, .NET 8+ + Spectra.CLI (command integration), Spectra.Core (config, parsing), System.CommandLine (interactive prompts) (004-test-generation-profile)
+- File-based (spectra.profile.md at repo root, _profile.md in suites) (004-test-generation-profile)
+
+## Recent Changes
+- 004-test-generation-profile: Added C# 12, .NET 8+ + Spectra.CLI (command integration), Spectra.Core (config, parsing), System.CommandLine (interactive prompts)

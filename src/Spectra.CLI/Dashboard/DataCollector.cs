@@ -1,0 +1,479 @@
+using System.Text.Json;
+using Spectra.Core.Models;
+using Spectra.Core.Models.Coverage;
+using Spectra.Core.Models.Dashboard;
+using Spectra.Core.Storage;
+
+namespace Spectra.CLI.Dashboard;
+
+/// <summary>
+/// Collects data from test suite indexes and execution reports for dashboard generation.
+/// </summary>
+public sealed class DataCollector
+{
+    private readonly string _basePath;
+    private readonly string _testsPath;
+    private readonly string _reportsPath;
+    private readonly ExecutionDbReader _dbReader;
+
+    public DataCollector(string basePath)
+    {
+        _basePath = basePath;
+        _testsPath = Path.Combine(basePath, "tests");
+        _reportsPath = Path.Combine(basePath, "reports");
+        _dbReader = new ExecutionDbReader(basePath);
+    }
+
+    /// <summary>
+    /// Collects all data needed for dashboard generation.
+    /// </summary>
+    public async Task<DashboardData> CollectAsync()
+    {
+        var suiteIndexes = await LoadSuiteIndexesAsync();
+        var runSummaries = await CollectRunHistoryAsync();
+        var testEntries = BuildTestEntries(suiteIndexes);
+        var suiteStats = BuildSuiteStats(suiteIndexes, runSummaries);
+        var trends = CalculateTrends(runSummaries);
+        var coverage = BuildCoverageData(testEntries);
+
+        return new DashboardData
+        {
+            GeneratedAt = DateTime.UtcNow,
+            Repository = Path.GetFileName(_basePath),
+            Suites = suiteStats,
+            Runs = runSummaries,
+            Tests = testEntries,
+            Coverage = coverage,
+            Trends = trends
+        };
+    }
+
+    /// <summary>
+    /// Loads all _index.json files from test suites.
+    /// </summary>
+    private async Task<Dictionary<string, MetadataIndex>> LoadSuiteIndexesAsync()
+    {
+        var indexes = new Dictionary<string, MetadataIndex>();
+
+        if (!Directory.Exists(_testsPath))
+        {
+            return indexes;
+        }
+
+        foreach (var suiteDir in Directory.GetDirectories(_testsPath))
+        {
+            var indexPath = Path.Combine(suiteDir, "_index.json");
+            if (!File.Exists(indexPath))
+            {
+                continue;
+            }
+
+            try
+            {
+                var json = await File.ReadAllTextAsync(indexPath);
+                var index = JsonSerializer.Deserialize<MetadataIndex>(json);
+                if (index is not null)
+                {
+                    indexes[index.Suite] = index;
+                }
+            }
+            catch (JsonException)
+            {
+                // Skip malformed index files
+            }
+        }
+
+        return indexes;
+    }
+
+    /// <summary>
+    /// Collects run history from both reports/ directory and .execution/ database.
+    /// </summary>
+    private async Task<IReadOnlyList<RunSummary>> CollectRunHistoryAsync()
+    {
+        var runs = new List<RunSummary>();
+
+        // Read from .execution/spectra.db
+        try
+        {
+            var dbRuns = await _dbReader.GetRunSummariesAsync();
+            runs.AddRange(dbRuns);
+        }
+        catch (FileNotFoundException)
+        {
+            // Database doesn't exist, that's OK
+        }
+
+        // Read from reports/ directory
+        if (Directory.Exists(_reportsPath))
+        {
+            foreach (var reportFile in Directory.GetFiles(_reportsPath, "*.json"))
+            {
+                try
+                {
+                    var json = await File.ReadAllTextAsync(reportFile);
+                    var report = JsonSerializer.Deserialize<ExecutionReportJson>(json);
+                    if (report is not null)
+                    {
+                        // Check if we already have this run from the database
+                        if (!runs.Any(r => r.RunId == report.RunId))
+                        {
+                            runs.Add(ConvertReportToSummary(report));
+                        }
+                    }
+                }
+                catch (JsonException)
+                {
+                    // Skip malformed report files
+                }
+            }
+        }
+
+        // Sort by start time descending
+        return runs.OrderByDescending(r => r.StartedAt).ToList();
+    }
+
+    /// <summary>
+    /// Builds test entries from suite indexes.
+    /// </summary>
+    private IReadOnlyList<TestEntry> BuildTestEntries(Dictionary<string, MetadataIndex> indexes)
+    {
+        var entries = new List<TestEntry>();
+
+        foreach (var (suite, index) in indexes)
+        {
+            foreach (var test in index.Tests)
+            {
+                entries.Add(new TestEntry
+                {
+                    Id = test.Id,
+                    Suite = suite,
+                    Title = test.Title,
+                    File = test.File,
+                    Priority = test.Priority,
+                    Tags = test.Tags,
+                    Component = test.Component,
+                    SourceRefs = test.SourceRefs,
+                    AutomatedBy = null, // Will be populated by coverage analysis
+                    HasAutomation = false // Will be populated by coverage analysis
+                });
+            }
+        }
+
+        return entries.OrderBy(e => e.Suite).ThenBy(e => e.Id).ToList();
+    }
+
+    /// <summary>
+    /// Builds suite statistics from indexes and run history.
+    /// </summary>
+    private IReadOnlyList<SuiteStats> BuildSuiteStats(
+        Dictionary<string, MetadataIndex> indexes,
+        IReadOnlyList<RunSummary> runs)
+    {
+        var stats = new List<SuiteStats>();
+
+        foreach (var (suite, index) in indexes)
+        {
+            var byPriority = index.Tests
+                .GroupBy(t => t.Priority)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            var byComponent = index.Tests
+                .Where(t => !string.IsNullOrEmpty(t.Component))
+                .GroupBy(t => t.Component!)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            var allTags = index.Tests
+                .SelectMany(t => t.Tags)
+                .Distinct()
+                .OrderBy(t => t)
+                .ToList();
+
+            var lastRun = runs.FirstOrDefault(r =>
+                r.Suite.Equals(suite, StringComparison.OrdinalIgnoreCase));
+
+            stats.Add(new SuiteStats
+            {
+                Name = suite,
+                TestCount = index.TestCount,
+                ByPriority = byPriority,
+                ByComponent = byComponent,
+                Tags = allTags,
+                LastRun = lastRun,
+                AutomationCoverage = 0 // Will be populated by coverage analysis
+            });
+        }
+
+        return stats.OrderBy(s => s.Name).ToList();
+    }
+
+    /// <summary>
+    /// Converts a JSON execution report to a run summary.
+    /// </summary>
+    private static RunSummary ConvertReportToSummary(ExecutionReportJson report)
+    {
+        return new RunSummary
+        {
+            RunId = report.RunId,
+            Suite = report.Suite ?? "unknown",
+            Status = report.Status ?? "completed",
+            StartedAt = report.StartedAt,
+            CompletedAt = report.CompletedAt,
+            StartedBy = report.StartedBy ?? "unknown",
+            DurationSeconds = report.CompletedAt.HasValue
+                ? (int)(report.CompletedAt.Value - report.StartedAt).TotalSeconds
+                : null,
+            Total = report.Total,
+            Passed = report.Passed,
+            Failed = report.Failed,
+            Skipped = report.Skipped,
+            Blocked = report.Blocked
+        };
+    }
+
+    /// <summary>
+    /// Calculates trend data from run history.
+    /// </summary>
+    private static TrendData CalculateTrends(IReadOnlyList<RunSummary> runs)
+    {
+        if (runs.Count == 0)
+        {
+            return new TrendData();
+        }
+
+        // Calculate overall pass rate
+        var totalPassed = runs.Sum(r => r.Passed);
+        var totalTests = runs.Sum(r => r.Total);
+        var overallPassRate = totalTests > 0 ? (totalPassed * 100m) / totalTests : 0m;
+
+        // Group runs by date for trend points (aggregate by day)
+        var pointsByDate = runs
+            .GroupBy(r => r.StartedAt.Date)
+            .OrderBy(g => g.Key)
+            .Select(g =>
+            {
+                var dayPassed = g.Sum(r => r.Passed);
+                var dayTotal = g.Sum(r => r.Total);
+                var dayFailed = g.Sum(r => r.Failed);
+                return new TrendPoint
+                {
+                    Date = g.Key,
+                    PassRate = dayTotal > 0 ? Math.Round((dayPassed * 100m) / dayTotal, 2) : 0m,
+                    Total = dayTotal,
+                    Passed = dayPassed,
+                    Failed = dayFailed
+                };
+            })
+            .ToList();
+
+        // Calculate trend direction (compare first half to second half)
+        var direction = "stable";
+        if (pointsByDate.Count >= 2)
+        {
+            var midpoint = pointsByDate.Count / 2;
+            var firstHalfAvg = pointsByDate.Take(midpoint).Average(p => p.PassRate);
+            var secondHalfAvg = pointsByDate.Skip(midpoint).Average(p => p.PassRate);
+            var diff = secondHalfAvg - firstHalfAvg;
+
+            if (diff > 5) direction = "improving";
+            else if (diff < -5) direction = "declining";
+        }
+
+        // Calculate trends by suite
+        var suiteTrends = runs
+            .GroupBy(r => r.Suite, StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
+            {
+                var suiteRuns = g.OrderByDescending(r => r.StartedAt).ToList();
+                var suitePassed = suiteRuns.Sum(r => r.Passed);
+                var suiteTotal = suiteRuns.Sum(r => r.Total);
+                var currentRate = suiteTotal > 0 ? Math.Round((suitePassed * 100m) / suiteTotal, 2) : 0m;
+
+                // Calculate change from previous runs
+                decimal change = 0m;
+                if (suiteRuns.Count >= 2)
+                {
+                    var recentRuns = suiteRuns.Take(suiteRuns.Count / 2 + 1).ToList();
+                    var olderRuns = suiteRuns.Skip(suiteRuns.Count / 2 + 1).ToList();
+
+                    if (olderRuns.Count > 0)
+                    {
+                        var recentPassed = recentRuns.Sum(r => r.Passed);
+                        var recentTotal = recentRuns.Sum(r => r.Total);
+                        var recentRate = recentTotal > 0 ? (recentPassed * 100m) / recentTotal : 0m;
+
+                        var olderPassed = olderRuns.Sum(r => r.Passed);
+                        var olderTotal = olderRuns.Sum(r => r.Total);
+                        var olderRate = olderTotal > 0 ? (olderPassed * 100m) / olderTotal : 0m;
+
+                        change = Math.Round(recentRate - olderRate, 2);
+                    }
+                }
+
+                return new SuiteTrend
+                {
+                    Suite = g.Key,
+                    PassRate = currentRate,
+                    RunCount = suiteRuns.Count,
+                    Change = change
+                };
+            })
+            .OrderBy(s => s.Suite)
+            .ToList();
+
+        return new TrendData
+        {
+            Points = pointsByDate,
+            OverallPassRate = Math.Round(overallPassRate, 2),
+            Direction = direction,
+            BySuite = suiteTrends
+        };
+    }
+
+    /// <summary>
+    /// Builds coverage data for visualization from test entries.
+    /// </summary>
+    private static CoverageData BuildCoverageData(IReadOnlyList<TestEntry> testEntries)
+    {
+        var nodes = new List<CoverageNode>();
+        var links = new List<CoverageLink>();
+        var documentNodes = new Dictionary<string, CoverageNode>();
+        var automationNodes = new Dictionary<string, CoverageNode>();
+
+        // Build test nodes and extract document/automation references
+        foreach (var test in testEntries)
+        {
+            var testNodeId = $"test:{test.Id}";
+            var testStatus = test.HasAutomation ? CoverageStatus.Covered : CoverageStatus.Partial;
+
+            nodes.Add(new CoverageNode
+            {
+                Id = testNodeId,
+                Type = NodeType.Test,
+                Name = test.Title,
+                Path = test.File,
+                Status = testStatus
+            });
+
+            // Process source_refs -> document nodes
+            foreach (var sourceRef in test.SourceRefs)
+            {
+                var docNodeId = $"doc:{NormalizeDocPath(sourceRef)}";
+
+                if (!documentNodes.ContainsKey(docNodeId))
+                {
+                    documentNodes[docNodeId] = new CoverageNode
+                    {
+                        Id = docNodeId,
+                        Type = NodeType.Document,
+                        Name = Path.GetFileName(sourceRef),
+                        Path = sourceRef,
+                        Status = CoverageStatus.Covered // Has at least one test
+                    };
+                }
+
+                // Document -> Test link
+                links.Add(new CoverageLink
+                {
+                    Source = docNodeId,
+                    Target = testNodeId,
+                    Type = LinkType.DocumentToTest,
+                    Status = LinkStatus.Valid
+                });
+            }
+
+            // Process automated_by -> automation nodes
+            if (!string.IsNullOrEmpty(test.AutomatedBy))
+            {
+                var automationNodeId = $"auto:{NormalizeDocPath(test.AutomatedBy)}";
+
+                if (!automationNodes.ContainsKey(automationNodeId))
+                {
+                    automationNodes[automationNodeId] = new CoverageNode
+                    {
+                        Id = automationNodeId,
+                        Type = NodeType.Automation,
+                        Name = Path.GetFileName(test.AutomatedBy),
+                        Path = test.AutomatedBy,
+                        Status = CoverageStatus.Covered
+                    };
+                }
+
+                // Test -> Automation link
+                links.Add(new CoverageLink
+                {
+                    Source = testNodeId,
+                    Target = automationNodeId,
+                    Type = LinkType.TestToAutomation,
+                    Status = LinkStatus.Valid
+                });
+            }
+        }
+
+        // Add document nodes
+        nodes.AddRange(documentNodes.Values);
+
+        // Add automation nodes
+        nodes.AddRange(automationNodes.Values);
+
+        // Update document status based on whether all linked tests have automation
+        foreach (var docNode in documentNodes.Values)
+        {
+            var docLinks = links
+                .Where(l => l.Source == docNode.Id && l.Type == LinkType.DocumentToTest)
+                .ToList();
+
+            var linkedTestIds = docLinks.Select(l => l.Target).ToHashSet();
+            var allTestsAutomated = testEntries
+                .Where(t => linkedTestIds.Contains($"test:{t.Id}"))
+                .All(t => t.HasAutomation);
+
+            if (!allTestsAutomated)
+            {
+                // Update to partial since not all tests are automated
+                var index = nodes.IndexOf(docNode);
+                nodes[index] = new CoverageNode
+                {
+                    Id = docNode.Id,
+                    Type = docNode.Type,
+                    Name = docNode.Name,
+                    Path = docNode.Path,
+                    Status = CoverageStatus.Partial,
+                    Children = docNode.Children
+                };
+            }
+        }
+
+        return new CoverageData
+        {
+            Nodes = nodes.OrderBy(n => n.Type).ThenBy(n => n.Id).ToList(),
+            Links = links.OrderBy(l => l.Source).ThenBy(l => l.Target).ToList()
+        };
+    }
+
+    /// <summary>
+    /// Normalizes a document path for use as an ID.
+    /// </summary>
+    private static string NormalizeDocPath(string path)
+    {
+        return path.Replace('\\', '/').Replace('/', '_').Replace('.', '_');
+    }
+
+    /// <summary>
+    /// Internal model for deserializing execution report JSON files.
+    /// </summary>
+    private sealed class ExecutionReportJson
+    {
+        public string RunId { get; set; } = "";
+        public string? Suite { get; set; }
+        public string? Status { get; set; }
+        public DateTime StartedAt { get; set; }
+        public DateTime? CompletedAt { get; set; }
+        public string? StartedBy { get; set; }
+        public int Total { get; set; }
+        public int Passed { get; set; }
+        public int Failed { get; set; }
+        public int Skipped { get; set; }
+        public int Blocked { get; set; }
+    }
+}

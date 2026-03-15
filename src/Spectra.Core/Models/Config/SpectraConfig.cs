@@ -32,6 +32,12 @@ public sealed class SpectraConfig
     [JsonPropertyName("validation")]
     public ValidationConfig Validation { get; init; } = new();
 
+    [JsonPropertyName("dashboard")]
+    public DashboardConfig Dashboard { get; init; } = new();
+
+    [JsonPropertyName("coverage")]
+    public CoverageConfig Coverage { get; init; } = new();
+
     /// <summary>
     /// Creates a default configuration.
     /// </summary>
