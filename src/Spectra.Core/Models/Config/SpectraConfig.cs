@@ -38,6 +38,9 @@ public sealed class SpectraConfig
     [JsonPropertyName("coverage")]
     public CoverageConfig Coverage { get; init; } = new();
 
+    [JsonPropertyName("profile")]
+    public ProfileConfig Profile { get; init; } = new();
+
     /// <summary>
     /// Creates a default configuration.
     /// </summary>

@@ -1,3 +1,4 @@
+using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Profile;
 
 namespace Spectra.Core.Profile;
@@ -9,6 +10,20 @@ public sealed class ProfileLoader
 {
     private readonly ProfileParser _parser = new();
     private readonly ProfileValidator _validator = new();
+    private readonly string _repositoryFileName;
+    private readonly string _suiteFileName;
+    private readonly bool _validateOnLoad;
+
+    public ProfileLoader() : this(null)
+    {
+    }
+
+    public ProfileLoader(ProfileConfig? config)
+    {
+        _repositoryFileName = config?.RepositoryFile ?? ProfileDefaults.RepositoryProfileFileName;
+        _suiteFileName = config?.SuiteFile ?? ProfileDefaults.SuiteProfileFileName;
+        _validateOnLoad = config?.ValidateOnLoad ?? true;
+    }
 
     /// <summary>
     /// Loads the effective profile for a given suite path.
@@ -23,7 +38,7 @@ public sealed class ProfileLoader
 
         if (!string.IsNullOrEmpty(suitePath))
         {
-            var suiteProfilePath = Path.Combine(suitePath, ProfileDefaults.SuiteProfileFileName);
+            var suiteProfilePath = Path.Combine(suitePath, _suiteFileName);
             var loadResult = await TryLoadProfileAsync(suiteProfilePath, ct);
             if (loadResult.HasValue)
             {
@@ -33,7 +48,7 @@ public sealed class ProfileLoader
         }
 
         // Try to load repository profile
-        var repoProfilePath = Path.Combine(basePath, ProfileDefaults.RepositoryProfileFileName);
+        var repoProfilePath = Path.Combine(basePath, _repositoryFileName);
         var repoResult = await TryLoadProfileAsync(repoProfilePath, ct);
         GenerationProfile? repoProfile = repoResult?.Profile;
         ProfileSource? repoSource = repoResult.HasValue
@@ -69,7 +84,7 @@ public sealed class ProfileLoader
     {
         ArgumentNullException.ThrowIfNullOrWhiteSpace(basePath);
 
-        var profilePath = Path.Combine(basePath, ProfileDefaults.RepositoryProfileFileName);
+        var profilePath = Path.Combine(basePath, _repositoryFileName);
         return await LoadFromPathAsync(profilePath, ct);
     }
 
@@ -95,14 +110,19 @@ public sealed class ProfileLoader
                 return ProfileLoadResult.Invalid(path, [parseResult.Error!]);
             }
 
-            var validationResult = _validator.Validate(parseResult.Profile!);
-
-            if (!validationResult.IsValid)
+            if (_validateOnLoad)
             {
-                return ProfileLoadResult.Invalid(path, validationResult.Errors, validationResult.Warnings);
+                var validationResult = _validator.Validate(parseResult.Profile!);
+
+                if (!validationResult.IsValid)
+                {
+                    return ProfileLoadResult.Invalid(path, validationResult.Errors, validationResult.Warnings);
+                }
+
+                return ProfileLoadResult.Success(parseResult.Profile!, path, validationResult.Warnings);
             }
 
-            return ProfileLoadResult.Success(parseResult.Profile!, path, validationResult.Warnings);
+            return ProfileLoadResult.Success(parseResult.Profile!, path);
         }
         catch (Exception ex)
         {
@@ -115,7 +135,7 @@ public sealed class ProfileLoader
     /// </summary>
     public bool RepositoryProfileExists(string basePath)
     {
-        var profilePath = Path.Combine(basePath, ProfileDefaults.RepositoryProfileFileName);
+        var profilePath = Path.Combine(basePath, _repositoryFileName);
         return File.Exists(profilePath);
     }
 
@@ -124,9 +144,19 @@ public sealed class ProfileLoader
     /// </summary>
     public bool SuiteProfileExists(string suitePath)
     {
-        var profilePath = Path.Combine(suitePath, ProfileDefaults.SuiteProfileFileName);
+        var profilePath = Path.Combine(suitePath, _suiteFileName);
         return File.Exists(profilePath);
     }
+
+    /// <summary>
+    /// Gets the repository profile file name.
+    /// </summary>
+    public string RepositoryFileName => _repositoryFileName;
+
+    /// <summary>
+    /// Gets the suite profile file name.
+    /// </summary>
+    public string SuiteFileName => _suiteFileName;
 
     private async Task<(GenerationProfile Profile, string Path)?> TryLoadProfileAsync(string path, CancellationToken ct)
     {

@@ -247,4 +247,102 @@ public sealed class ProfileLoaderTests : IDisposable
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => _loader.LoadAsync(basePath));
     }
+
+    [Fact]
+    public async Task LoadAsync_CustomRepositoryFileName_LoadsFromCustomPath()
+    {
+        // Arrange
+        var config = new Core.Models.Config.ProfileConfig { RepositoryFile = "custom.profile.md" };
+        var loader = new ProfileLoader(config);
+
+        var customProfilePath = Path.Combine(_testDir, "custom.profile.md");
+        await File.WriteAllTextAsync(customProfilePath, """
+            ---
+            profile_version: 1
+            options:
+              detail_level: very_detailed
+            ---
+            """);
+
+        // Act
+        var result = await loader.LoadAsync(_testDir);
+
+        // Assert
+        Assert.Equal(SourceType.Repository, result.Source.Type);
+        Assert.Equal(DetailLevel.VeryDetailed, result.Profile.Options.DetailLevel);
+    }
+
+    [Fact]
+    public async Task LoadAsync_CustomSuiteFileName_LoadsFromCustomPath()
+    {
+        // Arrange
+        var config = new Core.Models.Config.ProfileConfig { SuiteFile = "custom.suite.md" };
+        var loader = new ProfileLoader(config);
+
+        var suiteDir = Path.Combine(_testDir, "tests", "checkout");
+        Directory.CreateDirectory(suiteDir);
+
+        var customSuiteProfilePath = Path.Combine(suiteDir, "custom.suite.md");
+        await File.WriteAllTextAsync(customSuiteProfilePath, """
+            ---
+            profile_version: 1
+            options:
+              detail_level: very_detailed
+            ---
+            """);
+
+        // Act
+        var result = await loader.LoadAsync(_testDir, suiteDir);
+
+        // Assert
+        Assert.Equal(SourceType.Suite, result.Source.Type);
+        Assert.Equal(DetailLevel.VeryDetailed, result.Profile.Options.DetailLevel);
+    }
+
+    [Fact]
+    public void RepositoryFileName_ReturnsConfiguredValue()
+    {
+        // Arrange
+        var config = new Core.Models.Config.ProfileConfig { RepositoryFile = "my-profile.md" };
+        var loader = new ProfileLoader(config);
+
+        // Assert
+        Assert.Equal("my-profile.md", loader.RepositoryFileName);
+    }
+
+    [Fact]
+    public void SuiteFileName_ReturnsConfiguredValue()
+    {
+        // Arrange
+        var config = new Core.Models.Config.ProfileConfig { SuiteFile = "my-suite.md" };
+        var loader = new ProfileLoader(config);
+
+        // Assert
+        Assert.Equal("my-suite.md", loader.SuiteFileName);
+    }
+
+    [Fact]
+    public async Task LoadAsync_ValidateOnLoadFalse_SkipsValidation()
+    {
+        // Arrange
+        var config = new Core.Models.Config.ProfileConfig { ValidateOnLoad = false };
+        var loader = new ProfileLoader(config);
+
+        // Profile with invalid value (min_negative_scenarios: -1 would normally fail validation)
+        var profilePath = Path.Combine(_testDir, ProfileDefaults.RepositoryProfileFileName);
+        await File.WriteAllTextAsync(profilePath, """
+            ---
+            profile_version: 1
+            options:
+              min_negative_scenarios: -1
+            ---
+            """);
+
+        // Act - should not throw or return invalid because validation is skipped
+        var result = await loader.LoadFromPathAsync(profilePath);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.Equal(-1, result.Profile!.Options.MinNegativeScenarios);
+    }
 }
