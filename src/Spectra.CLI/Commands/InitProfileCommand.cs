@@ -12,63 +12,79 @@ namespace Spectra.CLI.Commands;
 /// </summary>
 public sealed class InitProfileCommand : Command
 {
+    // Options defined as static fields for reuse
+    private static readonly Option<bool> NonInteractiveOption = new(
+        ["--non-interactive", "-n"],
+        "Run without interactive prompts, using defaults or provided options");
+
+    private static readonly Option<string?> DetailLevelOption = new(
+        ["--detail-level", "-d"],
+        "Detail level: high_level, detailed, or very_detailed");
+
+    private static readonly Option<int?> MinNegativeOption = new(
+        ["--min-negative"],
+        "Minimum negative test scenarios per feature");
+
+    private static readonly Option<string?> PriorityOption = new(
+        ["--priority", "-p"],
+        "Default priority: high, medium, or low");
+
+    private static readonly Option<string?> StepFormatOption = new(
+        ["--step-format"],
+        "Step format: numbered, bullets, or paragraphs");
+
+    private static readonly Option<bool?> ActionVerbsOption = new(
+        ["--action-verbs"],
+        "Use action verbs in steps");
+
+    private static readonly Option<bool?> ScreenshotsOption = new(
+        ["--screenshots"],
+        "Include screenshot suggestions");
+
+    private static readonly Option<string[]?> DomainsOption = new(
+        ["--domains"],
+        "Domains: payments, authentication, pii_gdpr, healthcare, financial, accessibility");
+
+    private static readonly Option<string?> PiiSensitivityOption = new(
+        ["--pii-sensitivity"],
+        "PII sensitivity: none, standard, or strict");
+
+    private static readonly Option<string[]?> ExclusionsOption = new(
+        ["--exclusions"],
+        "Exclusion categories");
+
+    private static readonly Option<string?> DescriptionOption = new(
+        ["--description"],
+        "Profile description");
+
+    private static readonly Option<bool> ForceOption = new(
+        ["--force", "-f"],
+        "Overwrite existing profile without confirmation");
+
+    private static readonly Option<string?> SuiteOption = new(
+        ["--suite", "-s"],
+        "Create a suite-level profile in the specified suite directory");
+
+    private static readonly Option<bool> EditOption = new(
+        ["--edit", "-e"],
+        "Edit an existing profile (only update specified options)");
+
     public InitProfileCommand() : base("init-profile", "Create or update a test generation profile")
     {
-        AddOption(new Option<bool>(
-            ["--non-interactive", "-n"],
-            "Run without interactive prompts, using defaults or provided options"));
-
-        AddOption(new Option<string?>(
-            ["--detail-level", "-d"],
-            "Detail level: high_level, detailed, or very_detailed"));
-
-        AddOption(new Option<int?>(
-            ["--min-negative"],
-            "Minimum negative test scenarios per feature"));
-
-        AddOption(new Option<string?>(
-            ["--priority", "-p"],
-            "Default priority: high, medium, or low"));
-
-        AddOption(new Option<string?>(
-            ["--step-format"],
-            "Step format: numbered, bullets, or paragraphs"));
-
-        AddOption(new Option<bool?>(
-            ["--action-verbs"],
-            "Use action verbs in steps"));
-
-        AddOption(new Option<bool?>(
-            ["--screenshots"],
-            "Include screenshot suggestions"));
-
-        AddOption(new Option<string[]?>(
-            ["--domains"],
-            "Domains: payments, authentication, pii_gdpr, healthcare, financial, accessibility"));
-
-        AddOption(new Option<string?>(
-            ["--pii-sensitivity"],
-            "PII sensitivity: none, standard, or strict"));
-
-        AddOption(new Option<string[]?>(
-            ["--exclusions"],
-            "Exclusion categories"));
-
-        AddOption(new Option<string?>(
-            ["--description"],
-            "Profile description"));
-
-        AddOption(new Option<bool>(
-            ["--force", "-f"],
-            "Overwrite existing profile without confirmation"));
-
-        AddOption(new Option<string?>(
-            ["--suite", "-s"],
-            "Create a suite-level profile in the specified suite directory"));
-
-        AddOption(new Option<bool>(
-            ["--edit", "-e"],
-            "Edit an existing profile (only update specified options)"));
+        AddOption(NonInteractiveOption);
+        AddOption(DetailLevelOption);
+        AddOption(MinNegativeOption);
+        AddOption(PriorityOption);
+        AddOption(StepFormatOption);
+        AddOption(ActionVerbsOption);
+        AddOption(ScreenshotsOption);
+        AddOption(DomainsOption);
+        AddOption(PiiSensitivityOption);
+        AddOption(ExclusionsOption);
+        AddOption(DescriptionOption);
+        AddOption(ForceOption);
+        AddOption(SuiteOption);
+        AddOption(EditOption);
 
         this.SetHandler(ExecuteAsync);
     }
@@ -77,10 +93,10 @@ public sealed class InitProfileCommand : Command
     {
         var ct = context.GetCancellationToken();
 
-        var nonInteractive = context.ParseResult.GetValueForOption<bool>(Options.Get<bool>("--non-interactive"));
-        var force = context.ParseResult.GetValueForOption<bool>(Options.Get<bool>("--force"));
-        var suiteDir = context.ParseResult.GetValueForOption<string?>(Options.Get<string?>("--suite"));
-        var edit = context.ParseResult.GetValueForOption<bool>(Options.Get<bool>("--edit"));
+        var nonInteractive = context.ParseResult.GetValueForOption(NonInteractiveOption);
+        var force = context.ParseResult.GetValueForOption(ForceOption);
+        var suiteDir = context.ParseResult.GetValueForOption(SuiteOption);
+        var edit = context.ParseResult.GetValueForOption(EditOption);
 
         try
         {
@@ -227,16 +243,16 @@ public sealed class InitProfileCommand : Command
 
     private static ProfileCreationOptions BuildOptionsFromContext(InvocationContext context, GenerationProfile? existing)
     {
-        var detailLevelStr = context.ParseResult.GetValueForOption<string?>(Options.Get<string?>("--detail-level"));
-        var minNegative = context.ParseResult.GetValueForOption<int?>(Options.Get<int?>("--min-negative"));
-        var priorityStr = context.ParseResult.GetValueForOption<string?>(Options.Get<string?>("--priority"));
-        var stepFormatStr = context.ParseResult.GetValueForOption<string?>(Options.Get<string?>("--step-format"));
-        var actionVerbs = context.ParseResult.GetValueForOption<bool?>(Options.Get<bool?>("--action-verbs"));
-        var screenshots = context.ParseResult.GetValueForOption<bool?>(Options.Get<bool?>("--screenshots"));
-        var domainsStr = context.ParseResult.GetValueForOption<string[]?>(Options.Get<string[]?>("--domains"));
-        var piiSensitivityStr = context.ParseResult.GetValueForOption<string?>(Options.Get<string?>("--pii-sensitivity"));
-        var exclusionsStr = context.ParseResult.GetValueForOption<string[]?>(Options.Get<string[]?>("--exclusions"));
-        var description = context.ParseResult.GetValueForOption<string?>(Options.Get<string?>("--description"));
+        var detailLevelStr = context.ParseResult.GetValueForOption(DetailLevelOption);
+        var minNegative = context.ParseResult.GetValueForOption(MinNegativeOption);
+        var priorityStr = context.ParseResult.GetValueForOption(PriorityOption);
+        var stepFormatStr = context.ParseResult.GetValueForOption(StepFormatOption);
+        var actionVerbs = context.ParseResult.GetValueForOption(ActionVerbsOption);
+        var screenshots = context.ParseResult.GetValueForOption(ScreenshotsOption);
+        var domainsStr = context.ParseResult.GetValueForOption(DomainsOption);
+        var piiSensitivityStr = context.ParseResult.GetValueForOption(PiiSensitivityOption);
+        var exclusionsStr = context.ParseResult.GetValueForOption(ExclusionsOption);
+        var description = context.ParseResult.GetValueForOption(DescriptionOption);
 
         return new ProfileCreationOptions
         {
@@ -347,37 +363,4 @@ public sealed class InitProfileCommand : Command
         return result.Count > 0 ? result : null;
     }
 
-    // Helper class for option retrieval
-    private static class Options
-    {
-        private static readonly Dictionary<string, Option> _options = new();
-
-        static Options()
-        {
-            Register<bool>("--non-interactive");
-            Register<string?>("--detail-level");
-            Register<int?>("--min-negative");
-            Register<string?>("--priority");
-            Register<string?>("--step-format");
-            Register<bool?>("--action-verbs");
-            Register<bool?>("--screenshots");
-            Register<string[]?>("--domains");
-            Register<string?>("--pii-sensitivity");
-            Register<string[]?>("--exclusions");
-            Register<string?>("--description");
-            Register<bool>("--force");
-            Register<string?>("--suite");
-            Register<bool>("--edit");
-        }
-
-        private static void Register<T>(string name)
-        {
-            _options[name] = new Option<T>(name);
-        }
-
-        public static Option<T> Get<T>(string name)
-        {
-            return (Option<T>)_options[name];
-        }
-    }
 }

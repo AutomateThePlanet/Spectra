@@ -19,19 +19,23 @@ public sealed class ProfileCommand : Command
 
     private sealed class ShowCommand : Command
     {
+        private static readonly Option<string?> SuiteOption = new(
+            ["--suite", "-s"],
+            "Show the effective profile for a specific suite");
+
+        private static readonly Option<bool> JsonOption = new(
+            ["--json", "-j"],
+            "Output profile as JSON");
+
+        private static readonly Option<bool> ContextOption = new(
+            ["--context", "-c"],
+            "Show the AI context that would be generated");
+
         public ShowCommand() : base("show", "Display the current effective profile")
         {
-            AddOption(new Option<string?>(
-                ["--suite", "-s"],
-                "Show the effective profile for a specific suite"));
-
-            AddOption(new Option<bool>(
-                ["--json", "-j"],
-                "Output profile as JSON"));
-
-            AddOption(new Option<bool>(
-                ["--context", "-c"],
-                "Show the AI context that would be generated"));
+            AddOption(SuiteOption);
+            AddOption(JsonOption);
+            AddOption(ContextOption);
 
             this.SetHandler(ExecuteAsync);
         }
@@ -40,9 +44,9 @@ public sealed class ProfileCommand : Command
         {
             var ct = context.GetCancellationToken();
 
-            var suiteDir = context.ParseResult.GetValueForOption<string?>(Options.Get<string?>("--suite"));
-            var asJson = context.ParseResult.GetValueForOption<bool>(Options.Get<bool>("--json"));
-            var showContext = context.ParseResult.GetValueForOption<bool>(Options.Get<bool>("--context"));
+            var suiteDir = context.ParseResult.GetValueForOption(SuiteOption);
+            var asJson = context.ParseResult.GetValueForOption(JsonOption);
+            var showContext = context.ParseResult.GetValueForOption(ContextOption);
 
             try
             {
@@ -97,26 +101,5 @@ public sealed class ProfileCommand : Command
             }
         }
 
-        private static class Options
-        {
-            private static readonly Dictionary<string, Option> _options = new();
-
-            static Options()
-            {
-                Register<string?>("--suite");
-                Register<bool>("--json");
-                Register<bool>("--context");
-            }
-
-            private static void Register<T>(string name)
-            {
-                _options[name] = new Option<T>(name);
-            }
-
-            public static Option<T> Get<T>(string name)
-            {
-                return (Option<T>)_options[name];
-            }
-        }
     }
 }

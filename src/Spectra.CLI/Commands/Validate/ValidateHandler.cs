@@ -2,8 +2,11 @@ using System.Text.Json;
 using Spectra.CLI.Infrastructure;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
+using Spectra.Core.Models.Profile;
 using Spectra.Core.Parsing;
+using Spectra.Core.Profile;
 using Spectra.Core.Validation;
+using ProfileValidationError = Spectra.Core.Models.Profile.ValidationError;
 
 namespace Spectra.CLI.Commands.Validate;
 
@@ -42,6 +45,10 @@ public sealed class ValidateHandler
                 return ExitCodes.Error;
             }
         }
+
+        // Validate profile if it exists
+        var profileValidationErrors = await ValidateProfileAsync(currentDir, cancellationToken);
+        var totalProfileErrors = profileValidationErrors.Count;
 
         var testsDir = config?.Tests?.Dir ?? "tests";
         var testsPath = Path.Combine(currentDir, testsDir);
@@ -145,7 +152,7 @@ public sealed class ValidateHandler
 
         // Run validation
         var result = orchestrator.ValidateAll(allSuites);
-        totalErrors += result.Errors.Count;
+        totalErrors += result.Errors.Count + totalProfileErrors;
         totalWarnings += result.Warnings.Count;
 
         // Output results
@@ -207,5 +214,52 @@ public sealed class ValidateHandler
         return Directory.GetDirectories(testsPath)
             .Where(d => !Path.GetFileName(d).StartsWith("_"))
             .ToList();
+    }
+
+    private async Task<List<ProfileValidationError>> ValidateProfileAsync(string basePath, CancellationToken ct)
+    {
+        var errors = new List<ProfileValidationError>();
+        var profilePath = Path.Combine(basePath, ProfileDefaults.RepositoryProfileFileName);
+
+        if (!File.Exists(profilePath))
+        {
+            return errors;
+        }
+
+        try
+        {
+            var content = await File.ReadAllTextAsync(profilePath, ct);
+            var profileValidator = new ProfileValidator();
+            var validationResult = profileValidator.ValidateContent(content);
+
+            if (!validationResult.IsValid)
+            {
+                foreach (var error in validationResult.Errors)
+                {
+                    Console.Error.WriteLine($"Profile error [{error.Code}]: {error.Message}");
+                    errors.Add(error);
+                }
+            }
+
+            if (validationResult.Warnings.Count > 0 && _verbosity >= VerbosityLevel.Normal)
+            {
+                foreach (var warning in validationResult.Warnings)
+                {
+                    Console.WriteLine($"Profile warning [{warning.Code}]: {warning.Message}");
+                }
+            }
+
+            if (_verbosity >= VerbosityLevel.Detailed && validationResult.IsValid)
+            {
+                Console.WriteLine($"Profile validated: {profilePath}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error reading profile: {ex.Message}");
+            errors.Add(ProfileValidationError.Create("PROFILE_READ_ERROR", ex.Message));
+        }
+
+        return errors;
     }
 }

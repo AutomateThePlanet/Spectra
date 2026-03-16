@@ -6,7 +6,10 @@ using Spectra.CLI.Source;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
+using Spectra.Core.Models.Profile;
 using Spectra.Core.Parsing;
+using Spectra.Core.Profile;
+using ProfilePriority = Spectra.Core.Models.Profile.Priority;
 
 namespace Spectra.CLI.Commands.Generate;
 
@@ -91,6 +94,22 @@ public sealed class GenerateHandler
             Console.WriteLine($"Found {existingTests.Count} existing test(s) in '{suite}'");
         }
 
+        // Load profile
+        var profileLoader = new ProfileLoader();
+        var effectiveProfile = await profileLoader.LoadAsync(currentDir, suitePath, ct);
+
+        if (_verbosity >= VerbosityLevel.Normal)
+        {
+            if (effectiveProfile.Source.Type != SourceType.Default)
+            {
+                Console.WriteLine($"Loaded profile: {effectiveProfile.Source.Type} ({effectiveProfile.Source.Path})");
+            }
+            else
+            {
+                Console.WriteLine("Using default profile settings");
+            }
+        }
+
         // Create agent
         var agent = AgentFactory.Create(config.Ai);
 
@@ -107,7 +126,7 @@ public sealed class GenerateHandler
         }
 
         // Generate tests
-        var prompt = BuildPrompt(suite, count ?? 5, existingTests);
+        var prompt = BuildPrompt(suite, count ?? 5, existingTests, effectiveProfile);
         var result = await agent.GenerateTestsAsync(prompt, documentMap, existingTests, ct);
 
         if (!result.IsSuccess)
@@ -246,26 +265,45 @@ public sealed class GenerateHandler
         return tests;
     }
 
-    private static string BuildPrompt(string suite, int count, IReadOnlyList<TestCase> existingTests)
+    private static string BuildPrompt(string suite, int count, IReadOnlyList<TestCase> existingTests, EffectiveProfile profile)
     {
         var existingIds = string.Join(", ", existingTests.Select(t => t.Id));
+
+        // Build profile context section
+        var profileContext = string.Empty;
+        if (profile.Source.Type != SourceType.Default)
+        {
+            var contextBuilder = new ProfileContextBuilder();
+            profileContext = contextBuilder.Build(profile);
+        }
+
+        var options = profile.Profile.Options;
+        var defaultPriority = options.DefaultPriority switch
+        {
+            ProfilePriority.High => "high",
+            ProfilePriority.Low => "low",
+            _ => "medium"
+        };
+
+        var minNegative = options.MinNegativeScenarios;
 
         return $"""
             Generate {count} new manual test cases for the '{suite}' feature.
 
+            {profileContext}
             Requirements:
             - Each test must have a unique ID in format TC-XXX (where XXX is a number)
             - Do not duplicate these existing test IDs: {existingIds}
             - Tests should cover different aspects of the feature
-            - Include clear, numbered steps
-            - Include expected results for each test
-            - Assign appropriate priority (high, medium, low)
+            - Include at least {minNegative} negative/error scenario test(s)
+            - Default priority is {defaultPriority} unless the scenario clearly warrants different priority
+            - Include clear steps and expected results for each test
 
             For each test, provide:
             - id: unique identifier
             - title: descriptive title
             - priority: high/medium/low
-            - steps: numbered list of actions
+            - steps: list of actions
             - expected_result: what should happen
             """;
     }
