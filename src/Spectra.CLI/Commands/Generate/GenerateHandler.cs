@@ -1,9 +1,11 @@
 using System.Text.Json;
 using Spectra.CLI.Agent;
 using Spectra.CLI.Commands.Auth;
+using Spectra.CLI.Coverage;
 using Spectra.CLI.Infrastructure;
+using Spectra.CLI.Interactive;
 using Spectra.CLI.IO;
-using Spectra.CLI.Review;
+using Spectra.CLI.Output;
 using Spectra.CLI.Source;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
@@ -16,72 +18,98 @@ using ProfilePriority = Spectra.Core.Models.Profile.Priority;
 namespace Spectra.CLI.Commands.Generate;
 
 /// <summary>
-/// Handles the generate command execution.
+/// Handles the generate command execution with direct and interactive modes.
 /// </summary>
 public sealed class GenerateHandler
 {
     private readonly VerbosityLevel _verbosity;
     private readonly bool _dryRun;
     private readonly bool _noReview;
+    private readonly bool _noInteraction;
+    private readonly ProgressReporter _progress;
+    private readonly ResultPresenter _results;
+    private readonly GapPresenter _gapPresenter;
 
     public GenerateHandler(
         VerbosityLevel verbosity = VerbosityLevel.Normal,
         bool dryRun = false,
-        bool noReview = false)
+        bool noReview = false,
+        bool noInteraction = false)
     {
         _verbosity = verbosity;
         _dryRun = dryRun;
         _noReview = noReview;
+        _noInteraction = noInteraction;
+        _progress = new ProgressReporter();
+        _results = new ResultPresenter();
+        _gapPresenter = new GapPresenter();
     }
 
-    public async Task<int> ExecuteAsync(string suite, int? count, CancellationToken ct = default)
+    public async Task<int> ExecuteAsync(
+        string? suite,
+        int? count,
+        string? focus,
+        CancellationToken ct = default)
+    {
+        // Detect mode: direct if suite provided, interactive otherwise
+        var isNonInteractive = _noInteraction ||
+            Console.IsInputRedirected ||
+            !Console.IsOutputRedirected;
+
+        var isDirectMode = !string.IsNullOrEmpty(suite);
+
+        // Validate: --no-interaction requires --suite
+        if (isNonInteractive && !isDirectMode)
+        {
+            _progress.Error("--suite is required when using --no-interaction");
+            Console.Error.WriteLine();
+            Console.Error.WriteLine("Usage: spectra ai generate <suite> [--focus <description>] [--no-interaction]");
+            Console.Error.WriteLine();
+            Console.Error.WriteLine("Run 'spectra ai generate --help' for more information.");
+            return ExitCodes.Error;
+        }
+
+        if (isDirectMode)
+        {
+            return await ExecuteDirectModeAsync(suite!, count ?? 5, focus, ct);
+        }
+        else
+        {
+            return await ExecuteInteractiveModeAsync(count ?? 5, ct);
+        }
+    }
+
+    private async Task<int> ExecuteDirectModeAsync(
+        string suite,
+        int count,
+        string? focus,
+        CancellationToken ct)
     {
         var currentDir = Directory.GetCurrentDirectory();
         var configPath = Path.Combine(currentDir, "spectra.config.json");
 
         // Load config
-        SpectraConfig? config = null;
-        if (File.Exists(configPath))
-        {
-            try
-            {
-                var configJson = await File.ReadAllTextAsync(configPath, ct);
-                config = JsonSerializer.Deserialize<SpectraConfig>(configJson, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-            }
-            catch (JsonException ex)
-            {
-                Console.Error.WriteLine($"Error reading config: {ex.Message}");
-                return ExitCodes.Error;
-            }
-        }
-
+        var config = await LoadConfigAsync(configPath, ct);
         if (config is null)
         {
-            Console.Error.WriteLine("No spectra.config.json found. Run 'spectra init' first.");
             return ExitCodes.Error;
         }
 
         // Build document map
-        if (_verbosity >= VerbosityLevel.Normal)
-        {
-            Console.WriteLine("Scanning source documentation...");
-        }
-
-        var mapBuilder = new DocumentMapBuilder(config.Source);
-        var documentMap = await mapBuilder.BuildAsync(currentDir, ct);
+        var documentMap = await _progress.StatusAsync(
+            $"Loading {suite} suite...",
+            async () =>
+            {
+                var mapBuilder = new DocumentMapBuilder(config.Source);
+                return await mapBuilder.BuildAsync(currentDir, ct);
+            });
 
         if (documentMap.Documents.Count == 0)
         {
-            Console.Error.WriteLine("No source documentation found. Check your source configuration.");
+            _progress.Error("No source documentation found in docs/");
+            Console.Error.WriteLine();
+            Console.Error.WriteLine("Please add documentation files or check your spectra.config.json.");
             return ExitCodes.Error;
-        }
-
-        if (_verbosity >= VerbosityLevel.Normal)
-        {
-            Console.WriteLine($"Found {documentMap.Documents.Count} source file(s)");
         }
 
         // Load existing tests
@@ -89,28 +117,48 @@ public sealed class GenerateHandler
         var testsPath = Path.Combine(currentDir, testsDir);
         var suitePath = Path.Combine(testsPath, suite);
 
+        // Create suite directory if it doesn't exist
+        if (!Directory.Exists(suitePath))
+        {
+            Directory.CreateDirectory(suitePath);
+        }
+
         var existingTests = await LoadExistingTestsAsync(suitePath, testsPath, ct);
 
-        if (_verbosity >= VerbosityLevel.Normal)
-        {
-            Console.WriteLine($"Found {existingTests.Count} existing test(s) in '{suite}'");
-        }
+        _progress.Success($"Loading {suite} suite... {existingTests.Count} existing tests");
+        _progress.Success($"Scanning documentation... {documentMap.Documents.Count} relevant files");
 
         // Load profile
         var profileLoader = new ProfileLoader();
         var effectiveProfile = await profileLoader.LoadAsync(currentDir, suitePath, ct);
 
-        if (_verbosity >= VerbosityLevel.Normal)
+        // Analyze coverage gaps
+        var gapAnalyzer = new GapAnalyzer();
+        var gaps = gapAnalyzer.AnalyzeGaps(documentMap, existingTests, focus);
+
+        // Show existing tests matching focus if specified
+        if (!string.IsNullOrEmpty(focus))
         {
-            if (effectiveProfile.Source.Type != SourceType.Default)
+            var matchingTests = FilterTestsByFocus(existingTests, focus);
+            if (matchingTests.Count > 0)
             {
-                Console.WriteLine($"Loaded profile: {effectiveProfile.Source.Type} ({effectiveProfile.Source.Path})");
+                _results.ShowExistingTests(matchingTests, focus);
             }
-            else
+
+            if (gaps.Count == 0)
             {
-                Console.WriteLine("Using default profile settings");
+                _gapPresenter.ShowAllCovered(focus);
+                return ExitCodes.Success;
             }
+
+            _gapPresenter.ShowUncoveredAreas(gaps);
         }
+
+        // Check duplicates status message
+        await _progress.StatusAsync("Checking for duplicates...", async () =>
+        {
+            await Task.Delay(100, ct); // Small delay for UX
+        });
 
         // Create agent with graceful auth handling
         var createResult = await AgentFactory.TryCreateWithDetailsAsync(config.Ai, ct);
@@ -125,72 +173,67 @@ public sealed class GenerateHandler
 
         if (!await agent.IsAvailableAsync(ct))
         {
-            Console.Error.WriteLine($"AI provider '{agent.ProviderName}' is not available.");
+            _progress.Error($"AI provider '{agent.ProviderName}' is not available.");
             return ExitCodes.Error;
         }
 
-        if (_verbosity >= VerbosityLevel.Normal)
-        {
-            Console.WriteLine($"Using AI provider: {agent.ProviderName}");
-            Console.WriteLine("Generating tests...");
-        }
-
         // Generate tests
-        var prompt = BuildPrompt(suite, count ?? 5, existingTests, effectiveProfile);
-        var result = await agent.GenerateTestsAsync(prompt, documentMap, existingTests, ct);
+        GenerationResult result;
+        await _progress.StatusAsync("Generating tests...", async () =>
+        {
+            var prompt = BuildPrompt(suite, count, existingTests, effectiveProfile, focus);
+            result = await agent.GenerateTestsAsync(prompt, documentMap, existingTests, ct);
+        });
+
+        var prompt2 = BuildPrompt(suite, count, existingTests, effectiveProfile, focus);
+        result = await agent.GenerateTestsAsync(prompt2, documentMap, existingTests, ct);
 
         if (!result.IsSuccess)
         {
-            Console.Error.WriteLine("Generation failed:");
+            _progress.Error("AI generation failed:");
             foreach (var error in result.Errors)
             {
                 Console.Error.WriteLine($"  {error}");
             }
+
+            // Note partial success if any tests were generated before failure
+            if (result.Tests.Count > 0)
+            {
+                Console.Error.WriteLine();
+                Console.Error.WriteLine($"{result.Tests.Count} tests were written before the error.");
+                Console.Error.WriteLine($"You can retry with: spectra ai generate {suite} --focus \"{focus ?? ""}\"");
+            }
+
             return ExitCodes.Error;
         }
 
         if (result.Tests.Count == 0)
         {
-            Console.WriteLine("No new tests generated.");
+            _progress.Info("No new tests generated.");
             return ExitCodes.Success;
         }
 
-        if (_verbosity >= VerbosityLevel.Normal)
-        {
-            Console.WriteLine($"Generated {result.Tests.Count} test(s)");
-        }
+        // Display generated tests
+        _progress.Success($"Generated {result.Tests.Count} tests:");
+        _progress.BlankLine();
+        _results.ShowGeneratedTests(result.Tests);
 
         // Preview or write tests
         if (_dryRun)
         {
-            Console.WriteLine("\nDry run - tests would be written:");
-            foreach (var test in result.Tests)
-            {
-                Console.WriteLine($"  {test.Id}: {test.Title}");
-            }
+            _progress.BlankLine();
+            _progress.Info("Dry run - no files written");
             return ExitCodes.Success;
         }
 
-        // Interactive review (unless --no-review)
+        // Write tests directly (no review step per spec)
         var testsToWrite = result.Tests.ToList();
-        if (!_noReview && testsToWrite.Count > 0)
-        {
-            testsToWrite = await InteractiveReviewAsync(testsToWrite, ct);
-        }
-
-        if (testsToWrite.Count == 0)
-        {
-            Console.WriteLine("No tests selected for writing.");
-            return ExitCodes.Success;
-        }
-
-        // Write tests
         var writer = new TestFileWriter();
+
         foreach (var test in testsToWrite)
         {
             var filePath = TestFileWriter.GetFilePath(testsPath, suite, test.Id);
 
-            // Update test with correct file path
             var testWithPath = new TestCase
             {
                 Id = test.Id,
@@ -212,19 +255,12 @@ public sealed class GenerateHandler
             };
 
             await writer.WriteAsync(filePath, testWithPath, ct);
-
-            if (_verbosity >= VerbosityLevel.Normal)
-            {
-                Console.WriteLine($"  Created: {testWithPath.FilePath}");
-            }
         }
+
+        _progress.BlankLine();
+        _results.ShowCompletion($"tests/{suite}/", testsToWrite.Count);
 
         // Update index
-        if (_verbosity >= VerbosityLevel.Normal)
-        {
-            Console.WriteLine("\nUpdating index...");
-        }
-
         var allTests = new List<TestCase>(existingTests);
         allTests.AddRange(testsToWrite);
 
@@ -234,14 +270,309 @@ public sealed class GenerateHandler
         var indexWriter = new IndexWriter();
         await indexWriter.WriteAsync(Path.Combine(suitePath, "_index.json"), index, ct);
 
-        // Summary
-        Console.WriteLine($"\nGenerated {testsToWrite.Count} test(s) in '{suite}'");
-        if (result.TokenUsage is not null)
+        // Show remaining gaps
+        var remainingGaps = gapAnalyzer.GetRemainingGaps(gaps, testsToWrite);
+        _gapPresenter.ShowRemainingGaps(remainingGaps);
+
+        // Token usage if verbose
+        if (_verbosity >= VerbosityLevel.Detailed && result.TokenUsage is not null)
         {
-            Console.WriteLine($"Token usage: {result.TokenUsage.InputTokens} in / {result.TokenUsage.OutputTokens} out");
+            _progress.BlankLine();
+            _progress.Info($"Token usage: {result.TokenUsage.InputTokens} in / {result.TokenUsage.OutputTokens} out");
         }
 
         return ExitCodes.Success;
+    }
+
+    private async Task<int> ExecuteInteractiveModeAsync(int count, CancellationToken ct)
+    {
+        var currentDir = Directory.GetCurrentDirectory();
+        var configPath = Path.Combine(currentDir, "spectra.config.json");
+
+        // Load config
+        var config = await LoadConfigAsync(configPath, ct);
+        if (config is null)
+        {
+            return ExitCodes.Error;
+        }
+
+        // Initialize session
+        var session = new InteractiveSession { Mode = SessionMode.Generate };
+
+        // Scan for suites
+        var testsDir = config.Tests?.Dir ?? "tests";
+        var testsPath = Path.Combine(currentDir, testsDir);
+
+        var scanner = new SuiteScanner();
+        var suites = await scanner.ScanSuitesAsync(testsPath, ct);
+
+        // Select suite
+        var suiteSelector = new SuiteSelector();
+        var suiteResult = suiteSelector.SelectForGeneration(suites);
+
+        string suiteName;
+        string suitePath;
+
+        if (suiteResult.IsCreateNew)
+        {
+            // Prompt for new suite name
+            var prompt = new Spectre.Console.TextPrompt<string>("│  Suite name: ");
+            prompt.PromptStyle = new Spectre.Console.Style(foreground: Spectre.Console.Color.Cyan);
+            var newSuiteName = Spectre.Console.AnsiConsole.Prompt(prompt);
+
+            suiteName = newSuiteName.Trim().ToLowerInvariant().Replace(' ', '-');
+            suitePath = Path.Combine(testsPath, suiteName);
+            Directory.CreateDirectory(suitePath);
+            _progress.Success($"Created new suite: {suiteName}");
+        }
+        else if (suiteResult.Suite is null)
+        {
+            _progress.Error("No suite selected.");
+            return ExitCodes.Error;
+        }
+        else
+        {
+            suiteName = suiteResult.Suite.Name;
+            suitePath = suiteResult.Suite.Path;
+        }
+
+        session.SetSuite(suiteName, suitePath);
+
+        // Select test type
+        var typeSelector = new TestTypeSelector();
+        var testType = typeSelector.Select(suiteName);
+        session.SetTestType(testType);
+
+        // Get focus if needed
+        string? focus = typeSelector.GetFocusDescription(testType);
+
+        if (testType is TestTypeSelection.SpecificArea or TestTypeSelection.FreeDescription)
+        {
+            var focusDescriptor = new FocusDescriptor();
+            focus = testType == TestTypeSelection.SpecificArea
+                ? focusDescriptor.GetSpecificArea()
+                : focusDescriptor.GetFocus();
+        }
+
+        session.SetFocus(focus);
+
+        // Build document map
+        var documentMap = await _progress.StatusAsync(
+            $"Scanning documentation...",
+            async () =>
+            {
+                var mapBuilder = new DocumentMapBuilder(config.Source);
+                return await mapBuilder.BuildAsync(currentDir, ct);
+            });
+
+        if (documentMap.Documents.Count == 0)
+        {
+            _progress.Error("No source documentation found in docs/");
+            Console.Error.WriteLine();
+            Console.Error.WriteLine("Please add documentation files or check your spectra.config.json.");
+            return ExitCodes.Error;
+        }
+
+        _progress.Success($"Scanning documentation... {documentMap.Documents.Count} files");
+
+        // Load existing tests
+        var existingTests = await LoadExistingTestsAsync(suitePath, testsPath, ct);
+        _progress.Success($"Loading {suiteName} suite... {existingTests.Count} existing tests");
+
+        // Load profile
+        var profileLoader = new ProfileLoader();
+        var effectiveProfile = await profileLoader.LoadAsync(currentDir, suitePath, ct);
+
+        // Analyze coverage gaps
+        var gapAnalyzer = new GapAnalyzer();
+        var gaps = gapAnalyzer.AnalyzeGaps(documentMap, existingTests, focus);
+
+        // Show existing tests matching focus if specified
+        if (!string.IsNullOrEmpty(focus))
+        {
+            var matchingTests = FilterTestsByFocus(existingTests, focus);
+            if (matchingTests.Count > 0)
+            {
+                _results.ShowExistingTests(matchingTests, focus);
+            }
+
+            if (gaps.Count == 0)
+            {
+                _gapPresenter.ShowAllCovered(focus);
+                session.Complete();
+                return ExitCodes.Success;
+            }
+
+            _gapPresenter.ShowUncoveredAreas(gaps);
+        }
+
+        // Interactive generation loop
+        var allGeneratedTests = new List<TestCase>();
+        var remainingGaps = gaps.ToList();
+
+        while (!session.IsComplete)
+        {
+            session.StartGenerating();
+
+            // Create agent
+            var createResult = await AgentFactory.TryCreateWithDetailsAsync(config.Ai, ct);
+
+            if (!createResult.Success)
+            {
+                AuthHandler.WriteAuthError(createResult.ProviderName!, createResult.AuthResult!);
+                return ExitCodes.Error;
+            }
+
+            var agent = createResult.Agent!;
+
+            if (!await agent.IsAvailableAsync(ct))
+            {
+                _progress.Error($"AI provider '{agent.ProviderName}' is not available.");
+                return ExitCodes.Error;
+            }
+
+            // Generate tests
+            GenerationResult result;
+            await _progress.StatusAsync("Generating tests...", async () =>
+            {
+                var prompt = BuildPrompt(suiteName, count, existingTests, effectiveProfile, focus);
+                result = await agent.GenerateTestsAsync(prompt, documentMap, existingTests, ct);
+            });
+
+            var prompt2 = BuildPrompt(suiteName, count, existingTests, effectiveProfile, focus);
+            result = await agent.GenerateTestsAsync(prompt2, documentMap, existingTests, ct);
+
+            if (!result.IsSuccess)
+            {
+                _progress.Error("AI generation failed:");
+                foreach (var error in result.Errors)
+                {
+                    Console.Error.WriteLine($"  {error}");
+                }
+                return ExitCodes.Error;
+            }
+
+            if (result.Tests.Count == 0)
+            {
+                _progress.Info("No new tests generated.");
+                session.Complete();
+                break;
+            }
+
+            // Display and write tests
+            _progress.Success($"Generated {result.Tests.Count} tests:");
+            _progress.BlankLine();
+            _results.ShowGeneratedTests(result.Tests);
+
+            if (!_dryRun)
+            {
+                var writer = new TestFileWriter();
+
+                foreach (var test in result.Tests)
+                {
+                    var filePath = TestFileWriter.GetFilePath(testsPath, suiteName, test.Id);
+
+                    var testWithPath = new TestCase
+                    {
+                        Id = test.Id,
+                        Title = test.Title,
+                        Priority = test.Priority,
+                        Tags = test.Tags,
+                        Component = test.Component,
+                        Preconditions = test.Preconditions,
+                        Environment = test.Environment,
+                        EstimatedDuration = test.EstimatedDuration,
+                        DependsOn = test.DependsOn,
+                        SourceRefs = test.SourceRefs,
+                        RelatedWorkItems = test.RelatedWorkItems,
+                        Custom = test.Custom,
+                        Steps = test.Steps,
+                        ExpectedResult = test.ExpectedResult,
+                        TestData = test.TestData,
+                        FilePath = Path.GetRelativePath(testsPath, filePath)
+                    };
+
+                    await writer.WriteAsync(filePath, testWithPath, ct);
+                    existingTests = [.. existingTests, testWithPath];
+                }
+
+                allGeneratedTests.AddRange(result.Tests);
+
+                _progress.BlankLine();
+                _results.ShowCompletion($"tests/{suiteName}/", result.Tests.Count);
+            }
+
+            // Update remaining gaps
+            remainingGaps = gapAnalyzer.GetRemainingGaps(remainingGaps, result.Tests).ToList();
+            session.RecordGeneration(result.Tests, remainingGaps);
+
+            // Prompt for more if gaps remain
+            if (remainingGaps.Count > 0 && !_dryRun)
+            {
+                _gapPresenter.ShowRemainingGaps(remainingGaps);
+
+                var gapSelector = new GapSelector();
+                var gapResult = gapSelector.PromptForMore(remainingGaps);
+
+                switch (gapResult.Action)
+                {
+                    case GapAction.GenerateAll:
+                        focus = null; // Generate for all remaining gaps
+                        session.SelectGaps(remainingGaps);
+                        break;
+
+                    case GapAction.GenerateSelected:
+                        // Build focus from selected gaps
+                        focus = string.Join(", ", gapResult.SelectedGaps.Select(g => g.Suggestion ?? g.DocumentPath));
+                        session.SelectGaps(gapResult.SelectedGaps);
+                        break;
+
+                    case GapAction.Done:
+                    default:
+                        session.Complete();
+                        break;
+                }
+            }
+            else
+            {
+                session.Complete();
+            }
+        }
+
+        // Update index if we wrote any tests
+        if (allGeneratedTests.Count > 0 && !_dryRun)
+        {
+            var indexGenerator = new IndexGenerator();
+            var index = indexGenerator.Generate(suiteName, existingTests.ToList());
+
+            var indexWriter = new IndexWriter();
+            await indexWriter.WriteAsync(Path.Combine(suitePath, "_index.json"), index, ct);
+        }
+
+        return ExitCodes.Success;
+    }
+
+    private async Task<SpectraConfig?> LoadConfigAsync(string configPath, CancellationToken ct)
+    {
+        if (!File.Exists(configPath))
+        {
+            _progress.Error("No spectra.config.json found. Run 'spectra init' first.");
+            return null;
+        }
+
+        try
+        {
+            var configJson = await File.ReadAllTextAsync(configPath, ct);
+            return JsonSerializer.Deserialize<SpectraConfig>(configJson, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        catch (JsonException ex)
+        {
+            _progress.Error($"Error reading config: {ex.Message}");
+            return null;
+        }
     }
 
     private async Task<List<TestCase>> LoadExistingTestsAsync(
@@ -275,11 +606,27 @@ public sealed class GenerateHandler
         return tests;
     }
 
-    private static string BuildPrompt(string suite, int count, IReadOnlyList<TestCase> existingTests, EffectiveProfile profile)
+    private static List<TestCase> FilterTestsByFocus(IReadOnlyList<TestCase> tests, string focus)
+    {
+        var lowerFocus = focus.ToLowerInvariant();
+
+        return tests.Where(t =>
+            t.Title.ToLowerInvariant().Contains(lowerFocus) ||
+            t.Tags.Any(tag => tag.ToLowerInvariant().Contains(lowerFocus)) ||
+            (t.Component?.ToLowerInvariant().Contains(lowerFocus) ?? false) ||
+            t.Steps.Any(s => s.ToLowerInvariant().Contains(lowerFocus))
+        ).ToList();
+    }
+
+    private static string BuildPrompt(
+        string suite,
+        int count,
+        IReadOnlyList<TestCase> existingTests,
+        EffectiveProfile profile,
+        string? focus)
     {
         var existingIds = string.Join(", ", existingTests.Select(t => t.Id));
 
-        // Build profile context section
         var profileContext = string.Empty;
         if (profile.Source.Type != SourceType.Default)
         {
@@ -297,6 +644,10 @@ public sealed class GenerateHandler
 
         var minNegative = options.MinNegativeScenarios;
 
+        var focusInstruction = string.IsNullOrEmpty(focus)
+            ? "Cover different aspects of the feature"
+            : $"Focus on: {focus}";
+
         return $"""
             Generate {count} new manual test cases for the '{suite}' feature.
 
@@ -304,7 +655,7 @@ public sealed class GenerateHandler
             Requirements:
             - Each test must have a unique ID in format TC-XXX (where XXX is a number)
             - Do not duplicate these existing test IDs: {existingIds}
-            - Tests should cover different aspects of the feature
+            - {focusInstruction}
             - Include at least {minNegative} negative/error scenario test(s)
             - Default priority is {defaultPriority} unless the scenario clearly warrants different priority
             - Include clear steps and expected results for each test
@@ -316,54 +667,5 @@ public sealed class GenerateHandler
             - steps: list of actions
             - expected_result: what should happen
             """;
-    }
-
-    private async Task<List<TestCase>> InteractiveReviewAsync(
-        List<TestCase> tests,
-        CancellationToken ct)
-    {
-        Console.WriteLine("\nReview generated tests:");
-        Console.WriteLine("(y=accept, n=reject, e=edit, a=accept all, q=quit)\n");
-
-        var accepted = new List<TestCase>();
-
-        foreach (var test in tests)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            Console.WriteLine($"[{test.Id}] {test.Title}");
-            Console.WriteLine($"  Priority: {test.Priority}");
-            Console.WriteLine($"  Steps: {test.Steps.Count}");
-            Console.Write("  Accept? [y/n/e/a/q]: ");
-
-            var key = Console.ReadKey();
-            Console.WriteLine();
-
-            switch (key.KeyChar)
-            {
-                case 'y' or 'Y':
-                    accepted.Add(test);
-                    break;
-                case 'n' or 'N':
-                    // Skip
-                    break;
-                case 'e' or 'E':
-                    var editor = new TestEditor();
-                    var edited = editor.Edit(test);
-                    if (edited is not null)
-                    {
-                        accepted.Add(edited);
-                    }
-                    break;
-                case 'a' or 'A':
-                    accepted.Add(test);
-                    accepted.AddRange(tests.SkipWhile(t => t != test).Skip(1));
-                    return accepted;
-                case 'q' or 'Q':
-                    return accepted;
-            }
-        }
-
-        return accepted;
     }
 }

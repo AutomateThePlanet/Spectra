@@ -58,6 +58,11 @@ public sealed class GenerationResult
     public TokenUsage? TokenUsage { get; init; }
 
     /// <summary>
+    /// Coverage gaps remaining after generation.
+    /// </summary>
+    public IReadOnlyList<Core.Models.CoverageGap> CoverageGapsRemaining { get; init; } = [];
+
+    /// <summary>
     /// Whether generation was successful.
     /// </summary>
     public bool IsSuccess => Errors.Count == 0;
