@@ -52,6 +52,163 @@ For the full walkthrough, see [End-to-End Workflow](#end-to-end-workflow-generat
 - Git
 - VS Code with GitHub Copilot (for MCP execution)
 - GitHub Copilot Chat extension (for MCP support)
+- One of the following authentication options (for AI test generation):
+  - GitHub CLI authenticated (`gh auth login`)
+  - `GITHUB_TOKEN` environment variable
+  - `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` for alternative providers
+
+---
+
+## Authentication Setup
+
+SPECTRA requires authentication to access AI providers for test generation. The CLI provides helpful error messages and automatic fallback when auth is missing.
+
+### Quick Status Check
+
+```bash
+spectra auth
+```
+
+This shows authentication status for all configured providers:
+
+```
+SPECTRA Authentication Status
+========================================
+
+github-models        [OK] via gh-cli
+openai               [NOT CONFIGURED]
+                       Set the OPENAI_API_KEY environment variable
+anthropic            [NOT CONFIGURED]
+                       Set the ANTHROPIC_API_KEY environment variable
+```
+
+### GitHub Models (Recommended)
+
+GitHub Models is the default provider. You can authenticate in two ways:
+
+**Option 1: GitHub CLI (Recommended)**
+
+```bash
+# Install GitHub CLI if needed
+# https://cli.github.com/
+
+# Authenticate
+gh auth login
+
+# Verify
+spectra auth -p github-models
+```
+
+SPECTRA automatically detects `gh auth token` and uses it.
+
+**Option 2: Environment Variable**
+
+```bash
+# Create a GitHub token at https://github.com/settings/tokens
+# Required scopes: read:user
+
+# Set environment variable
+export GITHUB_TOKEN="ghp_your_token_here"
+
+# Windows PowerShell
+$env:GITHUB_TOKEN = "ghp_your_token_here"
+
+# Windows CMD
+set GITHUB_TOKEN=ghp_your_token_here
+```
+
+### OpenAI
+
+```bash
+# Get API key from https://platform.openai.com/api-keys
+export OPENAI_API_KEY="sk-your_key_here"
+
+# Verify
+spectra auth -p openai
+```
+
+Update `spectra.config.json` to use OpenAI:
+
+```json
+{
+  "ai": {
+    "providers": [
+      { "name": "openai", "model": "gpt-4o", "enabled": true }
+    ]
+  }
+}
+```
+
+### Anthropic
+
+```bash
+# Get API key from https://console.anthropic.com/
+export ANTHROPIC_API_KEY="sk-ant-your_key_here"
+
+# Verify
+spectra auth -p anthropic
+```
+
+Update `spectra.config.json` to use Anthropic:
+
+```json
+{
+  "ai": {
+    "providers": [
+      { "name": "anthropic", "model": "claude-sonnet-4-5-20250514", "enabled": true }
+    ]
+  }
+}
+```
+
+### Custom Environment Variables
+
+Override the default environment variable name in config:
+
+```json
+{
+  "ai": {
+    "providers": [
+      {
+        "name": "openai",
+        "model": "gpt-4o",
+        "api_key_env": "MY_CUSTOM_OPENAI_KEY",
+        "enabled": true
+      }
+    ]
+  }
+}
+```
+
+### Troubleshooting Authentication
+
+**Stack trace instead of helpful error?**
+
+This shouldn't happen anymore. If you see a stack trace for missing auth, please report it as a bug.
+
+**"GitHub CLI is installed but not authenticated"**
+
+Run `gh auth login` and follow the prompts.
+
+**"GitHub CLI is not installed"**
+
+Install from https://cli.github.com/ or use the `GITHUB_TOKEN` environment variable instead.
+
+**"API key not found"**
+
+Verify the environment variable is set:
+
+```bash
+# Linux/macOS
+echo $OPENAI_API_KEY
+
+# Windows PowerShell
+echo $env:OPENAI_API_KEY
+```
+
+**Wrong provider being used?**
+
+Check which provider is enabled first in `spectra.config.json`. SPECTRA uses the first enabled provider.
 
 ## Project Structure
 

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Spectra.CLI.Agent;
+using Spectra.CLI.Commands.Auth;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.IO;
 using Spectra.CLI.Review;
@@ -111,8 +112,16 @@ public sealed class GenerateHandler
             }
         }
 
-        // Create agent
-        var agent = AgentFactory.Create(config.Ai);
+        // Create agent with graceful auth handling
+        var createResult = await AgentFactory.TryCreateWithDetailsAsync(config.Ai, ct);
+
+        if (!createResult.Success)
+        {
+            AuthHandler.WriteAuthError(createResult.ProviderName!, createResult.AuthResult!);
+            return ExitCodes.Error;
+        }
+
+        var agent = createResult.Agent!;
 
         if (!await agent.IsAvailableAsync(ct))
         {

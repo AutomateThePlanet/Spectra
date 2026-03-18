@@ -50,7 +50,10 @@
       "Bash(spectra --help:*)",
       "Bash(done)",
       "Bash(find:*)",
-      "WebFetch(domain:www.nuget.org)"
+      "WebFetch(domain:www.nuget.org)",
+      "Bash(dotnet tool update:*)",
+      "Bash(dotnet tool:*)",
+      "Bash(spectra:*)"
     ]
   }
 }

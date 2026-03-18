@@ -17,9 +17,28 @@ public sealed class GitHubModelsAgent : IAgentRuntime
 
     private readonly ProviderConfig _provider;
     private readonly ChatCompletionsClient _client;
+    private readonly bool _hasValidToken;
 
     public string ProviderName => "github-models";
 
+    /// <summary>
+    /// Creates a new GitHubModelsAgent with a pre-obtained token.
+    /// Preferred constructor for use with GitHubCliTokenProvider.
+    /// </summary>
+    public GitHubModelsAgent(ProviderConfig provider, string token)
+    {
+        _provider = provider ?? throw new ArgumentNullException(nameof(provider));
+        ArgumentException.ThrowIfNullOrEmpty(token);
+
+        var endpoint = new Uri(_provider.BaseUrl ?? BaseUrl);
+        _client = new ChatCompletionsClient(endpoint, new AzureKeyCredential(token));
+        _hasValidToken = true;
+    }
+
+    /// <summary>
+    /// Creates a new GitHubModelsAgent, retrieving the token from environment variables.
+    /// Falls back to checking GITHUB_TOKEN if ApiKeyEnv is not set.
+    /// </summary>
     public GitHubModelsAgent(ProviderConfig provider)
     {
         _provider = provider ?? throw new ArgumentNullException(nameof(provider));
@@ -33,12 +52,12 @@ public sealed class GitHubModelsAgent : IAgentRuntime
 
         var endpoint = new Uri(_provider.BaseUrl ?? BaseUrl);
         _client = new ChatCompletionsClient(endpoint, new AzureKeyCredential(apiKey));
+        _hasValidToken = true;
     }
 
-    public async Task<bool> IsAvailableAsync(CancellationToken ct = default)
+    public Task<bool> IsAvailableAsync(CancellationToken ct = default)
     {
-        var apiKey = GetApiKey();
-        return await Task.FromResult(!string.IsNullOrEmpty(apiKey));
+        return Task.FromResult(_hasValidToken);
     }
 
     public async Task<GenerationResult> GenerateTestsAsync(

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Spectra.CLI.Agent;
 using Spectra.CLI.Infrastructure;
 using Spectra.Core.Config;
 
@@ -11,16 +12,18 @@ public sealed class InitHandler
 {
     private readonly ILogger<InitHandler> _logger;
     private readonly string _workingDirectory;
+    private readonly bool _interactive;
 
     private const string ConfigFileName = "spectra.config.json";
     private const string SkillPath = ".github/skills/test-generation/SKILL.md";
     private const string DocsDir = "docs";
     private const string TestsDir = "tests";
 
-    public InitHandler(ILogger<InitHandler> logger, string? workingDirectory = null)
+    public InitHandler(ILogger<InitHandler> logger, string? workingDirectory = null, bool interactive = false)
     {
         _logger = logger;
         _workingDirectory = workingDirectory ?? Directory.GetCurrentDirectory();
+        _interactive = interactive;
     }
 
     /// <summary>
@@ -61,12 +64,83 @@ public sealed class InitHandler
             _logger.LogInformation("  - {TestsDir}/", TestsDir);
             _logger.LogInformation("  - {SkillPath}", SkillPath);
 
+            // Interactive auth setup
+            if (_interactive)
+            {
+                Console.WriteLine();
+                await InteractiveAuthSetupAsync(ct);
+            }
+
             return ExitCodes.Success;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to initialize SPECTRA");
             return ExitCodes.Error;
+        }
+    }
+
+    private async Task InteractiveAuthSetupAsync(CancellationToken ct)
+    {
+        Console.WriteLine("AI Provider Setup");
+        Console.WriteLine(new string('-', 40));
+        Console.WriteLine();
+        Console.WriteLine("Which AI provider would you like to use?");
+        Console.WriteLine("  1. GitHub Models (uses GITHUB_TOKEN or gh CLI)");
+        Console.WriteLine("  2. OpenAI (requires OPENAI_API_KEY)");
+        Console.WriteLine("  3. Anthropic (requires ANTHROPIC_API_KEY)");
+        Console.WriteLine("  4. Skip for now");
+        Console.Write("> ");
+
+        var input = Console.ReadLine()?.Trim();
+
+        if (string.IsNullOrEmpty(input) || input == "4")
+        {
+            Console.WriteLine();
+            Console.WriteLine("Skipped. Run 'spectra auth' to check authentication status later.");
+            return;
+        }
+
+        var provider = input switch
+        {
+            "1" => "github-models",
+            "2" => "openai",
+            "3" => "anthropic",
+            _ => null
+        };
+
+        if (provider is null)
+        {
+            Console.WriteLine();
+            Console.WriteLine("Invalid selection. Run 'spectra auth' to check authentication status later.");
+            return;
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"Checking {provider} authentication...");
+
+        var authResult = await AgentFactory.GetAuthStatusAsync(provider, null, ct);
+
+        if (authResult.IsAuthenticated)
+        {
+            Console.WriteLine($"  [OK] Authenticated via {authResult.Source}");
+            Console.WriteLine();
+            Console.WriteLine("Configuration complete!");
+        }
+        else
+        {
+            Console.WriteLine($"  [NOT CONFIGURED]");
+            Console.WriteLine();
+            Console.WriteLine("To authenticate:");
+            foreach (var instruction in authResult.SetupInstructions)
+            {
+                if (!string.IsNullOrEmpty(instruction))
+                {
+                    Console.WriteLine($"  {instruction}");
+                }
+            }
+            Console.WriteLine();
+            Console.WriteLine("Run 'spectra auth' to verify authentication after setup.");
         }
     }
 

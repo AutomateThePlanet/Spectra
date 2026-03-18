@@ -1,6 +1,7 @@
 using System.CommandLine;
 using Spectra.CLI.Commands;
 using Spectra.CLI.Commands.Ai;
+using Spectra.CLI.Commands.Auth;
 using Spectra.CLI.Commands.Config;
 using Spectra.CLI.Commands.Dashboard;
 using Spectra.CLI.Commands.Index;
@@ -47,6 +48,7 @@ public class Program
         rootCommand.AddCommand(new ConfigCommand());
         rootCommand.AddCommand(new InitProfileCommand());
         rootCommand.AddCommand(new ProfileCommand());
+        rootCommand.AddCommand(new AuthCommand());
 
         return rootCommand;
     }

@@ -66,7 +66,18 @@ spectra index
 ### Prerequisites
 
 - .NET 8.0+
-- GitHub Copilot CLI installed and authenticated (or BYOK API key for OpenAI/Anthropic)
+- One of the following authentication options:
+  - GitHub CLI authenticated (`gh auth login`), OR
+  - `GITHUB_TOKEN` environment variable, OR
+  - `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` for alternative providers
+
+### Quick Auth Check
+
+```bash
+spectra auth
+```
+
+This shows authentication status for all configured providers.
 
 ## Test Case Format
 

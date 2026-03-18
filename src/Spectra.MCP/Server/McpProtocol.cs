@@ -160,4 +160,5 @@ public static class JsonRpcErrorCodes
     public const int NotFound = -32001;
     public const int Conflict = -32002;
     public const int Unauthorized = -32003;
+    public const int AuthenticationRequired = -32004;
 }
