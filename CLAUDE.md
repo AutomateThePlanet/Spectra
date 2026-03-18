@@ -13,6 +13,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-18
 - File-based (tests/, docs/, spectra.config.json, _index.json) (006-interactive-generation)
 - C# 12, .NET 8+ + System.CommandLine (CLI), Spectre.Console (terminal UX), Microsoft.Extensions.AI (AI tools) (006-conversational-generation)
 - File system (tests/{suite}/*.md), JSON indexes (_index.json) (006-conversational-generation)
+- C# 12, .NET 8+ + Spectra.Core (parsing, validation, indexing), Spectra.MCP (tool registry, protocol), System.Text.Json, System.CommandLine (007-execution-agent-mcp-tools)
+- File system (Markdown test files, JSON indexes), embedded resources for bundled agent prompts (007-execution-agent-mcp-tools)
 
 - C# 12, .NET 8+ + System.CommandLine (CLI), Microsoft.Extensions.AI (AI tools), Markdig (Markdown parsing), YamlDotNet (frontmatter), GitHub Copilot SDK (AI runtime) (001-ai-test-generation-cli)
 
@@ -117,9 +119,9 @@ spectra ai analyze --coverage --verbosity detailed
 - **Tests:** xUnit with structured results (never throw on validation errors)
 
 ## Recent Changes
+- 007-execution-agent-mcp-tools: Added C# 12, .NET 8+ + Spectra.Core (parsing, validation, indexing), Spectra.MCP (tool registry, protocol), System.Text.Json, System.CommandLine
 - 006-conversational-generation: ✅ COMPLETE - Two-mode test generation (Direct/Interactive), test updates with classification (UP_TO_DATE, OUTDATED, ORPHANED, REDUNDANT), rich terminal UX with Spectre.Console
 - 004-test-generation-profile: Added profile support for test generation settings
-- 003-dashboard-coverage-analysis: Dashboard generation and coverage analysis
 
 
 <!-- MANUAL ADDITIONS START -->
