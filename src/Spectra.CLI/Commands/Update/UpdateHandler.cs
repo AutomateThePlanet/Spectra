@@ -293,17 +293,18 @@ public sealed class UpdateHandler
         }
 
         // Apply changes
+        var orphanedCount = 0;
         if (!_dryRun)
         {
-            await ApplyChangesAsync(suitePath, reviewResult, ct);
+            orphanedCount = await ApplyChangesAsync(suitePath, reviewResult, ct);
         }
         else
         {
             _progress.Info("Dry run - no changes were made.");
         }
 
-        // Update index
-        if (!_dryRun && (reviewResult.ToUpdate.Count > 0 || reviewResult.ToDelete.Count > 0))
+        // Update index with redundant test info
+        if (!_dryRun && (reviewResult.ToUpdate.Count > 0 || reviewResult.ToDelete.Count > 0 || orphanedCount > 0))
         {
             // Re-read all tests to rebuild index
             var rereadResult = await batchReader.ExecuteAsync(suitePath, ct: ct);
@@ -311,15 +312,49 @@ public sealed class UpdateHandler
             {
                 var indexGenerator = new IndexGenerator();
                 var index = indexGenerator.Generate(suite, rereadResult.Tests);
+
+                // Add redundant test info to index entries
+                var redundantTests = classificationResults
+                    .Where(r => r.Classification == UpdateClassification.Redundant)
+                    .ToDictionary(r => r.Test.Id);
+
+                var updatedEntries = index.Tests.Select(entry =>
+                {
+                    if (redundantTests.TryGetValue(entry.Id, out var result))
+                    {
+                        return new TestIndexEntry
+                        {
+                            Id = entry.Id,
+                            File = entry.File,
+                            Title = entry.Title,
+                            Priority = entry.Priority,
+                            Tags = entry.Tags,
+                            Component = entry.Component,
+                            DependsOn = entry.DependsOn,
+                            SourceRefs = entry.SourceRefs,
+                            RedundantOf = result.RelatedTestId,
+                            RedundantReason = $"{result.Confidence:P0} content similarity"
+                        };
+                    }
+                    return entry;
+                }).ToList();
+
+                var updatedIndex = new MetadataIndex
+                {
+                    Suite = index.Suite,
+                    GeneratedAt = index.GeneratedAt,
+                    Tests = updatedEntries
+                };
+
                 var indexWriter = new IndexWriter();
-                await indexWriter.WriteAsync(Path.Combine(suitePath, "_index.json"), index, ct);
+                await indexWriter.WriteAsync(Path.Combine(suitePath, "_index.json"), updatedIndex, ct);
             }
         }
 
         // Summary
         _classificationPresenter.ShowUpdateComplete(
             reviewResult.ToUpdate.Count,
-            0, // marked orphaned count (we update in place)
+            orphanedCount,
             reviewResult.ToDelete.Count);
 
         return ExitCodes.Success;
@@ -395,12 +430,13 @@ public sealed class UpdateHandler
         return proposals;
     }
 
-    private static async Task ApplyChangesAsync(
+    private static async Task<int> ApplyChangesAsync(
         string suitePath,
         UpdateReviewResult result,
         CancellationToken ct)
     {
         var writer = new TestFileWriter();
+        var orphanedCount = 0;
 
         // Apply updates
         foreach (var proposal in result.ToUpdate)
@@ -413,6 +449,39 @@ public sealed class UpdateHandler
             }
         }
 
+        // Mark orphaned tests (in skipped list) with status
+        foreach (var proposal in result.Skipped.Where(p => p.Classification == UpdateClassification.Orphaned))
+        {
+            var originalTest = proposal.OriginalTest;
+            var orphanedTest = new TestCase
+            {
+                Id = originalTest.Id,
+                FilePath = originalTest.FilePath,
+                Priority = originalTest.Priority,
+                Tags = originalTest.Tags,
+                Component = originalTest.Component,
+                Preconditions = originalTest.Preconditions,
+                Environment = originalTest.Environment,
+                EstimatedDuration = originalTest.EstimatedDuration,
+                DependsOn = originalTest.DependsOn,
+                SourceRefs = originalTest.SourceRefs,
+                RelatedWorkItems = originalTest.RelatedWorkItems,
+                Custom = originalTest.Custom,
+                Title = originalTest.Title,
+                Steps = originalTest.Steps,
+                ExpectedResult = originalTest.ExpectedResult,
+                TestData = originalTest.TestData,
+                Status = "orphaned",
+                OrphanedReason = proposal.Reason ?? "Source documentation no longer exists",
+                OrphanedDate = DateTimeOffset.UtcNow
+            };
+
+            var path = Path.Combine(suitePath, $"{originalTest.Id}.md");
+            await writer.WriteAsync(path, orphanedTest, ct);
+            Console.WriteLine($"  Marked orphaned: {originalTest.Id}");
+            orphanedCount++;
+        }
+
         // Delete tests
         foreach (var proposal in result.ToDelete)
         {
@@ -423,6 +492,8 @@ public sealed class UpdateHandler
                 Console.WriteLine($"  Deleted: {proposal.OriginalTest.Id}");
             }
         }
+
+        return orphanedCount;
     }
 
     private async Task<SpectraConfig?> LoadConfigAsync(string configPath, CancellationToken ct)

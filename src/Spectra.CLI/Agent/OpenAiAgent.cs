@@ -100,6 +100,50 @@ public sealed class OpenAiAgent : IAgentRuntime
                 TokenUsage = tokenUsage
             };
         }
+        catch (HttpRequestException ex) when (ex.Message.Contains("429"))
+        {
+            return new GenerationResult
+            {
+                Tests = [],
+                Errors = [
+                    "OpenAI rate limit exceeded.",
+                    "Retry: Wait a few minutes and try again, or reduce --count."
+                ]
+            };
+        }
+        catch (HttpRequestException ex) when (ex.Message.Contains("5"))
+        {
+            return new GenerationResult
+            {
+                Tests = [],
+                Errors = [
+                    $"OpenAI service error: {ex.Message}",
+                    "Retry: The service may be temporarily unavailable. Try again in a few minutes."
+                ]
+            };
+        }
+        catch (HttpRequestException ex)
+        {
+            return new GenerationResult
+            {
+                Tests = [],
+                Errors = [
+                    $"Network error: {ex.Message}",
+                    "Retry: Check your internet connection and try again."
+                ]
+            };
+        }
+        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+        {
+            return new GenerationResult
+            {
+                Tests = [],
+                Errors = [
+                    "Request timed out.",
+                    "Retry: The AI service is slow. Try again or reduce --count."
+                ]
+            };
+        }
         catch (Exception ex)
         {
             return new GenerationResult

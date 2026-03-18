@@ -216,23 +216,48 @@ Done.
 
 ## Implementation Notes
 
+**Status**: ✅ Complete (2026-03-18)
+
 ### Files Modified
 
-- `GenerateCommand.cs` — Suite argument now optional
-- `GenerateHandler.cs` — Mode detection + interactive flow
-- `UpdateCommand.cs` — Suite argument now optional
-- `UpdateHandler.cs` — Classification + update flow
+- `src/Spectra.CLI/Commands/Generate/GenerateCommand.cs` — Suite argument now optional, added --focus and --no-interaction
+- `src/Spectra.CLI/Commands/Generate/GenerateHandler.cs` — Full rewrite with direct/interactive modes
+- `src/Spectra.CLI/Commands/Update/UpdateCommand.cs` — Suite argument now optional, added --no-interaction
+- `src/Spectra.CLI/Commands/Update/UpdateHandler.cs` — Full rewrite with direct/interactive modes and classification
+- `src/Spectra.Core/Models/TestCase.cs` — Added Status, OrphanedReason, OrphanedDate fields
+- `src/Spectra.Core/Models/TestIndexEntry.cs` — Added RedundantOf, RedundantReason fields
+- `src/Spectra.CLI/IO/TestFileWriter.cs` — Output orphaned status in frontmatter
+- `src/Spectra.CLI/Agent/*.cs` — Enhanced error handling with retry suggestions
 
 ### New Files
 
-- `Interactive/SuiteSelector.cs` — Suite selection UI
-- `Interactive/TestTypeSelector.cs` — Test type selection UI
-- `Interactive/FocusDescriptor.cs` — Focus input UI
-- `Interactive/GapSelector.cs` — Gap selection UI
-- `Coverage/GapAnalyzer.cs` — Gap detection logic
-- `Classification/TestClassifier.cs` — Test classification logic
-- `Output/ProgressReporter.cs` — Spinner/progress display
-- `Output/ResultPresenter.cs` — Table/summary display
+**Core Models** (`src/Spectra.Core/Models/`):
+- `SessionMode.cs` — Generate/Update mode enum
+- `SessionState.cs` — Interactive flow state enum
+- `TestTypeSelection.cs` — Test type selection enum
+- `ClassifiedTest.cs` — Classified test model
+- `SuiteSummary.cs` — Suite summary with test count
+- `UpdateResult.cs` — Update operation result
+
+**Interactive Components** (`src/Spectra.CLI/Interactive/`):
+- `SuiteSelector.cs` — Suite selection with "Create new suite" option
+- `SuiteScanner.cs` — Scan suites with test counts
+- `TestTypeSelector.cs` — Test type selection (Full/Negative/Specific/Free)
+- `FocusDescriptor.cs` — Focus description input
+- `GapSelector.cs` — Gap selection for follow-up generation
+- `InteractiveSession.cs` — State machine for interactive flow
+
+**Output Components** (`src/Spectra.CLI/Output/`):
+- `OutputSymbols.cs` — Unicode symbols (◆◐✓✗⚠ℹ)
+- `ProgressReporter.cs` — Spinner/progress display
+- `ResultPresenter.cs` — Table/summary display
+
+**Coverage Components** (`src/Spectra.CLI/Coverage/`):
+- `GapAnalyzer.cs` — Compare docs against test source_refs
+- `GapPresenter.cs` — Display coverage gaps
+
+**Classification Components** (`src/Spectra.CLI/Classification/`):
+- `ClassificationPresenter.cs` — Display update classification results
 
 ### Dependencies
 

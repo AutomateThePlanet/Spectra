@@ -115,12 +115,56 @@ public sealed class GitHubModelsAgent : IAgentRuntime
                 TokenUsage = tokenUsage
             };
         }
+        catch (RequestFailedException ex) when (ex.Status == 429)
+        {
+            return new GenerationResult
+            {
+                Tests = [],
+                Errors = [
+                    "GitHub Models rate limit exceeded.",
+                    "Retry: Wait a few minutes and try again, or reduce --count."
+                ]
+            };
+        }
+        catch (RequestFailedException ex) when (ex.Status >= 500)
+        {
+            return new GenerationResult
+            {
+                Tests = [],
+                Errors = [
+                    $"GitHub Models service error (HTTP {ex.Status}).",
+                    "Retry: The service may be temporarily unavailable. Try again in a few minutes."
+                ]
+            };
+        }
         catch (RequestFailedException ex)
         {
             return new GenerationResult
             {
                 Tests = [],
                 Errors = [$"GitHub Models API error: {ex.Message}"]
+            };
+        }
+        catch (HttpRequestException ex)
+        {
+            return new GenerationResult
+            {
+                Tests = [],
+                Errors = [
+                    $"Network error: {ex.Message}",
+                    "Retry: Check your internet connection and try again."
+                ]
+            };
+        }
+        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+        {
+            return new GenerationResult
+            {
+                Tests = [],
+                Errors = [
+                    "Request timed out.",
+                    "Retry: The AI service is slow. Try again or reduce --count."
+                ]
             };
         }
         catch (Exception ex)

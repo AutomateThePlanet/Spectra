@@ -72,6 +72,22 @@ public sealed class TestFileWriter
             sb.AppendLine($"estimated_duration: {FormatDuration(duration)}");
         }
 
+        // Orphaned status fields
+        if (!string.IsNullOrWhiteSpace(testCase.Status))
+        {
+            sb.AppendLine($"status: {testCase.Status}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(testCase.OrphanedReason))
+        {
+            sb.AppendLine($"orphaned_reason: \"{EscapeYamlString(testCase.OrphanedReason)}\"");
+        }
+
+        if (testCase.OrphanedDate.HasValue)
+        {
+            sb.AppendLine($"orphaned_date: {testCase.OrphanedDate.Value:yyyy-MM-dd}");
+        }
+
         sb.AppendLine("---");
         sb.AppendLine();
 
@@ -133,5 +149,10 @@ public sealed class TestFileWriter
             return $"{(int)duration.TotalMinutes}m";
         }
         return $"{(int)duration.TotalSeconds}s";
+    }
+
+    private static string EscapeYamlString(string value)
+    {
+        return value.Replace("\"", "\\\"").Replace("\n", "\\n");
     }
 }

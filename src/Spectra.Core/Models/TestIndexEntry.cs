@@ -30,4 +30,18 @@ public sealed class TestIndexEntry
 
     [JsonPropertyName("source_refs")]
     public IReadOnlyList<string> SourceRefs { get; init; } = [];
+
+    /// <summary>
+    /// ID of the test this one duplicates (if redundant).
+    /// </summary>
+    [JsonPropertyName("redundant_of")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RedundantOf { get; init; }
+
+    /// <summary>
+    /// Reason this test was flagged as redundant.
+    /// </summary>
+    [JsonPropertyName("redundant_reason")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RedundantReason { get; init; }
 }

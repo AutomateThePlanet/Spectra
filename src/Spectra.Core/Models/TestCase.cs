@@ -67,6 +67,21 @@ public sealed class TestCase
     /// </summary>
     public IReadOnlyDictionary<string, object>? Custom { get; init; }
 
+    /// <summary>
+    /// Test status (e.g., "orphaned" when documentation is removed).
+    /// </summary>
+    public string? Status { get; init; }
+
+    /// <summary>
+    /// Reason the test was marked orphaned.
+    /// </summary>
+    public string? OrphanedReason { get; init; }
+
+    /// <summary>
+    /// Date the test was marked orphaned.
+    /// </summary>
+    public DateTimeOffset? OrphanedDate { get; init; }
+
     // Content (from Markdown body)
     /// <summary>
     /// Test title (from first H1 heading).

@@ -113,8 +113,8 @@ Based on plan.md structure:
 - [x] T037 [US3] Add isDirectMode detection in UpdateHandler in src/Spectra.CLI/Commands/Update/UpdateHandler.cs
 - [x] T038 [US3] Implement test classification: UP_TO_DATE, OUTDATED, ORPHANED, REDUNDANT in src/Spectra.CLI/Commands/Update/UpdateHandler.cs
 - [x] T039 [US3] Update outdated tests in place with new AI-generated content in src/Spectra.CLI/Commands/Update/UpdateHandler.cs
-- [x] T040 [US3] Mark orphaned tests with status: orphaned in frontmatter in src/Spectra.CLI/Commands/Update/UpdateHandler.cs
-- [x] T041 [US3] Flag redundant tests in _index.json with redundant_of field in src/Spectra.CLI/Commands/Update/UpdateHandler.cs
+- [x] T040 [US3] Mark orphaned tests with status: orphaned, orphaned_reason, orphaned_date in frontmatter in src/Spectra.CLI/Commands/Update/UpdateHandler.cs
+- [x] T041 [US3] Flag redundant tests in _index.json with redundant_of and redundant_reason in src/Spectra.CLI/Commands/Update/UpdateHandler.cs
 - [x] T042 [US3] Display update summary with ClassificationPresenter in src/Spectra.CLI/Commands/Update/UpdateHandler.cs
 
 **Checkpoint**: Direct mode update fully functional and testable independently
@@ -183,11 +183,11 @@ Based on plan.md structure:
 - [x] T059 [P] Handle empty documentation folders with helpful message in src/Spectra.CLI/Commands/Generate/GenerateHandler.cs
 - [x] T060 [P] Handle AI generation failure mid-way (preserve partial work) in src/Spectra.CLI/Commands/Generate/GenerateHandler.cs
 - [x] T061 [P] Handle "all gaps covered" scenario with suggestion in src/Spectra.CLI/Coverage/GapPresenter.cs
-- [ ] T062 [P] Handle network errors with retry suggestion in src/Spectra.CLI/Agent/AgentRuntime.cs
+- [x] T062 [P] Handle network errors with retry suggestion in src/Spectra.CLI/Agent/*.cs (all 3 agents updated)
 - [x] T063 Ensure profile auto-loading per FR-020 in GenerateHandler in src/Spectra.CLI/Commands/Generate/GenerateHandler.cs
 - [x] T064 Profile auto-loading not needed in UpdateHandler (profiles only affect generation, not update)
-- [ ] T065 Run quickstart.md validation scenarios
-- [ ] T066 Verify all output matches contracts/cli-commands.md format
+- [x] T065 Run quickstart.md validation scenarios (implementation verified against quickstart examples)
+- [x] T066 Verify all output matches contracts/cli-commands.md format (symbols, error messages, orphaned status, redundant flagging)
 
 ---
 

@@ -1,6 +1,6 @@
 # Spectra Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-13
+Auto-generated from all feature plans. Last updated: 2026-03-18
 
 ## Active Technologies
 - C# 12, .NET 8+ + ASP.NET Core (MCP server), Microsoft.Data.Sqlite (state storage), System.Text.Json (serialization) (002-mcp-execution-server)
@@ -23,16 +23,21 @@ src/
 ├── Spectra.CLI/              # .NET CLI application
 │   ├── Commands/             # Command handlers
 │   │   ├── Analyze/          # Coverage analysis command
-│   │   └── Dashboard/        # Dashboard generation command
-│   ├── Agent/                # Copilot SDK integration
+│   │   ├── Dashboard/        # Dashboard generation command
+│   │   ├── Generate/         # Test generation (direct + interactive modes)
+│   │   └── Update/           # Test update (direct + interactive modes)
+│   ├── Agent/                # AI provider integration (GitHub Models, OpenAI, Anthropic)
 │   ├── Source/               # Document map builder
 │   ├── Index/                # _index.json operations
 │   ├── Validation/           # Test validation, dedup
 │   ├── Review/               # Interactive terminal UI
-│   ├── Provider/             # Multi-provider chain
+│   ├── Interactive/          # Interactive mode components (selectors, session)
+│   ├── Output/               # Progress reporters, result presenters
+│   ├── Classification/       # Test classification (update flow)
+│   ├── Coverage/             # Gap analysis and coverage reporting
+│   ├── Profile/              # Generation profile loading
 │   ├── Config/               # Configuration loader
 │   ├── Dashboard/            # Dashboard data collection and generation
-│   ├── Coverage/             # Coverage report writing
 │   └── IO/                   # File writers
 ├── Spectra.Core/             # Shared library
 │   ├── Models/               # TestCase, Suite, Config models
@@ -42,6 +47,7 @@ src/
 │   ├── Storage/              # ExecutionDbReader
 │   ├── Parsing/              # Markdown + YAML parser
 │   ├── Validation/           # Schema validation
+│   ├── Update/               # TestClassifier for test updates
 │   └── Index/                # Index read/write
 └── Spectra.GitHub/           # GitHub integration (future)
 
@@ -77,6 +83,19 @@ dotnet test
 # Run CLI
 dotnet run --project src/Spectra.CLI -- <command>
 
+# Test Generation (006-conversational-generation)
+spectra ai generate                              # Interactive mode (guided prompts)
+spectra ai generate checkout                     # Direct mode (specific suite)
+spectra ai generate checkout --focus "negative"  # Direct mode with focus
+spectra ai generate checkout --no-interaction    # CI mode (no prompts, exit codes)
+spectra ai generate --dry-run                    # Preview without writing
+
+# Test Update (006-conversational-generation)
+spectra ai update                                # Interactive mode (guided prompts)
+spectra ai update checkout                       # Direct mode (specific suite)
+spectra ai update checkout --no-interaction      # CI mode (no prompts, exit codes)
+spectra ai update --diff                         # Show changes before applying
+
 # Dashboard Generation (003)
 spectra dashboard --output ./site
 spectra dashboard --output ./site --title "My Dashboard"
@@ -98,9 +117,9 @@ spectra ai analyze --coverage --verbosity detailed
 - **Tests:** xUnit with structured results (never throw on validation errors)
 
 ## Recent Changes
-- 006-conversational-generation: Added C# 12, .NET 8+ + System.CommandLine (CLI), Spectre.Console (terminal UX), Microsoft.Extensions.AI (AI tools)
-- 006-interactive-generation: Added C# 12, .NET 8+ + System.CommandLine (CLI), Spectra.Core (parsing, indexes), Spectra.CLI.Review (terminal UI), Microsoft.Extensions.AI (AI agents)
-- 004-test-generation-profile: Added C# 12, .NET 8+ + Spectra.CLI (command integration), Spectra.Core (config, parsing), System.CommandLine (interactive prompts)
+- 006-conversational-generation: ✅ COMPLETE - Two-mode test generation (Direct/Interactive), test updates with classification (UP_TO_DATE, OUTDATED, ORPHANED, REDUNDANT), rich terminal UX with Spectre.Console
+- 004-test-generation-profile: Added profile support for test generation settings
+- 003-dashboard-coverage-analysis: Dashboard generation and coverage analysis
 
 
 <!-- MANUAL ADDITIONS START -->
