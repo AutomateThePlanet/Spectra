@@ -54,7 +54,10 @@
       "Bash(dotnet tool update:*)",
       "Bash(dotnet tool:*)",
       "Bash(spectra:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(.specify/scripts/bash/create-new-feature.sh \"Refactor SPECTRA test generation to be conversational by default. When spectra ai generate is run without arguments, it enters interactive mode: lists available suites with existing test counts, asks what kind of tests, loads existing tests and shows coverage, identifies gaps and lets user pick which to fill, generates tests with summary, suggests additional uncovered areas. Same flow for spectra ai update. Flags still work for CI. Include bundled generation agent prompt.\" --json --short-name \"interactive-generation\")",
+      "Bash(git branch:*)",
+      "Bash(.specify/scripts/bash/create-new-feature.sh:*)"
     ]
   }
 }

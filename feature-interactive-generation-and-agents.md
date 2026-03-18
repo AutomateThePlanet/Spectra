@@ -5,193 +5,246 @@
 
 ---
 
-## 1. Problem Statement
+## 1. Overview
 
-Current `spectra ai generate` is a batch command with flags:
+Test generation and update stay in the CLI. Two modes: **direct mode** (describe what you want, AI executes autonomously) and **interactive mode** (AI guides you step by step). Both write files directly — no review/accept step. Git is the review tool.
 
-```bash
-spectra ai generate --suite checkout --count 20 --priority high --tags payments
-```
-
-This requires the user to know upfront what suite, how many tests, what filters, and what focus area. In reality, QA engineers want a conversational flow where the AI guides them through decisions, shows what already exists, and suggests what's missing.
-
-Similarly, the MCP execution engine has tools but no guidance on how an orchestrator should use them. Every team writes their own prompt (like the RMH copilot-instructions.md). SPECTRA should ship with a ready-to-use execution agent prompt.
+Execution stays in Copilot Chat / Claude via MCP tools with a bundled agent prompt.
 
 ---
 
-## 2. Interactive Generation Mode
+## 2. CLI Generation — Two Modes
 
-### Design: `spectra ai generate` becomes conversational by default
+### Mode 1: Direct (current behavior, improved)
 
-When run without arguments, the command enters interactive chat mode. The AI guides the user step by step:
+User describes what to do. AI figures out how.
+
+```bash
+$ spectra ai generate --suite checkout --focus "negative payment scenarios"
+```
 
 ```
+  ◐ Loading checkout suite... 42 existing tests
+  ◐ Scanning documentation... 8 relevant files
+  ◐ Checking for duplicates...
+  ◐ Generating tests...
+
+  ✓ Generated 5 tests:
+
+    TC-201  Payment with card expired this month        high   negative
+    TC-202  Payment with currency mismatch              high   negative
+    TC-203  Duplicate payment within 30 seconds         high   negative
+    TC-204  Card number with valid Luhn wrong length    medium negative
+    TC-205  Payment timeout after gateway delay         medium negative
+
+  ✓ Written to tests/checkout/
+  ✓ Index updated
+
+  ℹ Gaps still uncovered:
+    • Refund after partial payment
+    • 3D Secure authentication failure
+    • Zero-amount authorization
+```
+
+No prompts, no questions. Describe intent → get tests → done.
+
+For fully autonomous (CI):
+
+```bash
+$ spectra ai generate --suite checkout --no-interaction
+```
+
+### Mode 2: Interactive (new)
+
+User runs without arguments. AI asks questions.
+
+```bash
 $ spectra ai generate
-
-SPECTRA Test Generation
-
-? Which suite would you like to generate tests for?
-  1. checkout (42 existing tests)
-  2. auth (18 existing tests)
-  3. orders (7 existing tests)
-  4. Create new suite
-  > 1
-
-Loading documentation map for checkout...
-Found 8 relevant documents in docs/features/checkout/
-
-? What kind of tests do you want to generate?
-  1. Full coverage (happy path + negative + boundary + security)
-  2. Only negative / error scenarios
-  3. Only for a specific feature area
-  4. Let me describe what I need
-  > 4
-
-? Describe what you need:
-  > I want negative test cases for payment validation, especially
-    edge cases around card expiration and currency handling
-
-Checking existing tests...
-Found 3 existing tests covering payment validation:
-  - TC-105: Checkout with expired card
-  - TC-108: Checkout with invalid card number
-  - TC-112: Checkout with zero amount
-
-These areas have NO existing coverage:
-  - Card expiration with future year but past month
-  - Currency mismatch between cart and payment
-  - Card number with valid Luhn but wrong length
-  - Duplicate payment prevention
-  - Payment timeout handling
-
-? How should I proceed?
-  1. Generate only new tests (skip areas already covered)
-  2. Generate new + update existing if they're incomplete
-  3. Let me pick which gaps to cover
-  > 3
-
-? Select areas to cover (space to toggle, enter to confirm):
-  [x] Card expiration with future year but past month
-  [x] Currency mismatch between cart and payment
-  [ ] Card number with valid Luhn but wrong length
-  [x] Duplicate payment prevention
-  [ ] Payment timeout handling
-
-Generating 3 tests...
-
-Generated:
-  TC-201: Payment with card expired this month (priority: high)
-  TC-202: Payment with currency mismatch (priority: high)
-  TC-203: Duplicate payment within 30 seconds (priority: high)
-
-? Review:
-  (a)ccept all  (r)eview one by one  (e)dit  (g)enerate more  (q)uit
-  > a
-
-✓ 3 tests written to tests/checkout/
-✓ _index.json updated
-
-I noticed these areas still have no test coverage:
-  - Card number with valid Luhn but wrong length
-  - Payment timeout handling
-  - Refund after partial payment
-  - 3D Secure authentication flow
-
-? Generate tests for any of these? (y/n)
 ```
 
-### Key Behaviors
+```
+  ┌ SPECTRA Test Generation
+  │
+  ◆ Which suite?
+  │  ○ checkout (42 tests)
+  │  ○ auth (18 tests)
+  │  ○ orders (7 tests)
+  │  ○ Create new suite
+  └  ↑/↓ to select, enter to confirm
 
-**Always check existing tests first.** Before generating anything, load the suite index and show what already exists for the requested area. This prevents duplicates proactively.
+  ◆ checkout selected. What kind of tests?
+  │  ○ Full coverage (happy path + negative + boundary)
+  │  ○ Negative / error scenarios only
+  │  ○ Specific area — let me describe
+  └
 
-**Suggest gaps after generation.** After the user accepts generated tests, the AI analyzes what's still uncovered and offers to generate more. The user can stop at any time.
+  ◆ Describe what you need:
+  │  > negative tests for payment validation, edge cases
+  │    around card expiration and currency
+  └
 
-**Support quick mode with flags.** For CI or experienced users, flags still work:
+  ◐ Checking existing coverage...
+
+  ℹ Existing payment validation tests:
+    TC-105  Checkout with expired card
+    TC-108  Checkout with invalid card number
+    TC-112  Checkout with zero amount
+
+  ℹ Uncovered areas:
+    • Card expired this month (future year, past month)
+    • Currency mismatch between cart and payment
+    • Valid Luhn but wrong card length
+    • Duplicate payment prevention
+    • Payment timeout
+
+  ◐ Generating 5 tests...
+
+  ✓ Generated:
+
+    TC-201  Payment with card expired this month        high   negative
+    TC-202  Payment with currency mismatch              high   negative
+    TC-203  Duplicate payment within 30 seconds         high   negative
+    TC-204  Card number with valid Luhn wrong length    medium negative
+    TC-205  Payment timeout after gateway delay         medium negative
+
+  ✓ Written to tests/checkout/
+  ✓ Index updated
+
+  ℹ Still uncovered:
+    • Refund after partial payment
+    • 3D Secure authentication failure
+
+  ◆ Generate tests for uncovered areas?
+  │  ○ Yes, generate all
+  │  ○ Let me pick
+  │  ○ No, I'm done
+  └
+```
+
+### Key Principles
+
+**No review step.** Tests are written to disk immediately. User reviews via IDE, git diff, or any file browser. Revert with `git checkout .` if not happy.
+
+**Always show existing tests.** Before generating, show what already exists for the requested area. Prevents duplicates proactively.
+
+**Always show gaps after generation.** After writing tests, show what's still uncovered. User can continue or stop.
+
+**Profile is loaded automatically.** If `spectra.profile.md` exists, AI follows it. Interactive mode adds user intent on top.
+
+---
+
+## 3. CLI Update — Two Modes
+
+### Mode 1: Direct
 
 ```bash
-# Quick mode — skips all interactive prompts
-spectra ai generate --suite checkout --focus "negative payment scenarios" --no-interaction
+$ spectra ai update --suite checkout
 ```
 
-When `--suite` and `--focus` are provided, the AI skips the interactive prompts but still runs dedup check and gap analysis silently, logging results.
+```
+  ◐ Loading 42 tests from checkout...
+  ◐ Comparing against documentation...
 
-**Load profile automatically.** If `spectra.profile.md` exists, the AI follows it. The interactive flow doesn't replace the profile — it adds the user's intent on top of the profile's rules.
+  Results:
+    ✓ 35 up to date
+    ⚠ 4 outdated — updated
+    ✗ 2 orphaned — marked with WARNING header
+    ↔ 1 redundant — flagged in index
 
+  ✓ 4 test files updated
+  ✓ 2 orphaned tests marked
+  ✓ Index rebuilt
+
+  ℹ Orphaned tests (documentation removed):
+    TC-108  Guest checkout validation
+    TC-122  Legacy payment gateway timeout
+    Review these and delete if no longer needed.
+```
+
+Outdated tests are **updated in place**. Orphaned tests get a warning added to their frontmatter:
+
+```yaml
 ---
-
-## 3. Interactive Update Mode
-
-Same conversational approach for updates:
-
+id: TC-108
+status: orphaned
+orphaned_reason: "Source documentation docs/features/checkout/guest-checkout.md no longer exists"
+---
 ```
+
+User decides what to do with them via git.
+
+### Mode 2: Interactive
+
+```bash
 $ spectra ai update
+```
 
-SPECTRA Test Maintenance
+```
+  ┌ SPECTRA Test Maintenance
+  │
+  ◆ Which suite to review?
+  │  ○ checkout (42 tests, last updated 12 days ago)
+  │  ○ auth (18 tests, last updated 3 days ago)
+  │  ○ orders (7 tests, last updated 45 days ago)
+  │  ○ All suites
+  └
 
-? Which suite to review?
-  1. checkout (42 tests, last updated 12 days ago)
-  2. auth (18 tests, last updated 3 days ago)
-  3. orders (7 tests, last updated 45 days ago)
-  4. All suites
-  > 1
+  ◐ Comparing 42 tests against documentation...
 
-Comparing 42 tests against current documentation...
+  Results:
+    ✓ 35 up to date
+    ⚠ 4 outdated — updated
+    ✗ 2 orphaned — marked
+    ↔ 1 redundant — flagged
 
-Results:
-  ✓ 35 up to date
-  ⚠ 4 outdated
-  ✗ 2 orphaned (documentation removed)
-  ↔ 1 redundant (duplicates TC-103)
+  ✓ Written all changes
 
-? What would you like to do?
-  1. Review all findings one by one
-  2. Auto-accept updates, review orphaned/redundant only
-  3. Show me only the critical changes
-  > 2
+  ℹ Orphaned tests:
+    TC-108  Guest checkout validation
+    TC-122  Legacy payment gateway timeout
 
-4 tests updated automatically.
+  ℹ Redundant test:
+    TC-115  Nearly identical to TC-103
 
-Orphaned tests (no matching documentation):
-  TC-108: Guest checkout validation
-    → docs/features/checkout/guest-checkout.md was deleted
-
-  TC-122: Legacy payment gateway timeout
-    → docs/features/checkout/legacy-gateway.md was deleted
-
-? For each orphaned test:
-  (d)elete  (k)eep  (m)ark as deprecated
-  
-TC-108 > d
-TC-122 > k (keeping for regression reference)
-
-Redundant test:
-  TC-115: Refund processing flow
-    → Nearly identical to TC-103: Refund request handling
-    → TC-115 has 2 extra steps covering email notification
-
-? (d)elete TC-115  (m)erge into TC-103  (k)eep both
-  > m
-
-✓ Merged TC-115 into TC-103 (added email notification steps)
-✓ 4 tests updated, 1 deleted, 1 merged
-✓ _index.json rebuilt
+  ◆ Review changes in your IDE or run: git diff tests/checkout/
+  └
 ```
 
 ---
 
-## 4. Bundled Execution Agent Prompt
+## 4. CLI UX Style
 
-SPECTRA ships with a ready-to-use agent prompt that orchestrators (Copilot Chat, Claude) can use to drive test execution through MCP tools.
+The CLI output should follow the visual style of modern terminal tools (similar to GitHub Copilot CLI, clack prompts):
+
+- `◆` for interactive prompts (selection, text input)
+- `◐` for loading/progress spinners
+- `✓` for success
+- `✗` for errors
+- `⚠` for warnings
+- `ℹ` for informational messages
+- `│` and `┌ └` for visual grouping
+- Color: green for success, yellow for warnings, red for errors, cyan for info
+- Tables for test listings (ID, title, priority, tags)
+- No walls of text — concise, scannable output
+
+Library recommendation: [Spectre.Console](https://spectreconsole.net/) for .NET — supports tables, trees, prompts, progress, and rich formatting.
+
+---
+
+## 5. Bundled Execution Agent Prompt
+
+SPECTRA ships with a ready-to-use agent prompt for test execution via MCP tools.
 
 ### Location
 
+Installed by `spectra init` into the target repo:
+
 ```
 .github/agents/spectra-execution.agent.md
+.github/skills/spectra-execution/SKILL.md     (same content, for Copilot CLI)
 ```
 
-Installed by `spectra init` into the target repo. Also available as a Copilot Agent Skill in `.github/skills/spectra-execution/SKILL.md`.
-
-### Agent Prompt Content
+### Agent Prompt
 
 ```markdown
 ---
@@ -204,192 +257,98 @@ description: >
 # SPECTRA Test Execution Agent
 
 You are a QA Test Execution Assistant. You execute manual test suites
-interactively using SPECTRA MCP tools. You guide the QA engineer through
-each test case, collect results, and generate reports.
+interactively using SPECTRA MCP tools.
 
-## Execution Workflow
-
-1. **Start**: Call `list_available_suites` to show available suites
-2. **Ask**: Which suite to execute? Any filters (priority, tags, type)?
-3. **Begin**: Call `start_execution_run` with chosen suite and filters
-4. **For each test**:
-   a. Call `get_test_case_details` with the current test handle
-   b. Present the test clearly:
-      - Title and business purpose
-      - Preconditions (what must be true before starting)
-      - Steps (numbered, clear, actionable)
-      - Expected result
-      - Test data (if any)
-   c. Ask: "Execute this test and tell me: PASS, FAIL, BLOCKED, or SKIP"
-   d. If FAIL: ask for a comment describing what went wrong
-   e. If BLOCKED: ask for the blocking reason
-   f. Call `advance_test_case` or `skip_test_case` with the result
-   g. Show progress: "Test 5 of 15 complete. 4 passed, 1 failed."
-5. **Finish**: Call `finalize_execution_run`
-6. **Report**: Present summary and ask:
-   - "Want me to log bugs for failed tests in Azure DevOps?"
-   - "Want me to post the summary to Teams?"
+## Workflow
+1. Call list_available_suites to show available suites
+2. Ask which suite and any filters (priority, tags, type)
+3. Call start_execution_run with chosen suite and filters
+4. For each test:
+   a. Call get_test_case_details with current handle
+   b. Present: title, preconditions, steps, expected result, test data
+   c. Ask: PASS, FAIL, BLOCKED, or SKIP
+   d. If FAIL: ask for comment
+   e. Call advance_test_case or skip_test_case
+   f. Show progress: "Test 5/15 — 4 passed, 1 failed"
+5. Call finalize_execution_run
+6. Present summary, offer to log bugs via Azure DevOps MCP
 
 ## Presentation Rules
+- ONE test at a time
+- Numbered steps, each starting with action verb
+- Always show progress after recording result
 
-- Present ONE test at a time. Never dump the full suite.
-- Show the test ID, title, and step count before the detailed steps.
-- Use numbered steps. Each step starts with an action verb.
-- After expected result, show pass/fail criteria clearly.
-- Always show current progress after recording a result.
-
-## Result Collection Rules
-
-- Accept: PASS, FAIL, BLOCKED, SKIP (or natural language equivalents)
+## Result Collection
 - "it passed" → PASS
-- "failed, the button was greyed out" → FAIL with comment
-- "can't test, staging is down" → BLOCKED with reason
+- "failed, button greyed out" → FAIL with comment
+- "staging is down" → BLOCKED with reason
 - "not applicable" → SKIP with reason
-- Always confirm the recorded result before moving to the next test.
 
-## Bug Logging (if Azure DevOps MCP is connected)
-
-When a test fails and the user wants to log a bug:
-- Title: "[SPECTRA] {test_title} — {one-line failure summary}"
-- Description: Include test ID, steps to reproduce (from test steps),
-  expected vs actual result, and the user's comment
-- Priority: Map from test priority (high→P1, medium→P2, low→P3)
-- Tags: Include suite name and component from test metadata
-
-## End of Run
-
-After finalize, always show:
-- Total: X tests
-- Passed: X | Failed: X | Blocked: X | Skipped: X
-- Pass rate: X%
-- Duration: X minutes
-- Report location: reports/{run_id}.html
+## Bug Logging (if Azure DevOps MCP connected)
+When test fails and user wants a bug:
+- Title: "[SPECTRA] {test_title} — {failure_summary}"
+- Include test ID, steps, expected vs actual, user comment
+- Priority: high→P1, medium→P2, low→P3
 ```
 
-### Execution Agent for Different Orchestrators
+### Works Across Orchestrators
 
-The same agent prompt works across:
-- **GitHub Copilot Chat** — as `.github/agents/spectra-execution.agent.md`
-- **GitHub Copilot CLI** — as `.github/skills/spectra-execution/SKILL.md`
-- **Claude** — copied into project instructions or used as a system prompt
-- **Any MCP client** — the prompt is documentation, not code
+- **Copilot Chat (VS Code)** — as `.github/agents/spectra-execution.agent.md`
+- **Copilot CLI** — as `.github/skills/spectra-execution/SKILL.md`
+- **Claude** — paste into project instructions
+- **Any MCP client** — reference documentation
 
 ---
 
-## 5. MCP Server Configuration
+## 6. MCP Tools (additions for data access)
 
-### How MCP Knows Where Tests Are
+These MCP tools support the CLI and provide value to any orchestrator:
 
-The MCP server reads `spectra.config.json` from its working directory at startup:
+| Tool                    | Purpose                                      |
+| ----------------------- | -------------------------------------------- |
+| `validate_tests`        | Validate all test files, return errors       |
+| `rebuild_indexes`       | Rebuild all _index.json files                |
+| `analyze_coverage_gaps` | Compare docs against tests, return uncovered areas |
 
-```json
-{
-  "tests": { "dir": "tests/" },
-  "reports": { "dir": "reports/" },
-  "source": { "local_dir": "docs/" }
-}
-```
-
-If started with explicit flags, they override config:
-
-```bash
-spectra mcp serve --tests-dir ./tests --reports-dir ./reports
-```
-
-The MCP server resolves paths relative to the working directory. It reads `_index.json` files for test selection and individual `.md` files for `get_test_case_details`.
-
-### `get_test_case_details` Enrichment
-
-When returning test case details, the MCP tool can optionally enrich the raw Markdown with documentation context:
-
-```json
-{
-  "test_handle": "a3f7c291-TC104-x9k2",
-  "test_id": "TC-104",
-  "title": "Checkout with expired card",
-  "steps": [...],
-  "expected_result": "...",
-  "source_refs": ["docs/features/checkout/payment-methods.md"],
-  "requirements": ["REQ-042"],
-  "acceptance_criteria": ["Error message contains reason for rejection"]
-}
-```
-
-The `source_refs`, `requirements`, and `acceptance_criteria` fields give the orchestrator context about WHY this test exists and WHAT it validates, without the orchestrator needing to read the documentation itself.
+These are **data tools** — no AI, no model dependency. Deterministic operations.
 
 ---
 
-## 6. Generation Agent Prompt
+## 7. What Goes Where (Summary)
 
-Similar to the execution agent, a generation agent prompt for use in Copilot Chat / Claude:
-
-### Location
-
-```
-.github/agents/spectra-generation.agent.md
-```
-
-### Purpose
-
-When a user says "help me generate tests" in Copilot Chat, this agent drives the interactive flow described in Section 2 by calling SPECTRA CLI tools or working with the test files directly.
-
-```markdown
----
-name: spectra-generation
-description: >
-  Generate and maintain manual test cases interactively using SPECTRA.
-  Use when asked to create tests, generate test cases, or update test suites.
----
-
-# SPECTRA Test Generation Agent
-
-You are a QA Test Generation Assistant. You help teams create and maintain
-manual test suites by analyzing documentation and generating test cases.
-
-## Before Generating Anything
-
-1. Ask which suite the user wants to work with
-2. Load the suite's _index.json to see existing tests
-3. Ask what kind of tests they need (full coverage, negative only, specific area)
-4. Show existing tests that cover the requested area
-5. Identify gaps — areas with no test coverage
-6. Let the user choose which gaps to fill
-
-## Generation Rules
-
-- Always check for duplicates before creating new tests
-- After generation, suggest additional areas that have no coverage
-- Follow spectra.profile.md if it exists in the repo
-- Each test must trace back to a documentation source (source_refs)
-- Each test must have clear, actionable steps a junior QA can follow
-
-## When User Says "Update Tests"
-
-1. Ask which suite
-2. Compare all tests against current documentation
-3. Classify: UP_TO_DATE, OUTDATED, ORPHANED, REDUNDANT
-4. Present findings and let user decide per test
-5. For orphaned tests: suggest delete, keep, or mark deprecated
-6. For redundant tests: suggest merge or keep both
-```
+| Operation            | Where          | Why                                    |
+| -------------------- | -------------- | -------------------------------------- |
+| Generate tests       | CLI            | Needs provider chain, BYOK, model control |
+| Update tests         | CLI            | Same — AI operation with model control |
+| Analyze coverage     | CLI            | Same                                   |
+| Execute tests        | MCP + Chat     | Ping-pong flow, chat is natural        |
+| Validate             | MCP tool       | Deterministic, no AI                   |
+| Rebuild indexes      | MCP tool       | Deterministic, no AI                   |
+| List suites          | MCP tool       | Data access, no AI                     |
+| Show test details    | MCP tool       | Data access, no AI                     |
+| Init repo            | CLI            | One-time setup                         |
+| Init profile         | CLI            | One-time setup, interactive            |
+| Generate dashboard   | CLI            | Build step, not runtime                |
 
 ---
 
-## 7. Spec-Kit Breakdown
+## 8. Spec-Kit Breakdown
 
-This feature should be split into two spec-kit cycles:
+### Cycle A: Interactive CLI Generation
 
-### Cycle A: Interactive Generation Mode
+- Refactor `spectra ai generate` to support two modes (direct + interactive)
+- Refactor `spectra ai update` to support two modes (direct + interactive)
+- No review/accept step — write directly, git is the review tool
+- Always check existing tests before generating (dedup)
+- Always show coverage gaps after generating
+- Spectre.Console for rich terminal UX (tables, prompts, spinners, colors)
+- `--no-interaction` flag for CI
+- Profile loaded automatically
 
-- Refactor `spectra ai generate` to be conversational by default
-- Interactive suite selection, focus area description, dedup check, gap suggestions
-- `--no-interaction` flag for CI/quick mode
-- Bundled generation agent prompt (`.github/agents/spectra-generation.agent.md`)
+### Cycle B: Bundled Execution Agent
 
-### Cycle B: Bundled Execution Agent + MCP Config
-
-- Bundled execution agent prompt (`.github/agents/spectra-execution.agent.md`)
-- Execution agent as Copilot Skill (`.github/skills/spectra-execution/SKILL.md`)
-- MCP server config resolution from `spectra.config.json`
-- `spectra init` installs agent prompts into target repo
-- Documentation for using the execution agent with Copilot Chat, Claude, and other clients
+- Create `.github/agents/spectra-execution.agent.md`
+- Create `.github/skills/spectra-execution/SKILL.md`
+- `spectra init` installs agent files into target repo
+- Add MCP tools: validate_tests, rebuild_indexes, analyze_coverage_gaps
+- Documentation for usage with Copilot Chat, Claude, generic MCP clients

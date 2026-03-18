@@ -9,6 +9,10 @@ Auto-generated from all feature plans. Last updated: 2026-03-13
 - Reads from `tests/*/_index.json`, `reports/*.json`, `.execution/spectra.db`; Writes to output directory (static files) (003-dashboard-coverage-analysis)
 - C# 12, .NET 8+ + Spectra.CLI (command integration), Spectra.Core (config, parsing), System.CommandLine (interactive prompts) (004-test-generation-profile)
 - File-based (spectra.profile.md at repo root, _profile.md in suites) (004-test-generation-profile)
+- C# 12, .NET 8+ + System.CommandLine (CLI), Spectra.Core (parsing, indexes), Spectra.CLI.Review (terminal UI), Microsoft.Extensions.AI (AI agents) (006-interactive-generation)
+- File-based (tests/, docs/, spectra.config.json, _index.json) (006-interactive-generation)
+- C# 12, .NET 8+ + System.CommandLine (CLI), Spectre.Console (terminal UX), Microsoft.Extensions.AI (AI tools) (006-conversational-generation)
+- File system (tests/{suite}/*.md), JSON indexes (_index.json) (006-conversational-generation)
 
 - C# 12, .NET 8+ + System.CommandLine (CLI), Microsoft.Extensions.AI (AI tools), Markdig (Markdown parsing), YamlDotNet (frontmatter), GitHub Copilot SDK (AI runtime) (001-ai-test-generation-cli)
 
@@ -94,9 +98,9 @@ spectra ai analyze --coverage --verbosity detailed
 - **Tests:** xUnit with structured results (never throw on validation errors)
 
 ## Recent Changes
+- 006-conversational-generation: Added C# 12, .NET 8+ + System.CommandLine (CLI), Spectre.Console (terminal UX), Microsoft.Extensions.AI (AI tools)
+- 006-interactive-generation: Added C# 12, .NET 8+ + System.CommandLine (CLI), Spectra.Core (parsing, indexes), Spectra.CLI.Review (terminal UI), Microsoft.Extensions.AI (AI agents)
 - 004-test-generation-profile: Added C# 12, .NET 8+ + Spectra.CLI (command integration), Spectra.Core (config, parsing), System.CommandLine (interactive prompts)
-- 004-test-generation-profile: Added C# 12, .NET 8+ + Spectra.CLI (command integration), Spectra.Core (config, parsing), System.CommandLine (interactive prompts)
-- 003-dashboard-coverage-analysis: Added C# 12, .NET 8+ (CLI and coverage analysis); HTML/CSS/JS (dashboard output) + Spectra.Core (parsing, indexes), Spectra.CLI (command integration), System.Text.Json, Microsoft.Data.Sqlite (reading .execution DB)
 
 
 <!-- MANUAL ADDITIONS START -->
