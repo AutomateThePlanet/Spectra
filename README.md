@@ -107,30 +107,42 @@ SPECTRA is part of the [Automate The Planet](https://www.automatetheplanet.com/)
 
 ## Documentation
 
+- [Development Guide](docs/DEVELOPMENT.md) — Building, testing, and running locally
+- [CLI Quickstart](specs/001-ai-test-generation-cli/quickstart.md) — Using the AI test generation CLI
+- [MCP Server Quickstart](specs/002-mcp-execution-server/quickstart.md) — Using the MCP execution server
 - [Architecture Specification](spec-kit/architecture.md) — Full system design
-- [CLI Architecture](spec-kit/cli-architecture.md) — AI generation agent design
 - [ADR Index](spec-kit/adr/) — Architecture Decision Records
 
 ## Project Status
 
-SPECTRA is in early development. See the [roadmap](#roadmap) for current priorities.
+SPECTRA is in active development. See the [roadmap](#roadmap) for current priorities.
 
 ### Roadmap
 
-**Phase 1: AI Test Generation CLI** ← *current*
+**Phase 1: AI Test Generation CLI** ✓ *complete*
 - Markdown test format with metadata schema
 - Document map builder + selective loading
 - Batch generation and batch update
 - Provider chain (Copilot + BYOK fallback)
 - Validation, indexing, deduplication
 
-**Phase 2: MCP Execution Engine**
+**Phase 2: MCP Execution Engine** ✓ *complete*
 - Deterministic state machine
 - SQLite execution storage
 - Test handles, run lifecycle
 - Orchestrator-agnostic MCP API
 
-**Phase 3: Integrations and Ecosystem**
+**Phase 3: Dashboard & Coverage Analysis** ✓ *complete*
+- Interactive HTML dashboard
+- Coverage reports (JSON, Markdown)
+- Test-to-automation linking
+
+**Phase 4: Test Generation Profiles** ← *current*
+- Repository-level profiles (`spectra.profile.md`)
+- Suite-level profiles (`_profile.md`)
+- Profile management commands
+
+**Phase 5: Integrations and Ecosystem** *planned*
 - Cross-MCP patterns (Azure DevOps, Teams, Slack)
 - Copilot Spaces as knowledge source
 - Optional Runner UI
