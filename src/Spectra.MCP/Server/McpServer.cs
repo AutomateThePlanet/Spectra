@@ -108,13 +108,13 @@ public sealed class McpServer
                 "Method is required");
         }
 
-        // Handle protocol methods
-        if (request.Method.StartsWith("$/"))
+        // Handle protocol methods (MCP spec uses methods without $/ prefix)
+        if (IsProtocolMethod(request.Method))
         {
             return HandleProtocolMethod(request);
         }
 
-        // Handle tool invocations
+        // Handle tool invocations (tools/call wraps tool name in params)
         var response = await _toolRegistry.InvokeAsync(request.Method, request.Params);
 
         // Wrap result in JSON-RPC response if needed
@@ -135,13 +135,30 @@ public sealed class McpServer
         return response;
     }
 
+    private static bool IsProtocolMethod(string method)
+    {
+        // MCP protocol methods (standard MCP spec)
+        return method is "initialize" or "initialized" or "ping" or "shutdown"
+            or "tools/list" or "tools/call" or "resources/list" or "resources/read"
+            or "prompts/list" or "prompts/get" or "notifications/initialized"
+            // Legacy $/ prefixed methods for backwards compatibility
+            || method.StartsWith("$/");
+    }
+
     private string HandleProtocolMethod(McpRequest request)
     {
-        return request.Method switch
+        // Normalize method name (remove $/ prefix if present)
+        var method = request.Method.StartsWith("$/")
+            ? request.Method[2..]
+            : request.Method;
+
+        return method switch
         {
-            "$/initialize" => HandleInitialize(request),
-            "$/ping" => McpProtocol.CreateResponse(request.Id, new { pong = true }),
-            "$/listTools" => HandleListTools(request),
+            "initialize" => HandleInitialize(request),
+            "initialized" or "notifications/initialized" => McpProtocol.CreateResponse(request.Id, new { }),
+            "ping" => McpProtocol.CreateResponse(request.Id, new { pong = true }),
+            "listTools" or "tools/list" => HandleListTools(request),
+            "shutdown" => HandleShutdown(request),
             _ => McpProtocol.CreateErrorResponse(
                 request.Id,
                 JsonRpcErrorCodes.MethodNotFound,
@@ -149,21 +166,36 @@ public sealed class McpServer
         };
     }
 
+    private string HandleShutdown(McpRequest request)
+    {
+        _running = false;
+        return McpProtocol.CreateResponse(request.Id, new { });
+    }
+
     private string HandleInitialize(McpRequest request)
     {
-        var capabilities = new
+        // MCP spec initialize response format
+        var result = new
         {
-            name = "spectra-mcp",
-            version = "1.0.0",
-            tools = _toolRegistry.GetToolMetadata()
+            protocolVersion = "2024-11-05",
+            capabilities = new
+            {
+                tools = new { }  // We support tools
+            },
+            serverInfo = new
+            {
+                name = "spectra-mcp",
+                version = "1.0.0"
+            }
         };
 
-        return McpProtocol.CreateResponse(request.Id, capabilities);
+        return McpProtocol.CreateResponse(request.Id, result);
     }
 
     private string HandleListTools(McpRequest request)
     {
         var tools = _toolRegistry.GetToolMetadata();
+        // MCP spec expects { tools: [...] } format
         return McpProtocol.CreateResponse(request.Id, new { tools });
     }
 }

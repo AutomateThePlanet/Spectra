@@ -1357,12 +1357,18 @@ dotnet build -p:NoWarn=CA1062
 
 3. **Test the MCP server manually:**
    ```bash
-   echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | spectra-mcp .
+   # Test initialize handshake
+   echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | spectra-mcp .
+
+   # Test tools list
+   echo '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | spectra-mcp .
    ```
 
 4. **Reload VS Code window** after changing MCP config
 
 5. **Check Copilot Chat output** for MCP connection errors
+
+6. **Ensure base path is correct** - The first argument to `spectra-mcp` must be the project directory containing `tests/` folder
 
 ### "No spectra.config.json found"
 

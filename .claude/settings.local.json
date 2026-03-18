@@ -53,7 +53,8 @@
       "WebFetch(domain:www.nuget.org)",
       "Bash(dotnet tool update:*)",
       "Bash(dotnet tool:*)",
-      "Bash(spectra:*)"
+      "Bash(spectra:*)",
+      "Bash(taskkill:*)"
     ]
   }
 }

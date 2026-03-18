@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Azure;
 using Azure.AI.Inference;
 using Spectra.Core.Models;
@@ -154,7 +155,9 @@ public sealed class GitHubModelsAgent : IAgentRuntime
               "preconditions": "Prerequisites for the test",
               "steps": ["Step 1", "Step 2", "Step 3"],
               "expected_result": "What should happen",
-              "test_data": "Any test data needed (optional)"
+              "test_data": "Any test data needed (optional)",
+              "source_refs": ["path/to/source/doc.md"],
+              "estimated_duration": "5m"
             }
 
             Guidelines:
@@ -162,6 +165,8 @@ public sealed class GitHubModelsAgent : IAgentRuntime
             - Cover happy paths, edge cases, and error scenarios
             - Steps should be clear and actionable
             - Expected results should be specific and verifiable
+            - IMPORTANT: Include source_refs with the exact paths to documentation files that informed this test
+            - Use estimated_duration format: Ns for seconds, Nm for minutes, Nh for hours (e.g., "30s", "5m", "1h")
             """;
     }
 
@@ -176,13 +181,13 @@ public sealed class GitHubModelsAgent : IAgentRuntime
         sb.AppendLine();
 
         // Add document context
-        sb.AppendLine("## Source Documentation");
+        sb.AppendLine("## Source Documentation (use these paths in source_refs)");
         sb.AppendLine();
 
         foreach (var doc in documentMap.Documents.Take(5)) // Limit context size
         {
             sb.AppendLine($"### {doc.Title}");
-            sb.AppendLine($"Path: {doc.Path}");
+            sb.AppendLine($"**Path: {doc.Path}**");
             if (!string.IsNullOrEmpty(doc.Preview))
             {
                 sb.AppendLine(doc.Preview);
@@ -303,6 +308,31 @@ public sealed class GitHubModelsAgent : IAgentRuntime
                 }
             }
 
+            // Parse source_refs array
+            var sourceRefs = new List<string>();
+            if (element.TryGetProperty("source_refs", out var refsElement) &&
+                refsElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var refItem in refsElement.EnumerateArray())
+                {
+                    if (refItem.GetString() is string r)
+                    {
+                        sourceRefs.Add(r);
+                    }
+                }
+            }
+
+            // Parse estimated_duration
+            TimeSpan? estimatedDuration = null;
+            if (element.TryGetProperty("estimated_duration", out var durElement))
+            {
+                var durStr = durElement.GetString();
+                if (!string.IsNullOrEmpty(durStr))
+                {
+                    estimatedDuration = ParseDuration(durStr);
+                }
+            }
+
             return new TestCase
             {
                 Id = id,
@@ -314,6 +344,8 @@ public sealed class GitHubModelsAgent : IAgentRuntime
                 Steps = steps,
                 ExpectedResult = element.TryGetProperty("expected_result", out var er) ? er.GetString() ?? "" : "",
                 TestData = element.TryGetProperty("test_data", out var td) ? td.GetString() : null,
+                SourceRefs = sourceRefs,
+                EstimatedDuration = estimatedDuration,
                 FilePath = $"{id}.md"
             };
         }
@@ -321,5 +353,22 @@ public sealed class GitHubModelsAgent : IAgentRuntime
         {
             return null;
         }
+    }
+
+    private static TimeSpan? ParseDuration(string duration)
+    {
+        if (string.IsNullOrEmpty(duration)) return null;
+
+        var match = Regex.Match(duration.Trim(), @"^(\d+)(s|m|h)$", RegexOptions.IgnoreCase);
+        if (!match.Success) return null;
+
+        var value = int.Parse(match.Groups[1].Value);
+        return match.Groups[2].Value.ToLowerInvariant() switch
+        {
+            "s" => TimeSpan.FromSeconds(value),
+            "m" => TimeSpan.FromMinutes(value),
+            "h" => TimeSpan.FromHours(value),
+            _ => null
+        };
     }
 }
