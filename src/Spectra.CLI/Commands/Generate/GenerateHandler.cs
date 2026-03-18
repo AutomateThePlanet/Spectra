@@ -2,6 +2,7 @@ using System.Text.Json;
 using Spectra.CLI.Agent;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.IO;
+using Spectra.CLI.Review;
 using Spectra.CLI.Source;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
@@ -338,9 +339,12 @@ public sealed class GenerateHandler
                     // Skip
                     break;
                 case 'e' or 'E':
-                    // TODO: Implement editing
-                    Console.WriteLine("  Editing not yet implemented, accepting as-is");
-                    accepted.Add(test);
+                    var editor = new TestEditor();
+                    var edited = editor.Edit(test);
+                    if (edited is not null)
+                    {
+                        accepted.Add(edited);
+                    }
                     break;
                 case 'a' or 'A':
                     accepted.Add(test);

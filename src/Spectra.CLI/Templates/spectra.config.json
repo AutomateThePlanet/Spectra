@@ -14,10 +14,24 @@
   "ai": {
     "providers": [
       {
-        "name": "copilot",
+        "name": "github-models",
         "model": "gpt-4o",
         "enabled": true,
         "priority": 1
+      },
+      {
+        "name": "openai",
+        "model": "gpt-4o",
+        "enabled": false,
+        "priority": 2,
+        "api_key_env": "OPENAI_API_KEY"
+      },
+      {
+        "name": "anthropic",
+        "model": "claude-sonnet-4-5-20250514",
+        "enabled": false,
+        "priority": 3,
+        "api_key_env": "ANTHROPIC_API_KEY"
       }
     ],
     "fallback_strategy": "auto"

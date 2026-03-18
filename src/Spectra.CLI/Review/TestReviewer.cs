@@ -155,10 +155,11 @@ public sealed class TestReviewer
 
     private Task<TestCase?> EditTestAsync(TestCase test, CancellationToken ct)
     {
-        // For now, return null (editing not implemented)
-        // In a full implementation, this would open an editor
-        _presenter.ShowWarning("Test editing is not yet implemented. Skipping.");
-        return Task.FromResult<TestCase?>(null);
+        ct.ThrowIfCancellationRequested();
+
+        var editor = new TestEditor();
+        var edited = editor.Edit(test);
+        return Task.FromResult(edited);
     }
 }
 

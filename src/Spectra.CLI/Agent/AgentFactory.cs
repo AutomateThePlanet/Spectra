@@ -13,14 +13,13 @@ public static class AgentFactory
     public static IAgentRuntime Create(AiConfig? config)
     {
         // Get the first enabled provider or default to mock
-        var provider = config?.Providers?.FirstOrDefault()?.Name ?? "mock";
-
-        return provider.ToLowerInvariant() switch
+        var providerConfig = config?.Providers?.FirstOrDefault(p => p.Enabled);
+        if (providerConfig is null)
         {
-            "github-copilot" or "copilot" => new CopilotAgent(config),
-            "mock" => new MockAgent(),
-            _ => new MockAgent() // Default to mock for unknown providers
-        };
+            return new MockAgent();
+        }
+
+        return CreateFromProvider(providerConfig);
     }
 
     /// <summary>
@@ -32,13 +31,27 @@ public static class AgentFactory
 
         return provider.Name.ToLowerInvariant() switch
         {
-            "github-copilot" or "copilot" => new CopilotAgent(new AiConfig
-            {
-                Providers = [provider]
-            }),
+            "github-models" or "github-copilot" or "copilot" => new GitHubModelsAgent(provider),
+            "openai" => new OpenAiAgent(provider),
+            "anthropic" => new AnthropicAgent(provider),
             "mock" => new MockAgent(),
             _ => new MockAgent() // Default to mock for unknown providers
         };
+    }
+
+    /// <summary>
+    /// Tries to create an agent, returning null if initialization fails.
+    /// </summary>
+    public static IAgentRuntime? TryCreateFromProvider(ProviderConfig provider)
+    {
+        try
+        {
+            return CreateFromProvider(provider);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -46,6 +59,6 @@ public static class AgentFactory
     /// </summary>
     public static IReadOnlyList<string> GetAvailableProviders()
     {
-        return ["github-copilot", "mock"];
+        return ["github-models", "openai", "anthropic", "mock"];
     }
 }

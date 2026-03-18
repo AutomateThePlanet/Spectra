@@ -46,7 +46,11 @@
       "Bash(git push:*)",
       "Bash(dotnet pack:*)",
       "Bash(dotnet tool install:*)",
-      "Bash(spectra-mcp:*)"
+      "Bash(spectra-mcp:*)",
+      "Bash(spectra --help:*)",
+      "Bash(done)",
+      "Bash(find:*)",
+      "WebFetch(domain:www.nuget.org)"
     ]
   }
 }
