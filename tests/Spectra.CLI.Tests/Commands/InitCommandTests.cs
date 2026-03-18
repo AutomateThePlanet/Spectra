@@ -155,4 +155,108 @@ public class InitCommandTests : IDisposable
         Assert.True(config.RootElement.TryGetProperty("tests", out _));
         Assert.True(config.RootElement.TryGetProperty("ai", out _));
     }
+
+    [Fact]
+    public async Task HandleAsync_InstallsExecutionAgentFile()
+    {
+        // Arrange
+        var handler = new InitHandler(_logger, _testDir);
+
+        // Act
+        var exitCode = await handler.HandleAsync(force: false);
+
+        // Assert
+        Assert.Equal(ExitCodes.Success, exitCode);
+
+        // Verify execution agent file
+        var agentPath = Path.Combine(_testDir, ".github", "agents", "spectra-execution.agent.md");
+        Assert.True(File.Exists(agentPath), "Execution agent file should exist");
+
+        var content = await File.ReadAllTextAsync(agentPath);
+        Assert.Contains("spectra-execution", content);
+        Assert.Contains("Test Execution Agent", content);
+    }
+
+    [Fact]
+    public async Task HandleAsync_InstallsExecutionSkillFile()
+    {
+        // Arrange
+        var handler = new InitHandler(_logger, _testDir);
+
+        // Act
+        var exitCode = await handler.HandleAsync(force: false);
+
+        // Assert
+        Assert.Equal(ExitCodes.Success, exitCode);
+
+        // Verify execution skill file
+        var skillPath = Path.Combine(_testDir, ".github", "skills", "spectra-execution", "SKILL.md");
+        Assert.True(File.Exists(skillPath), "Execution skill file should exist");
+
+        var content = await File.ReadAllTextAsync(skillPath);
+        Assert.Contains("spectra-execution", content);
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithExistingAgentFile_SkipsWithoutForce()
+    {
+        // Arrange
+        var handler = new InitHandler(_logger, _testDir);
+
+        // Create existing agent file
+        var agentDir = Path.Combine(_testDir, ".github", "agents");
+        Directory.CreateDirectory(agentDir);
+        var agentPath = Path.Combine(agentDir, "spectra-execution.agent.md");
+        await File.WriteAllTextAsync(agentPath, "# Custom Agent Content");
+
+        // Act
+        var exitCode = await handler.HandleAsync(force: false);
+
+        // Assert
+        Assert.Equal(ExitCodes.Success, exitCode);
+
+        // Verify original content preserved
+        var content = await File.ReadAllTextAsync(agentPath);
+        Assert.Equal("# Custom Agent Content", content);
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithExistingAgentFile_OverwritesWithForce()
+    {
+        // Arrange
+        var handler = new InitHandler(_logger, _testDir);
+
+        // Create existing agent file
+        var agentDir = Path.Combine(_testDir, ".github", "agents");
+        Directory.CreateDirectory(agentDir);
+        var agentPath = Path.Combine(agentDir, "spectra-execution.agent.md");
+        await File.WriteAllTextAsync(agentPath, "# Custom Agent Content");
+
+        // Act
+        var exitCode = await handler.HandleAsync(force: true);
+
+        // Assert
+        Assert.Equal(ExitCodes.Success, exitCode);
+
+        // Verify content was overwritten
+        var content = await File.ReadAllTextAsync(agentPath);
+        Assert.Contains("SPECTRA Test Execution Agent", content);
+    }
+
+    [Fact]
+    public async Task HandleAsync_AgentFilesHaveVersionComment()
+    {
+        // Arrange
+        var handler = new InitHandler(_logger, _testDir);
+
+        // Act
+        var exitCode = await handler.HandleAsync(force: false);
+
+        // Assert
+        Assert.Equal(ExitCodes.Success, exitCode);
+
+        var agentPath = Path.Combine(_testDir, ".github", "agents", "spectra-execution.agent.md");
+        var content = await File.ReadAllTextAsync(agentPath);
+        Assert.Contains("<!-- SPECTRA Execution Agent v1.0.0 -->", content);
+    }
 }

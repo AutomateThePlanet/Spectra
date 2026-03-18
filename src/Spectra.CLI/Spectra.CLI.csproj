@@ -32,4 +32,9 @@
     <PackageOutputPath>./nupkg</PackageOutputPath>
   </PropertyGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Agent\Resources\spectra-execution.agent.md" />
+    <EmbeddedResource Include="Agent\Resources\SKILL.md" />
+  </ItemGroup>
+
 </Project>

@@ -16,6 +16,8 @@ public sealed class InitHandler
 
     private const string ConfigFileName = "spectra.config.json";
     private const string SkillPath = ".github/skills/test-generation/SKILL.md";
+    private const string ExecutionAgentPath = ".github/agents/spectra-execution.agent.md";
+    private const string ExecutionSkillPath = ".github/skills/spectra-execution/SKILL.md";
     private const string DocsDir = "docs";
     private const string TestsDir = "tests";
 
@@ -54,6 +56,9 @@ public sealed class InitHandler
             // Create skill file
             await CreateSkillFileAsync(ct);
 
+            // Install execution agent files
+            await InstallAgentFilesAsync(force, ct);
+
             // Update .gitignore
             await UpdateGitIgnoreAsync(ct);
 
@@ -63,6 +68,8 @@ public sealed class InitHandler
             _logger.LogInformation("  - {DocsDir}/", DocsDir);
             _logger.LogInformation("  - {TestsDir}/", TestsDir);
             _logger.LogInformation("  - {SkillPath}", SkillPath);
+            _logger.LogInformation("  - {AgentPath}", ExecutionAgentPath);
+            _logger.LogInformation("  - {SkillPath}", ExecutionSkillPath);
 
             // Interactive auth setup
             if (_interactive)
@@ -250,4 +257,34 @@ public sealed class InitHandler
         - `check_duplicates_batch`: Verify tests are unique
         - `batch_write_tests`: Submit generated tests
         """;
+
+    private async Task InstallAgentFilesAsync(bool force, CancellationToken ct)
+    {
+        // Install execution agent prompt
+        var agentPath = Path.Combine(_workingDirectory, ExecutionAgentPath);
+        await InstallAgentFileAsync(agentPath, AgentResourceLoader.GetExecutionAgentPrompt, force, ct);
+
+        // Install execution skill
+        var skillPath = Path.Combine(_workingDirectory, ExecutionSkillPath);
+        await InstallAgentFileAsync(skillPath, AgentResourceLoader.GetSkillContent, force, ct);
+    }
+
+    private async Task InstallAgentFileAsync(string targetPath, Func<string> contentProvider, bool force, CancellationToken ct)
+    {
+        var directory = Path.GetDirectoryName(targetPath);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        if (File.Exists(targetPath) && !force)
+        {
+            _logger.LogDebug("Agent file exists, skipping: {Path}", targetPath);
+            return;
+        }
+
+        var content = contentProvider();
+        await File.WriteAllTextAsync(targetPath, content, ct);
+        _logger.LogDebug("Installed agent file: {Path}", targetPath);
+    }
 }

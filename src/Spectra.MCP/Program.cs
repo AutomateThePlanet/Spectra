@@ -10,6 +10,7 @@ using Spectra.MCP.Infrastructure;
 using Spectra.MCP.Reports;
 using Spectra.MCP.Server;
 using Spectra.MCP.Storage;
+using Spectra.MCP.Tools.Data;
 using Spectra.MCP.Tools.Reporting;
 using Spectra.MCP.Tools.RunManagement;
 using Spectra.MCP.Tools.TestExecution;
@@ -110,6 +111,11 @@ public static class Program
         // Reporting tools
         registry.Register("get_run_history", new GetRunHistoryTool(runRepo));
         registry.Register("get_execution_summary", new GetExecutionSummaryTool(runRepo, resultRepo));
+
+        // Data tools (deterministic, no AI dependency)
+        registry.Register("validate_tests", new ValidateTestsTool(basePath));
+        registry.Register("rebuild_indexes", new RebuildIndexesTool(basePath));
+        registry.Register("analyze_coverage_gaps", new AnalyzeCoverageGapsTool(basePath));
 
         // Create and run server
         var server = new McpServer(registry, logger: logger);

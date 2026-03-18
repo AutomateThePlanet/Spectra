@@ -7,11 +7,15 @@ namespace Spectra.Core.Models;
 /// <param name="Message">Human-readable error message</param>
 /// <param name="FilePath">Path to the file that caused the error</param>
 /// <param name="TestId">Test ID if applicable</param>
+/// <param name="LineNumber">Line number where error occurred (if determinable)</param>
+/// <param name="FieldName">Field name that caused the error</param>
 public sealed record ValidationError(
     string Code,
     string Message,
     string FilePath,
-    string? TestId = null);
+    string? TestId = null,
+    int? LineNumber = null,
+    string? FieldName = null);
 
 /// <summary>
 /// Represents a warning found during validation.
@@ -35,6 +39,16 @@ public sealed record ValidationResult
     /// Returns true if validation passed (no errors).
     /// </summary>
     public bool IsValid => Errors.Count == 0;
+
+    /// <summary>
+    /// Total number of files validated.
+    /// </summary>
+    public int TotalFiles { get; init; }
+
+    /// <summary>
+    /// Number of files that passed validation.
+    /// </summary>
+    public int ValidFiles { get; init; }
 
     /// <summary>
     /// Validation errors that prevent the test from being used.
