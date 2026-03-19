@@ -61,7 +61,7 @@ public sealed class GenerateHandler
         // Detect mode: direct if suite provided, interactive otherwise
         var isNonInteractive = _noInteraction ||
             Console.IsInputRedirected ||
-            !Console.IsOutputRedirected;
+            Console.IsOutputRedirected;
 
         var isDirectMode = !string.IsNullOrEmpty(suite);
 
@@ -194,15 +194,12 @@ public sealed class GenerateHandler
         }
 
         // Generate tests
-        GenerationResult result;
+        var prompt = BuildPrompt(suite, count, allExistingIds, effectiveProfile, focus);
+        GenerationResult result = null!;
         await _progress.StatusAsync("Generating tests...", async () =>
         {
-            var prompt = BuildPrompt(suite, count, allExistingIds, effectiveProfile, focus);
             result = await agent.GenerateTestsAsync(prompt, documentMap, existingTests, ct);
         });
-
-        var prompt2 = BuildPrompt(suite, count, allExistingIds, effectiveProfile, focus);
-        result = await agent.GenerateTestsAsync(prompt2, documentMap, existingTests, ct);
 
         if (!result.IsSuccess)
         {
@@ -252,33 +249,59 @@ public sealed class GenerateHandler
             return ExitCodes.Success;
         }
 
-        // Write tests directly (no review step per spec)
+        // Verify tests against documentation if critic is configured
+        var verificationResults = new List<(TestCase Test, VerificationResult Result)>();
         var testsToWrite = result.Tests.ToList();
+        var generatorModel = agent.ProviderName;
+
+        if (ShouldVerify(config.Ai.Critic))
+        {
+            verificationResults = await VerifyTestsAsync(
+                result.Tests,
+                documentMap,
+                config.Ai.Critic!,
+                generatorModel,
+                ct);
+
+            // Show verification summary
+            _verification.ShowSummary(verificationResults);
+            _verification.ShowPartialDetails(verificationResults);
+            _verification.ShowRejectedDetails(verificationResults);
+
+            // Filter out hallucinated tests
+            testsToWrite = verificationResults
+                .Where(r => r.Result.Verdict != VerificationVerdict.Hallucinated)
+                .Select(r => r.Test)
+                .ToList();
+
+            if (testsToWrite.Count == 0)
+            {
+                _progress.BlankLine();
+                _progress.Warning("All generated tests were rejected as hallucinated");
+                _progress.Info("Try adding more documentation or narrowing the focus");
+                return ExitCodes.Success;
+            }
+        }
+        else if (_skipCritic)
+        {
+            _verification.ShowSkippedNotice();
+        }
+
+        // Write tests with grounding metadata
         var writer = new TestFileWriter();
 
         foreach (var test in testsToWrite)
         {
             var filePath = TestFileWriter.GetFilePath(testsPath, suite, test.Id);
 
-            var testWithPath = new TestCase
-            {
-                Id = test.Id,
-                Title = test.Title,
-                Priority = test.Priority,
-                Tags = test.Tags,
-                Component = test.Component,
-                Preconditions = test.Preconditions,
-                Environment = test.Environment,
-                EstimatedDuration = test.EstimatedDuration,
-                DependsOn = test.DependsOn,
-                SourceRefs = test.SourceRefs,
-                RelatedWorkItems = test.RelatedWorkItems,
-                Custom = test.Custom,
-                Steps = test.Steps,
-                ExpectedResult = test.ExpectedResult,
-                TestData = test.TestData,
-                FilePath = Path.GetRelativePath(testsPath, filePath)
-            };
+            // Get verification result for this test if available
+            var verification = verificationResults.FirstOrDefault(r => r.Test.Id == test.Id);
+            var testWithPath = CreateTestWithGrounding(
+                test,
+                verification.Result,
+                generatorModel,
+                filePath,
+                testsPath);
 
             await writer.WriteAsync(filePath, testWithPath, ct);
         }
@@ -468,15 +491,12 @@ public sealed class GenerateHandler
             }
 
             // Generate tests
-            GenerationResult result;
+            var prompt = BuildPrompt(suiteName, count, allExistingIds, effectiveProfile, focus);
+            GenerationResult result = null!;
             await _progress.StatusAsync("Generating tests...", async () =>
             {
-                var prompt = BuildPrompt(suiteName, count, allExistingIds, effectiveProfile, focus);
                 result = await agent.GenerateTestsAsync(prompt, documentMap, existingTests, ct);
             });
-
-            var prompt2 = BuildPrompt(suiteName, count, allExistingIds, effectiveProfile, focus);
-            result = await agent.GenerateTestsAsync(prompt2, documentMap, existingTests, ct);
 
             if (!result.IsSuccess)
             {
@@ -512,41 +532,69 @@ public sealed class GenerateHandler
 
             if (!_dryRun)
             {
+                // Verify tests against documentation if critic is configured
+                var verificationResults = new List<(TestCase Test, VerificationResult Result)>();
+                var testsToWrite = result.Tests.ToList();
+                var generatorModel = agent.ProviderName;
+
+                if (ShouldVerify(config.Ai.Critic))
+                {
+                    verificationResults = await VerifyTestsAsync(
+                        result.Tests,
+                        documentMap,
+                        config.Ai.Critic!,
+                        generatorModel,
+                        ct);
+
+                    // Show verification summary
+                    _verification.ShowSummary(verificationResults);
+                    _verification.ShowPartialDetails(verificationResults);
+                    _verification.ShowRejectedDetails(verificationResults);
+
+                    // Filter out hallucinated tests
+                    testsToWrite = verificationResults
+                        .Where(r => r.Result.Verdict != VerificationVerdict.Hallucinated)
+                        .Select(r => r.Test)
+                        .ToList();
+
+                    if (testsToWrite.Count == 0)
+                    {
+                        _progress.BlankLine();
+                        _progress.Warning("All generated tests were rejected as hallucinated");
+                        _progress.Info("Try adding more documentation or narrowing the focus");
+                        session.Complete();
+                        break;
+                    }
+                }
+                else if (_skipCritic)
+                {
+                    _verification.ShowSkippedNotice();
+                }
+
                 var writer = new TestFileWriter();
 
-                foreach (var test in result.Tests)
+                foreach (var test in testsToWrite)
                 {
                     var filePath = TestFileWriter.GetFilePath(testsPath, suiteName, test.Id);
 
-                    var testWithPath = new TestCase
-                    {
-                        Id = test.Id,
-                        Title = test.Title,
-                        Priority = test.Priority,
-                        Tags = test.Tags,
-                        Component = test.Component,
-                        Preconditions = test.Preconditions,
-                        Environment = test.Environment,
-                        EstimatedDuration = test.EstimatedDuration,
-                        DependsOn = test.DependsOn,
-                        SourceRefs = test.SourceRefs,
-                        RelatedWorkItems = test.RelatedWorkItems,
-                        Custom = test.Custom,
-                        Steps = test.Steps,
-                        ExpectedResult = test.ExpectedResult,
-                        TestData = test.TestData,
-                        FilePath = Path.GetRelativePath(testsPath, filePath)
-                    };
+                    // Get verification result for this test if available
+                    var verification = verificationResults.FirstOrDefault(r => r.Test.Id == test.Id);
+                    var testWithPath = CreateTestWithGrounding(
+                        test,
+                        verification.Result,
+                        generatorModel,
+                        filePath,
+                        testsPath);
 
                     await writer.WriteAsync(filePath, testWithPath, ct);
                     existingTests = [.. existingTests, testWithPath];
                     allExistingIds.Add(testWithPath.Id);
                 }
 
-                allGeneratedTests.AddRange(result.Tests);
+                allGeneratedTests.AddRange(testsToWrite);
 
                 _progress.BlankLine();
-                _results.ShowCompletion($"tests/{suiteName}/", result.Tests.Count);
+                _results.ShowCompletion($"tests/{suiteName}/", testsToWrite.Count);
             }
 
             // Update remaining gaps

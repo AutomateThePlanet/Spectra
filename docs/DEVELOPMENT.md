@@ -375,6 +375,75 @@ Edit `spectra.config.json` to point to your docs:
 
 ## Step 3: Generate Tests from Documentation
 
+SPECTRA supports two generation modes: **Interactive** and **Direct**.
+
+### Interactive Mode (Recommended for Exploration)
+
+Run without arguments to enter interactive mode:
+
+```bash
+spectra ai generate
+```
+
+This launches a guided session using Spectre.Console:
+
+```
+┌ SPECTRA Test Generation
+│
+◆ Which suite?
+│  ○ checkout (42 tests)
+│  ○ authentication (18 tests)
+│  ○ payments (0 tests)
+│  ○ + Create new suite
+└
+
+◆ What kind of tests?
+│  ○ Full coverage - Generate tests for all documented scenarios
+│  ○ Negative only - Focus on error cases and edge conditions
+│  ○ Specific area - I'll describe what I want
+│  ○ Free description - Let me type what I need
+└
+
+◆ Focus area:
+│  > payment validation errors
+└
+
+ℹ Existing tests matching "payment validation":
+   TC-105  Payment rejected for expired card
+   TC-108  Payment fails with insufficient funds
+
+ℹ Uncovered areas:
+   • Invalid CVV handling (docs/payments.md)
+   • Currency conversion errors (docs/payments.md)
+
+Generating tests...
+✓ Generated 5 tests
+
+  ✓ 4 grounded
+  ⚠ 1 partial — written with grounding warnings
+
+✓ 5 tests written to tests/payments/
+
+◆ Generate more tests?
+│  ○ Yes, generate for all remaining gaps
+│  ○ Let me pick specific gaps
+│  ○ No, I'm done
+└
+```
+
+**Interactive mode features:**
+- Suite selection with test counts
+- Four test type options (full coverage, negative only, specific area, free description)
+- Shows existing tests matching your focus
+- Displays uncovered documentation sections
+- Grounding verification with summary output
+- Follow-up prompts to cover remaining gaps
+- No review step - tests are written directly
+
+### Direct Mode
+
+Specify the suite as an argument for non-interactive generation:
+
 ```bash
 # Generate tests for a specific suite (feature area)
 spectra ai generate checkout --count 10
@@ -1106,12 +1175,45 @@ grounding:
     - "Expected Result: specific error code not in docs"
 ```
 
+## Verification Output
+
+After generation, SPECTRA displays verification results:
+
+```
+Generating tests...
+✓ Generated 10 tests
+
+  ✓ 7 grounded
+  ⚠ 2 partial — written with grounding warnings
+  ✗ 1 hallucinated — rejected
+
+✓ 9 tests written to tests/checkout/
+✓ Index updated
+
+ℹ Partial tests (review recommended):
+   TC-209  Assumes refund email is sent within 5 minutes — not confirmed in docs
+   TC-212  Navigation path to currency settings not documented
+
+ℹ Rejected tests:
+   TC-220  References "fraud detection API" — not mentioned in any documentation
+```
+
+**What happens to each verdict:**
+- `grounded` - Written with full grounding metadata
+- `partial` - Written with warnings in grounding metadata (review recommended)
+- `hallucinated` - Rejected, not written to disk
+
 ## Skip Verification
 
 To skip grounding verification (faster but no hallucination detection):
 
 ```bash
 spectra ai generate checkout --skip-critic
+```
+
+When skipped, you'll see:
+```
+  ℹ Verification skipped (--skip-critic)
 ```
 
 Or disable in config:

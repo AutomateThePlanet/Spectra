@@ -117,11 +117,24 @@ grounding:
 
 ### Test Generation
 
-```bash
-# Interactive mode (guided prompts)
-spectra ai generate
+SPECTRA supports two modes for test generation:
 
-# Direct mode - generate tests for a specific suite
+**Interactive Mode** - Guided prompts for exploratory generation:
+```bash
+spectra ai generate
+```
+
+This launches a guided session that:
+1. Lists available suites with test counts (or create a new suite)
+2. Asks what kind of tests you want (full coverage, negative only, specific area)
+3. Shows existing tests matching your focus
+4. Identifies coverage gaps in your documentation
+5. Generates tests and writes them directly
+6. Prompts to generate more for remaining gaps
+
+**Direct Mode** - Specify suite and options upfront:
+```bash
+# Generate tests for a specific suite
 spectra ai generate checkout --count 10
 
 # Focus on specific scenarios

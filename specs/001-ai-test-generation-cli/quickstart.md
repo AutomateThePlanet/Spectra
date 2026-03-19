@@ -118,10 +118,48 @@ Users can complete purchases through our checkout flow.
 
 ## Generate Tests
 
-```bash
-# Interactive mode (guided prompts)
-spectra ai generate
+SPECTRA supports two modes: **Interactive** (guided) and **Direct** (command-line).
 
+### Interactive Mode
+
+Run without arguments to enter interactive mode:
+
+```bash
+spectra ai generate
+```
+
+This launches a guided session:
+
+```
+┌ SPECTRA Test Generation
+│
+◆ Which suite?
+│  ○ checkout (42 tests)
+│  ○ authentication (18 tests)
+│  ○ + Create new suite
+└
+
+◆ What kind of tests?
+│  ○ Full coverage
+│  ○ Negative only
+│  ○ Specific area
+│  ○ Free description
+└
+```
+
+The session will:
+1. Let you select or create a suite
+2. Ask what kind of tests you want
+3. Show existing tests matching your focus
+4. Identify coverage gaps
+5. Generate and verify tests
+6. Prompt to continue for remaining gaps
+
+### Direct Mode
+
+Specify suite and options for non-interactive generation:
+
+```bash
 # Generate tests for a specific suite
 spectra ai generate checkout --count 10
 
@@ -131,6 +169,20 @@ spectra ai generate auth --focus "edge cases with special characters"
 
 # Skip grounding verification (faster, but no hallucination detection)
 spectra ai generate checkout --skip-critic
+```
+
+### Verification Output
+
+After generation, you'll see verification results:
+
+```
+✓ Generated 10 tests
+
+  ✓ 7 grounded
+  ⚠ 2 partial — written with grounding warnings
+  ✗ 1 hallucinated — rejected
+
+✓ 9 tests written to tests/checkout/
 ```
 
 ### Interactive Review
