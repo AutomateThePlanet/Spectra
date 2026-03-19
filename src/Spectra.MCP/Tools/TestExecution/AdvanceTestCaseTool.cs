@@ -23,7 +23,7 @@ public sealed class AdvanceTestCaseTool : IMcpTool
         {
             test_handle = new { type = "string", description = "Current test handle" },
             status = new { type = "string", @enum = new[] { "PASSED", "FAILED" }, description = "Test result" },
-            notes = new { type = "string", description = "Optional observations" }
+            notes = new { type = "string", description = "Observations (REQUIRED for FAILED tests)" }
         },
         required = new[] { "test_handle", "status" }
     };
@@ -56,6 +56,14 @@ public sealed class AdvanceTestCaseTool : IMcpTool
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "INVALID_STATUS",
                 "Status must be PASSED or FAILED"));
+        }
+
+        // Notes are required for failed tests
+        if (status == TestStatus.Failed && string.IsNullOrWhiteSpace(request.Notes))
+        {
+            return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
+                "NOTES_REQUIRED",
+                "Notes are required for FAILED tests - explain why the test failed"));
         }
 
         var result = await _engine.GetTestResultAsync(request.TestHandle);

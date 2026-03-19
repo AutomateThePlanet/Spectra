@@ -268,17 +268,18 @@ function renderTests() {
     }
 
     return `
-        <div class="card-grid">
+        <div class="test-list">
             ${tests.map(t => `
-                <div class="card" onclick="showTestDetail('${escapeHtml(t.id)}')">
-                    <div class="card-title">${escapeHtml(t.id)}: ${escapeHtml(t.title)}</div>
-                    <div class="card-meta">
+                <div class="test-row" onclick="showTestDetail('${escapeHtml(t.id)}')">
+                    <div class="test-row-main">
+                        <span class="test-row-id">${escapeHtml(t.id)}</span>
+                        <span class="test-row-title">${escapeHtml(t.title)}</span>
+                    </div>
+                    <div class="test-row-meta">
                         <span class="badge ${t.priority}">${t.priority}</span>
                         ${t.component ? `<span class="badge">${escapeHtml(t.component)}</span>` : ''}
                         ${t.has_automation ? '<span class="badge automated">Automated</span>' : ''}
-                    </div>
-                    <div style="font-size: 0.85rem; color: var(--text-muted);">
-                        Suite: ${escapeHtml(t.suite)}
+                        <span class="test-row-suite">${escapeHtml(t.suite)}</span>
                     </div>
                 </div>
             `).join('')}
@@ -287,7 +288,7 @@ function renderTests() {
 }
 
 /**
- * Render execution run history with trend chart
+ * Render execution run history with table and trend chart
  */
 function renderRuns() {
     if (!data.runs.length) {
@@ -305,45 +306,56 @@ function renderRuns() {
     return `
         ${trendChart}
         ${trendSummary}
-        <h3 class="section-title">Run History</h3>
-        <div class="run-list">
-            ${data.runs.map(r => {
-                const passRate = r.total > 0 ? ((r.passed / r.total) * 100).toFixed(1) : 0;
-                return `
-                <div class="run-row clickable" onclick="showRunDetail('${escapeHtml(r.run_id)}')">
-                    <div class="run-info">
-                        <span class="run-suite">${escapeHtml(r.suite)}</span>
-                        <span class="run-id">${escapeHtml(r.run_id)}</span>
-                        <span class="run-date">
-                            ${new Date(r.started_at).toLocaleString()} by ${escapeHtml(r.started_by)}
-                        </span>
-                    </div>
-                    <div class="run-progress">
-                        <div class="run-progress-bar">
-                            <div class="run-progress-passed" style="width: ${passRate}%"></div>
-                        </div>
-                        <span class="run-progress-label">${passRate}%</span>
-                    </div>
-                    <div class="run-stats">
-                        <div class="run-stat passed">
-                            <div class="run-stat-value">${r.passed}</div>
-                            <div class="run-stat-label">Passed</div>
-                        </div>
-                        <div class="run-stat failed">
-                            <div class="run-stat-value">${r.failed}</div>
-                            <div class="run-stat-label">Failed</div>
-                        </div>
-                        <div class="run-stat">
-                            <div class="run-stat-value">${r.skipped}</div>
-                            <div class="run-stat-label">Skipped</div>
-                        </div>
-                        <div class="run-stat">
-                            <div class="run-stat-value">${r.total}</div>
-                            <div class="run-stat-label">Total</div>
-                        </div>
-                    </div>
-                </div>
-            `}).join('')}
+        <div class="section-header">
+            <h3 class="section-title">Run History</h3>
+            <span class="section-count">${data.runs.length} runs</span>
+        </div>
+        <div class="run-table-container">
+            <table class="run-table">
+                <thead>
+                    <tr>
+                        <th>Suite</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Duration</th>
+                        <th>Pass Rate</th>
+                        <th class="num-col">Passed</th>
+                        <th class="num-col">Failed</th>
+                        <th class="num-col">Skipped</th>
+                        <th class="num-col">Blocked</th>
+                        <th class="num-col">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.runs.map(r => {
+                        const passRate = r.total > 0 ? ((r.passed / r.total) * 100).toFixed(1) : 0;
+                        const duration = r.duration_seconds ? formatDuration(r.duration_seconds) : '-';
+                        const dateStr = new Date(r.started_at).toLocaleString();
+                        const statusClass = r.status === 'completed' ? 'completed' :
+                                           r.status === 'failed' ? 'failed' : 'other';
+                        return `
+                        <tr class="run-table-row" onclick="showRunDetail('${escapeHtml(r.run_id)}')">
+                            <td class="suite-cell">${escapeHtml(r.suite)}</td>
+                            <td><span class="status-badge ${statusClass}">${escapeHtml(r.status)}</span></td>
+                            <td class="date-cell">${dateStr}</td>
+                            <td>${duration}</td>
+                            <td>
+                                <div class="pass-rate-cell">
+                                    <div class="mini-progress">
+                                        <div class="mini-progress-bar" style="width: ${passRate}%"></div>
+                                    </div>
+                                    <span>${passRate}%</span>
+                                </div>
+                            </td>
+                            <td class="num-col passed-cell">${r.passed}</td>
+                            <td class="num-col failed-cell">${r.failed}</td>
+                            <td class="num-col">${r.skipped}</td>
+                            <td class="num-col">${r.blocked}</td>
+                            <td class="num-col">${r.total}</td>
+                        </tr>
+                    `}).join('')}
+                </tbody>
+            </table>
         </div>
     `;
 }
@@ -589,47 +601,93 @@ function showSuiteTests(suite) {
 }
 
 /**
- * Show detailed test view
+ * Show detailed test view in slide-out panel
  */
 function showTestDetail(id) {
     const test = allTests.find(t => t.id === id);
     if (!test) return;
 
-    const content = document.getElementById('content');
+    const panel = document.getElementById('test-detail-panel');
+    const overlay = document.getElementById('detail-panel-overlay');
+    const title = document.getElementById('detail-panel-title');
+    const content = document.getElementById('detail-panel-content');
+
+    title.textContent = `${test.id}: ${test.title}`;
+
     content.innerHTML = `
-        <div class="card test-detail">
-            <button class="back-btn" onclick="render()">← Back to Tests</button>
-            <h2>${escapeHtml(test.id)}: ${escapeHtml(test.title)}</h2>
-            <div class="card-meta" style="margin-bottom: 1.5rem;">
-                <span class="badge ${test.priority}">${test.priority}</span>
-                ${test.component ? `<span class="badge">${escapeHtml(test.component)}</span>` : ''}
-                ${(test.tags || []).map(t => `<span class="badge">${escapeHtml(t)}</span>`).join('')}
+        <div class="detail-badges">
+            <span class="badge ${test.priority}">${test.priority}</span>
+            ${test.component ? `<span class="badge">${escapeHtml(test.component)}</span>` : ''}
+            ${(test.tags || []).map(t => `<span class="badge tag">${escapeHtml(t)}</span>`).join('')}
+            ${test.has_automation ? '<span class="badge automated">Automated</span>' : '<span class="badge manual">Manual</span>'}
+        </div>
+
+        <div class="detail-section">
+            <h4>Location</h4>
+            <div class="detail-row">
+                <span class="detail-label">Suite:</span>
+                <span class="detail-value">${escapeHtml(test.suite)}</span>
             </div>
-            <div class="metadata">
-                <div class="stat">
-                    <span class="stat-label">Suite</span>
-                    <span class="stat-value">${escapeHtml(test.suite)}</span>
-                </div>
-                <div class="stat">
-                    <span class="stat-label">File</span>
-                    <span class="stat-value">${escapeHtml(test.file)}</span>
-                </div>
-                ${test.automated_by ? `
-                    <div class="stat">
-                        <span class="stat-label">Automated By</span>
-                        <span class="stat-value">${escapeHtml(test.automated_by)}</span>
-                    </div>
-                ` : ''}
-                ${(test.source_refs || []).length ? `
-                    <div class="stat">
-                        <span class="stat-label">Source Refs</span>
-                        <span class="stat-value">${test.source_refs.map(escapeHtml).join(', ')}</span>
-                    </div>
-                ` : ''}
+            <div class="detail-row">
+                <span class="detail-label">File:</span>
+                <span class="detail-value code">${escapeHtml(test.file)}</span>
             </div>
         </div>
+
+        ${test.automated_by ? `
+        <div class="detail-section">
+            <h4>Automation</h4>
+            <div class="detail-row">
+                <span class="detail-label">Automated By:</span>
+                <span class="detail-value code">${escapeHtml(test.automated_by)}</span>
+            </div>
+        </div>
+        ` : ''}
+
+        ${(test.source_refs || []).length > 0 ? `
+        <div class="detail-section">
+            <h4>Source References</h4>
+            <ul class="source-ref-list">
+                ${test.source_refs.map(ref => `<li class="code">${escapeHtml(ref)}</li>`).join('')}
+            </ul>
+        </div>
+        ` : ''}
+
+        ${test.content ? `
+        <div class="detail-section">
+            <h4>Test Content</h4>
+            <div class="test-content-preview">
+                <pre>${escapeHtml(test.content)}</pre>
+            </div>
+        </div>
+        ` : ''}
     `;
+
+    panel.classList.add('open');
+    overlay.classList.add('open');
+    document.body.classList.add('panel-open');
 }
+
+/**
+ * Close the detail panel
+ */
+function closeDetailPanel() {
+    const panel = document.getElementById('test-detail-panel');
+    const overlay = document.getElementById('detail-panel-overlay');
+
+    panel.classList.remove('open');
+    overlay.classList.remove('open');
+    document.body.classList.remove('panel-open');
+}
+
+/**
+ * Close panel on Escape key
+ */
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeDetailPanel();
+    }
+});
 
 /**
  * Escape HTML to prevent XSS

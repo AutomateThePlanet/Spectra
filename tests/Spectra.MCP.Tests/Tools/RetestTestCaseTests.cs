@@ -109,7 +109,7 @@ public class RetestTestCaseTests : IAsyncDisposable
 
         // Get details and fail it
         await _detailsTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{firstHandle}}}"}""").RootElement);
-        await _advanceTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{firstHandle}}}", "status": "FAILED"}""").RootElement);
+        await _advanceTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{firstHandle}}}", "status": "FAILED", "notes": "Test failed"}""").RootElement);
 
         // Retest the failed test
         var result = await _retestTool.ExecuteAsync(JsonDocument.Parse($$$"""
@@ -134,7 +134,7 @@ public class RetestTestCaseTests : IAsyncDisposable
 
         // Fail first test
         await _detailsTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{firstHandle}}}"}""").RootElement);
-        await _advanceTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{firstHandle}}}", "status": "FAILED"}""").RootElement);
+        await _advanceTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{firstHandle}}}", "status": "FAILED", "notes": "Test failed"}""").RootElement);
 
         // Retest first test - should be requeued at end
         var retestResult = await _retestTool.ExecuteAsync(JsonDocument.Parse($$$"""
@@ -168,7 +168,7 @@ public class RetestTestCaseTests : IAsyncDisposable
 
         // Get details and fail it
         await _detailsTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{firstHandle}}}"}""").RootElement);
-        await _advanceTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{firstHandle}}}", "status": "FAILED"}""").RootElement);
+        await _advanceTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{firstHandle}}}", "status": "FAILED", "notes": "Test failed"}""").RootElement);
 
         // Retest the failed test
         var result = await _retestTool.ExecuteAsync(JsonDocument.Parse($$$"""

@@ -77,7 +77,7 @@ public class AdvanceTestCaseTests : IAsyncDisposable
     public async Task Execute_FailedStatus_RecordsAndBlocksDependents()
     {
         var handle = await StartRunAndGetInProgressHandle();
-        var parameters = JsonDocument.Parse($$$"""{"test_handle": "{{{handle}}}", "status": "FAILED"}""").RootElement;
+        var parameters = JsonDocument.Parse($$$"""{"test_handle": "{{{handle}}}", "status": "FAILED", "notes": "Test failed due to assertion error"}""").RootElement;
 
         var result = await _tool.ExecuteAsync(parameters);
         var response = JsonDocument.Parse(result).RootElement;

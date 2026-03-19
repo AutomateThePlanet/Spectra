@@ -22,7 +22,8 @@ public sealed class SkipTestCaseTool : IMcpTool
         properties = new
         {
             test_handle = new { type = "string", description = "Test handle to skip" },
-            reason = new { type = "string", description = "Reason for skipping" }
+            reason = new { type = "string", description = "Reason for skipping (REQUIRED)" },
+            blocked = new { type = "boolean", description = "Mark as BLOCKED (dependency failed) rather than SKIPPED", @default = false }
         },
         required = new[] { "test_handle", "reason" }
     };
@@ -77,7 +78,8 @@ public sealed class SkipTestCaseTool : IMcpTool
             var (skipped, blocked, next) = await _engine.SkipTestAsync(
                 result.RunId,
                 request.TestHandle,
-                request.Reason);
+                request.Reason,
+                request.Blocked);
 
             var queue = await _engine.GetQueueAsync(result.RunId);
             var progress = queue?.GetProgress() ?? "?/?";
@@ -123,4 +125,7 @@ internal sealed class SkipTestCaseRequest
 
     [JsonPropertyName("reason")]
     public string? Reason { get; set; }
+
+    [JsonPropertyName("blocked")]
+    public bool Blocked { get; set; }
 }

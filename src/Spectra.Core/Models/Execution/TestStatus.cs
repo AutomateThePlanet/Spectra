@@ -1,8 +1,11 @@
+using System.Text.Json.Serialization;
+
 namespace Spectra.Core.Models.Execution;
 
 /// <summary>
 /// Execution result for a single test.
 /// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum TestStatus
 {
     /// <summary>Not yet executed.</summary>

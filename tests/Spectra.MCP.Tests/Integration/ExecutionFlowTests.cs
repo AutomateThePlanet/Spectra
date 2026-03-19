@@ -204,7 +204,11 @@ public class ExecutionFlowTests : IAsyncDisposable
         var detailsParams = JsonDocument.Parse($$$"""{"test_handle": "{{{handle}}}"}""").RootElement;
         await _detailsTool.ExecuteAsync(detailsParams);
 
-        var advanceParams = JsonDocument.Parse($$$"""{"test_handle": "{{{handle}}}", "status": "{{{status}}}"}""").RootElement;
+        // Notes are required for FAILED status
+        var json = status == "FAILED"
+            ? $$$"""{"test_handle": "{{{handle}}}", "status": "{{{status}}}", "notes": "Test failed"}"""
+            : $$$"""{"test_handle": "{{{handle}}}", "status": "{{{status}}}"}""";
+        var advanceParams = JsonDocument.Parse(json).RootElement;
         await _advanceTool.ExecuteAsync(advanceParams);
     }
 

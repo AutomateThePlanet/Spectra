@@ -61,6 +61,18 @@
         </footer>
     </div>
 
+    <!-- Test Detail Slide-out Panel -->
+    <div id="test-detail-panel" class="detail-panel">
+        <div class="detail-panel-header">
+            <h2 id="detail-panel-title">Test Details</h2>
+            <button class="detail-panel-close" onclick="closeDetailPanel()">&times;</button>
+        </div>
+        <div id="detail-panel-content" class="detail-panel-content">
+            <!-- Populated by JavaScript -->
+        </div>
+    </div>
+    <div id="detail-panel-overlay" class="detail-panel-overlay" onclick="closeDetailPanel()"></div>
+
     <script id="dashboard-data" type="application/json">
     {{DASHBOARD_DATA}}
     </script>

@@ -116,6 +116,7 @@ public static class Program
         registry.Register("skip_test_case", new SkipTestCaseTool(engine));
         registry.Register("add_test_note", new AddTestNoteTool(engine));
         registry.Register("retest_test_case", new RetestTestCaseTool(engine));
+        registry.Register("save_screenshot", new SaveScreenshotTool(engine, config.ReportsPath));
 
         // Reporting tools
         registry.Register("get_run_history", new GetRunHistoryTool(runRepo));

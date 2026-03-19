@@ -134,7 +134,7 @@ public class BlockingCascadeTests : IAsyncDisposable
         // Get and fail first test
         var firstHandle = startResponse.GetProperty("data").GetProperty("first_test").GetProperty("test_handle").GetString()!;
         await _detailsTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{firstHandle}}}"}""").RootElement);
-        var advanceResult = await _advanceTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{firstHandle}}}", "status": "FAILED"}""").RootElement);
+        var advanceResult = await _advanceTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{firstHandle}}}", "status": "FAILED", "notes": "Test failed"}""").RootElement);
 
         // Get and pass independent test (TC-004)
         var advanceResponse = JsonDocument.Parse(advanceResult).RootElement;
@@ -165,7 +165,7 @@ public class BlockingCascadeTests : IAsyncDisposable
         // Get and fail first test
         var firstHandle = startResponse.GetProperty("data").GetProperty("first_test").GetProperty("test_handle").GetString()!;
         await _detailsTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{firstHandle}}}"}""").RootElement);
-        var advanceResult = await _advanceTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{firstHandle}}}", "status": "FAILED"}""").RootElement);
+        var advanceResult = await _advanceTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{firstHandle}}}", "status": "FAILED", "notes": "Test failed"}""").RootElement);
         var advanceResponse = JsonDocument.Parse(advanceResult).RootElement;
 
         // TC-004 should not be blocked (no dependency on TC-001)

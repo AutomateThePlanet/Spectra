@@ -261,14 +261,16 @@ public sealed class ExecutionEngine
     }
 
     /// <summary>
-    /// Skips a test with a reason.
+    /// Skips a test with a reason, optionally marking it as blocked.
     /// </summary>
     public async Task<(TestResult Skipped, IReadOnlyList<string> Blocked, QueuedTest? Next)> SkipTestAsync(
         string runId,
         string testHandle,
-        string reason)
+        string reason,
+        bool blocked = false)
     {
-        return await AdvanceTestAsync(runId, testHandle, TestStatus.Skipped, reason);
+        var status = blocked ? TestStatus.Blocked : TestStatus.Skipped;
+        return await AdvanceTestAsync(runId, testHandle, status, reason);
     }
 
     /// <summary>

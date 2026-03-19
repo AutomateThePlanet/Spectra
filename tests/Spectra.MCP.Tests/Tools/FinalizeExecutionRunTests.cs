@@ -91,8 +91,8 @@ public class FinalizeExecutionRunTests : IAsyncDisposable
         var response = JsonDocument.Parse(result).RootElement;
 
         var data = response.GetProperty("data");
-        Assert.True(data.TryGetProperty("report_path", out var reportPath));
-        Assert.True(File.Exists(reportPath.GetString()));
+        Assert.True(data.TryGetProperty("reports", out var reports));
+        Assert.True(File.Exists(reports.GetProperty("json").GetString()));
     }
 
     [Fact]

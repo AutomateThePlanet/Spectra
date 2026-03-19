@@ -69,10 +69,10 @@ public sealed class ExecutionDbReader : IAsyncDisposable
                 r.started_by,
                 r.completed_at,
                 COUNT(tr.test_id) as total,
-                SUM(CASE WHEN tr.status = 'Passed' THEN 1 ELSE 0 END) as passed,
-                SUM(CASE WHEN tr.status = 'Failed' THEN 1 ELSE 0 END) as failed,
-                SUM(CASE WHEN tr.status = 'Skipped' THEN 1 ELSE 0 END) as skipped,
-                SUM(CASE WHEN tr.status = 'Blocked' THEN 1 ELSE 0 END) as blocked
+                SUM(CASE WHEN UPPER(tr.status) = 'PASSED' THEN 1 ELSE 0 END) as passed,
+                SUM(CASE WHEN UPPER(tr.status) = 'FAILED' THEN 1 ELSE 0 END) as failed,
+                SUM(CASE WHEN UPPER(tr.status) = 'SKIPPED' THEN 1 ELSE 0 END) as skipped,
+                SUM(CASE WHEN UPPER(tr.status) = 'BLOCKED' THEN 1 ELSE 0 END) as blocked
             FROM runs r
             LEFT JOIN test_results tr ON r.run_id = tr.run_id
             GROUP BY r.run_id

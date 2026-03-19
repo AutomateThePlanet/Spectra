@@ -80,7 +80,7 @@ public class RetestFlowTests : IAsyncDisposable
 
         // Fail first test
         await _detailsTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{handle}}}"}""").RootElement);
-        var advanceResult = await _advanceTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{handle}}}", "status": "FAILED"}""").RootElement);
+        var advanceResult = await _advanceTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{handle}}}", "status": "FAILED", "notes": "Test failed"}""").RootElement);
         var advanceResponse = JsonDocument.Parse(advanceResult).RootElement;
         handle = advanceResponse.GetProperty("data").GetProperty("next").GetProperty("test_handle").GetString()!;
 
@@ -121,7 +121,7 @@ public class RetestFlowTests : IAsyncDisposable
 
         // Fail first test
         await _detailsTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{handle}}}"}""").RootElement);
-        await _advanceTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{handle}}}", "status": "FAILED"}""").RootElement);
+        await _advanceTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{handle}}}", "status": "FAILED", "notes": "Test failed"}""").RootElement);
 
         // Retest first time - fail again
         var retestResult1 = await _retestTool.ExecuteAsync(JsonDocument.Parse($$$"""
@@ -130,7 +130,7 @@ public class RetestFlowTests : IAsyncDisposable
         var retest1Handle = JsonDocument.Parse(retestResult1).RootElement.GetProperty("data").GetProperty("test_handle").GetString()!;
 
         await _detailsTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{retest1Handle}}}"}""").RootElement);
-        await _advanceTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{retest1Handle}}}", "status": "FAILED"}""").RootElement);
+        await _advanceTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{retest1Handle}}}", "status": "FAILED", "notes": "Test failed again"}""").RootElement);
 
         // Retest second time - pass
         var retestResult2 = await _retestTool.ExecuteAsync(JsonDocument.Parse($$$"""
@@ -172,7 +172,7 @@ public class RetestFlowTests : IAsyncDisposable
 
         // Fail first test
         await _detailsTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{handle}}}"}""").RootElement);
-        var advanceResult = await _advanceTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{handle}}}", "status": "FAILED"}""").RootElement);
+        var advanceResult = await _advanceTool.ExecuteAsync(JsonDocument.Parse($$$"""{"test_handle": "{{{handle}}}", "status": "FAILED", "notes": "Test failed"}""").RootElement);
 
         // Progress should be 1/2
         Assert.Equal("1/2", JsonDocument.Parse(advanceResult).RootElement.GetProperty("progress").GetString());
