@@ -8,7 +8,8 @@ namespace Spectra.CLI.Coverage;
 public sealed class GapAnalyzer
 {
     /// <summary>
-    /// Identifies coverage gaps by comparing documents against test source_refs.
+    /// Identifies coverage gaps by comparing documents against test source_refs
+    /// and analyzing section-level coverage.
     /// </summary>
     public IReadOnlyList<CoverageGap> AnalyzeGaps(
         DocumentMap documentMap,
@@ -22,17 +23,14 @@ public sealed class GapAnalyzer
             .Distinct()
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        // Build a searchable index of test coverage (titles + steps)
+        var testCoverageTerms = BuildCoverageIndex(existingTests);
+
         var gaps = new List<CoverageGap>();
 
         foreach (var doc in documentMap.Documents)
         {
             var normalizedPath = NormalizePath(doc.Path);
-
-            // Skip if already covered
-            if (coveredPaths.Contains(normalizedPath))
-            {
-                continue;
-            }
 
             // Skip if focus area specified and doc doesn't match
             if (!string.IsNullOrEmpty(focusArea) && !MatchesFocus(doc, focusArea))
@@ -40,17 +38,128 @@ public sealed class GapAnalyzer
                 continue;
             }
 
-            gaps.Add(new CoverageGap
+            // Check if document is covered at path level
+            var isDocCovered = coveredPaths.Contains(normalizedPath);
+
+            if (!isDocCovered)
             {
-                DocumentPath = doc.Path,
-                Section = null,
-                Reason = $"No tests reference this document",
-                Severity = EstimateSeverity(doc),
-                Suggestion = $"Generate tests for: {doc.Title}"
-            });
+                // Document not referenced at all - add document-level gap
+                gaps.Add(new CoverageGap
+                {
+                    DocumentPath = doc.Path,
+                    Section = null,
+                    Reason = "No tests reference this document",
+                    Severity = EstimateSeverity(doc),
+                    Suggestion = $"Generate tests for: {doc.Title}"
+                });
+            }
+            else if (doc.Headings?.Count > 0)
+            {
+                // Document is referenced - check section-level coverage
+                var uncoveredSections = FindUncoveredSections(doc, testCoverageTerms);
+
+                foreach (var section in uncoveredSections)
+                {
+                    gaps.Add(new CoverageGap
+                    {
+                        DocumentPath = doc.Path,
+                        Section = section,
+                        Reason = $"Section '{section}' has no matching tests",
+                        Severity = GapSeverity.Medium,
+                        Suggestion = $"Generate tests for: {section}"
+                    });
+                }
+            }
         }
 
         return gaps.OrderByDescending(g => g.Severity).ToList();
+    }
+
+    /// <summary>
+    /// Builds a searchable index of terms covered by existing tests.
+    /// </summary>
+    private static HashSet<string> BuildCoverageIndex(IReadOnlyList<TestCase> tests)
+    {
+        var terms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var test in tests)
+        {
+            // Add normalized words from title
+            AddNormalizedTerms(terms, test.Title);
+
+            // Add normalized words from steps
+            foreach (var step in test.Steps)
+            {
+                AddNormalizedTerms(terms, step);
+            }
+
+            // Add normalized words from expected result
+            if (!string.IsNullOrEmpty(test.ExpectedResult))
+            {
+                AddNormalizedTerms(terms, test.ExpectedResult);
+            }
+
+            // Add tags
+            foreach (var tag in test.Tags)
+            {
+                terms.Add(tag.ToLowerInvariant());
+            }
+        }
+
+        return terms;
+    }
+
+    private static void AddNormalizedTerms(HashSet<string> terms, string text)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+
+        // Split on common separators and add meaningful words
+        var words = text.ToLowerInvariant()
+            .Split([' ', '-', '_', '.', ',', ':', ';', '(', ')', '[', ']', '"', '\'', '\n', '\r'],
+                StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => w.Length > 2); // Skip very short words
+
+        foreach (var word in words)
+        {
+            terms.Add(word);
+        }
+    }
+
+    /// <summary>
+    /// Finds sections in a document that don't appear to be covered by tests.
+    /// </summary>
+    private static List<string> FindUncoveredSections(DocumentEntry doc, HashSet<string> coverageTerms)
+    {
+        var uncovered = new List<string>();
+
+        if (doc.Headings is null) return uncovered;
+
+        foreach (var heading in doc.Headings)
+        {
+            // Check if any significant words from the heading appear in test coverage
+            var headingWords = heading.ToLowerInvariant()
+                .Split([' ', '-', '_', '.', ':', '(', ')', '[', ']'],
+                    StringSplitOptions.RemoveEmptyEntries)
+                .Where(w => w.Length > 2)
+                .ToList();
+
+            // Skip if no meaningful words
+            if (headingWords.Count == 0) continue;
+
+            // Skip common generic headings
+            var skipHeadings = new[] { "overview", "introduction", "summary", "references", "appendix", "changelog", "prerequisites", "requirements" };
+            if (skipHeadings.Any(s => heading.ToLowerInvariant().Contains(s))) continue;
+
+            // Check if at least one significant word is covered
+            var isCovered = headingWords.Any(w => coverageTerms.Contains(w));
+
+            if (!isCovered)
+            {
+                uncovered.Add(heading);
+            }
+        }
+
+        return uncovered;
     }
 
     /// <summary>

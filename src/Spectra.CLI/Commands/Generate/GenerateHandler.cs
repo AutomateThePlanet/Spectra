@@ -132,8 +132,17 @@ public sealed class GenerateHandler
 
         var existingTests = await LoadExistingTestsAsync(suitePath, testsPath, ct);
 
+        // Scan ALL suites for existing IDs to ensure global uniqueness
+        var globalIdScanner = new GlobalIdScanner();
+        var allExistingIds = await globalIdScanner.ScanAllIdsAsync(testsPath, ct);
+
         _progress.Success($"Loading {suite} suite... {existingTests.Count} existing tests");
         _progress.Success($"Scanning documentation... {documentMap.Documents.Count} relevant files");
+
+        if (allExistingIds.Count > existingTests.Count)
+        {
+            _progress.Info($"Global IDs: {allExistingIds.Count} (ensuring uniqueness across all suites)");
+        }
 
         // Load profile
         var profileLoader = new ProfileLoader();
@@ -188,11 +197,11 @@ public sealed class GenerateHandler
         GenerationResult result;
         await _progress.StatusAsync("Generating tests...", async () =>
         {
-            var prompt = BuildPrompt(suite, count, existingTests, effectiveProfile, focus);
+            var prompt = BuildPrompt(suite, count, allExistingIds, effectiveProfile, focus);
             result = await agent.GenerateTestsAsync(prompt, documentMap, existingTests, ct);
         });
 
-        var prompt2 = BuildPrompt(suite, count, existingTests, effectiveProfile, focus);
+        var prompt2 = BuildPrompt(suite, count, allExistingIds, effectiveProfile, focus);
         result = await agent.GenerateTestsAsync(prompt2, documentMap, existingTests, ct);
 
         if (!result.IsSuccess)
@@ -216,7 +225,9 @@ public sealed class GenerateHandler
 
         if (result.Tests.Count == 0)
         {
-            _progress.Info("No new tests generated.");
+            _progress.Warning($"No tests generated (requested: {count})");
+            _progress.BlankLine();
+            ShowCountMismatchReason(0, count, documentMap.Documents.Count, existingTests.Count, focus);
             return ExitCodes.Success;
         }
 
@@ -224,6 +235,14 @@ public sealed class GenerateHandler
         _progress.Success($"Generated {result.Tests.Count} tests:");
         _progress.BlankLine();
         _results.ShowGeneratedTests(result.Tests);
+
+        // Warn if fewer tests than requested
+        if (result.Tests.Count < count)
+        {
+            _progress.BlankLine();
+            _progress.Warning($"Generated {result.Tests.Count} of {count} requested tests");
+            ShowCountMismatchReason(result.Tests.Count, count, documentMap.Documents.Count, existingTests.Count, focus);
+        }
 
         // Preview or write tests
         if (_dryRun)
@@ -384,7 +403,17 @@ public sealed class GenerateHandler
 
         // Load existing tests
         var existingTests = await LoadExistingTestsAsync(suitePath, testsPath, ct);
+
+        // Scan ALL suites for existing IDs to ensure global uniqueness
+        var globalIdScanner = new GlobalIdScanner();
+        var allExistingIds = await globalIdScanner.ScanAllIdsAsync(testsPath, ct);
+
         _progress.Success($"Loading {suiteName} suite... {existingTests.Count} existing tests");
+
+        if (allExistingIds.Count > existingTests.Count)
+        {
+            _progress.Info($"Global IDs: {allExistingIds.Count} (ensuring uniqueness across all suites)");
+        }
 
         // Load profile
         var profileLoader = new ProfileLoader();
@@ -442,11 +471,11 @@ public sealed class GenerateHandler
             GenerationResult result;
             await _progress.StatusAsync("Generating tests...", async () =>
             {
-                var prompt = BuildPrompt(suiteName, count, existingTests, effectiveProfile, focus);
+                var prompt = BuildPrompt(suiteName, count, allExistingIds, effectiveProfile, focus);
                 result = await agent.GenerateTestsAsync(prompt, documentMap, existingTests, ct);
             });
 
-            var prompt2 = BuildPrompt(suiteName, count, existingTests, effectiveProfile, focus);
+            var prompt2 = BuildPrompt(suiteName, count, allExistingIds, effectiveProfile, focus);
             result = await agent.GenerateTestsAsync(prompt2, documentMap, existingTests, ct);
 
             if (!result.IsSuccess)
@@ -461,7 +490,9 @@ public sealed class GenerateHandler
 
             if (result.Tests.Count == 0)
             {
-                _progress.Info("No new tests generated.");
+                _progress.Warning($"No tests generated (requested: {count})");
+                _progress.BlankLine();
+                ShowCountMismatchReason(0, count, documentMap.Documents.Count, existingTests.Count, focus);
                 session.Complete();
                 break;
             }
@@ -470,6 +501,14 @@ public sealed class GenerateHandler
             _progress.Success($"Generated {result.Tests.Count} tests:");
             _progress.BlankLine();
             _results.ShowGeneratedTests(result.Tests);
+
+            // Warn if fewer tests than requested
+            if (result.Tests.Count < count)
+            {
+                _progress.BlankLine();
+                _progress.Warning($"Generated {result.Tests.Count} of {count} requested tests");
+                ShowCountMismatchReason(result.Tests.Count, count, documentMap.Documents.Count, existingTests.Count, focus);
+            }
 
             if (!_dryRun)
             {
@@ -501,6 +540,7 @@ public sealed class GenerateHandler
 
                     await writer.WriteAsync(filePath, testWithPath, ct);
                     existingTests = [.. existingTests, testWithPath];
+                    allExistingIds.Add(testWithPath.Id);
                 }
 
                 allGeneratedTests.AddRange(result.Tests);
@@ -628,11 +668,11 @@ public sealed class GenerateHandler
     private static string BuildPrompt(
         string suite,
         int count,
-        IReadOnlyList<TestCase> existingTests,
+        IReadOnlyCollection<string> allExistingIds,
         EffectiveProfile profile,
         string? focus)
     {
-        var existingIds = string.Join(", ", existingTests.Select(t => t.Id));
+        var existingIds = string.Join(", ", allExistingIds);
 
         var profileContext = string.Empty;
         if (profile.Source.Type != SourceType.Default)
@@ -804,5 +844,56 @@ public sealed class GenerateHandler
             return false;
 
         return true;
+    }
+
+    /// <summary>
+    /// Shows explanation for why fewer tests were generated than requested.
+    /// </summary>
+    private void ShowCountMismatchReason(
+        int actual,
+        int requested,
+        int docCount,
+        int existingTestCount,
+        string? focus)
+    {
+        var reasons = new List<string>();
+
+        // Analyze possible reasons
+        if (docCount == 0)
+        {
+            reasons.Add("No documentation found - add files to docs/ folder");
+        }
+        else if (docCount < 3)
+        {
+            reasons.Add($"Limited documentation ({docCount} files) - AI may not find enough distinct scenarios");
+        }
+
+        if (existingTestCount > 0 && actual == 0)
+        {
+            reasons.Add($"Existing tests ({existingTestCount}) may already cover most scenarios");
+        }
+
+        if (!string.IsNullOrEmpty(focus))
+        {
+            reasons.Add($"Focus filter '{focus}' may be too narrow - try broadening or removing --focus");
+        }
+
+        if (requested > 20)
+        {
+            reasons.Add($"High count ({requested}) - try generating in smaller batches of 10-15");
+        }
+
+        if (reasons.Count == 0)
+        {
+            // Generic fallback
+            reasons.Add("AI determined fewer unique test scenarios were available");
+            reasons.Add("Try: different --focus, more documentation, or lower --count");
+        }
+
+        _progress.Info("Possible reasons:");
+        foreach (var reason in reasons)
+        {
+            Console.WriteLine($"  - {reason}");
+        }
     }
 }

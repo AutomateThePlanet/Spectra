@@ -18,6 +18,7 @@ public sealed class InitHandler
     private const string SkillPath = ".github/skills/test-generation/SKILL.md";
     private const string ExecutionAgentPath = ".github/agents/spectra-execution.agent.md";
     private const string ExecutionSkillPath = ".github/skills/spectra-execution/SKILL.md";
+    private const string VsCodeMcpPath = ".vscode/mcp.json";
     private const string DocsDir = "docs";
     private const string TestsDir = "tests";
 
@@ -59,6 +60,9 @@ public sealed class InitHandler
             // Install execution agent files
             await InstallAgentFilesAsync(force, ct);
 
+            // Create VS Code MCP configuration
+            await CreateVsCodeMcpConfigAsync(ct);
+
             // Update .gitignore
             await UpdateGitIgnoreAsync(ct);
 
@@ -70,6 +74,7 @@ public sealed class InitHandler
             _logger.LogInformation("  - {SkillPath}", SkillPath);
             _logger.LogInformation("  - {AgentPath}", ExecutionAgentPath);
             _logger.LogInformation("  - {SkillPath}", ExecutionSkillPath);
+            _logger.LogInformation("  - {McpPath}", VsCodeMcpPath);
 
             // Interactive auth setup
             if (_interactive)
@@ -190,6 +195,38 @@ public sealed class InitHandler
         var templateContent = GetEmbeddedTemplate("test-generation-skill.md");
         await File.WriteAllTextAsync(skillPath, templateContent, ct);
         _logger.LogDebug("Created skill file: {Path}", skillPath);
+    }
+
+    private async Task CreateVsCodeMcpConfigAsync(CancellationToken ct)
+    {
+        var mcpConfigPath = Path.Combine(_workingDirectory, VsCodeMcpPath);
+        var vsCodeDir = Path.GetDirectoryName(mcpConfigPath)!;
+
+        if (!Directory.Exists(vsCodeDir))
+        {
+            Directory.CreateDirectory(vsCodeDir);
+        }
+
+        // Don't overwrite existing MCP config
+        if (File.Exists(mcpConfigPath))
+        {
+            _logger.LogDebug("VS Code MCP config already exists, skipping: {Path}", mcpConfigPath);
+            return;
+        }
+
+        var mcpConfig = """
+            {
+              "servers": {
+                "spectra": {
+                  "command": "spectra-mcp",
+                  "args": ["."]
+                }
+              }
+            }
+            """;
+
+        await File.WriteAllTextAsync(mcpConfigPath, mcpConfig, ct);
+        _logger.LogDebug("Created VS Code MCP config: {Path}", mcpConfigPath);
     }
 
     private async Task UpdateGitIgnoreAsync(CancellationToken ct)
