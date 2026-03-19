@@ -158,12 +158,86 @@ public sealed class McpServer
             "initialized" or "notifications/initialized" => McpProtocol.CreateResponse(request.Id, new { }),
             "ping" => McpProtocol.CreateResponse(request.Id, new { pong = true }),
             "listTools" or "tools/list" => HandleListTools(request),
+            "tools/call" => HandleToolsCall(request).GetAwaiter().GetResult(),
             "shutdown" => HandleShutdown(request),
             _ => McpProtocol.CreateErrorResponse(
                 request.Id,
                 JsonRpcErrorCodes.MethodNotFound,
                 $"Unknown protocol method: {request.Method}")
         };
+    }
+
+    private async Task<string> HandleToolsCall(McpRequest request)
+    {
+        // MCP spec: tools/call takes { name: string, arguments?: object }
+        if (request.Params is null)
+        {
+            return McpProtocol.CreateErrorResponse(
+                request.Id,
+                JsonRpcErrorCodes.InvalidParams,
+                "tools/call requires params with 'name' field");
+        }
+
+        string? toolName = null;
+        JsonElement? arguments = null;
+
+        if (request.Params is JsonElement paramsElement)
+        {
+            if (paramsElement.TryGetProperty("name", out var nameElement))
+            {
+                toolName = nameElement.GetString();
+            }
+            if (paramsElement.TryGetProperty("arguments", out var argsElement))
+            {
+                arguments = argsElement;
+            }
+        }
+
+        if (string.IsNullOrEmpty(toolName))
+        {
+            return McpProtocol.CreateErrorResponse(
+                request.Id,
+                JsonRpcErrorCodes.InvalidParams,
+                "tools/call requires 'name' parameter");
+        }
+
+        // Invoke the tool
+        var response = await _toolRegistry.InvokeAsync(toolName, arguments);
+
+        // Wrap in proper MCP tools/call response format
+        try
+        {
+            var resultObj = JsonSerializer.Deserialize<object>(response);
+            // MCP spec: tools/call returns { content: [...] }
+            var mcpResult = new
+            {
+                content = new[]
+                {
+                    new
+                    {
+                        type = "text",
+                        text = response
+                    }
+                }
+            };
+            return McpProtocol.CreateResponse(request.Id, mcpResult);
+        }
+        catch
+        {
+            // If response is not valid JSON, wrap as text
+            var mcpResult = new
+            {
+                content = new[]
+                {
+                    new
+                    {
+                        type = "text",
+                        text = response
+                    }
+                }
+            };
+            return McpProtocol.CreateResponse(request.Id, mcpResult);
+        }
     }
 
     private string HandleShutdown(McpRequest request)
@@ -185,7 +259,7 @@ public sealed class McpServer
             serverInfo = new
             {
                 name = "spectra-mcp",
-                version = "1.0.0"
+                version = "1.1.0"
             }
         };
 
