@@ -48,6 +48,7 @@ src/
 │   ├── Models/               # TestCase, Suite, Config models
 │   │   ├── Dashboard/        # DashboardData, SuiteStats, TestEntry, etc.
 │   │   ├── Coverage/         # CoverageReport, CoverageLink, etc.
+│   │   ├── Execution/        # Run, TestResult, ExecutionReport, McpToolResponse
 │   │   └── Grounding/        # GroundingMetadata, VerificationVerdict, VerificationResult
 │   ├── Coverage/             # AutomationScanner, LinkReconciler, CoverageCalculator
 │   ├── Storage/              # ExecutionDbReader
@@ -55,6 +56,18 @@ src/
 │   ├── Validation/           # Schema validation
 │   ├── Update/               # TestClassifier for test updates
 │   └── Index/                # Index read/write
+├── Spectra.MCP/              # MCP execution server
+│   ├── Execution/            # ExecutionEngine, TestQueue, StateMachine
+│   ├── Storage/              # RunRepository, ResultRepository, ExecutionDb
+│   ├── Reports/              # ReportGenerator, ReportWriter (JSON/MD/HTML)
+│   ├── Tools/                # MCP tool implementations
+│   │   ├── RunManagement/    # Start, pause, resume, finalize tools
+│   │   ├── TestExecution/    # Advance, skip, bulk record, screenshot tools
+│   │   ├── Reporting/        # History, summary tools
+│   │   └── Data/             # Validate, rebuild, coverage tools
+│   ├── Server/               # McpServer, ToolRegistry, McpProtocol
+│   ├── Identity/             # UserIdentityResolver
+│   └── Infrastructure/       # McpConfig, McpLogging
 └── Spectra.GitHub/           # GitHub integration (future)
 
 dashboard-site/               # Static dashboard template
@@ -69,11 +82,15 @@ dashboard-site/               # Static dashboard template
 └── access-denied.html        # Auth error page
 
 tests/
-├── Spectra.Core.Tests/       # Unit tests
+├── Spectra.Core.Tests/       # Unit tests (284 tests)
 │   └── Coverage/             # AutomationScanner, LinkReconciler, Calculator tests
-├── Spectra.CLI.Tests/        # Integration tests
+├── Spectra.CLI.Tests/        # Integration tests (327 tests)
 │   ├── Dashboard/            # DataCollector, Generator tests
 │   └── Coverage/             # CoverageReportWriter tests
+├── Spectra.MCP.Tests/        # MCP server tests (306 tests)
+│   ├── Tools/                # Individual tool tests
+│   ├── Integration/          # Full execution flow tests
+│   └── Reports/              # Report generation tests
 └── TestFixtures/             # Sample data
 ```
 

@@ -10,14 +10,14 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>spectra-mcp</ToolCommandName>
     <PackageId>Spectra.MCP</PackageId>
-    <Version>1.9.3</Version>
+    <Version>1.9.4</Version>
     <Authors>Spectra</Authors>
     <Description>Spectra MCP Server for test execution</Description>
     <PackageOutputPath>./nupkg</PackageOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.8" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.5" />
   </ItemGroup>
 
   <ItemGroup>
