@@ -148,4 +148,46 @@ public class GetTestCaseDetailsTests : IAsyncDisposable
         Assert.Equal(TestStatus.InProgress, testResult!.Status);
         Assert.NotNull(testResult.StartedAt);
     }
+
+    [Fact]
+    public async Task Execute_ValidHandle_ReturnsAllContentFields()
+    {
+        // Test 7: Verify get_test_case_details MCP tool returns populated
+        // steps array, preconditions, expected_result, test_data
+        var handle = await StartRunAndGetFirstHandle();
+        var parameters = JsonDocument.Parse($$$"""{"test_handle": "{{{handle}}}"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(parameters);
+        var response = JsonDocument.Parse(result).RootElement;
+
+        Assert.True(response.TryGetProperty("data", out var data));
+
+        // Verify preconditions
+        Assert.True(data.TryGetProperty("preconditions", out var preconditions));
+        Assert.Equal("User is logged in", preconditions.GetString());
+
+        // Verify steps array with number and action
+        Assert.True(data.TryGetProperty("steps", out var steps));
+        Assert.Equal(3, steps.GetArrayLength());
+
+        var step1 = steps[0];
+        Assert.Equal(1, step1.GetProperty("number").GetInt32());
+        Assert.Equal("Navigate to cart", step1.GetProperty("action").GetString());
+
+        var step2 = steps[1];
+        Assert.Equal(2, step2.GetProperty("number").GetInt32());
+        Assert.Equal("Click checkout", step2.GetProperty("action").GetString());
+
+        var step3 = steps[2];
+        Assert.Equal(3, step3.GetProperty("number").GetInt32());
+        Assert.Equal("Enter payment", step3.GetProperty("action").GetString());
+
+        // Verify expected_result
+        Assert.True(data.TryGetProperty("expected_result", out var expectedResult));
+        Assert.Equal("Order is placed", expectedResult.GetString());
+
+        // Verify test_data
+        Assert.True(data.TryGetProperty("test_data", out var testData));
+        Assert.Equal("Card: 4111111111111111", testData.GetString());
+    }
 }

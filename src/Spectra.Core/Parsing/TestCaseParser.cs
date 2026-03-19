@@ -13,6 +13,9 @@ public sealed partial class TestCaseParser
     [GeneratedRegex(@"^#\s+(.+)$", RegexOptions.Multiline)]
     private static partial Regex TitleRegex();
 
+    [GeneratedRegex(@"^##\s+Preconditions?\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase)]
+    private static partial Regex PreconditionsHeaderRegex();
+
     [GeneratedRegex(@"^##\s+Steps\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase)]
     private static partial Regex StepsHeaderRegex();
 
@@ -51,6 +54,9 @@ public sealed partial class TestCaseParser
                 "No H1 title found in test case",
                 filePath));
         }
+
+        // Extract preconditions from body (falls back to frontmatter)
+        var preconditions = ExtractPreconditions(body) ?? frontmatter.Preconditions;
 
         // Extract steps
         var steps = ExtractSteps(body);
@@ -94,7 +100,7 @@ public sealed partial class TestCaseParser
             Priority = priority,
             Tags = frontmatter.Tags,
             Component = frontmatter.Component,
-            Preconditions = frontmatter.Preconditions,
+            Preconditions = preconditions,
             Environment = frontmatter.Environment,
             EstimatedDuration = duration,
             DependsOn = frontmatter.DependsOn,
@@ -141,6 +147,12 @@ public sealed partial class TestCaseParser
     {
         var match = TitleRegex().Match(body);
         return match.Success ? match.Groups[1].Value.Trim() : null;
+    }
+
+    private static string? ExtractPreconditions(string body)
+    {
+        var section = ExtractSection(body, PreconditionsHeaderRegex());
+        return section?.Trim();
     }
 
     private static IReadOnlyList<string> ExtractSteps(string body)
