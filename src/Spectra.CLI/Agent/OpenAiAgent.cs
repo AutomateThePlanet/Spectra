@@ -1,5 +1,4 @@
 using System.ClientModel;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
@@ -17,6 +16,7 @@ public sealed class OpenAiAgent : IAgentRuntime
 {
     private readonly ProviderConfig _provider;
     private readonly IChatClient _client;
+    private readonly string _model;
 
     public string ProviderName => "openai";
 
@@ -31,9 +31,9 @@ public sealed class OpenAiAgent : IAgentRuntime
                 $"API key not found. Set the {provider.ApiKeyEnv ?? "OPENAI_API_KEY"} environment variable.");
         }
 
-        var model = provider.Model ?? "gpt-4o";
+        _model = provider.Model ?? "gpt-4o";
         var openAiClient = new OpenAIClient(new ApiKeyCredential(apiKey));
-        _client = openAiClient.GetChatClient(model).AsIChatClient();
+        _client = openAiClient.GetChatClient(_model).AsIChatClient();
     }
 
     public async Task<bool> IsAvailableAsync(CancellationToken ct = default)
@@ -52,14 +52,15 @@ public sealed class OpenAiAgent : IAgentRuntime
 
     public async Task<GenerationResult> GenerateTestsAsync(
         string prompt,
-        DocumentMap documentMap,
+        IReadOnlyList<SourceDocument> documents,
         IReadOnlyList<TestCase> existingTests,
+        int requestedCount,
         CancellationToken ct = default)
     {
         try
         {
-            var systemPrompt = BuildSystemPrompt();
-            var userPrompt = BuildUserPrompt(prompt, documentMap, existingTests);
+            var systemPrompt = GroundedPromptBuilder.BuildSystemPrompt();
+            var userPrompt = GroundedPromptBuilder.BuildUserPrompt(prompt, documents, existingTests, requestedCount);
 
             var messages = new List<ChatMessage>
             {
@@ -70,7 +71,7 @@ public sealed class OpenAiAgent : IAgentRuntime
             var options = new ChatOptions
             {
                 Temperature = 0.7f,
-                MaxOutputTokens = 4096
+                MaxOutputTokens = GetMaxTokensForModel(_model)
             };
 
             var response = await _client.GetResponseAsync(messages, options, ct);
@@ -158,76 +159,6 @@ public sealed class OpenAiAgent : IAgentRuntime
     {
         var envVar = provider.ApiKeyEnv ?? "OPENAI_API_KEY";
         return Environment.GetEnvironmentVariable(envVar) ?? string.Empty;
-    }
-
-    private static string BuildSystemPrompt()
-    {
-        return """
-            You are a test case generation expert. Generate comprehensive manual test cases based on the provided documentation.
-
-            Output format: Return ONLY a JSON array of test cases. No markdown, no explanation, just valid JSON.
-
-            Each test case must have this structure:
-            {
-              "id": "TC-XXX",
-              "title": "Short descriptive title",
-              "priority": "high|medium|low",
-              "tags": ["tag1", "tag2"],
-              "component": "component-name",
-              "preconditions": "Prerequisites for the test",
-              "steps": ["Step 1", "Step 2", "Step 3"],
-              "expected_result": "What should happen",
-              "test_data": "Any test data needed (optional)",
-              "source_refs": ["path/to/source/doc.md"],
-              "estimated_duration": "5m"
-            }
-
-            Guidelines:
-            - Generate unique test IDs in TC-XXX format
-            - Cover happy paths, edge cases, and error scenarios
-            - Steps should be clear and actionable
-            - Expected results should be specific and verifiable
-            - IMPORTANT: Include source_refs with the exact paths to documentation files that informed this test
-            - Use estimated_duration format: Ns for seconds, Nm for minutes, Nh for hours (e.g., "30s", "5m", "1h")
-            """;
-    }
-
-    private static string BuildUserPrompt(
-        string prompt,
-        DocumentMap documentMap,
-        IReadOnlyList<TestCase> existingTests)
-    {
-        var sb = new StringBuilder();
-
-        sb.AppendLine(prompt);
-        sb.AppendLine();
-
-        // Add document context
-        sb.AppendLine("## Source Documentation (use these paths in source_refs)");
-        sb.AppendLine();
-
-        foreach (var doc in documentMap.Documents.Take(5)) // Limit context size
-        {
-            sb.AppendLine($"### {doc.Title}");
-            sb.AppendLine($"**Path: {doc.Path}**");
-            if (!string.IsNullOrEmpty(doc.Preview))
-            {
-                sb.AppendLine(doc.Preview);
-            }
-            sb.AppendLine();
-        }
-
-        // Add existing test IDs to avoid
-        if (existingTests.Count > 0)
-        {
-            sb.AppendLine("## Existing Test IDs (do not duplicate)");
-            sb.AppendLine(string.Join(", ", existingTests.Select(t => t.Id)));
-            sb.AppendLine();
-        }
-
-        sb.AppendLine("Generate the test cases as a JSON array:");
-
-        return sb.ToString();
     }
 
     private static List<TestCase> ParseTestsFromResponse(string response)
@@ -355,6 +286,13 @@ public sealed class OpenAiAgent : IAgentRuntime
                 }
             }
 
+            // Parse scenario_from_doc (grounding)
+            string? scenarioFromDoc = null;
+            if (element.TryGetProperty("scenario_from_doc", out var scenarioElement))
+            {
+                scenarioFromDoc = scenarioElement.GetString();
+            }
+
             return new TestCase
             {
                 Id = id,
@@ -367,6 +305,7 @@ public sealed class OpenAiAgent : IAgentRuntime
                 ExpectedResult = element.TryGetProperty("expected_result", out var er) ? er.GetString() ?? "" : "",
                 TestData = element.TryGetProperty("test_data", out var td) ? td.GetString() : null,
                 SourceRefs = sourceRefs,
+                ScenarioFromDoc = scenarioFromDoc,
                 EstimatedDuration = estimatedDuration,
                 FilePath = $"{id}.md"
             };
@@ -392,5 +331,44 @@ public sealed class OpenAiAgent : IAgentRuntime
             "h" => TimeSpan.FromHours(value),
             _ => null
         };
+    }
+
+    /// <summary>
+    /// Returns the maximum output tokens supported by the model.
+    /// </summary>
+    private static int GetMaxTokensForModel(string model)
+    {
+        var modelLower = model.ToLowerInvariant();
+
+        // GPT-5.x models
+        if (modelLower.Contains("gpt-5") || modelLower.Contains("gpt5"))
+            return 128000;
+
+        // o1 models have high limits
+        if (modelLower.Contains("o1"))
+            return 100000;
+
+        // GPT-4.1
+        if (modelLower.Contains("gpt-4.1") || modelLower.Contains("gpt4.1"))
+            return 32768;
+
+        // GPT-4o and variants
+        if (modelLower.Contains("gpt-4o"))
+            return 16384;
+
+        // GPT-4-turbo
+        if (modelLower.Contains("gpt-4-turbo") || modelLower.Contains("gpt-4-1106") || modelLower.Contains("gpt-4-0125"))
+            return 4096;
+
+        // GPT-4 (original)
+        if (modelLower.Contains("gpt-4"))
+            return 8192;
+
+        // GPT-3.5-turbo
+        if (modelLower.Contains("gpt-3.5"))
+            return 4096;
+
+        // Default fallback - safe for most models
+        return 4096;
     }
 }

@@ -73,13 +73,14 @@ public sealed class FinalizeExecutionRunTool : IMcpTool
             // Generate and write report
             var results = await _engine.GetResultsAsync(request.RunId);
             var report = _reportGenerator.Generate(finalizedRun, results);
-            var (jsonPath, _) = await _reportWriter.WriteAsync(report);
+            var (jsonPath, _, htmlPath) = await _reportWriter.WriteAsync(report);
 
             var data = new
             {
                 run_id = finalizedRun.RunId,
                 completed_at = finalizedRun.CompletedAt?.ToString("O"),
                 report_path = jsonPath,
+                html_report_path = htmlPath,
                 summary = new
                 {
                     total = report.Summary.Total,

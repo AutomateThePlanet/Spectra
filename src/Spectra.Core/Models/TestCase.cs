@@ -60,6 +60,12 @@ public sealed class TestCase
     public IReadOnlyList<string> SourceRefs { get; init; } = [];
 
     /// <summary>
+    /// The specific scenario from documentation that this test verifies.
+    /// Quoted or paraphrased from the source documentation.
+    /// </summary>
+    public string? ScenarioFromDoc { get; init; }
+
+    /// <summary>
     /// Related work items (issues, PRs, etc.).
     /// </summary>
     public IReadOnlyList<string> RelatedWorkItems { get; init; } = [];

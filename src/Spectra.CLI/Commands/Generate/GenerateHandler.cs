@@ -78,11 +78,11 @@ public sealed class GenerateHandler
 
         if (isDirectMode)
         {
-            return await ExecuteDirectModeAsync(suite!, count ?? 5, focus, ct);
+            return await ExecuteDirectModeAsync(suite!, count ?? 20, focus, ct);
         }
         else
         {
-            return await ExecuteInteractiveModeAsync(count ?? 5, ct);
+            return await ExecuteInteractiveModeAsync(count, ct);
         }
     }
 
@@ -102,22 +102,31 @@ public sealed class GenerateHandler
             return ExitCodes.Error;
         }
 
-        // Build document map
-        var documentMap = await _progress.StatusAsync(
+        // Load source documents with full content for grounded generation
+        var documents = await _progress.StatusAsync(
             $"Loading {suite} suite...",
             async () =>
             {
-                var mapBuilder = new DocumentMapBuilder(config.Source);
-                return await mapBuilder.BuildAsync(currentDir, ct);
+                var docLoader = new SourceDocumentLoader(config.Source);
+                return await docLoader.LoadAllAsync(currentDir, ct: ct);
             });
 
-        if (documentMap.Documents.Count == 0)
+        if (documents.Count == 0)
         {
             _progress.Error("No source documentation found in docs/");
             Console.Error.WriteLine();
             Console.Error.WriteLine("Please add documentation files or check your spectra.config.json.");
             return ExitCodes.Error;
         }
+
+        // Also create document map for gap analysis (uses previews)
+        var documentMap = await _progress.StatusAsync(
+            "Analyzing coverage...",
+            async () =>
+            {
+                var mapBuilder = new DocumentMapBuilder(config.Source);
+                return await mapBuilder.BuildAsync(currentDir, ct);
+            });
 
         // Load existing tests
         var testsDir = config.Tests?.Dir ?? "tests";
@@ -137,7 +146,7 @@ public sealed class GenerateHandler
         var allExistingIds = await globalIdScanner.ScanAllIdsAsync(testsPath, ct);
 
         _progress.Success($"Loading {suite} suite... {existingTests.Count} existing tests");
-        _progress.Success($"Scanning documentation... {documentMap.Documents.Count} relevant files");
+        _progress.Success($"Scanning documentation... {documents.Count} relevant files");
 
         if (allExistingIds.Count > existingTests.Count)
         {
@@ -148,9 +157,9 @@ public sealed class GenerateHandler
         var profileLoader = new ProfileLoader();
         var effectiveProfile = await profileLoader.LoadAsync(currentDir, suitePath, ct);
 
-        // Analyze coverage gaps
+        // Analyze coverage gaps (filtered by suite)
         var gapAnalyzer = new GapAnalyzer();
-        var gaps = gapAnalyzer.AnalyzeGaps(documentMap, existingTests, focus);
+        var gaps = gapAnalyzer.AnalyzeGaps(documentMap, existingTests, focus, suite);
 
         // Show existing tests matching focus if specified
         if (!string.IsNullOrEmpty(focus))
@@ -198,7 +207,7 @@ public sealed class GenerateHandler
         GenerationResult result = null!;
         await _progress.StatusAsync("Generating tests...", async () =>
         {
-            result = await agent.GenerateTestsAsync(prompt, documentMap, existingTests, ct);
+            result = await agent.GenerateTestsAsync(prompt, documents, existingTests, count, ct);
         });
 
         if (!result.IsSuccess)
@@ -333,7 +342,7 @@ public sealed class GenerateHandler
         return ExitCodes.Success;
     }
 
-    private async Task<int> ExecuteInteractiveModeAsync(int count, CancellationToken ct)
+    private async Task<int> ExecuteInteractiveModeAsync(int? count, CancellationToken ct)
     {
         var currentDir = Directory.GetCurrentDirectory();
         var configPath = Path.Combine(currentDir, "spectra.config.json");
@@ -405,16 +414,42 @@ public sealed class GenerateHandler
 
         session.SetFocus(focus);
 
-        // Build document map
-        var documentMap = await _progress.StatusAsync(
+        // Prompt for count if not provided via --count flag
+        int effectiveCount;
+        if (count.HasValue)
+        {
+            effectiveCount = count.Value;
+        }
+        else
+        {
+            // Suggest count based on test type
+            var suggestedCount = testType switch
+            {
+                TestTypeSelection.FullCoverage => 30,
+                TestTypeSelection.NegativeOnly => 15,
+                _ => 20
+            };
+
+            Spectre.Console.AnsiConsole.MarkupLine($"◆ How many test cases to generate?");
+            var countPrompt = new Spectre.Console.TextPrompt<int>($"│  Number of tests [grey](default: {suggestedCount})[/]: ");
+            countPrompt.PromptStyle = new Spectre.Console.Style(foreground: Spectre.Console.Color.Cyan);
+            countPrompt.AllowEmpty = true;
+            var countInput = Spectre.Console.AnsiConsole.Prompt(countPrompt);
+            effectiveCount = countInput > 0 ? countInput : suggestedCount;
+            Spectre.Console.AnsiConsole.MarkupLine("└");
+        }
+
+
+        // Load source documents with full content for grounded generation
+        var documents = await _progress.StatusAsync(
             $"Scanning documentation...",
             async () =>
             {
-                var mapBuilder = new DocumentMapBuilder(config.Source);
-                return await mapBuilder.BuildAsync(currentDir, ct);
+                var docLoader = new SourceDocumentLoader(config.Source);
+                return await docLoader.LoadAllAsync(currentDir, ct: ct);
             });
 
-        if (documentMap.Documents.Count == 0)
+        if (documents.Count == 0)
         {
             _progress.Error("No source documentation found in docs/");
             Console.Error.WriteLine();
@@ -422,7 +457,16 @@ public sealed class GenerateHandler
             return ExitCodes.Error;
         }
 
-        _progress.Success($"Scanning documentation... {documentMap.Documents.Count} files");
+        _progress.Success($"Scanning documentation... {documents.Count} files");
+
+        // Also create document map for gap analysis
+        var documentMap = await _progress.StatusAsync(
+            "Analyzing coverage...",
+            async () =>
+            {
+                var mapBuilder = new DocumentMapBuilder(config.Source);
+                return await mapBuilder.BuildAsync(currentDir, ct);
+            });
 
         // Load existing tests
         var existingTests = await LoadExistingTestsAsync(suitePath, testsPath, ct);
@@ -442,9 +486,9 @@ public sealed class GenerateHandler
         var profileLoader = new ProfileLoader();
         var effectiveProfile = await profileLoader.LoadAsync(currentDir, suitePath, ct);
 
-        // Analyze coverage gaps
+        // Analyze coverage gaps (filtered by suite)
         var gapAnalyzer = new GapAnalyzer();
-        var gaps = gapAnalyzer.AnalyzeGaps(documentMap, existingTests, focus);
+        var gaps = gapAnalyzer.AnalyzeGaps(documentMap, existingTests, focus, suiteName);
 
         // Show existing tests matching focus if specified
         if (!string.IsNullOrEmpty(focus))
@@ -491,11 +535,11 @@ public sealed class GenerateHandler
             }
 
             // Generate tests
-            var prompt = BuildPrompt(suiteName, count, allExistingIds, effectiveProfile, focus);
+            var prompt = BuildPrompt(suiteName, effectiveCount, allExistingIds, effectiveProfile, focus);
             GenerationResult result = null!;
             await _progress.StatusAsync("Generating tests...", async () =>
             {
-                result = await agent.GenerateTestsAsync(prompt, documentMap, existingTests, ct);
+                result = await agent.GenerateTestsAsync(prompt, documents, existingTests, effectiveCount, ct);
             });
 
             if (!result.IsSuccess)
@@ -510,9 +554,9 @@ public sealed class GenerateHandler
 
             if (result.Tests.Count == 0)
             {
-                _progress.Warning($"No tests generated (requested: {count})");
+                _progress.Warning($"No tests generated (requested: {effectiveCount})");
                 _progress.BlankLine();
-                ShowCountMismatchReason(0, count, documentMap.Documents.Count, existingTests.Count, focus);
+                ShowCountMismatchReason(0, effectiveCount, documentMap.Documents.Count, existingTests.Count, focus);
                 session.Complete();
                 break;
             }
@@ -523,11 +567,11 @@ public sealed class GenerateHandler
             _results.ShowGeneratedTests(result.Tests);
 
             // Warn if fewer tests than requested
-            if (result.Tests.Count < count)
+            if (result.Tests.Count < effectiveCount)
             {
                 _progress.BlankLine();
-                _progress.Warning($"Generated {result.Tests.Count} of {count} requested tests");
-                ShowCountMismatchReason(result.Tests.Count, count, documentMap.Documents.Count, existingTests.Count, focus);
+                _progress.Warning($"Generated {result.Tests.Count} of {effectiveCount} requested tests");
+                ShowCountMismatchReason(result.Tests.Count, effectiveCount, documentMap.Documents.Count, existingTests.Count, focus);
             }
 
             if (!_dryRun)
@@ -926,9 +970,9 @@ public sealed class GenerateHandler
             reasons.Add($"Focus filter '{focus}' may be too narrow - try broadening or removing --focus");
         }
 
-        if (requested > 20)
+        if (requested > 100)
         {
-            reasons.Add($"High count ({requested}) - try generating in smaller batches of 10-15");
+            reasons.Add($"Very high count ({requested}) - try generating in batches of 50 or less");
         }
 
         if (reasons.Count == 0)

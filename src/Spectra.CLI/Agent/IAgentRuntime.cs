@@ -8,17 +8,20 @@ namespace Spectra.CLI.Agent;
 public interface IAgentRuntime
 {
     /// <summary>
-    /// Generates test cases from documentation.
+    /// Generates test cases from full source documentation.
+    /// Uses document-grounded generation with semantic deduplication.
     /// </summary>
-    /// <param name="prompt">The prompt with context and instructions</param>
-    /// <param name="documentMap">Map of source documentation</param>
-    /// <param name="existingTests">Existing tests for deduplication</param>
+    /// <param name="prompt">The user's request prompt</param>
+    /// <param name="documents">Full source documents with content</param>
+    /// <param name="existingTests">Existing tests for semantic deduplication</param>
+    /// <param name="requestedCount">Number of tests requested</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>Generated test cases</returns>
     Task<GenerationResult> GenerateTestsAsync(
         string prompt,
-        DocumentMap documentMap,
+        IReadOnlyList<SourceDocument> documents,
         IReadOnlyList<TestCase> existingTests,
+        int requestedCount,
         CancellationToken ct = default);
 
     /// <summary>

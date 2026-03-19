@@ -136,10 +136,32 @@ public sealed class ExecutionEngine
             return null;
         }
 
-        queue = new TestQueue(runId);
-        // Queue reconstruction from results would require index data
-        // For now, return null if not in memory
-        return null;
+        // Rebuild queue from persisted results
+        queue = ReconstructQueue(runId, results);
+        _queues[runId] = queue;
+        return queue;
+    }
+
+    /// <summary>
+    /// Reconstructs a TestQueue from persisted test results.
+    /// </summary>
+    private static TestQueue ReconstructQueue(string runId, IReadOnlyList<TestResult> results)
+    {
+        var queue = new TestQueue(runId);
+
+        // Group by TestId and take the latest attempt for each
+        var latestResults = results
+            .GroupBy(r => r.TestId)
+            .Select(g => g.OrderByDescending(r => r.Attempt).First())
+            .OrderBy(r => r.TestId)
+            .ToList();
+
+        foreach (var result in latestResults)
+        {
+            queue.AddFromResult(result);
+        }
+
+        return queue;
     }
 
     /// <summary>

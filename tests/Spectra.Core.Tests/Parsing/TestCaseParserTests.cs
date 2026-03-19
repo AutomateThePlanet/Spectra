@@ -98,9 +98,9 @@ public class TestCaseParserTests
     }
 
     [Fact]
-    public void Parse_WithMissingExpectedResult_ReturnsFailure()
+    public void Parse_WithMissingExpectedResult_ReturnsSuccessWithNull()
     {
-        // Arrange
+        // Arrange - expected result is optional to allow partial parsing
         const string markdown = """
             ---
             id: TC-101
@@ -117,16 +117,18 @@ public class TestCaseParserTests
         // Act
         var result = _parser.Parse(markdown, "test.md");
 
-        // Assert
-        Assert.True(result.IsFailure);
-        Assert.Single(result.Errors);
-        Assert.Equal("MISSING_EXPECTED_RESULT", result.Errors[0].Code);
+        // Assert - parser should be lenient and return what it can
+        Assert.True(result.IsSuccess);
+        Assert.Equal("TC-101", result.Value.Id);
+        Assert.Equal("Test Title", result.Value.Title);
+        Assert.Single(result.Value.Steps);
+        Assert.Equal("", result.Value.ExpectedResult); // Empty string when missing
     }
 
     [Fact]
-    public void Parse_WithInvalidPriority_ReturnsFailure()
+    public void Parse_WithInvalidPriority_DefaultsToMedium()
     {
-        // Arrange
+        // Arrange - invalid priority should default to medium for lenient parsing
         const string markdown = """
             ---
             id: TC-101
@@ -147,10 +149,10 @@ public class TestCaseParserTests
         // Act
         var result = _parser.Parse(markdown, "test.md");
 
-        // Assert
-        Assert.True(result.IsFailure);
-        Assert.Single(result.Errors);
-        Assert.Equal("INVALID_PRIORITY", result.Errors[0].Code);
+        // Assert - parser should be lenient and default invalid priority to medium
+        Assert.True(result.IsSuccess);
+        Assert.Equal("TC-101", result.Value.Id);
+        Assert.Equal(Priority.Medium, result.Value.Priority);
     }
 
     [Fact]

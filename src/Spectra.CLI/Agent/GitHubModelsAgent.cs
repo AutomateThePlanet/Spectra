@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Azure;
@@ -63,22 +62,24 @@ public sealed class GitHubModelsAgent : IAgentRuntime
 
     public async Task<GenerationResult> GenerateTestsAsync(
         string prompt,
-        DocumentMap documentMap,
+        IReadOnlyList<SourceDocument> documents,
         IReadOnlyList<TestCase> existingTests,
+        int requestedCount,
         CancellationToken ct = default)
     {
         try
         {
-            var systemPrompt = BuildSystemPrompt();
-            var userPrompt = BuildUserPrompt(prompt, documentMap, existingTests);
+            var systemPrompt = GroundedPromptBuilder.BuildSystemPrompt();
+            var userPrompt = GroundedPromptBuilder.BuildUserPrompt(prompt, documents, existingTests, requestedCount);
 
             var model = _provider.Model ?? "gpt-4o";
+            var maxTokens = GetMaxTokensForModel(model);
 
             var options = new ChatCompletionsOptions
             {
                 Model = model,
                 Temperature = 0.7f,
-                MaxTokens = 4096,
+                MaxTokens = maxTokens,
                 Messages =
                 {
                     new ChatRequestSystemMessage(systemPrompt),
@@ -180,76 +181,6 @@ public sealed class GitHubModelsAgent : IAgentRuntime
     private static string GetApiKey()
     {
         return Environment.GetEnvironmentVariable("GITHUB_TOKEN") ?? string.Empty;
-    }
-
-    private static string BuildSystemPrompt()
-    {
-        return """
-            You are a test case generation expert. Generate comprehensive manual test cases based on the provided documentation.
-
-            Output format: Return ONLY a JSON array of test cases. No markdown, no explanation, just valid JSON.
-
-            Each test case must have this structure:
-            {
-              "id": "TC-XXX",
-              "title": "Short descriptive title",
-              "priority": "high|medium|low",
-              "tags": ["tag1", "tag2"],
-              "component": "component-name",
-              "preconditions": "Prerequisites for the test",
-              "steps": ["Step 1", "Step 2", "Step 3"],
-              "expected_result": "What should happen",
-              "test_data": "Any test data needed (optional)",
-              "source_refs": ["path/to/source/doc.md"],
-              "estimated_duration": "5m"
-            }
-
-            Guidelines:
-            - Generate unique test IDs in TC-XXX format
-            - Cover happy paths, edge cases, and error scenarios
-            - Steps should be clear and actionable
-            - Expected results should be specific and verifiable
-            - IMPORTANT: Include source_refs with the exact paths to documentation files that informed this test
-            - Use estimated_duration format: Ns for seconds, Nm for minutes, Nh for hours (e.g., "30s", "5m", "1h")
-            """;
-    }
-
-    private static string BuildUserPrompt(
-        string prompt,
-        DocumentMap documentMap,
-        IReadOnlyList<TestCase> existingTests)
-    {
-        var sb = new StringBuilder();
-
-        sb.AppendLine(prompt);
-        sb.AppendLine();
-
-        // Add document context
-        sb.AppendLine("## Source Documentation (use these paths in source_refs)");
-        sb.AppendLine();
-
-        foreach (var doc in documentMap.Documents.Take(5)) // Limit context size
-        {
-            sb.AppendLine($"### {doc.Title}");
-            sb.AppendLine($"**Path: {doc.Path}**");
-            if (!string.IsNullOrEmpty(doc.Preview))
-            {
-                sb.AppendLine(doc.Preview);
-            }
-            sb.AppendLine();
-        }
-
-        // Add existing test IDs to avoid
-        if (existingTests.Count > 0)
-        {
-            sb.AppendLine("## Existing Test IDs (do not duplicate)");
-            sb.AppendLine(string.Join(", ", existingTests.Select(t => t.Id)));
-            sb.AppendLine();
-        }
-
-        sb.AppendLine("Generate the test cases as a JSON array:");
-
-        return sb.ToString();
     }
 
     private static List<TestCase> ParseTestsFromResponse(string response)
@@ -377,6 +308,13 @@ public sealed class GitHubModelsAgent : IAgentRuntime
                 }
             }
 
+            // Parse scenario_from_doc (grounding)
+            string? scenarioFromDoc = null;
+            if (element.TryGetProperty("scenario_from_doc", out var scenarioElement))
+            {
+                scenarioFromDoc = scenarioElement.GetString();
+            }
+
             return new TestCase
             {
                 Id = id,
@@ -389,6 +327,7 @@ public sealed class GitHubModelsAgent : IAgentRuntime
                 ExpectedResult = element.TryGetProperty("expected_result", out var er) ? er.GetString() ?? "" : "",
                 TestData = element.TryGetProperty("test_data", out var td) ? td.GetString() : null,
                 SourceRefs = sourceRefs,
+                ScenarioFromDoc = scenarioFromDoc,
                 EstimatedDuration = estimatedDuration,
                 FilePath = $"{id}.md"
             };
@@ -414,5 +353,110 @@ public sealed class GitHubModelsAgent : IAgentRuntime
             "h" => TimeSpan.FromHours(value),
             _ => null
         };
+    }
+
+    /// <summary>
+    /// Returns the maximum output tokens supported by the model.
+    /// </summary>
+    private static int GetMaxTokensForModel(string model)
+    {
+        var modelLower = model.ToLowerInvariant();
+
+        // Grok models
+        if (modelLower.Contains("grok"))
+            return 131072;
+
+        // GPT-5.x models
+        if (modelLower.Contains("gpt-5") || modelLower.Contains("gpt5"))
+            return 128000;
+
+        // Gemini 3.x models
+        if (modelLower.Contains("gemini-3") || modelLower.Contains("gemini3"))
+            return 65536;
+
+        // Raptor models
+        if (modelLower.Contains("raptor"))
+            return 32768;
+
+        // GPT-4.1
+        if (modelLower.Contains("gpt-4.1") || modelLower.Contains("gpt4.1"))
+            return 32768;
+
+        // GPT-4o and variants
+        if (modelLower.Contains("gpt-4o"))
+            return 16384;
+
+        // GPT-4-turbo
+        if (modelLower.Contains("gpt-4-turbo") || modelLower.Contains("gpt-4-1106") || modelLower.Contains("gpt-4-0125"))
+            return 4096;
+
+        // GPT-4 (original)
+        if (modelLower.Contains("gpt-4"))
+            return 8192;
+
+        // GPT-3.5-turbo
+        if (modelLower.Contains("gpt-3.5"))
+            return 4096;
+
+        // Claude Opus 4.6
+        if (modelLower.Contains("claude-opus-4.6") || modelLower.Contains("opus-4.6") || modelLower.Contains("opus4.6"))
+            return 128000;
+
+        // Claude Sonnet 4.6
+        if (modelLower.Contains("claude-sonnet-4.6") || modelLower.Contains("sonnet-4.6") || modelLower.Contains("sonnet4.6"))
+            return 64000;
+
+        // Claude Haiku 4.5
+        if (modelLower.Contains("claude-haiku-4.5") || modelLower.Contains("haiku-4.5") || modelLower.Contains("haiku4.5"))
+            return 8192;
+
+        // Claude 3.5/4 Sonnet (older)
+        if (modelLower.Contains("claude-3-sonnet") || modelLower.Contains("claude-3-5-sonnet") || modelLower.Contains("claude-sonnet-4"))
+            return 8192;
+
+        // Claude 3 Opus/Haiku
+        if (modelLower.Contains("claude-3-opus"))
+            return 4096;
+        if (modelLower.Contains("claude-3-haiku"))
+            return 4096;
+
+        // Gemini 3.1 Pro
+        if (modelLower.Contains("gemini-3.1-pro") || modelLower.Contains("gemini3.1-pro"))
+            return 65536;
+
+        // Gemini 3.1 Flash
+        if (modelLower.Contains("gemini-3.1-flash") || modelLower.Contains("gemini3.1-flash"))
+            return 32768;
+
+        // Gemini 2.0 Flash
+        if (modelLower.Contains("gemini-2.0-flash") || modelLower.Contains("gemini2.0-flash"))
+            return 8192;
+
+        // Gemini (other)
+        if (modelLower.Contains("gemini"))
+            return 8192;
+
+        // Llama 4 models
+        if (modelLower.Contains("llama-4") || modelLower.Contains("llama4"))
+            return 65536;
+
+        // Llama (older)
+        if (modelLower.Contains("llama"))
+            return 4096;
+
+        // DeepSeek V3.2
+        if (modelLower.Contains("deepseek"))
+            return 16384;
+
+        // Mistral models
+        if (modelLower.Contains("mistral"))
+            return 8192;
+
+        // Cohere models
+        if (modelLower.Contains("cohere"))
+            return 4096;
+
+        // Default fallback - safe for most models
+        return 4096;
     }
 }

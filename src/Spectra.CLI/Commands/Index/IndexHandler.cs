@@ -190,12 +190,13 @@ public sealed class IndexHandler
         foreach (var file in files)
         {
             var content = await File.ReadAllTextAsync(file, ct);
-            var relativePath = Path.GetRelativePath(testsPath, file);
-            var parseResult = parser.Parse(content, relativePath);
+            // Use just the filename, not path relative to tests/ (suite is implied by directory)
+            var fileName = Path.GetFileName(file);
+            var parseResult = parser.Parse(content, fileName);
 
             if (!parseResult.IsSuccess)
             {
-                Console.Error.WriteLine($"Parse error in {relativePath}:");
+                Console.Error.WriteLine($"Parse error in {fileName}:");
                 foreach (var error in parseResult.Errors)
                 {
                     Console.Error.WriteLine($"  [{error.Code}] {error.Message}");
@@ -229,14 +230,15 @@ public sealed class IndexHandler
         await Parallel.ForEachAsync(files, options, async (file, token) =>
         {
             var content = await File.ReadAllTextAsync(file, token);
-            var relativePath = Path.GetRelativePath(testsPath, file);
-            var parseResult = parser.Parse(content, relativePath);
+            // Use just the filename, not path relative to tests/ (suite is implied by directory)
+            var fileName = Path.GetFileName(file);
+            var parseResult = parser.Parse(content, fileName);
 
             if (!parseResult.IsSuccess)
             {
                 foreach (var error in parseResult.Errors)
                 {
-                    errorMessages.Add($"  [{error.Code}] {error.Message} in {relativePath}");
+                    errorMessages.Add($"  [{error.Code}] {error.Message} in {fileName}");
                 }
                 Interlocked.Increment(ref errorCount);
                 return;

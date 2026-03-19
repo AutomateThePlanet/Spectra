@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Anthropic;
@@ -42,21 +41,23 @@ public sealed class AnthropicAgent : IAgentRuntime
 
     public async Task<GenerationResult> GenerateTestsAsync(
         string prompt,
-        DocumentMap documentMap,
+        IReadOnlyList<SourceDocument> documents,
         IReadOnlyList<TestCase> existingTests,
+        int requestedCount,
         CancellationToken ct = default)
     {
         try
         {
-            var systemPrompt = BuildSystemPrompt();
-            var userPrompt = BuildUserPrompt(prompt, documentMap, existingTests);
+            var systemPrompt = GroundedPromptBuilder.BuildSystemPrompt();
+            var userPrompt = GroundedPromptBuilder.BuildUserPrompt(prompt, documents, existingTests, requestedCount);
 
             var model = _provider.Model ?? "claude-sonnet-4-5-20250514";
+            var maxTokens = GetMaxTokensForModel(model);
 
             var parameters = new MessageCreateParams
             {
                 Model = model,
-                MaxTokens = 4096,
+                MaxTokens = maxTokens,
                 System = systemPrompt,
                 Messages =
                 [
@@ -164,76 +165,6 @@ public sealed class AnthropicAgent : IAgentRuntime
     {
         var envVar = provider.ApiKeyEnv ?? "ANTHROPIC_API_KEY";
         return Environment.GetEnvironmentVariable(envVar) ?? string.Empty;
-    }
-
-    private static string BuildSystemPrompt()
-    {
-        return """
-            You are a test case generation expert. Generate comprehensive manual test cases based on the provided documentation.
-
-            Output format: Return ONLY a JSON array of test cases. No markdown, no explanation, just valid JSON.
-
-            Each test case must have this structure:
-            {
-              "id": "TC-XXX",
-              "title": "Short descriptive title",
-              "priority": "high|medium|low",
-              "tags": ["tag1", "tag2"],
-              "component": "component-name",
-              "preconditions": "Prerequisites for the test",
-              "steps": ["Step 1", "Step 2", "Step 3"],
-              "expected_result": "What should happen",
-              "test_data": "Any test data needed (optional)",
-              "source_refs": ["path/to/source/doc.md"],
-              "estimated_duration": "5m"
-            }
-
-            Guidelines:
-            - Generate unique test IDs in TC-XXX format
-            - Cover happy paths, edge cases, and error scenarios
-            - Steps should be clear and actionable
-            - Expected results should be specific and verifiable
-            - IMPORTANT: Include source_refs with the exact paths to documentation files that informed this test
-            - Use estimated_duration format: Ns for seconds, Nm for minutes, Nh for hours (e.g., "30s", "5m", "1h")
-            """;
-    }
-
-    private static string BuildUserPrompt(
-        string prompt,
-        DocumentMap documentMap,
-        IReadOnlyList<TestCase> existingTests)
-    {
-        var sb = new StringBuilder();
-
-        sb.AppendLine(prompt);
-        sb.AppendLine();
-
-        // Add document context
-        sb.AppendLine("## Source Documentation (use these paths in source_refs)");
-        sb.AppendLine();
-
-        foreach (var doc in documentMap.Documents.Take(5)) // Limit context size
-        {
-            sb.AppendLine($"### {doc.Title}");
-            sb.AppendLine($"**Path: {doc.Path}**");
-            if (!string.IsNullOrEmpty(doc.Preview))
-            {
-                sb.AppendLine(doc.Preview);
-            }
-            sb.AppendLine();
-        }
-
-        // Add existing test IDs to avoid
-        if (existingTests.Count > 0)
-        {
-            sb.AppendLine("## Existing Test IDs (do not duplicate)");
-            sb.AppendLine(string.Join(", ", existingTests.Select(t => t.Id)));
-            sb.AppendLine();
-        }
-
-        sb.AppendLine("Generate the test cases as a JSON array:");
-
-        return sb.ToString();
     }
 
     private static List<TestCase> ParseTestsFromResponse(string response)
@@ -361,6 +292,13 @@ public sealed class AnthropicAgent : IAgentRuntime
                 }
             }
 
+            // Parse scenario_from_doc (grounding)
+            string? scenarioFromDoc = null;
+            if (element.TryGetProperty("scenario_from_doc", out var scenarioElement))
+            {
+                scenarioFromDoc = scenarioElement.GetString();
+            }
+
             return new TestCase
             {
                 Id = id,
@@ -373,6 +311,7 @@ public sealed class AnthropicAgent : IAgentRuntime
                 ExpectedResult = element.TryGetProperty("expected_result", out var er) ? er.GetString() ?? "" : "",
                 TestData = element.TryGetProperty("test_data", out var td) ? td.GetString() : null,
                 SourceRefs = sourceRefs,
+                ScenarioFromDoc = scenarioFromDoc,
                 EstimatedDuration = estimatedDuration,
                 FilePath = $"{id}.md"
             };
@@ -398,5 +337,48 @@ public sealed class AnthropicAgent : IAgentRuntime
             "h" => TimeSpan.FromHours(value),
             _ => null
         };
+    }
+
+    /// <summary>
+    /// Returns the maximum output tokens supported by the model.
+    /// </summary>
+    private static int GetMaxTokensForModel(string model)
+    {
+        var modelLower = model.ToLowerInvariant();
+
+        // Claude Opus 4.6
+        if (modelLower.Contains("claude-opus-4.6") || modelLower.Contains("opus-4.6") || modelLower.Contains("opus4.6"))
+            return 128000;
+
+        // Claude Sonnet 4.6
+        if (modelLower.Contains("claude-sonnet-4.6") || modelLower.Contains("sonnet-4.6") || modelLower.Contains("sonnet4.6"))
+            return 64000;
+
+        // Claude Haiku 4.5
+        if (modelLower.Contains("claude-haiku-4.5") || modelLower.Contains("haiku-4.5") || modelLower.Contains("haiku4.5"))
+            return 8192;
+
+        // Claude 3.5 Sonnet and Claude 4 models (older)
+        if (modelLower.Contains("claude-sonnet-4") || modelLower.Contains("claude-3-5-sonnet") || modelLower.Contains("claude-3.5-sonnet"))
+            return 8192;
+
+        // Claude 3 Opus
+        if (modelLower.Contains("claude-3-opus") || modelLower.Contains("claude-opus"))
+            return 4096;
+
+        // Claude 3 Sonnet
+        if (modelLower.Contains("claude-3-sonnet"))
+            return 4096;
+
+        // Claude 3 Haiku
+        if (modelLower.Contains("claude-3-haiku") || modelLower.Contains("claude-haiku"))
+            return 4096;
+
+        // Claude 2.x
+        if (modelLower.Contains("claude-2"))
+            return 4096;
+
+        // Default fallback
+        return 4096;
     }
 }

@@ -14,7 +14,8 @@ public sealed class GapAnalyzer
     public IReadOnlyList<CoverageGap> AnalyzeGaps(
         DocumentMap documentMap,
         IReadOnlyList<TestCase> existingTests,
-        string? focusArea = null)
+        string? focusArea = null,
+        string? suiteName = null)
     {
         // Collect all covered document paths from source_refs
         var coveredPaths = existingTests
@@ -31,6 +32,12 @@ public sealed class GapAnalyzer
         foreach (var doc in documentMap.Documents)
         {
             var normalizedPath = NormalizePath(doc.Path);
+
+            // Skip if suite name specified and doc doesn't match suite context
+            if (!string.IsNullOrEmpty(suiteName) && !MatchesSuite(doc, suiteName))
+            {
+                continue;
+            }
 
             // Skip if focus area specified and doc doesn't match
             if (!string.IsNullOrEmpty(focusArea) && !MatchesFocus(doc, focusArea))
@@ -221,6 +228,43 @@ public sealed class GapAnalyzer
         if (doc.Headings?.Any(h => h.ToLowerInvariant().Contains(lowerFocus)) == true)
         {
             return true;
+        }
+
+        return false;
+    }
+
+    private static bool MatchesSuite(DocumentEntry doc, string suiteName)
+    {
+        var lowerSuite = suiteName.ToLowerInvariant();
+
+        // Split suite name into words for matching (e.g., "citizen-portal" -> ["citizen", "portal"])
+        var suiteWords = lowerSuite
+            .Split(['-', '_', ' '], StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => w.Length > 2)
+            .ToList();
+
+        if (suiteWords.Count == 0)
+        {
+            suiteWords.Add(lowerSuite);
+        }
+
+        var docTitle = doc.Title.ToLowerInvariant();
+        var docPath = doc.Path.ToLowerInvariant();
+        var docPreview = doc.Preview.ToLowerInvariant();
+
+        // Check if any suite word appears in the document
+        foreach (var word in suiteWords)
+        {
+            if (docTitle.Contains(word) || docPath.Contains(word) || docPreview.Contains(word))
+            {
+                return true;
+            }
+
+            // Check headings
+            if (doc.Headings?.Any(h => h.ToLowerInvariant().Contains(word)) == true)
+            {
+                return true;
+            }
         }
 
         return false;

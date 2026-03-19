@@ -13,13 +13,13 @@ public sealed partial class TestCaseParser
     [GeneratedRegex(@"^#\s+(.+)$", RegexOptions.Multiline)]
     private static partial Regex TitleRegex();
 
-    [GeneratedRegex(@"^##\s+Preconditions?\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"^##\s+Pre[-\s]?conditions?\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase)]
     private static partial Regex PreconditionsHeaderRegex();
 
-    [GeneratedRegex(@"^##\s+Steps\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"^##\s+(?:Test\s+)?Steps?\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase)]
     private static partial Regex StepsHeaderRegex();
 
-    [GeneratedRegex(@"^##\s+Expected\s+Result\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"^##\s+Expected\s+Results?\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase)]
     private static partial Regex ExpectedResultHeaderRegex();
 
     [GeneratedRegex(@"^##\s+Test\s+Data\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase)]
@@ -61,26 +61,16 @@ public sealed partial class TestCaseParser
         // Extract steps
         var steps = ExtractSteps(body);
 
-        // Extract expected result
+        // Extract expected result (no longer required - return what we can parse)
         var expectedResult = ExtractExpectedResult(body);
-        if (string.IsNullOrWhiteSpace(expectedResult))
-        {
-            return ParseResult<TestCase>.Failure(new ParseError(
-                "MISSING_EXPECTED_RESULT",
-                "No expected result section found in test case",
-                filePath));
-        }
 
         // Extract test data (optional)
         var testData = ExtractTestData(body);
 
-        // Parse priority
+        // Parse priority (default to medium if missing/invalid)
         if (!TryParsePriority(frontmatter.Priority, out var priority))
         {
-            return ParseResult<TestCase>.Failure(new ParseError(
-                "INVALID_PRIORITY",
-                $"Invalid priority value: {frontmatter.Priority}. Expected: high, medium, or low",
-                filePath));
+            priority = Priority.Medium;
         }
 
         // Parse duration (optional)
@@ -105,12 +95,13 @@ public sealed partial class TestCaseParser
             EstimatedDuration = duration,
             DependsOn = frontmatter.DependsOn,
             SourceRefs = frontmatter.SourceRefs,
+            ScenarioFromDoc = frontmatter.ScenarioFromDoc,
             RelatedWorkItems = frontmatter.RelatedWorkItems,
             Custom = frontmatter.Custom,
             Grounding = frontmatter.Grounding?.ToMetadata(),
             Title = title,
             Steps = steps,
-            ExpectedResult = expectedResult,
+            ExpectedResult = expectedResult ?? "",
             TestData = testData
         };
 

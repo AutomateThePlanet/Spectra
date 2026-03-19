@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Spectra.CLI.Agent;
 using Spectra.CLI.Infrastructure;
 using Spectra.Core.Config;
+using Spectre.Console;
 
 namespace Spectra.CLI.Commands.Init;
 
@@ -94,66 +95,159 @@ public sealed class InitHandler
 
     private async Task InteractiveAuthSetupAsync(CancellationToken ct)
     {
-        Console.WriteLine("AI Provider Setup");
-        Console.WriteLine(new string('-', 40));
-        Console.WriteLine();
-        Console.WriteLine("Which AI provider would you like to use?");
-        Console.WriteLine("  1. GitHub Models (uses GITHUB_TOKEN or gh CLI)");
-        Console.WriteLine("  2. OpenAI (requires OPENAI_API_KEY)");
-        Console.WriteLine("  3. Anthropic (requires ANTHROPIC_API_KEY)");
-        Console.WriteLine("  4. Skip for now");
-        Console.Write("> ");
+        AnsiConsole.MarkupLine("[bold]AI Provider Setup[/]");
+        AnsiConsole.WriteLine();
 
-        var input = Console.ReadLine()?.Trim();
-
-        if (string.IsNullOrEmpty(input) || input == "4")
+        // Provider selection with arrow keys
+        var providerChoices = new Dictionary<string, (string Provider, string? ApiKeyEnv)>
         {
-            Console.WriteLine();
-            Console.WriteLine("Skipped. Run 'spectra auth' to check authentication status later.");
-            return;
-        }
-
-        var provider = input switch
-        {
-            "1" => "github-models",
-            "2" => "openai",
-            "3" => "anthropic",
-            _ => null
+            ["GitHub Models (GITHUB_TOKEN or gh CLI)"] = ("github-models", null),
+            ["OpenAI (OPENAI_API_KEY)"] = ("openai", "OPENAI_API_KEY"),
+            ["Anthropic (ANTHROPIC_API_KEY)"] = ("anthropic", "ANTHROPIC_API_KEY"),
+            ["Skip for now"] = (null!, null)
         };
+
+        var providerChoice = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("Which [cyan]AI provider[/] would you like to use?")
+                .PageSize(10)
+                .HighlightStyle(Style.Parse("cyan"))
+                .AddChoices(providerChoices.Keys));
+
+        var (provider, apiKeyEnv) = providerChoices[providerChoice];
 
         if (provider is null)
         {
-            Console.WriteLine();
-            Console.WriteLine("Invalid selection. Run 'spectra auth' to check authentication status later.");
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[grey]Skipped. Run 'spectra auth' to check authentication status later.[/]");
             return;
         }
 
-        Console.WriteLine();
-        Console.WriteLine($"Checking {provider} authentication...");
+        AnsiConsole.WriteLine();
+
+        // Model selection with arrow keys
+        var models = GetModelsForProvider(provider);
+        var modelChoices = models.ToDictionary(m => $"{m.Name} [grey]({m.Id})[/]", m => m.Id);
+
+        var modelChoice = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title($"Select a [cyan]model[/] for {provider}:")
+                .PageSize(20)
+                .HighlightStyle(Style.Parse("cyan"))
+                .AddChoices(modelChoices.Keys));
+
+        var selectedModel = modelChoices[modelChoice];
+
+        // Update config file with selected provider and model
+        var configPath = Path.Combine(_workingDirectory, ConfigFileName);
+        var configContent = ConfigLoader.GenerateConfig(provider, selectedModel, apiKeyEnv);
+        await File.WriteAllTextAsync(configPath, configContent, ct);
+
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine($"[green]Updated[/] {ConfigFileName} with [cyan]{provider}[/] / [cyan]{selectedModel}[/]");
+        AnsiConsole.WriteLine();
+
+        AnsiConsole.MarkupLine($"Checking {provider} authentication...");
 
         var authResult = await AgentFactory.GetAuthStatusAsync(provider, null, ct);
 
         if (authResult.IsAuthenticated)
         {
-            Console.WriteLine($"  [OK] Authenticated via {authResult.Source}");
-            Console.WriteLine();
-            Console.WriteLine("Configuration complete!");
+            AnsiConsole.MarkupLine($"  [green][[OK]][/] Authenticated via {authResult.Source}");
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[green]Configuration complete![/]");
         }
         else
         {
-            Console.WriteLine($"  [NOT CONFIGURED]");
-            Console.WriteLine();
-            Console.WriteLine("To authenticate:");
+            AnsiConsole.MarkupLine($"  [yellow][[NOT CONFIGURED]][/]");
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("To authenticate:");
             foreach (var instruction in authResult.SetupInstructions)
             {
                 if (!string.IsNullOrEmpty(instruction))
                 {
-                    Console.WriteLine($"  {instruction}");
+                    AnsiConsole.MarkupLine($"  [grey]{Markup.Escape(instruction)}[/]");
                 }
             }
-            Console.WriteLine();
-            Console.WriteLine("Run 'spectra auth' to verify authentication after setup.");
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("Run [cyan]spectra auth[/] to verify authentication after setup.");
         }
+    }
+
+    private static List<(string Id, string Name)> GetModelsForProvider(string provider)
+    {
+        return provider switch
+        {
+            "github-models" => new List<(string, string)>
+            {
+                // GPT-5.x Models
+                ("gpt-5.4", "GPT-5.4"),
+                ("gpt-5.4-mini", "GPT-5.4 Mini (0.33x cost)"),
+                ("gpt-5.3-codex", "GPT-5.3 Codex"),
+                ("gpt-5.2", "GPT-5.2"),
+                ("gpt-5.2-codex", "GPT-5.2 Codex"),
+                ("gpt-5.1-codex-max", "GPT-5.1 Codex Max"),
+                ("gpt-5.1-codex-mini", "GPT-5.1 Codex Mini (Preview)"),
+                ("gpt-5-mini", "GPT-5 Mini"),
+                // GPT-4.x Models
+                ("gpt-4.1", "GPT-4.1"),
+                ("gpt-4o", "GPT-4o (Recommended)"),
+                // Gemini Models
+                ("gemini-3-flash", "Gemini 3 Flash (Preview, 0.33x cost)"),
+                ("gemini-3-pro", "Gemini 3 Pro (Preview)"),
+                ("gemini-3.1-pro", "Gemini 3.1 Pro (Preview)"),
+                // Grok Models
+                ("grok-code-fast-1", "Grok Code Fast 1 (0.25x cost)"),
+                // Other
+                ("raptor-mini", "Raptor Mini (Preview)"),
+            },
+            "openai" => new List<(string, string)>
+            {
+                // GPT-5.x
+                ("gpt-5.4", "GPT-5.4"),
+                ("gpt-5.4-pro", "GPT-5.4 Pro"),
+                ("gpt-5.4-mini", "GPT-5.4 Mini"),
+                ("gpt-5.4-nano", "GPT-5.4 Nano"),
+                ("gpt-5.2", "GPT-5.2"),
+                // GPT-4.x
+                ("gpt-4.1", "GPT-4.1"),
+                ("gpt-4o", "GPT-4o (Recommended)"),
+                ("gpt-4o-mini", "GPT-4o Mini"),
+                ("gpt-4-turbo", "GPT-4 Turbo"),
+                ("gpt-4-turbo-preview", "GPT-4 Turbo Preview"),
+                ("gpt-4", "GPT-4"),
+                // GPT-3.5
+                ("gpt-3.5-turbo", "GPT-3.5 Turbo"),
+                // Reasoning
+                ("o1", "o1 (Reasoning)"),
+                ("o1-mini", "o1 Mini"),
+                ("o1-preview", "o1 Preview"),
+                ("o3-mini", "o3 Mini"),
+            },
+            "anthropic" => new List<(string, string)>
+            {
+                // Claude 4.6
+                ("claude-opus-4.6", "Claude Opus 4.6 (Most capable)"),
+                ("claude-sonnet-4.6", "Claude Sonnet 4.6"),
+                // Claude 4.5
+                ("claude-haiku-4.5", "Claude Haiku 4.5"),
+                // Claude 4
+                ("claude-opus-4-20250514", "Claude Opus 4"),
+                ("claude-sonnet-4-20250514", "Claude Sonnet 4 (Recommended)"),
+                ("claude-haiku-4-20250514", "Claude Haiku 4"),
+                // Claude 3.5
+                ("claude-3-5-sonnet-20241022", "Claude 3.5 Sonnet"),
+                ("claude-3-5-haiku-20241022", "Claude 3.5 Haiku"),
+                // Claude 3
+                ("claude-3-opus-20240229", "Claude 3 Opus"),
+                ("claude-3-sonnet-20240229", "Claude 3 Sonnet"),
+                ("claude-3-haiku-20240307", "Claude 3 Haiku"),
+            },
+            _ => new List<(string, string)>
+            {
+                ("gpt-4o", "GPT-4o")
+            }
+        };
     }
 
     private async Task CreateDirectoriesAsync(CancellationToken ct)
@@ -232,19 +326,57 @@ public sealed class InitHandler
     private async Task UpdateGitIgnoreAsync(CancellationToken ct)
     {
         var gitIgnorePath = Path.Combine(_workingDirectory, ".gitignore");
+        const string spectraSection = "# SPECTRA";
+        const string executionDir = ".execution/";
         const string lockPattern = ".spectra.lock";
+
+        var patterns = new[] { executionDir, lockPattern };
+        var newEntries = new List<string>();
 
         if (File.Exists(gitIgnorePath))
         {
             var content = await File.ReadAllTextAsync(gitIgnorePath, ct);
-            if (!content.Contains(lockPattern))
+
+            // Check which patterns are missing
+            foreach (var pattern in patterns)
             {
-                var newContent = content.TrimEnd() + Environment.NewLine + Environment.NewLine +
-                    "# SPECTRA lock files" + Environment.NewLine +
-                    lockPattern + Environment.NewLine;
-                await File.WriteAllTextAsync(gitIgnorePath, newContent, ct);
-                _logger.LogDebug("Updated .gitignore with lock pattern");
+                if (!content.Contains(pattern))
+                {
+                    newEntries.Add(pattern);
+                }
             }
+
+            if (newEntries.Count > 0)
+            {
+                var needsHeader = !content.Contains(spectraSection);
+                var sb = new System.Text.StringBuilder(content.TrimEnd());
+                sb.AppendLine();
+                sb.AppendLine();
+
+                if (needsHeader)
+                {
+                    sb.AppendLine(spectraSection);
+                }
+
+                foreach (var entry in newEntries)
+                {
+                    sb.AppendLine(entry);
+                }
+
+                await File.WriteAllTextAsync(gitIgnorePath, sb.ToString(), ct);
+                _logger.LogDebug("Updated .gitignore with SPECTRA patterns");
+            }
+        }
+        else
+        {
+            // Create new .gitignore
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine(spectraSection);
+            sb.AppendLine(executionDir);
+            sb.AppendLine(lockPattern);
+
+            await File.WriteAllTextAsync(gitIgnorePath, sb.ToString(), ct);
+            _logger.LogDebug("Created .gitignore with SPECTRA patterns");
         }
     }
 

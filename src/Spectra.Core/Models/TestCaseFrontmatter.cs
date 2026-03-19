@@ -36,6 +36,9 @@ public sealed class TestCaseFrontmatter
     [YamlMember(Alias = "source_refs")]
     public List<string> SourceRefs { get; set; } = [];
 
+    [YamlMember(Alias = "scenario_from_doc")]
+    public string? ScenarioFromDoc { get; set; }
+
     [YamlMember(Alias = "related_work_items")]
     public List<string> RelatedWorkItems { get; set; } = [];
 

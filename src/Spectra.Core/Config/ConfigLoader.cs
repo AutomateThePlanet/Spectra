@@ -124,6 +124,38 @@ public sealed class ConfigLoader
         });
     }
 
+    /// <summary>
+    /// Generates a configuration JSON string with custom provider and model.
+    /// </summary>
+    public static string GenerateConfig(string providerName, string model, string? apiKeyEnv = null)
+    {
+        var config = new SpectraConfig
+        {
+            Source = new SourceConfig(),
+            Tests = new TestsConfig(),
+            Ai = new AiConfig
+            {
+                Providers =
+                [
+                    new ProviderConfig
+                    {
+                        Name = providerName,
+                        Model = model,
+                        ApiKeyEnv = apiKeyEnv,
+                        Enabled = true,
+                        Priority = 1
+                    }
+                ]
+            }
+        };
+
+        return JsonSerializer.Serialize(config, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+        });
+    }
+
     private static IReadOnlyList<ParseError> Validate(SpectraConfig config, string? filePath)
     {
         var errors = new List<ParseError>();

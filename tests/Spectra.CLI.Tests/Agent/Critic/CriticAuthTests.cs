@@ -1,4 +1,5 @@
 using Spectra.CLI.Agent.Critic;
+using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 
 namespace Spectra.CLI.Tests.Agent.Critic;

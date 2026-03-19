@@ -36,8 +36,9 @@ public class ProviderChainTests
 
         public Task<GenerationResult> GenerateTestsAsync(
             string prompt,
-            DocumentMap documentMap,
+            IReadOnlyList<SourceDocument> documents,
             IReadOnlyList<TestCase> existingTests,
+            int requestedCount,
             CancellationToken ct = default)
         {
             if (ThrowOnGenerate is not null)
@@ -121,7 +122,7 @@ public class ProviderChainTests
 
         // Operation must call agent method to trigger the exception
         var result = await chain.ExecuteAsync<GenerationResult>(async (agent, ct) =>
-            await agent.GenerateTestsAsync("test", new DocumentMap { Documents = [], TotalSizeKb = 0 }, [], ct));
+            await agent.GenerateTestsAsync("test", [], [], 10, ct));
 
         Assert.True(result.IsSuccess);
         Assert.Equal("provider2", result.UsedProvider);
@@ -147,7 +148,7 @@ public class ProviderChainTests
 
         // Operation must call agent method to trigger the exception
         var result = await chain.ExecuteAsync<GenerationResult>(async (agent, ct) =>
-            await agent.GenerateTestsAsync("test", new DocumentMap { Documents = [], TotalSizeKb = 0 }, [], ct));
+            await agent.GenerateTestsAsync("test", [], [], 10, ct));
 
         Assert.False(result.IsSuccess);
         Assert.Contains("Unrecoverable", result.Error);
@@ -204,7 +205,7 @@ public class ProviderChainTests
 
         // Operation must call agent method to trigger the exception
         var result = await chain.ExecuteAsync<GenerationResult>(async (agent, ct) =>
-            await agent.GenerateTestsAsync("test", new DocumentMap { Documents = [], TotalSizeKb = 0 }, [], ct));
+            await agent.GenerateTestsAsync("test", [], [], 10, ct));
 
         Assert.True(result.IsSuccess);
         Assert.Equal("provider1", fallbackFrom);

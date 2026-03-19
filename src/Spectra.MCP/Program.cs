@@ -62,7 +62,16 @@ public static class Program
             var entry = entries.FirstOrDefault(e => e.Id == testId);
             if (entry is null) return null;
 
-            var testPath = Path.Combine(basePath, "tests", suite, entry.File);
+            // Handle both old format (suite\file.md) and new format (file.md)
+            var fileName = entry.File;
+            if (fileName.StartsWith(suite + Path.DirectorySeparatorChar) ||
+                fileName.StartsWith(suite + Path.AltDirectorySeparatorChar))
+            {
+                // Old format: strip the suite prefix to avoid doubling
+                fileName = fileName.Substring(suite.Length + 1);
+            }
+
+            var testPath = Path.Combine(basePath, "tests", suite, fileName);
             if (!File.Exists(testPath)) return null;
 
             var parseResult = parser.Parse(File.ReadAllText(testPath), testPath);

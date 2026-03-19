@@ -50,12 +50,19 @@ public sealed class TestQueue
     }
 
     /// <summary>
-    /// Gets the next pending test, or null if none remain.
-    /// Scans the entire queue to handle cases where tests are retested out of order.
+    /// Gets the next actionable test (InProgress first, then Pending), or null if none remain.
+    /// InProgress tests are returned first to allow resuming after a crash/restart.
     /// </summary>
     public QueuedTest? GetNext()
     {
-        // First try from current position forward
+        // First check if there's a test already in progress (needs to be resumed)
+        var inProgress = _tests.FirstOrDefault(t => t.Status == TestStatus.InProgress);
+        if (inProgress is not null)
+        {
+            return inProgress;
+        }
+
+        // Then try pending tests from current position forward
         for (var i = _currentIndex; i < _tests.Count; i++)
         {
             var test = _tests[i];
@@ -76,6 +83,28 @@ public sealed class TestQueue
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Adds a test from a persisted result (for queue reconstruction).
+    /// </summary>
+    public void AddFromResult(TestResult result)
+    {
+        _tests.Add(new QueuedTest
+        {
+            TestId = result.TestId,
+            TestHandle = result.TestHandle,
+            Title = result.TestId, // Title not available from result, use ID
+            Priority = Priority.Medium, // Not stored in result
+            DependsOn = null, // Not stored in result
+            Status = result.Status
+        });
+
+        // If this test is in progress, set it as current
+        if (result.Status == TestStatus.InProgress)
+        {
+            _currentIndex = _tests.Count - 1;
+        }
     }
 
     /// <summary>

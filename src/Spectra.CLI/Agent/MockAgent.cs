@@ -17,17 +17,18 @@ public sealed class MockAgent : IAgentRuntime
 
     public Task<GenerationResult> GenerateTestsAsync(
         string prompt,
-        DocumentMap documentMap,
+        IReadOnlyList<SourceDocument> documents,
         IReadOnlyList<TestCase> existingTests,
+        int requestedCount,
         CancellationToken ct = default)
     {
         var tests = new List<TestCase>();
         var existingIds = new HashSet<string>(existingTests.Select(t => t.Id));
 
-        // Generate placeholder tests based on document entries
+        // Generate placeholder tests based on source documents
         var testNumber = GetNextTestNumber(existingTests);
 
-        foreach (var entry in documentMap.Documents.Take(3)) // Limit to 3 per run
+        foreach (var doc in documents.Take(Math.Min(3, requestedCount))) // Limit to 3 per run or requested count
         {
             var id = $"TC-{testNumber:D3}";
             if (existingIds.Contains(id))
@@ -39,7 +40,7 @@ public sealed class MockAgent : IAgentRuntime
             tests.Add(new TestCase
             {
                 Id = id,
-                Title = $"Test {entry.Title}",
+                Title = $"Test {doc.Title}",
                 Priority = Priority.Medium,
                 Steps =
                 [
@@ -47,9 +48,10 @@ public sealed class MockAgent : IAgentRuntime
                     "Perform the main action",
                     "Verify the expected behavior"
                 ],
-                ExpectedResult = $"The {entry.Title.ToLowerInvariant()} feature works as documented",
+                ExpectedResult = $"The {doc.Title.ToLowerInvariant()} feature works as documented",
                 FilePath = $"{id}.md",
-                SourceRefs = [entry.Path],
+                SourceRefs = [doc.Path],
+                ScenarioFromDoc = doc.Sections.Count > 0 ? $"Based on section: {doc.Sections[0]}" : null,
                 Tags = ["generated", "mock"]
             });
 

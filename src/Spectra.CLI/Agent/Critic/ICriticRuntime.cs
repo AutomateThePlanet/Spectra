@@ -30,24 +30,3 @@ public interface ICriticRuntime
     /// </summary>
     string ModelName { get; }
 }
-
-/// <summary>
-/// A source document for verification context.
-/// </summary>
-public sealed record SourceDocument
-{
-    /// <summary>
-    /// Relative path to the document.
-    /// </summary>
-    public required string Path { get; init; }
-
-    /// <summary>
-    /// Document title.
-    /// </summary>
-    public string? Title { get; init; }
-
-    /// <summary>
-    /// Relevant content from the document.
-    /// </summary>
-    public required string Content { get; init; }
-}

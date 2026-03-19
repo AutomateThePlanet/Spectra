@@ -67,6 +67,11 @@ public sealed class TestFileWriter
             }
         }
 
+        if (!string.IsNullOrWhiteSpace(testCase.ScenarioFromDoc))
+        {
+            sb.AppendLine($"scenario_from_doc: \"{EscapeYamlString(testCase.ScenarioFromDoc)}\"");
+        }
+
         if (testCase.EstimatedDuration.HasValue)
         {
             var duration = testCase.EstimatedDuration.Value;
