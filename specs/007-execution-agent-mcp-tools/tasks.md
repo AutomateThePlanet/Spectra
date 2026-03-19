@@ -205,8 +205,10 @@
 - [x] T073 [P] Add unit tests for AnalyzeCoverageGapsTool in tests/Spectra.MCP.Tests/Tools/Data/AnalyzeCoverageGapsToolTests.cs
 - [x] T074 [P] Add unit tests for InitHandler agent file installation in tests/Spectra.CLI.Tests/Commands/InitCommandTests.cs
   - Note: Added 5 new tests to existing InitCommandTests.cs
-- [ ] T075 Run quickstart.md validation scenarios end-to-end
-- [ ] T076 Verify all MCP tools complete in <5s for 500 test file repository
+- [x] T075 Run quickstart.md validation scenarios end-to-end
+  - Added QuickstartScenariosTests.cs with 5 scenario tests
+- [x] T076 Verify all MCP tools complete in <5s for 500 test file repository
+  - Added PerformanceTests.cs with 4 performance tests (500 test files, all tools <5s)
 
 ---
 
