@@ -1,7 +1,10 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Coverage;
 using Spectra.Core.Models.Dashboard;
+using Spectra.Core.Models.Execution;
+using Spectra.Core.Parsing;
 using Spectra.Core.Storage;
 
 namespace Spectra.CLI.Dashboard;
@@ -15,6 +18,11 @@ public sealed class DataCollector
     private readonly string _testsPath;
     private readonly string _reportsPath;
     private readonly ExecutionDbReader _dbReader;
+
+    private static readonly JsonSerializerOptions s_jsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     public DataCollector(string basePath)
     {
@@ -112,11 +120,12 @@ public sealed class DataCollector
                 try
                 {
                     var json = await File.ReadAllTextAsync(reportFile);
-                    var report = JsonSerializer.Deserialize<ExecutionReportJson>(json);
+                    var report = JsonSerializer.Deserialize<ExecutionReportJson>(json, s_jsonOptions);
                     if (report is not null)
                     {
+                        var runId = report.GetRunId();
                         // Check if we already have this run from the database
-                        if (!runs.Any(r => r.RunId == report.RunId))
+                        if (!string.IsNullOrEmpty(runId) && !runs.Any(r => r.RunId == runId))
                         {
                             runs.Add(ConvertReportToSummary(report));
                         }
@@ -134,16 +143,45 @@ public sealed class DataCollector
     }
 
     /// <summary>
-    /// Builds test entries from suite indexes.
+    /// Builds test entries from suite indexes, including parsed content.
     /// </summary>
     private IReadOnlyList<TestEntry> BuildTestEntries(Dictionary<string, MetadataIndex> indexes)
     {
         var entries = new List<TestEntry>();
+        var parser = new TestCaseParser();
 
         foreach (var (suite, index) in indexes)
         {
             foreach (var test in index.Tests)
             {
+                // Try to read and parse the test file for content
+                string? content = null;
+                IReadOnlyList<string>? steps = null;
+                string? expectedResult = null;
+                string? preconditions = null;
+
+                try
+                {
+                    var testFilePath = Path.Combine(_testsPath, test.File);
+                    if (File.Exists(testFilePath))
+                    {
+                        content = File.ReadAllText(testFilePath);
+                        var parseResult = parser.Parse(content, test.File);
+                        if (parseResult.IsSuccess)
+                        {
+                            var testCase = parseResult.Value;
+                            steps = testCase.Steps.Count > 0 ? testCase.Steps : null;
+                            expectedResult = !string.IsNullOrWhiteSpace(testCase.ExpectedResult)
+                                ? testCase.ExpectedResult : null;
+                            preconditions = testCase.Preconditions;
+                        }
+                    }
+                }
+                catch
+                {
+                    // Ignore parsing errors - just include basic info
+                }
+
                 entries.Add(new TestEntry
                 {
                     Id = test.Id,
@@ -155,7 +193,11 @@ public sealed class DataCollector
                     Component = test.Component,
                     SourceRefs = test.SourceRefs,
                     AutomatedBy = null, // Will be populated by coverage analysis
-                    HasAutomation = false // Will be populated by coverage analysis
+                    HasAutomation = false, // Will be populated by coverage analysis
+                    Steps = steps,
+                    ExpectedResult = expectedResult,
+                    Preconditions = preconditions,
+                    Content = content
                 });
             }
         }
@@ -212,22 +254,33 @@ public sealed class DataCollector
     /// </summary>
     private static RunSummary ConvertReportToSummary(ExecutionReportJson report)
     {
+        // Use summary object if available, otherwise use legacy fields
+        var total = report.Summary?.Total ?? report.Total;
+        var passed = report.Summary?.Passed ?? report.Passed;
+        var failed = report.Summary?.Failed ?? report.Failed;
+        var skipped = report.Summary?.Skipped ?? report.Skipped;
+        var blocked = report.Summary?.Blocked ?? report.Blocked;
+
+        var startedAt = report.GetStartedAt();
+        var completedAt = report.GetCompletedAt();
+
         return new RunSummary
         {
-            RunId = report.RunId,
+            RunId = report.GetRunId(),
             Suite = report.Suite ?? "unknown",
             Status = report.Status ?? "completed",
-            StartedAt = report.StartedAt,
-            CompletedAt = report.CompletedAt,
-            StartedBy = report.StartedBy ?? "unknown",
-            DurationSeconds = report.CompletedAt.HasValue
-                ? (int)(report.CompletedAt.Value - report.StartedAt).TotalSeconds
+            StartedAt = startedAt,
+            CompletedAt = completedAt,
+            StartedBy = report.GetStartedBy(),
+            DurationSeconds = completedAt.HasValue
+                ? (int)(completedAt.Value - startedAt).TotalSeconds
                 : null,
-            Total = report.Total,
-            Passed = report.Passed,
-            Failed = report.Failed,
-            Skipped = report.Skipped,
-            Blocked = report.Blocked
+            Total = total,
+            Passed = passed,
+            Failed = failed,
+            Skipped = skipped,
+            Blocked = blocked,
+            Results = report.Results
         };
     }
 
@@ -461,15 +514,53 @@ public sealed class DataCollector
 
     /// <summary>
     /// Internal model for deserializing execution report JSON files.
+    /// Supports both snake_case (actual reports) and PascalCase (tests) via PropertyNameCaseInsensitive.
     /// </summary>
     private sealed class ExecutionReportJson
     {
-        public string RunId { get; set; } = "";
+        // Support both "run_id" and "RunId" via aliases
+        [JsonPropertyName("run_id")]
+        public string? RunIdSnake { get; set; }
+        public string? RunId { get; set; }
+        public string GetRunId() => RunIdSnake ?? RunId ?? "";
+
         public string? Suite { get; set; }
         public string? Status { get; set; }
-        public DateTime StartedAt { get; set; }
+
+        // Support both "started_at" and "StartedAt"
+        [JsonPropertyName("started_at")]
+        public DateTime? StartedAtSnake { get; set; }
+        public DateTime? StartedAt { get; set; }
+        public DateTime GetStartedAt() => StartedAtSnake ?? StartedAt ?? DateTime.UtcNow;
+
+        // Support both "completed_at" and "CompletedAt"
+        [JsonPropertyName("completed_at")]
+        public DateTime? CompletedAtSnake { get; set; }
         public DateTime? CompletedAt { get; set; }
+        public DateTime? GetCompletedAt() => CompletedAtSnake ?? CompletedAt;
+
+        // Support both "executed_by" and "StartedBy"
+        [JsonPropertyName("executed_by")]
+        public string? ExecutedBy { get; set; }
         public string? StartedBy { get; set; }
+        public string GetStartedBy() => ExecutedBy ?? StartedBy ?? "unknown";
+
+        public ReportSummaryJson? Summary { get; set; }
+        public List<TestResultEntry>? Results { get; set; }
+
+        // Legacy fields for backwards compatibility
+        public int Total { get; set; }
+        public int Passed { get; set; }
+        public int Failed { get; set; }
+        public int Skipped { get; set; }
+        public int Blocked { get; set; }
+    }
+
+    /// <summary>
+    /// Internal model for deserializing report summary.
+    /// </summary>
+    private sealed class ReportSummaryJson
+    {
         public int Total { get; set; }
         public int Passed { get; set; }
         public int Failed { get; set; }

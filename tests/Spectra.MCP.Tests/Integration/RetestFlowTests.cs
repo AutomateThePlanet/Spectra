@@ -56,11 +56,12 @@ public class RetestFlowTests : IAsyncDisposable
                 ExpectedResult = "Expected result"
             });
 
-        _startTool = new StartExecutionRunTool(_engine, _ => testEntries);
+        Func<string, IEnumerable<TestIndexEntry>> indexLoader = _ => testEntries;
+        _startTool = new StartExecutionRunTool(_engine, indexLoader);
         _detailsTool = new GetTestCaseDetailsTool(_engine, (_, id) => testCases.GetValueOrDefault(id));
         _advanceTool = new AdvanceTestCaseTool(_engine);
         _retestTool = new RetestTestCaseTool(_engine);
-        _finalizeTool = new FinalizeExecutionRunTool(_engine, reportGenerator, reportWriter);
+        _finalizeTool = new FinalizeExecutionRunTool(_engine, reportGenerator, reportWriter, indexLoader);
     }
 
     public async ValueTask DisposeAsync()

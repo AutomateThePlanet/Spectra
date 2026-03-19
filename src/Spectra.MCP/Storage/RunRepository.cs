@@ -92,6 +92,33 @@ public sealed class RunRepository
     }
 
     /// <summary>
+    /// Gets any active run for a user (regardless of suite).
+    /// </summary>
+    public async Task<Run?> GetActiveRunByUserAsync(string user)
+    {
+        var connection = await _db.GetConnectionAsync();
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = """
+            SELECT * FROM runs
+            WHERE started_by = @user
+            AND status IN ('Created', 'Running', 'Paused')
+            ORDER BY started_at DESC
+            LIMIT 1
+            """;
+
+        command.Parameters.AddWithValue("@user", user);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        if (await reader.ReadAsync())
+        {
+            return MapRun(reader);
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Updates run status.
     /// </summary>
     public async Task UpdateStatusAsync(string runId, RunStatus status, DateTime? completedAt = null)

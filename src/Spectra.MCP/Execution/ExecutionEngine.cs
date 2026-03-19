@@ -406,4 +406,109 @@ public sealed class ExecutionEngine
         var currentUser = _identity.GetCurrentUser();
         return run.StartedBy.Equals(currentUser, StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// Gets the active run for the current user.
+    /// </summary>
+    public async Task<Run?> GetActiveRunAsync()
+    {
+        var user = _identity.GetCurrentUser();
+        return await _runRepo.GetActiveRunByUserAsync(user);
+    }
+
+    /// <summary>
+    /// Records results for multiple tests in bulk.
+    /// </summary>
+    public async Task<BulkRecordResult> BulkRecordResultsAsync(
+        string runId,
+        IEnumerable<string> testHandles,
+        TestStatus status,
+        string? notes = null)
+    {
+        var processedTests = new List<TestResult>();
+        var allBlocked = new List<string>();
+        var now = DateTime.UtcNow;
+
+        foreach (var testHandle in testHandles)
+        {
+            var result = await _resultRepo.GetByHandleAsync(testHandle);
+            if (result is null) continue;
+
+            // Only process pending or in-progress tests
+            if (result.Status != TestStatus.Pending && result.Status != TestStatus.InProgress)
+            {
+                continue;
+            }
+
+            // For pending tests, mark as started first
+            if (result.Status == TestStatus.Pending)
+            {
+                await _resultRepo.UpdateStatusAsync(testHandle, TestStatus.InProgress, startedAt: now);
+            }
+
+            // Update to final status
+            await _resultRepo.UpdateStatusAsync(
+                testHandle,
+                status,
+                completedAt: now,
+                notes: notes);
+
+            // Update queue state
+            if (_queues.TryGetValue(runId, out var queue))
+            {
+                queue.MarkCompleted(testHandle, status);
+
+                // Handle blocking for failed/skipped tests
+                if (status is TestStatus.Failed or TestStatus.Skipped)
+                {
+                    var testId = TestHandle.ExtractTestId(testHandle);
+                    if (testId is not null)
+                    {
+                        var blocked = _dependencyResolver.PropagateBlocks(queue, testId);
+                        foreach (var blockedId in blocked)
+                        {
+                            var blockedTest = queue.GetById(blockedId);
+                            if (blockedTest is not null)
+                            {
+                                await _resultRepo.UpdateStatusAsync(
+                                    blockedTest.TestHandle,
+                                    TestStatus.Blocked,
+                                    completedAt: now,
+                                    blockedBy: testId);
+                            }
+                        }
+                        allBlocked.AddRange(blocked);
+                    }
+                }
+            }
+
+            processedTests.Add(new TestResult
+            {
+                RunId = runId,
+                TestId = result.TestId,
+                TestHandle = testHandle,
+                Status = status,
+                Notes = notes,
+                CompletedAt = now,
+                Attempt = result.Attempt
+            });
+        }
+
+        return new BulkRecordResult
+        {
+            ProcessedCount = processedTests.Count,
+            ProcessedTests = processedTests,
+            BlockedTests = allBlocked.Distinct().ToList()
+        };
+    }
+}
+
+/// <summary>
+/// Result of a bulk record operation.
+/// </summary>
+public sealed class BulkRecordResult
+{
+    public int ProcessedCount { get; init; }
+    public IReadOnlyList<TestResult> ProcessedTests { get; init; } = [];
+    public IReadOnlyList<string> BlockedTests { get; init; } = [];
 }

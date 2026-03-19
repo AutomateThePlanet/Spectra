@@ -55,11 +55,12 @@ public class BlockingCascadeTests : IAsyncDisposable
             ["TC-004"] = new() { Id = "TC-004", FilePath = "tc-004.md", Title = "Logout Test", Priority = Priority.Low, Steps = ["Step 1"], ExpectedResult = "Result 4" }
         };
 
-        _startTool = new StartExecutionRunTool(_engine, _ => _testEntries);
+        Func<string, IEnumerable<TestIndexEntry>> indexLoader = _ => _testEntries;
+        _startTool = new StartExecutionRunTool(_engine, indexLoader);
         _detailsTool = new GetTestCaseDetailsTool(_engine, (_, id) => testCases.GetValueOrDefault(id));
         _advanceTool = new AdvanceTestCaseTool(_engine);
         _skipTool = new SkipTestCaseTool(_engine);
-        _finalizeTool = new FinalizeExecutionRunTool(_engine, reportGenerator, reportWriter);
+        _finalizeTool = new FinalizeExecutionRunTool(_engine, reportGenerator, reportWriter, indexLoader);
     }
 
     public async ValueTask DisposeAsync()

@@ -59,7 +59,12 @@
       "Bash(git branch:*)",
       "Bash(.specify/scripts/bash/create-new-feature.sh:*)",
       "Bash(grep:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(Remove-Item \"C:\\\\SourceCode\\\\Spectra\\\\src\\\\Spectra.Core\\\\Models\\\\Dashboard\\\\TestResultEntry.cs\")",
+      "Bash(claude mcp add:*)",
+      "Bash(claude mcp list:*)",
+      "Bash(claude mcp remove:*)",
+      "Bash(timeout 5 dotnet:*)"
     ]
   }
 }

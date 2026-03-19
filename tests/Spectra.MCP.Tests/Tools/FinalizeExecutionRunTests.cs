@@ -40,7 +40,10 @@ public class FinalizeExecutionRunTests : IAsyncDisposable
             new TestIndexEntry { Id = "TC-002", File = "tc-002.md", Title = "Test Two", Priority = "medium", Tags = [] }
         ];
 
-        _tool = new FinalizeExecutionRunTool(_engine, reportGenerator, reportWriter);
+        // Create an index loader that returns test entries
+        Func<string, IEnumerable<TestIndexEntry>> indexLoader = _ => _testEntries;
+
+        _tool = new FinalizeExecutionRunTool(_engine, reportGenerator, reportWriter, indexLoader);
     }
 
     public async ValueTask DisposeAsync()

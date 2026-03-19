@@ -54,12 +54,13 @@ public class PauseResumeTests : IAsyncDisposable
             ["TC-003"] = new() { Id = "TC-003", FilePath = "tc-003.md", Title = "Test Three", Priority = Priority.Low, Steps = ["Step 1"], ExpectedResult = "Expected 3" }
         };
 
-        _startTool = new StartExecutionRunTool(_engine, _ => _testEntries);
+        Func<string, IEnumerable<TestIndexEntry>> indexLoader = _ => _testEntries;
+        _startTool = new StartExecutionRunTool(_engine, indexLoader);
         _pauseTool = new PauseExecutionRunTool(_engine);
         _resumeTool = new ResumeExecutionRunTool(_engine);
         _detailsTool = new GetTestCaseDetailsTool(_engine, (_, id) => testCases.GetValueOrDefault(id));
         _advanceTool = new AdvanceTestCaseTool(_engine);
-        _finalizeTool = new FinalizeExecutionRunTool(_engine, reportGenerator, reportWriter);
+        _finalizeTool = new FinalizeExecutionRunTool(_engine, reportGenerator, reportWriter, indexLoader);
     }
 
     public async ValueTask DisposeAsync()

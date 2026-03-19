@@ -516,15 +516,15 @@ function showRunDetail(runId) {
             </div>
             ${run.results && run.results.length > 0 ? `
                 <h3 class="section-title">Test Results</h3>
-                <div class="result-list">
-                    ${run.results.map(r => `
-                        <div class="result-row ${r.status}">
-                            <span class="result-status badge ${r.status}">${r.status}</span>
-                            <span class="result-id">${escapeHtml(r.test_id)}</span>
-                            <span class="result-title">${escapeHtml(r.title || '')}</span>
-                            ${r.duration_ms ? `<span class="result-duration">${r.duration_ms}ms</span>` : ''}
-                        </div>
-                    `).join('')}
+                <div class="result-filters">
+                    <button class="result-filter-btn active" onclick="filterResults('all', this)">All (${run.results.length})</button>
+                    <button class="result-filter-btn passed" onclick="filterResults('Passed', this)">Passed (${run.results.filter(r => r.status === 'Passed').length})</button>
+                    <button class="result-filter-btn failed" onclick="filterResults('Failed', this)">Failed (${run.results.filter(r => r.status === 'Failed').length})</button>
+                    <button class="result-filter-btn skipped" onclick="filterResults('Skipped', this)">Skipped (${run.results.filter(r => r.status === 'Skipped').length})</button>
+                    <button class="result-filter-btn blocked" onclick="filterResults('Blocked', this)">Blocked (${run.results.filter(r => r.status === 'Blocked').length})</button>
+                </div>
+                <div class="result-list" id="result-list">
+                    ${run.results.map(r => renderResultRow(r)).join('')}
                 </div>
             ` : `
                 <div class="empty-state small">
@@ -533,6 +533,80 @@ function showRunDetail(runId) {
             `}
         </div>
     `;
+}
+
+/**
+ * Render individual result row with expandable details
+ */
+function renderResultRow(r) {
+    const statusLower = (r.status || '').toLowerCase();
+    const hasDetails = r.notes || r.blocked_by || r.attempt > 1;
+    const durationStr = r.duration_ms ? formatDurationMs(r.duration_ms) : '';
+
+    if (hasDetails) {
+        return `
+            <details class="result-row ${statusLower}" data-status="${r.status}">
+                <summary>
+                    <span class="result-status badge ${statusLower}">${escapeHtml(r.status)}</span>
+                    <span class="result-id">${escapeHtml(r.test_id)}</span>
+                    <span class="result-title">${escapeHtml(r.title || '')}</span>
+                    ${r.attempt > 1 ? `<span class="result-attempt">Attempt ${r.attempt}</span>` : ''}
+                    ${durationStr ? `<span class="result-duration">${durationStr}</span>` : ''}
+                </summary>
+                <div class="result-details">
+                    ${r.notes ? `<div class="result-notes"><strong>Notes:</strong> ${escapeHtml(r.notes)}</div>` : ''}
+                    ${r.blocked_by ? `<div class="result-blocked-by"><strong>Blocked by:</strong> ${escapeHtml(r.blocked_by)}</div>` : ''}
+                </div>
+            </details>
+        `;
+    } else {
+        return `
+            <div class="result-row ${statusLower}" data-status="${r.status}">
+                <span class="result-status badge ${statusLower}">${escapeHtml(r.status)}</span>
+                <span class="result-id">${escapeHtml(r.test_id)}</span>
+                <span class="result-title">${escapeHtml(r.title || '')}</span>
+                ${durationStr ? `<span class="result-duration">${durationStr}</span>` : ''}
+            </div>
+        `;
+    }
+}
+
+/**
+ * Filter results by status
+ */
+function filterResults(status, btn) {
+    const resultList = document.getElementById('result-list');
+    if (!resultList) return;
+
+    // Update active button
+    document.querySelectorAll('.result-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Filter rows
+    const rows = resultList.querySelectorAll('.result-row');
+    rows.forEach(row => {
+        if (status === 'all' || row.dataset.status === status) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+/**
+ * Format duration in milliseconds to human readable string
+ */
+function formatDurationMs(ms) {
+    if (ms < 1000) return `${ms}ms`;
+    const seconds = Math.floor(ms / 1000);
+    const millis = ms % 1000;
+    if (seconds < 60) return `${seconds}.${Math.floor(millis / 100)}s`;
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (minutes < 60) return `${minutes}m ${secs}s`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h ${mins}m`;
 }
 
 /**
@@ -644,6 +718,29 @@ function showTestDetail(id) {
         </div>
         ` : ''}
 
+        ${test.preconditions ? `
+        <div class="detail-section">
+            <h4>Preconditions</h4>
+            <div class="detail-text">${escapeHtml(test.preconditions)}</div>
+        </div>
+        ` : ''}
+
+        ${(test.steps || []).length > 0 ? `
+        <div class="detail-section">
+            <h4>Steps</h4>
+            <ol class="steps-list">
+                ${test.steps.map(step => `<li>${escapeHtml(step)}</li>`).join('')}
+            </ol>
+        </div>
+        ` : ''}
+
+        ${test.expected_result ? `
+        <div class="detail-section">
+            <h4>Expected Result</h4>
+            <div class="detail-text">${escapeHtml(test.expected_result)}</div>
+        </div>
+        ` : ''}
+
         ${(test.source_refs || []).length > 0 ? `
         <div class="detail-section">
             <h4>Source References</h4>
@@ -653,9 +750,9 @@ function showTestDetail(id) {
         </div>
         ` : ''}
 
-        ${test.content ? `
+        ${test.content && !test.steps ? `
         <div class="detail-section">
-            <h4>Test Content</h4>
+            <h4>Raw Content</h4>
             <div class="test-content-preview">
                 <pre>${escapeHtml(test.content)}</pre>
             </div>

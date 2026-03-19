@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Spectra.Core.Models.Execution;
 
 namespace Spectra.Core.Models.Dashboard;
 
@@ -54,4 +55,9 @@ public sealed class RunSummary
     /// <summary>Tests that were blocked.</summary>
     [JsonPropertyName("blocked")]
     public required int Blocked { get; init; }
+
+    /// <summary>Individual test results for this run.</summary>
+    [JsonPropertyName("results")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<TestResultEntry>? Results { get; init; }
 }

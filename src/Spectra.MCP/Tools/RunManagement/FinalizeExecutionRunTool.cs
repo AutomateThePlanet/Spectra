@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Spectra.Core.Index;
+using Spectra.Core.Models;
 using Spectra.Core.Models.Execution;
 using Spectra.MCP.Execution;
 using Spectra.MCP.Reports;
@@ -16,6 +18,7 @@ public sealed class FinalizeExecutionRunTool : IMcpTool
     private readonly ExecutionEngine _engine;
     private readonly ReportGenerator _reportGenerator;
     private readonly ReportWriter _reportWriter;
+    private readonly Func<string, IEnumerable<TestIndexEntry>> _indexLoader;
 
     public string Description => "Completes the run and generates reports";
 
@@ -33,11 +36,13 @@ public sealed class FinalizeExecutionRunTool : IMcpTool
     public FinalizeExecutionRunTool(
         ExecutionEngine engine,
         ReportGenerator reportGenerator,
-        ReportWriter reportWriter)
+        ReportWriter reportWriter,
+        Func<string, IEnumerable<TestIndexEntry>> indexLoader)
     {
         _engine = engine;
         _reportGenerator = reportGenerator;
         _reportWriter = reportWriter;
+        _indexLoader = indexLoader;
     }
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
@@ -72,7 +77,12 @@ public sealed class FinalizeExecutionRunTool : IMcpTool
 
             // Generate and write report
             var results = await _engine.GetResultsAsync(request.RunId);
-            var report = _reportGenerator.Generate(finalizedRun, results);
+
+            // Load test titles from index
+            var testTitles = _indexLoader(finalizedRun.Suite)
+                .ToDictionary(e => e.Id, e => e.Title, StringComparer.OrdinalIgnoreCase);
+
+            var report = _reportGenerator.Generate(finalizedRun, results, testTitles);
             var (jsonPath, mdPath, htmlPath) = await _reportWriter.WriteAsync(report);
 
             var data = new

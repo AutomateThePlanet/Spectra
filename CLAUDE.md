@@ -1,6 +1,6 @@
 # Spectra Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-18
+Auto-generated from all feature plans. Last updated: 2026-03-19
 
 ## Active Technologies
 - C# 12, .NET 8+ + ASP.NET Core (MCP server), Microsoft.Data.Sqlite (state storage), System.Text.Json (serialization) (002-mcp-execution-server)
@@ -129,6 +129,67 @@ spectra ai analyze --coverage --verbosity detailed
 - 006-conversational-generation: ✅ COMPLETE - Two-mode test generation (Direct/Interactive), test updates with classification (UP_TO_DATE, OUTDATED, ORPHANED, REDUNDANT), rich terminal UX with Spectre.Console
 - 004-test-generation-profile: Added profile support for test generation settings
 
+## MCP Execution Server
+
+The MCP server (`Spectra.MCP`) provides test execution tools for AI agents.
+
+### Available MCP Tools
+
+**Run Management:**
+- `start_execution_run` - Start a new test execution run
+- `get_execution_status` - Get current run status and next test
+- `pause_execution_run` - Pause execution
+- `resume_execution_run` - Resume paused execution
+- `cancel_execution_run` - Cancel execution
+- `finalize_execution_run` - Complete run and generate reports
+- `list_available_suites` - List test suites
+
+**Test Execution:**
+- `get_test_case_details` - Get test steps, expected result, preconditions
+- `advance_test_case` - Record PASSED/FAILED result
+- `skip_test_case` - Skip test with reason (supports --blocked flag)
+- `bulk_record_results` - Bulk record results for multiple tests at once
+- `add_test_note` - Add notes to a test
+- `retest_test_case` - Requeue a test for another attempt
+- `save_screenshot` - Save screenshot attachment
+
+**Data Tools:**
+- `validate_tests` - Validate test files
+- `rebuild_indexes` - Rebuild _index.json files
+- `analyze_coverage_gaps` - Analyze test coverage
+
+**Reporting:**
+- `get_run_history` - Get execution history
+- `get_execution_summary` - Get summary statistics
+
+### Bulk Operations
+
+The `bulk_record_results` tool allows processing multiple tests at once:
+
+```json
+// Skip all remaining tests
+{"status": "SKIPPED", "remaining": true, "reason": "Environment unavailable"}
+
+// Pass all remaining tests
+{"status": "PASSED", "remaining": true}
+
+// Process specific test IDs
+{"status": "FAILED", "test_ids": ["TC-001", "TC-002"], "reason": "API down"}
+```
+
+### Report Generation
+
+Reports are generated in three formats:
+- **JSON** - Machine-readable with all data
+- **Markdown** - Human-readable summary
+- **HTML** - Professional styled report with expandable test details
+
+Report features:
+- Test titles from `_index.json` (not just IDs)
+- Human-readable durations ("1h 23m 45s")
+- UTC-normalized timestamps (no negative durations)
+- Expandable non-passing tests with failure reasons
+- Status enums serialized as strings
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

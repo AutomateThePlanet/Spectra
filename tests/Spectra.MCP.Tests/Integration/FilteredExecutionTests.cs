@@ -58,10 +58,11 @@ public class FilteredExecutionTests : IAsyncDisposable
                 ExpectedResult = "Expected result"
             });
 
-        _startTool = new StartExecutionRunTool(_engine, _ => _testEntries);
+        Func<string, IEnumerable<TestIndexEntry>> indexLoader = _ => _testEntries;
+        _startTool = new StartExecutionRunTool(_engine, indexLoader);
         _detailsTool = new GetTestCaseDetailsTool(_engine, (_, id) => testCases.GetValueOrDefault(id));
         _advanceTool = new AdvanceTestCaseTool(_engine);
-        _finalizeTool = new FinalizeExecutionRunTool(_engine, reportGenerator, reportWriter);
+        _finalizeTool = new FinalizeExecutionRunTool(_engine, reportGenerator, reportWriter, indexLoader);
     }
 
     public async ValueTask DisposeAsync()

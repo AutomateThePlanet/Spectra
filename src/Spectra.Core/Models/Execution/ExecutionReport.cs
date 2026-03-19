@@ -28,9 +28,21 @@ public sealed record ExecutionReport
     [JsonPropertyName("completed_at")]
     public required DateTime CompletedAt { get; init; }
 
-    /// <summary>Duration in minutes.</summary>
+    /// <summary>Duration in minutes (UTC-normalized).</summary>
     [JsonPropertyName("duration_minutes")]
-    public double DurationMinutes => Math.Round((CompletedAt - StartedAt).TotalMinutes, 1);
+    public double DurationMinutes
+    {
+        get
+        {
+            // Normalize both timestamps to UTC to avoid timezone issues
+            var startUtc = StartedAt.ToUniversalTime();
+            var endUtc = CompletedAt.ToUniversalTime();
+            var duration = endUtc - startUtc;
+            // Guard against negative durations
+            if (duration < TimeSpan.Zero) duration = TimeSpan.Zero;
+            return Math.Round(duration.TotalMinutes, 1);
+        }
+    }
 
     /// <summary>User who executed the run.</summary>
     [JsonPropertyName("executed_by")]
@@ -38,6 +50,7 @@ public sealed record ExecutionReport
 
     /// <summary>Final run status.</summary>
     [JsonPropertyName("status")]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public required RunStatus Status { get; init; }
 
     /// <summary>Aggregate test counts.</summary>

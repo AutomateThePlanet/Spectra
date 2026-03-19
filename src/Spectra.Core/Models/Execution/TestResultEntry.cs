@@ -17,6 +17,7 @@ public sealed record TestResultEntry
 
     /// <summary>Final status.</summary>
     [JsonPropertyName("status")]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public required TestStatus Status { get; init; }
 
     /// <summary>Attempt number.</summary>

@@ -46,4 +46,24 @@ public sealed class TestEntry
     /// <summary>Whether any automation link exists (from automated_by or attribute scan).</summary>
     [JsonPropertyName("has_automation")]
     public bool HasAutomation { get; init; }
+
+    /// <summary>Test steps as a list.</summary>
+    [JsonPropertyName("steps")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? Steps { get; init; }
+
+    /// <summary>Expected result description.</summary>
+    [JsonPropertyName("expected_result")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExpectedResult { get; init; }
+
+    /// <summary>Preconditions for the test.</summary>
+    [JsonPropertyName("preconditions")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Preconditions { get; init; }
+
+    /// <summary>Full markdown content of the test file (for preview).</summary>
+    [JsonPropertyName("content")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Content { get; init; }
 }
