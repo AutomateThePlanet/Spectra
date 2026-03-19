@@ -15,6 +15,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-18
 - File system (tests/{suite}/*.md), JSON indexes (_index.json) (006-conversational-generation)
 - C# 12, .NET 8+ + Spectra.Core (parsing, validation, indexing), Spectra.MCP (tool registry, protocol), System.Text.Json, System.CommandLine (007-execution-agent-mcp-tools)
 - File system (Markdown test files, JSON indexes), embedded resources for bundled agent prompts (007-execution-agent-mcp-tools)
+- C# 12, .NET 8+ + ICriticRuntime (multi-provider), Microsoft.Extensions.AI, System.Text.Json (008-grounding-verification)
+- Dual-model verification: Generator (Claude/GPT) + Critic (Gemini Flash/GPT-4o-mini) (008-grounding-verification)
 
 - C# 12, .NET 8+ + System.CommandLine (CLI), Microsoft.Extensions.AI (AI tools), Markdig (Markdown parsing), YamlDotNet (frontmatter), GitHub Copilot SDK (AI runtime) (001-ai-test-generation-cli)
 
@@ -29,6 +31,7 @@ src/
 │   │   ├── Generate/         # Test generation (direct + interactive modes)
 │   │   └── Update/           # Test update (direct + interactive modes)
 │   ├── Agent/                # AI provider integration (GitHub Models, OpenAI, Anthropic)
+│   │   └── Critic/           # Grounding verification (ICriticRuntime implementations)
 │   ├── Source/               # Document map builder
 │   ├── Index/                # _index.json operations
 │   ├── Validation/           # Test validation, dedup
@@ -44,7 +47,8 @@ src/
 ├── Spectra.Core/             # Shared library
 │   ├── Models/               # TestCase, Suite, Config models
 │   │   ├── Dashboard/        # DashboardData, SuiteStats, TestEntry, etc.
-│   │   └── Coverage/         # CoverageReport, CoverageLink, etc.
+│   │   ├── Coverage/         # CoverageReport, CoverageLink, etc.
+│   │   └── Grounding/        # GroundingMetadata, VerificationVerdict, VerificationResult
 │   ├── Coverage/             # AutomationScanner, LinkReconciler, CoverageCalculator
 │   ├── Storage/              # ExecutionDbReader
 │   ├── Parsing/              # Markdown + YAML parser
@@ -91,6 +95,7 @@ spectra ai generate checkout                     # Direct mode (specific suite)
 spectra ai generate checkout --focus "negative"  # Direct mode with focus
 spectra ai generate checkout --no-interaction    # CI mode (no prompts, exit codes)
 spectra ai generate --dry-run                    # Preview without writing
+spectra ai generate checkout --skip-critic       # Skip grounding verification (008)
 
 # Test Update (006-conversational-generation)
 spectra ai update                                # Interactive mode (guided prompts)
@@ -119,6 +124,7 @@ spectra ai analyze --coverage --verbosity detailed
 - **Tests:** xUnit with structured results (never throw on validation errors)
 
 ## Recent Changes
+- 008-grounding-verification: ✅ COMPLETE - Dual-model critic flow (generator + verifier), three verdicts (grounded/partial/hallucinated), grounding metadata in YAML frontmatter, configurable critic provider (Google/OpenAI/Anthropic/GitHub), --skip-critic flag
 - 007-execution-agent-mcp-tools: Added C# 12, .NET 8+ + Spectra.Core (parsing, validation, indexing), Spectra.MCP (tool registry, protocol), System.Text.Json, System.CommandLine
 - 006-conversational-generation: ✅ COMPLETE - Two-mode test generation (Direct/Interactive), test updates with classification (UP_TO_DATE, OUTDATED, ORPHANED, REDUNDANT), rich terminal UX with Spectre.Console
 - 004-test-generation-profile: Added profile support for test generation settings

@@ -384,6 +384,9 @@ spectra ai generate authentication --count 15 -v
 
 # Generate in CI mode (no interactive review)
 spectra ai generate checkout --count 10 --no-review
+
+# Skip grounding verification (faster, but no hallucination detection)
+spectra ai generate checkout --count 10 --skip-critic
 ```
 
 The CLI will:
@@ -935,6 +938,101 @@ The CLI:
 3. Falls back to built-in defaults
 
 The profile content is injected into the AI prompt context.
+
+---
+
+# Grounding Verification (Critic Flow)
+
+When AI generates test cases, it can hallucinate — invent steps, expected results, or behaviors that don't exist in your documentation. SPECTRA's grounding verification uses a second AI model (the "critic") to verify each test against the source documentation.
+
+## How It Works
+
+1. **Generator** creates draft test cases from your documentation
+2. **Critic** (different model) verifies each test against the same docs
+3. Tests receive a verdict: `grounded`, `partial`, or `hallucinated`
+4. Only grounded and partial tests are written to disk
+
+## Verdicts
+
+| Verdict | Meaning | Action |
+|---------|---------|--------|
+| `grounded` | All steps trace to documentation | Written as-is |
+| `partial` | Some steps have assumptions | Written with warnings |
+| `hallucinated` | Contains invented behaviors | Rejected |
+
+## Configuration
+
+Configure the critic in `spectra.config.json`:
+
+```json
+{
+  "ai": {
+    "providers": [...],
+    "critic": {
+      "enabled": true,
+      "provider": "google",
+      "model": "gemini-2.0-flash"
+    }
+  }
+}
+```
+
+Supported providers: `google`, `openai`, `anthropic`, `github`
+
+Default API key environment variables:
+- Google: `GOOGLE_API_KEY`
+- OpenAI: `OPENAI_API_KEY`
+- Anthropic: `ANTHROPIC_API_KEY`
+- GitHub: `GITHUB_TOKEN`
+
+## Grounding Metadata
+
+Verified tests include grounding metadata in their frontmatter:
+
+```yaml
+---
+id: TC-102
+priority: high
+grounding:
+  verdict: grounded
+  score: 0.95
+  generator: claude-sonnet-4
+  critic: gemini-2.0-flash
+  verified_at: 2026-03-19T10:30:00Z
+  unverified_claims: []
+---
+```
+
+For partial verdicts, `unverified_claims` lists what couldn't be verified:
+
+```yaml
+grounding:
+  verdict: partial
+  score: 0.72
+  unverified_claims:
+    - "Step 3: assumes refund email sent within 5 minutes"
+    - "Expected Result: specific error code not in docs"
+```
+
+## Skip Verification
+
+To skip grounding verification (faster but no hallucination detection):
+
+```bash
+spectra ai generate checkout --skip-critic
+```
+
+Or disable in config:
+
+```json
+{
+  "ai": {
+    "critic": {
+      "enabled": false
+    }
+  }
+}
+```
 
 ### Without Profile
 

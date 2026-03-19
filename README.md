@@ -90,6 +90,12 @@ priority: high
 tags: [payments, negative]
 component: checkout
 source_refs: [docs/features/checkout/payment-methods.md]
+grounding:
+  verdict: grounded
+  score: 0.95
+  generator: claude-sonnet-4
+  critic: gemini-2.0-flash
+  verified_at: 2026-03-19T10:30:00Z
 ---
 
 # Checkout with expired card
@@ -148,12 +154,18 @@ SPECTRA is in active development. See the [roadmap](#roadmap) for current priori
 - Coverage reports (JSON, Markdown)
 - Test-to-automation linking
 
-**Phase 4: Test Generation Profiles** ← *current*
+**Phase 4: Test Generation Profiles** ✓ *complete*
 - Repository-level profiles (`spectra.profile.md`)
 - Suite-level profiles (`_profile.md`)
 - Profile management commands
 
-**Phase 5: Integrations and Ecosystem** *planned*
+**Phase 5: Grounding Verification** ✓ *complete*
+- Dual-model critic flow (generator + verifier)
+- Three verdicts: grounded, partial, hallucinated
+- Grounding metadata in test frontmatter
+- Configurable critic provider (Google, OpenAI, Anthropic, GitHub)
+
+**Phase 6: Integrations and Ecosystem** ← *current*
 - Cross-MCP patterns (Azure DevOps, Teams, Slack)
 - Copilot Spaces as knowledge source
 - Optional Runner UI
@@ -176,7 +188,12 @@ SPECTRA is configured via `spectra.config.json` at the repository root. See [Con
       { "name": "copilot", "model": "gpt-5", "priority": 1 },
       { "name": "anthropic", "model": "claude-sonnet-4-5", "api_key_env": "ANTHROPIC_API_KEY", "priority": 2 }
     ],
-    "fallback_strategy": "auto"
+    "fallback_strategy": "auto",
+    "critic": {
+      "enabled": true,
+      "provider": "google",
+      "model": "gemini-2.0-flash"
+    }
   }
 }
 ```
