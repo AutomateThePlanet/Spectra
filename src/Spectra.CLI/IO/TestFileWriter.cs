@@ -1,5 +1,6 @@
 using System.Text;
 using Spectra.Core.Models;
+using Spectra.Core.Models.Grounding;
 
 namespace Spectra.CLI.IO;
 
@@ -86,6 +87,26 @@ public sealed class TestFileWriter
         if (testCase.OrphanedDate.HasValue)
         {
             sb.AppendLine($"orphaned_date: {testCase.OrphanedDate.Value:yyyy-MM-dd}");
+        }
+
+        // Grounding metadata (if verified)
+        if (testCase.Grounding is not null)
+        {
+            sb.AppendLine("grounding:");
+            sb.AppendLine($"  verdict: {testCase.Grounding.Verdict.ToString().ToLowerInvariant()}");
+            sb.AppendLine($"  score: {testCase.Grounding.Score:F2}");
+            sb.AppendLine($"  generator: {testCase.Grounding.Generator}");
+            sb.AppendLine($"  critic: {testCase.Grounding.Critic}");
+            sb.AppendLine($"  verified_at: {testCase.Grounding.VerifiedAt:yyyy-MM-ddTHH:mm:ssZ}");
+
+            if (testCase.Grounding.UnverifiedClaims.Count > 0)
+            {
+                sb.AppendLine("  unverified_claims:");
+                foreach (var claim in testCase.Grounding.UnverifiedClaims)
+                {
+                    sb.AppendLine($"    - \"{EscapeYamlString(claim)}\"");
+                }
+            }
         }
 
         sb.AppendLine("---");

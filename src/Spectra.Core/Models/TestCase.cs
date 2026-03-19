@@ -1,3 +1,5 @@
+using Spectra.Core.Models.Grounding;
+
 namespace Spectra.Core.Models;
 
 /// <summary>
@@ -102,4 +104,9 @@ public sealed class TestCase
     /// Test data.
     /// </summary>
     public string? TestData { get; init; }
+
+    /// <summary>
+    /// Grounding verification metadata (if verified).
+    /// </summary>
+    public GroundingMetadata? Grounding { get; init; }
 }

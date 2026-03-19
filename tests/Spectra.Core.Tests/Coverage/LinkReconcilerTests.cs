@@ -1,5 +1,6 @@
 using Spectra.Core.Coverage;
 using Spectra.Core.Models;
+using Spectra.Core.Models.Coverage;
 
 namespace Spectra.Core.Tests.Coverage;
 
@@ -312,7 +313,7 @@ public class LinkReconcilerTests
         Assert.Single(result.ValidLinks);
         Assert.Equal("TC-001", result.ValidLinks[0].Source);
         Assert.Equal("tests/LoginTests.cs", result.ValidLinks[0].Target);
-        Assert.Equal(Models.Coverage.LinkStatus.Valid, result.ValidLinks[0].Status);
+        Assert.Equal(LinkStatus.Valid, result.ValidLinks[0].Status);
         Assert.Empty(result.UnlinkedTests);
         Assert.Empty(result.OrphanedAutomation);
         Assert.Empty(result.BrokenLinks);
@@ -412,7 +413,7 @@ public class LinkReconcilerTests
 
         // Assert
         Assert.Single(result.ValidLinks);
-        Assert.Equal(Models.Coverage.LinkStatus.Valid, result.ValidLinks[0].Status);
+        Assert.Equal(LinkStatus.Valid, result.ValidLinks[0].Status);
     }
 
     [Fact]

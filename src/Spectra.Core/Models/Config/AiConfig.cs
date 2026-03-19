@@ -12,4 +12,11 @@ public sealed class AiConfig
 
     [JsonPropertyName("fallback_strategy")]
     public string FallbackStrategy { get; init; } = "auto";
+
+    /// <summary>
+    /// Configuration for the grounding verification critic.
+    /// When enabled, generated tests are verified against source documentation.
+    /// </summary>
+    [JsonPropertyName("critic")]
+    public CriticConfig? Critic { get; init; }
 }

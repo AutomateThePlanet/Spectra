@@ -101,6 +101,7 @@ public sealed partial class TestCaseParser
             SourceRefs = frontmatter.SourceRefs,
             RelatedWorkItems = frontmatter.RelatedWorkItems,
             Custom = frontmatter.Custom,
+            Grounding = frontmatter.Grounding?.ToMetadata(),
             Title = title,
             Steps = steps,
             ExpectedResult = expectedResult,

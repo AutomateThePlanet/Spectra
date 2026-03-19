@@ -32,10 +32,15 @@ public sealed class GenerateCommand : Command
             "--no-interaction",
             "Disable interactive prompts (for CI/automation)");
 
+        var skipCriticOption = new Option<bool>(
+            "--skip-critic",
+            "Skip grounding verification (faster, but no verification metadata)");
+
         AddArgument(suiteArgument);
         AddOption(countOption);
         AddOption(focusOption);
         AddOption(noInteractionOption);
+        AddOption(skipCriticOption);
 
         this.SetHandler(async (context) =>
         {
@@ -43,11 +48,12 @@ public sealed class GenerateCommand : Command
             var count = context.ParseResult.GetValueForOption(countOption);
             var focus = context.ParseResult.GetValueForOption(focusOption);
             var noInteraction = context.ParseResult.GetValueForOption(noInteractionOption);
+            var skipCritic = context.ParseResult.GetValueForOption(skipCriticOption);
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
             var dryRun = context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption);
             var noReview = context.ParseResult.GetValueForOption(GlobalOptions.NoReviewOption);
 
-            var handler = new GenerateHandler(verbosity, dryRun, noReview, noInteraction);
+            var handler = new GenerateHandler(verbosity, dryRun, noReview, noInteraction, skipCritic);
             context.ExitCode = await handler.ExecuteAsync(suite, count, focus, context.GetCancellationToken());
         });
     }

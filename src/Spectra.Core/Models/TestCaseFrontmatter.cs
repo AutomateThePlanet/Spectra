@@ -1,3 +1,4 @@
+using Spectra.Core.Models.Grounding;
 using YamlDotNet.Serialization;
 
 namespace Spectra.Core.Models;
@@ -40,4 +41,7 @@ public sealed class TestCaseFrontmatter
 
     [YamlMember(Alias = "custom")]
     public Dictionary<string, object>? Custom { get; set; }
+
+    [YamlMember(Alias = "grounding")]
+    public GroundingFrontmatter? Grounding { get; set; }
 }

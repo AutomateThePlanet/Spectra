@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Spectra.CLI.Agent;
+using Spectra.CLI.Agent.Critic;
 using Spectra.CLI.Commands.Auth;
 using Spectra.CLI.Coverage;
 using Spectra.CLI.Infrastructure;
@@ -10,6 +11,7 @@ using Spectra.CLI.Source;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
+using Spectra.Core.Models.Grounding;
 using Spectra.Core.Models.Profile;
 using Spectra.Core.Parsing;
 using Spectra.Core.Profile;
@@ -26,23 +28,28 @@ public sealed class GenerateHandler
     private readonly bool _dryRun;
     private readonly bool _noReview;
     private readonly bool _noInteraction;
+    private readonly bool _skipCritic;
     private readonly ProgressReporter _progress;
     private readonly ResultPresenter _results;
     private readonly GapPresenter _gapPresenter;
+    private readonly VerificationPresenter _verification;
 
     public GenerateHandler(
         VerbosityLevel verbosity = VerbosityLevel.Normal,
         bool dryRun = false,
         bool noReview = false,
-        bool noInteraction = false)
+        bool noInteraction = false,
+        bool skipCritic = false)
     {
         _verbosity = verbosity;
         _dryRun = dryRun;
         _noReview = noReview;
         _noInteraction = noInteraction;
+        _skipCritic = skipCritic;
         _progress = new ProgressReporter();
         _results = new ResultPresenter();
         _gapPresenter = new GapPresenter();
+        _verification = new VerificationPresenter();
     }
 
     public async Task<int> ExecuteAsync(
@@ -667,5 +674,135 @@ public sealed class GenerateHandler
             - steps: list of actions
             - expected_result: what should happen
             """;
+    }
+
+    /// <summary>
+    /// Verifies tests against documentation using the critic model.
+    /// </summary>
+    private async Task<List<(TestCase Test, VerificationResult Result)>> VerifyTestsAsync(
+        IReadOnlyList<TestCase> tests,
+        DocumentMap documentMap,
+        CriticConfig criticConfig,
+        string generatorModel,
+        CancellationToken ct)
+    {
+        var results = new List<(TestCase Test, VerificationResult Result)>();
+
+        var createResult = CriticFactory.TryCreate(criticConfig);
+        if (!createResult.Success)
+        {
+            _verification.ShowCriticUnavailable(createResult.ErrorMessage ?? "Critic not available");
+
+            // In non-interactive mode, proceed without verification
+            if (_noInteraction)
+            {
+                foreach (var test in tests)
+                {
+                    results.Add((test, VerificationResult.Unverified(
+                        "none", createResult.ErrorMessage ?? "Critic not configured")));
+                }
+                return results;
+            }
+
+            // In interactive mode, ask user
+            var proceed = Spectre.Console.AnsiConsole.Confirm("Proceed without verification?", defaultValue: true);
+            if (!proceed)
+            {
+                return results; // Return empty - will be handled by caller
+            }
+
+            foreach (var test in tests)
+            {
+                results.Add((test, VerificationResult.Unverified(
+                    "none", createResult.ErrorMessage ?? "Critic not configured")));
+            }
+            return results;
+        }
+
+        var critic = createResult.Critic!;
+
+        // Convert document map to source documents
+        var sourceDocs = documentMap.Documents
+            .Select(d => new SourceDocument
+            {
+                Path = d.Path,
+                Title = d.Title,
+                Content = d.Preview ?? ""
+            })
+            .ToList();
+
+        // Verify each test
+        foreach (var test in tests)
+        {
+            await _progress.StatusAsync($"Verifying {test.Id} ({critic.ModelName})...", async () =>
+            {
+                try
+                {
+                    var result = await critic.VerifyTestAsync(test, sourceDocs, ct);
+                    results.Add((test, result));
+                }
+                catch (Exception ex)
+                {
+                    results.Add((test, VerificationResult.Unverified(critic.ModelName, ex.Message)));
+                }
+            });
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// Creates a test with grounding metadata if verified.
+    /// </summary>
+    private static TestCase CreateTestWithGrounding(
+        TestCase test,
+        VerificationResult? result,
+        string generatorModel,
+        string filePath,
+        string testsPath)
+    {
+        GroundingMetadata? grounding = null;
+
+        if (result is not null && result.IsSuccess)
+        {
+            grounding = result.ToMetadata(generatorModel);
+        }
+
+        return new TestCase
+        {
+            Id = test.Id,
+            Title = test.Title,
+            Priority = test.Priority,
+            Tags = test.Tags,
+            Component = test.Component,
+            Preconditions = test.Preconditions,
+            Environment = test.Environment,
+            EstimatedDuration = test.EstimatedDuration,
+            DependsOn = test.DependsOn,
+            SourceRefs = test.SourceRefs,
+            RelatedWorkItems = test.RelatedWorkItems,
+            Custom = test.Custom,
+            Steps = test.Steps,
+            ExpectedResult = test.ExpectedResult,
+            TestData = test.TestData,
+            FilePath = Path.GetRelativePath(testsPath, filePath),
+            Grounding = grounding
+        };
+    }
+
+    /// <summary>
+    /// Checks if critic verification should be performed.
+    /// </summary>
+    private bool ShouldVerify(CriticConfig? criticConfig)
+    {
+        // Skip if --skip-critic flag is set
+        if (_skipCritic)
+            return false;
+
+        // Skip if critic not configured or disabled
+        if (criticConfig is null || !criticConfig.Enabled)
+            return false;
+
+        return true;
     }
 }
