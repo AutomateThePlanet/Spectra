@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "grounding-metadata.schema.json",
+  "title": "GroundingMetadata",
+  "description": "Schema for grounding metadata stored in test case YAML frontmatter",
+  "type": "object",
+  "required": ["verdict", "score", "generator", "critic", "verified_at"],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "description": "Verification verdict",
+      "enum": ["grounded", "partial", "hallucinated"]
+    },
+    "score": {
+      "type": "number",
+      "description": "Confidence score from 0.0 to 1.0",
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    "generator": {
+      "type": "string",
+      "description": "Model name that generated the test",
+      "examples": ["claude-sonnet-4-5", "gpt-4o", "claude-opus-4-5"]
+    },
+    "critic": {
+      "type": "string",
+      "description": "Model name that verified the test",
+      "examples": ["gemini-2.0-flash", "gpt-4o-mini", "claude-3.5-haiku"]
+    },
+    "verified_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when verification was performed"
+    },
+    "unverified_claims": {
+      "type": "array",
+      "description": "List of claims that could not be verified. Only present for 'partial' verdicts.",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    }
+  },
+  "if": {
+    "properties": {
+      "verdict": { "const": "partial" }
+    }
+  },
+  "then": {
+    "required": ["unverified_claims"],
+    "properties": {
+      "unverified_claims": {
+        "minItems": 1
+      }
+    }
+  },
+  "examples": [
+    {
+      "verdict": "grounded",
+      "score": 0.94,
+      "generator": "claude-sonnet-4-5",
+      "critic": "gemini-2.0-flash",
+      "verified_at": "2026-03-19T14:30:00Z",
+      "unverified_claims": []
+    },
+    {
+      "verdict": "partial",
+      "score": 0.72,
+      "generator": "claude-sonnet-4-5",
+      "critic": "gemini-2.0-flash",
+      "verified_at": "2026-03-19T14:30:00Z",
+      "unverified_claims": [
+        "Step 3: assumes refund email sent within 5 minutes — not confirmed in docs",
+        "Expected Result: specific error code E-4012 not found in documentation"
+      ]
+    }
+  ]
+}

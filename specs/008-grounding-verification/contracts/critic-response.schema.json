@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "critic-response.schema.json",
+  "title": "CriticResponse",
+  "description": "Schema for the response from the critic model after verification",
+  "type": "object",
+  "required": ["verdict", "score", "findings"],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "description": "Overall verification verdict",
+      "enum": ["grounded", "partial", "hallucinated"]
+    },
+    "score": {
+      "type": "number",
+      "description": "Confidence score from 0.0 to 1.0",
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    "findings": {
+      "type": "array",
+      "description": "Individual findings for each claim in the test",
+      "items": {
+        "type": "object",
+        "required": ["element", "claim", "status"],
+        "properties": {
+          "element": {
+            "type": "string",
+            "description": "What part of the test this finding applies to",
+            "examples": ["Step 1", "Step 3", "Expected Result", "Precondition"]
+          },
+          "claim": {
+            "type": "string",
+            "description": "The specific claim being checked"
+          },
+          "status": {
+            "type": "string",
+            "description": "Status of this claim",
+            "enum": ["grounded", "unverified", "hallucinated"]
+          },
+          "evidence": {
+            "type": ["string", "null"],
+            "description": "Quote or reference from documentation supporting the claim. Null if unverified or hallucinated."
+          },
+          "reason": {
+            "type": ["string", "null"],
+            "description": "Reason why the claim is unverified or hallucinated. Null if grounded."
+          }
+        }
+      },
+      "minItems": 1
+    }
+  },
+  "examples": [
+    {
+      "verdict": "grounded",
+      "score": 0.95,
+      "findings": [
+        {
+          "element": "Step 1",
+          "claim": "Navigate to checkout page",
+          "status": "grounded",
+          "evidence": "Section 2.1: 'Users access checkout via the cart icon'",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "verdict": "partial",
+      "score": 0.72,
+      "findings": [
+        {
+          "element": "Step 3",
+          "claim": "User receives refund email within 5 minutes",
+          "status": "unverified",
+          "evidence": null,
+          "reason": "Documentation mentions email notification but specifies no time limit"
+        }
+      ]
+    },
+    {
+      "verdict": "hallucinated",
+      "score": 0.25,
+      "findings": [
+        {
+          "element": "Expected Result",
+          "claim": "Fraud detection API returns score > 0.8",
+          "status": "hallucinated",
+          "evidence": null,
+          "reason": "No fraud detection API is mentioned in any documentation"
+        }
+      ]
+    }
+  ]
+}

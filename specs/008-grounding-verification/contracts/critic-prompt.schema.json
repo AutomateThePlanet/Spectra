@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "critic-prompt.schema.json",
+  "title": "CriticPrompt",
+  "description": "Schema for the prompt sent to the critic model for grounding verification",
+  "type": "object",
+  "required": ["test_case", "source_documents"],
+  "properties": {
+    "test_case": {
+      "type": "object",
+      "description": "The test case to verify",
+      "required": ["id", "title", "steps", "expected_result"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Test case identifier",
+          "pattern": "^TC-\\d+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Test case title"
+        },
+        "preconditions": {
+          "type": "string",
+          "description": "Test preconditions"
+        },
+        "steps": {
+          "type": "array",
+          "description": "Test steps to execute",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "expected_result": {
+          "type": "string",
+          "description": "Expected outcome"
+        },
+        "test_data": {
+          "type": "string",
+          "description": "Test data requirements"
+        }
+      }
+    },
+    "source_documents": {
+      "type": "array",
+      "description": "Source documentation to verify against",
+      "items": {
+        "type": "object",
+        "required": ["path", "content"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Relative path to the document"
+          },
+          "title": {
+            "type": "string",
+            "description": "Document title"
+          },
+          "content": {
+            "type": "string",
+            "description": "Relevant excerpt from the document"
+          }
+        }
+      },
+      "minItems": 1
+    }
+  }
+}
