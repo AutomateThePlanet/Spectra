@@ -54,7 +54,10 @@ dotnet tool install -g spectra
 spectra init
 
 # Generate tests from documentation
-spectra ai generate --suite checkout
+spectra ai generate checkout --count 10
+
+# Generate with focus on specific scenarios
+spectra ai generate checkout --focus "negative payment validation"
 
 # Validate all tests
 spectra validate
@@ -109,6 +112,78 @@ grounding:
 - Payment is rejected
 - Error message displays: card expired
 ```
+
+## CLI Reference
+
+### Test Generation
+
+```bash
+# Interactive mode (guided prompts)
+spectra ai generate
+
+# Direct mode - generate tests for a specific suite
+spectra ai generate checkout --count 10
+
+# Focus on specific scenarios
+spectra ai generate checkout --focus "error handling"
+spectra ai generate payments --focus "negative validation edge cases"
+
+# Skip grounding verification (faster)
+spectra ai generate checkout --skip-critic
+
+# CI mode (no interactive prompts)
+spectra ai generate checkout --count 10 --no-interaction --no-review
+
+# Preview without writing files
+spectra ai generate checkout --count 5 --dry-run
+```
+
+### Test Updates
+
+```bash
+# Interactive mode
+spectra ai update
+
+# Update specific suite
+spectra ai update checkout
+
+# Show diff of proposed changes
+spectra ai update checkout --diff
+
+# Auto-delete orphaned tests
+spectra ai update checkout --delete-orphaned
+
+# CI mode
+spectra ai update checkout --no-interaction
+```
+
+### Coverage Analysis
+
+```bash
+# Analyze coverage gaps
+spectra ai analyze --coverage
+
+# Output as JSON
+spectra ai analyze --coverage --format json --output coverage.json
+
+# Output as Markdown
+spectra ai analyze --coverage --format markdown --output coverage.md
+```
+
+### Global Options
+
+| Option | Description |
+|--------|-------------|
+| `--verbosity`, `-v` | Output level: quiet, minimal, normal, detailed, diagnostic |
+| `--dry-run` | Preview changes without executing |
+| `--no-review` | Skip interactive review (CI mode) |
+
+### Test ID Allocation
+
+Test IDs are unique globally across all suites. When you generate tests:
+- SPECTRA scans all `_index.json` files to find existing IDs
+- New tests continue from the global maximum (e.g., if TC-150 exists anywhere, new tests start at TC-151)
+- This prevents ID collisions when tests are moved between suites
 
 ## How It Fits
 

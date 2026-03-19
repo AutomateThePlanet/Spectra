@@ -119,11 +119,18 @@ Users can complete purchases through our checkout flow.
 ## Generate Tests
 
 ```bash
-# Generate tests for a suite
-spectra ai generate --suite checkout
+# Interactive mode (guided prompts)
+spectra ai generate
 
-# With options
-spectra ai generate --suite checkout --count 20 --tags smoke,payments
+# Generate tests for a specific suite
+spectra ai generate checkout --count 10
+
+# Focus on specific scenarios
+spectra ai generate checkout --focus "negative payment validation"
+spectra ai generate auth --focus "edge cases with special characters"
+
+# Skip grounding verification (faster, but no hallucination detection)
+spectra ai generate checkout --skip-critic
 ```
 
 ### Interactive Review
@@ -150,7 +157,72 @@ Press `a` to accept all valid tests, or `r` to review each one.
 ### CI Mode (Non-Interactive)
 
 ```bash
-spectra ai generate --suite checkout --no-review
+# Skip interactive review
+spectra ai generate checkout --count 10 --no-review
+
+# Full CI mode (no prompts at all)
+spectra ai generate checkout --count 10 --no-interaction --no-review
+
+# Preview without writing files
+spectra ai generate checkout --count 5 --dry-run
+```
+
+**Exit Codes:**
+- `0` - Success
+- `1` - Error (missing configuration, auth failure, etc.)
+
+### Using the --focus Flag
+
+The `--focus` flag narrows test generation to specific scenarios:
+
+```bash
+# Focus on negative scenarios
+spectra ai generate checkout --focus "negative payment validation"
+
+# Focus on edge cases
+spectra ai generate auth --focus "edge cases with special characters"
+
+# Focus on specific features
+spectra ai generate user-profile --focus "email verification flow"
+```
+
+**When to use --focus:**
+- Your documentation covers multiple areas but you want tests for a specific subset
+- You already have tests for happy paths and need negative/edge cases
+- You want to generate additional tests for a recently changed feature
+
+**Note:** If the focus is too narrow, fewer tests may be generated than requested. The CLI will explain why if the count isn't met.
+
+---
+
+## Grounding Verification
+
+By default, SPECTRA uses a second AI model (the "critic") to verify each test against your documentation, detecting hallucinations.
+
+```bash
+# Default: verification enabled
+spectra ai generate checkout --count 10
+
+# Skip verification (faster)
+spectra ai generate checkout --count 10 --skip-critic
+```
+
+Tests receive a verdict:
+- `grounded` - All steps trace to documentation
+- `partial` - Some steps have assumptions (written with warnings)
+- `hallucinated` - Contains invented behaviors (rejected)
+
+Configure the critic in `spectra.config.json`:
+```json
+{
+  "ai": {
+    "critic": {
+      "enabled": true,
+      "provider": "google",
+      "model": "gemini-2.0-flash"
+    }
+  }
+}
 ```
 
 ---
@@ -200,13 +272,25 @@ spectra show TC-102
 When your documentation changes:
 
 ```bash
-# Analyze and update tests
-spectra ai update --suite checkout
+# Interactive mode (guided prompts)
+spectra ai update
+
+# Update a specific suite
+spectra ai update checkout
+
+# Show diff of proposed changes
+spectra ai update checkout --diff
+
+# Auto-delete orphaned tests
+spectra ai update checkout --delete-orphaned
+
+# CI mode
+spectra ai update checkout --no-interaction
 ```
 
 This will:
 1. Compare tests against current documentation
-2. Identify outdated, orphaned, or redundant tests
+2. Classify tests as: UP_TO_DATE, OUTDATED, ORPHANED, or REDUNDANT
 3. Propose updates for your review
 
 ---

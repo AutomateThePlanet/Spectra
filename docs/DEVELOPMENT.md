@@ -389,6 +389,31 @@ spectra ai generate checkout --count 10 --no-review
 spectra ai generate checkout --count 10 --skip-critic
 ```
 
+### Using the --focus Flag
+
+The `--focus` flag narrows test generation to specific scenarios. The AI uses this description to filter documentation and focus on relevant test cases.
+
+```bash
+# Focus on negative scenarios
+spectra ai generate checkout --focus "negative payment validation"
+
+# Focus on edge cases
+spectra ai generate auth --focus "edge cases with special characters"
+
+# Focus on specific features
+spectra ai generate user-profile --focus "email verification flow"
+
+# Combine with count
+spectra ai generate payments --count 5 --focus "refund error handling"
+```
+
+**When to use --focus:**
+- Your documentation covers multiple areas but you want tests for a specific subset
+- You already have tests for happy paths and need negative/edge cases
+- You want to generate additional tests for a recently changed feature
+
+**Note:** If the focus is too narrow, fewer tests may be generated. The CLI will explain why if requested count isn't met.
+
 The CLI will:
 1. Scan your `docs/` folder for relevant documentation
 2. Use AI to generate test cases
@@ -423,6 +448,31 @@ Updating index...
 Generated 10 test(s) in 'checkout'
 ```
 
+### Global Test ID Uniqueness
+
+Test IDs are unique **globally across all suites**, not just within a single suite. This prevents ID collisions when tests are moved or copied between suites.
+
+**How it works:**
+1. Before generating new tests, SPECTRA scans all `_index.json` files in the `tests/` directory
+2. Finds the maximum existing test ID number (e.g., TC-150)
+3. Allocates new IDs starting from max + 1 (e.g., TC-151, TC-152, ...)
+
+**Example:**
+```
+tests/
+├── auth/
+│   └── _index.json     # Contains TC-001 through TC-050
+├── checkout/
+│   └── _index.json     # Contains TC-051 through TC-100
+└── payments/
+    └── _index.json     # (new suite, will start from TC-101)
+```
+
+This ensures that:
+- IDs remain stable when tests move between suites
+- No manual ID management is needed
+- External references to test IDs remain valid
+
 ### Validate and Rebuild Index
 
 ```bash
@@ -435,6 +485,48 @@ spectra index --rebuild
 # List available suites
 spectra list
 ```
+
+### CI/Automation Mode
+
+For CI pipelines and automation, use flags to disable interactive prompts:
+
+```bash
+# Generate tests without prompts (exits with code 0 on success, 1 on failure)
+spectra ai generate checkout --count 10 --no-interaction --no-review
+
+# Update tests without prompts
+spectra ai update checkout --no-interaction
+
+# Preview changes only (useful for PR checks)
+spectra ai generate checkout --count 5 --dry-run
+spectra ai update checkout --diff
+```
+
+**Exit Codes:**
+- `0` - Success
+- `1` - Error (missing configuration, auth failure, etc.)
+
+### Generate Command Options Reference
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--count` | `-n` | Number of tests to generate (default: 5) |
+| `--focus` | `-f` | Focus area description for targeted generation |
+| `--skip-critic` | | Skip grounding verification (faster) |
+| `--no-interaction` | | Disable interactive prompts |
+| `--no-review` | | Skip interactive review of generated tests |
+| `--dry-run` | | Preview without writing files |
+| `--verbosity` | `-v` | Output verbosity level |
+
+### Update Command Options Reference
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--diff` | `-d` | Show diff of proposed changes |
+| `--delete-orphaned` | | Automatically delete orphaned tests |
+| `--no-interaction` | | Disable interactive prompts |
+| `--no-review` | | Skip interactive review |
+| `--dry-run` | | Preview without applying changes |
 
 ---
 
