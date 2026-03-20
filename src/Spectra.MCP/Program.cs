@@ -1,8 +1,10 @@
 // Spectra MCP Execution Server
 // Entry point for stdio transport
 
+using System.Text.Json;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
+using Spectra.Core.Models.Config;
 using Spectra.Core.Parsing;
 using Spectra.MCP.Execution;
 using Spectra.MCP.Identity;
@@ -98,11 +100,39 @@ public static class Program
                 .Cast<SuiteInfo>();
         };
 
+        // Suite list loader (returns suite names only)
+        Func<IEnumerable<string>> suiteListLoader = () =>
+        {
+            var testsDir = Path.Combine(basePath, "tests");
+            if (!Directory.Exists(testsDir)) return [];
+            return Directory.GetDirectories(testsDir)
+                .Select(Path.GetFileName)
+                .Where(name => name is not null && File.Exists(Path.Combine(basePath, "tests", name, "_index.json")))
+                .Cast<string>();
+        };
+
+        // Config loader for saved selections
+        Func<IReadOnlyDictionary<string, SavedSelectionConfig>> selectionsLoader = () =>
+        {
+            var configPath = Path.Combine(basePath, "spectra.config.json");
+            if (!File.Exists(configPath)) return new Dictionary<string, SavedSelectionConfig>();
+            try
+            {
+                var json = File.ReadAllText(configPath);
+                var spectraConfig = JsonSerializer.Deserialize<SpectraConfig>(json);
+                return spectraConfig?.Selections ?? new Dictionary<string, SavedSelectionConfig>();
+            }
+            catch
+            {
+                return new Dictionary<string, SavedSelectionConfig>();
+            }
+        };
+
         // Register tools
         var registry = new ToolRegistry();
 
         // Run management tools
-        registry.Register("start_execution_run", new StartExecutionRunTool(engine, indexLoader));
+        registry.Register("start_execution_run", new StartExecutionRunTool(engine, indexLoader, suiteListLoader, selectionsLoader));
         registry.Register("get_execution_status", new GetExecutionStatusTool(engine));
         registry.Register("pause_execution_run", new PauseExecutionRunTool(engine));
         registry.Register("resume_execution_run", new ResumeExecutionRunTool(engine));
@@ -127,6 +157,9 @@ public static class Program
         registry.Register("validate_tests", new ValidateTestsTool(basePath));
         registry.Register("rebuild_indexes", new RebuildIndexesTool(basePath));
         registry.Register("analyze_coverage_gaps", new AnalyzeCoverageGapsTool(basePath));
+        registry.Register("find_test_cases", new FindTestCasesTool(suiteListLoader, indexLoader));
+        registry.Register("get_test_execution_history", new GetTestExecutionHistoryTool(resultRepo));
+        registry.Register("list_saved_selections", new ListSavedSelectionsTool(selectionsLoader, suiteListLoader, indexLoader));
 
         // Create and run server
         var server = new McpServer(registry, logger: logger);

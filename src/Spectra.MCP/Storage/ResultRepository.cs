@@ -285,6 +285,93 @@ public sealed class ResultRepository
         await updateCmd.ExecuteNonQueryAsync();
     }
 
+    /// <summary>
+    /// Gets execution history statistics per test.
+    /// </summary>
+    public async Task<Dictionary<string, TestExecutionHistoryEntry>> GetTestExecutionHistoryAsync(
+        IReadOnlyList<string>? testIds = null,
+        int limit = 10)
+    {
+        var connection = await _db.GetConnectionAsync();
+        var results = new Dictionary<string, TestExecutionHistoryEntry>();
+
+        // Build query - get all terminal results (not Pending/InProgress)
+        var sql = """
+            SELECT test_id, run_id, status, completed_at, attempt
+            FROM test_results
+            WHERE status IN ('Passed', 'Failed', 'Skipped', 'Blocked')
+            """;
+
+        if (testIds is { Count: > 0 })
+        {
+            var placeholders = string.Join(", ", testIds.Select((_, i) => $"@id{i}"));
+            sql += $" AND test_id IN ({placeholders})";
+        }
+
+        sql += " ORDER BY test_id, completed_at DESC";
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+
+        if (testIds is { Count: > 0 })
+        {
+            for (var i = 0; i < testIds.Count; i++)
+            {
+                command.Parameters.AddWithValue($"@id{i}", testIds[i]);
+            }
+        }
+
+        await using var reader = await command.ExecuteReaderAsync();
+
+        // Group by test_id in memory, respecting limit per test
+        var testGroups = new Dictionary<string, List<(string RunId, string Status, DateTime? CompletedAt)>>();
+
+        while (await reader.ReadAsync())
+        {
+            var testId = reader.GetString(0);
+            var runId = reader.GetString(1);
+            var status = reader.GetString(2);
+            var completedAt = reader.IsDBNull(3) ? (DateTime?)null : DateTime.Parse(reader.GetString(3));
+
+            if (!testGroups.ContainsKey(testId))
+                testGroups[testId] = [];
+
+            if (testGroups[testId].Count < limit)
+                testGroups[testId].Add((runId, status, completedAt));
+        }
+
+        // Compute stats per test
+        foreach (var (testId, entries) in testGroups)
+        {
+            var totalRuns = entries.Count;
+            var passCount = entries.Count(e => e.Status == "Passed");
+            var latest = entries.FirstOrDefault();
+
+            results[testId] = new TestExecutionHistoryEntry
+            {
+                LastExecuted = latest.CompletedAt,
+                LastStatus = latest.Status,
+                TotalRuns = totalRuns,
+                PassRate = totalRuns > 0 ? Math.Round((decimal)passCount / totalRuns * 100, 1) : null,
+                LastRunId = latest.RunId
+            };
+        }
+
+        // Add null entries for requested test IDs with no history
+        if (testIds is not null)
+        {
+            foreach (var id in testIds)
+            {
+                if (!results.ContainsKey(id))
+                {
+                    results[id] = new TestExecutionHistoryEntry();
+                }
+            }
+        }
+
+        return results;
+    }
+
     private static TestResult MapResult(SqliteDataReader reader)
     {
         IReadOnlyList<string>? screenshotPaths = null;

@@ -22,6 +22,7 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
   "validation": { ... },
   "git": { ... },
   "dashboard": { ... },
+  "selections": { ... },
   "profile": { ... }
 }
 ```
@@ -186,6 +187,44 @@ See [Coverage](coverage.md) for how these settings are used.
 | `report_orphans` | bool | `true` | Report automation files not linked to any test |
 | `report_broken_links` | bool | `true` | Report tests referencing non-existent files |
 | `report_mismatches` | bool | `true` | Report inconsistencies between index and files |
+
+## `selections` — Saved Test Selections
+
+Named test selections for quick execution. Each selection defines filters that are evaluated across all suites at runtime.
+
+```json
+{
+  "selections": {
+    "smoke": {
+      "description": "Quick smoke test — high priority tests only",
+      "priorities": ["high"]
+    },
+    "regression": {
+      "description": "Full regression suite",
+      "tags": ["regression"]
+    },
+    "auth-manual": {
+      "description": "Manual auth tests without automation",
+      "components": ["auth"],
+      "has_automation": false
+    }
+  }
+}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `description` | string | Human-readable description shown when listing selections |
+| `tags` | string[] | Filter by tags (OR within array) |
+| `priorities` | string[] | Filter by priority (OR within array) |
+| `components` | string[] | Filter by component (OR within array) |
+| `has_automation` | bool | `true` = only automated tests, `false` = only manual tests |
+
+Filters are combined with AND logic between types. Use the `list_saved_selections` MCP tool to preview how many tests each selection matches, or start a run with `start_execution_run` using the `selection` parameter.
+
+The default configuration includes a `smoke` selection that matches all high-priority tests.
+
+---
 
 ## `validation` — Test Validation Rules
 

@@ -221,4 +221,53 @@ Start the MCP execution server.
 spectra mcp start
 ```
 
-The server runs on stdio transport (JSON-RPC 2.0). See [Execution Agent Overview](execution-agent/overview.md) for available MCP tools.
+The server runs on stdio transport (JSON-RPC 2.0). The MCP tools available are grouped below.
+
+#### Run Management Tools
+
+| Tool | Description |
+|------|-------------|
+| `start_execution_run` | Start a new run by suite, test IDs, or saved selection |
+| `get_execution_status` | Get current run status and next test |
+| `pause_execution_run` | Pause execution |
+| `resume_execution_run` | Resume paused execution |
+| `cancel_execution_run` | Cancel execution |
+| `finalize_execution_run` | Complete run and generate reports |
+| `list_available_suites` | List test suites |
+
+#### Test Execution Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_test_case_details` | Get test steps, expected result, preconditions |
+| `advance_test_case` | Record PASSED/FAILED/BLOCKED result |
+| `skip_test_case` | Skip test with reason |
+| `bulk_record_results` | Bulk record results for multiple tests |
+| `add_test_note` | Add notes to a test |
+| `retest_test_case` | Requeue a test for another attempt |
+| `save_screenshot` | Save screenshot attachment |
+
+#### Smart Selection Tools
+
+| Tool | Description |
+|------|-------------|
+| `find_test_cases` | Cross-suite search and filter by query, priority, tags, component, automation status |
+| `get_test_execution_history` | Per-test execution statistics (pass rate, last status, run count) |
+| `list_saved_selections` | List named selections from config with estimated test counts |
+
+The `find_test_cases` tool supports free-text search (OR across keywords, matching title + description + tags), metadata filters (AND between types, OR within arrays), and returns results ranked by relevance with total estimated duration.
+
+The `start_execution_run` tool supports three mutually exclusive modes:
+- `suite` — run all tests in a suite (with optional filters)
+- `test_ids` — run specific tests from any suites
+- `selection` — run a named saved selection from config
+
+#### Data & Reporting Tools
+
+| Tool | Description |
+|------|-------------|
+| `validate_tests` | Validate test files |
+| `rebuild_indexes` | Rebuild `_index.json` files |
+| `analyze_coverage_gaps` | Analyze test coverage |
+| `get_run_history` | Get execution history |
+| `get_execution_summary` | Get summary statistics |

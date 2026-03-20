@@ -41,6 +41,10 @@ public sealed class SpectraConfig
     [JsonPropertyName("profile")]
     public ProfileConfig Profile { get; init; } = new();
 
+    [JsonPropertyName("selections")]
+    public IReadOnlyDictionary<string, SavedSelectionConfig> Selections { get; init; } =
+        new Dictionary<string, SavedSelectionConfig>();
+
     /// <summary>
     /// Creates a default configuration.
     /// </summary>
@@ -60,6 +64,14 @@ public sealed class SpectraConfig
                     Priority = 1
                 }
             ]
+        },
+        Selections = new Dictionary<string, SavedSelectionConfig>
+        {
+            ["smoke"] = new SavedSelectionConfig
+            {
+                Description = "Quick smoke test — high priority tests only",
+                Priorities = ["high"]
+            }
         }
     };
 }

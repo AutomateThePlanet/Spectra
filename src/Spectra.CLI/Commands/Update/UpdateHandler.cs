@@ -327,11 +327,15 @@ public sealed class UpdateHandler
                             Id = entry.Id,
                             File = entry.File,
                             Title = entry.Title,
+                            Description = entry.Description,
                             Priority = entry.Priority,
                             Tags = entry.Tags,
                             Component = entry.Component,
+                            EstimatedDuration = entry.EstimatedDuration,
                             DependsOn = entry.DependsOn,
                             SourceRefs = entry.SourceRefs,
+                            AutomatedBy = entry.AutomatedBy,
+                            Requirements = entry.Requirements,
                             RedundantOf = result.RelatedTestId,
                             RedundantReason = $"{result.Confidence:P0} content similarity"
                         };

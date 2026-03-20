@@ -90,6 +90,7 @@ public sealed partial class TestCaseParser
             Priority = priority,
             Tags = frontmatter.Tags,
             Component = frontmatter.Component,
+            Description = frontmatter.Description,
             Preconditions = preconditions,
             Environment = frontmatter.Environment,
             EstimatedDuration = duration,

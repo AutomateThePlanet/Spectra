@@ -16,6 +16,10 @@ public sealed class TestIndexEntry
     [JsonPropertyName("title")]
     public required string Title { get; init; }
 
+    [JsonPropertyName("description")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Description { get; init; }
+
     [JsonPropertyName("priority")]
     public required string Priority { get; init; }
 
@@ -24,6 +28,10 @@ public sealed class TestIndexEntry
 
     [JsonPropertyName("component")]
     public string? Component { get; init; }
+
+    [JsonPropertyName("estimated_duration")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? EstimatedDuration { get; init; }
 
     [JsonPropertyName("depends_on")]
     public string? DependsOn { get; init; }

@@ -39,11 +39,21 @@ public sealed class IndexGenerator
             Id = testCase.Id,
             File = testCase.FilePath,
             Title = testCase.Title,
+            Description = testCase.Description,
             Priority = testCase.Priority.ToString().ToLowerInvariant(),
             Tags = testCase.Tags.ToList(),
             Component = testCase.Component,
+            EstimatedDuration = testCase.EstimatedDuration?.TotalMinutes switch
+            {
+                null => null,
+                < 1 => $"{(int)testCase.EstimatedDuration.Value.TotalSeconds}s",
+                < 60 => $"{(int)testCase.EstimatedDuration.Value.TotalMinutes}m",
+                _ => $"{(int)testCase.EstimatedDuration.Value.TotalHours}h {testCase.EstimatedDuration.Value.Minutes}m"
+            },
             DependsOn = testCase.DependsOn,
-            SourceRefs = testCase.SourceRefs.ToList()
+            SourceRefs = testCase.SourceRefs.ToList(),
+            AutomatedBy = testCase.AutomatedBy,
+            Requirements = testCase.Requirements
         };
     }
 

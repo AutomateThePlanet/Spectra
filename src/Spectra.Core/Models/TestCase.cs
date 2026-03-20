@@ -35,6 +35,11 @@ public sealed class TestCase
     public string? Component { get; init; }
 
     /// <summary>
+    /// Short description of what the test verifies.
+    /// </summary>
+    public string? Description { get; init; }
+
+    /// <summary>
     /// Test preconditions (from frontmatter, not body).
     /// </summary>
     public string? Preconditions { get; init; }
