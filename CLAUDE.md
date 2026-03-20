@@ -70,7 +70,7 @@ dashboard-site/               # Static dashboard template
 ├── styles/main.css           # Dashboard styles
 ├── scripts/
 │   ├── app.js                # Main dashboard JavaScript
-│   └── coverage-map.js       # D3.js coverage visualization
+│   └── coverage-map.js       # D3.js coverage visualization + treemap
 ├── functions/                # Cloudflare Pages functions (auth)
 │   ├── _middleware.js        # OAuth middleware
 │   └── auth/callback.js      # OAuth callback handler
@@ -145,6 +145,7 @@ spectra ai analyze --coverage --verbosity detailed
 - **Tests:** xUnit with structured results (never throw on validation errors)
 
 ## Recent Changes
+- 009-coverage-dashboard-viz: ✅ COMPLETE - Enhanced dashboard coverage visualizations. Typed detail models replacing `IReadOnlyList<object>` (`DocumentationSectionData`, `RequirementsSectionData`, `AutomationSectionData` with per-item detail classes). `DataCollector` populates detail lists for all three sections. Dashboard: expandable progress bar drill-down with per-item breakdown, donut chart (SVG, automated/manual/unlinked distribution), D3.js treemap (suites sized by test count, colored by automation %), empty state guidance with setup instructions. CSS transitions for expand/collapse animations.
 - 011-coverage-overhaul: ✅ COMPLETE - Unified three-type coverage system (Documentation, Requirements, Automation) in one report. Added `automated_by` and `requirements` fields to TestCase/TestCaseFrontmatter/TestIndexEntry. New models: `UnifiedCoverageReport`, `DocumentationCoverage`, `RequirementsCoverage`, `AutomationCoverage`, `RequirementDefinition`. New services: `DocumentationCoverageAnalyzer`, `RequirementsCoverageAnalyzer`, `UnifiedCoverageBuilder`, `AutoLinkService`, `RequirementsParser`, `FrontmatterUpdater`. New config: `scan_patterns`, `file_extensions`, `requirements_file` in CoverageConfig. CLI: `--auto-link` flag writes `automated_by` back into test files. Dashboard: three stacked coverage sections with progress bars. `spectra init` creates `docs/requirements/_requirements.yaml` template.
 - 010-document-index: ✅ COMPLETE - Persistent `docs/_index.md` with per-document metadata (sections, entities, tokens, content hashes). Incremental updates via SHA-256 hashing. `spectra docs index [--force]` CLI command. Auto-refresh before `ai generate`. `GetDocumentMapTool` prefers index when available. Models: `DocumentIndex`, `DocumentIndexEntry`, `SectionSummary`. Services: `DocumentIndexExtractor`, `DocumentIndexWriter`, `DocumentIndexReader`, `DocumentIndexService`.
 - 009-copilot-sdk-consolidation: ✅ COMPLETE - Unified all AI operations under GitHub Copilot SDK as the sole runtime. Removed legacy agent implementations (OpenAiAgent, AnthropicAgent, GitHubModelsAgent, MockAgent) and critic implementations (GoogleCritic, OpenAiCritic, AnthropicCritic, GitHubCritic). Provider selection now via spectra.config.json with CopilotGenerationAgent and CopilotCritic handling all providers.

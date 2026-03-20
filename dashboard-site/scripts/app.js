@@ -5,6 +5,7 @@
 
 // Load dashboard data from embedded JSON
 const data = JSON.parse(document.getElementById('dashboard-data').textContent);
+window.dashboardData = data;
 
 // Application state
 let currentView = 'suites';
@@ -186,10 +187,11 @@ function render() {
             break;
         case 'coverage':
             content.innerHTML = renderCoverage();
-            // Initialize D3 visualization after DOM is updated
-            if (typeof window.initCoverageMap === 'function') {
-                setTimeout(() => window.initCoverageMap(), 0);
-            }
+            // Initialize D3 visualizations after DOM is updated
+            setTimeout(() => {
+                if (typeof window.initCoverageMap === 'function') window.initCoverageMap();
+                if (typeof window.initTreemap === 'function') window.initTreemap();
+            }, 0);
             break;
     }
 }
@@ -774,58 +776,265 @@ function renderCoverage() {
 }
 
 /**
- * Render three stacked coverage sections with progress bars.
+ * Render three stacked coverage sections with progress bars, expandable details, and empty states.
  */
 function renderThreeSectionCoverage(summary) {
-    const sections = [
-        { label: 'Documentation Coverage', data: summary.documentation, unit: 'documents' },
-        { label: 'Requirements Coverage', data: summary.requirements, unit: 'requirements' },
-        { label: 'Automation Coverage', data: summary.automation, unit: 'tests' }
-    ];
+    let html = '';
 
-    let html = '<div class="coverage-sections">';
+    // Donut chart at top (if test data available)
+    html += renderDonutChart();
 
-    for (const section of sections) {
-        const pct = section.data.percentage || 0;
-        const colorClass = pct >= 80 ? 'coverage-green' : pct >= 50 ? 'coverage-yellow' : 'coverage-red';
-        const covered = section.data.covered || 0;
-        const total = section.data.total || 0;
+    html += '<div class="coverage-sections">';
 
-        html += `
-            <div class="coverage-section">
-                <div class="coverage-section-header">
-                    <span class="coverage-section-label">${section.label}</span>
-                    <span class="coverage-section-pct ${colorClass}">${pct.toFixed(1)}%</span>
-                </div>
-                <div class="coverage-progress-bar">
-                    <div class="coverage-bar-fill ${colorClass}" style="width: ${Math.min(pct, 100)}%"></div>
-                </div>
-                <span class="coverage-section-detail">${covered} of ${total} ${section.unit} covered</span>
-        `;
+    // Documentation section
+    html += renderCoverageSection('Documentation Coverage', summary.documentation, 'documents', renderDocDetails);
 
-        // Render detail list if available
-        if (section.data.details && section.data.details.length > 0) {
-            html += '<ul class="coverage-detail-list">';
-            for (const detail of section.data.details) {
-                const name = detail.doc || detail.id || detail.suite || '';
-                const count = detail.test_count != null ? ` — ${detail.test_count} tests` : '';
-                const mark = detail.covered !== false ? '<span class="coverage-green">&#10003;</span>' : '<span class="coverage-red">&#10007;</span>';
-                html += `<li>${name}${count} ${mark}</li>`;
-            }
-            html += '</ul>';
-        }
+    // Requirements section
+    html += renderCoverageSection('Requirements Coverage', summary.requirements, 'requirements', renderReqDetails);
 
-        html += '</div>';
-    }
+    // Automation section
+    html += renderCoverageSection('Automation Coverage', summary.automation, 'tests', renderAutoDetails);
 
     html += '</div>';
 
-    // Still show coverage map visualization if available
+    // Treemap (rendered by coverage-map.js if available)
+    if (typeof window.renderTreemap === 'function') {
+        html += window.renderTreemap(summary);
+    }
+
+    // Legacy coverage map visualization
     if (typeof window.renderCoverageMap === 'function') {
         html += window.renderCoverageMap();
     }
 
     return html;
+}
+
+/**
+ * Render a single coverage section with progress bar, empty state, and detail toggle.
+ */
+function renderCoverageSection(label, sectionData, unit, renderDetailsFn) {
+    const pct = sectionData.percentage || 0;
+    const colorClass = pct >= 80 ? 'coverage-green' : pct >= 50 ? 'coverage-yellow' : 'coverage-red';
+    const covered = sectionData.covered || 0;
+    const total = sectionData.total || 0;
+    const sectionId = label.toLowerCase().replace(/\s+/g, '-');
+
+    let html = `<div class="coverage-section">
+        <div class="coverage-section-header">
+            <span class="coverage-section-label">${label}</span>
+            <span class="coverage-section-pct ${colorClass}">${pct.toFixed(1)}%</span>
+        </div>
+        <div class="coverage-progress-bar">
+            <div class="coverage-bar-fill ${colorClass}" style="width: ${Math.min(pct, 100)}%"></div>
+        </div>
+        <span class="coverage-section-detail">${covered} of ${total} ${unit} covered</span>`;
+
+    // Empty states
+    const emptyHtml = getEmptyState(label, sectionData, total, pct);
+    if (emptyHtml) {
+        html += emptyHtml;
+    } else if (sectionData.details && sectionData.details.length > 0) {
+        // Expandable detail list
+        html += `<button class="coverage-toggle-btn" onclick="toggleCoverageDetails('${sectionId}')">Show details</button>`;
+        html += `<ul class="coverage-detail-list collapsed" id="details-${sectionId}">`;
+        html += renderDetailsFn(sectionData);
+        html += '</ul>';
+    }
+
+    html += '</div>';
+    return html;
+}
+
+/**
+ * Get empty state HTML for a coverage section, or null if data is present.
+ */
+function getEmptyState(label, sectionData, total, pct) {
+    if (label.startsWith('Documentation')) {
+        if (total === 0) return null; // No docs at all — standard progress bar is fine
+        if (pct === 100 && total > 0) {
+            return `<div class="coverage-empty-state success">
+                <span class="empty-icon">&#10004;</span>
+                <div class="empty-text"><strong>All documents have test coverage!</strong>Every documentation file is referenced by at least one test.</div>
+            </div>`;
+        }
+        return null;
+    }
+
+    if (label.startsWith('Requirements')) {
+        if (total === 0 && !sectionData.has_requirements_file) {
+            return `<div class="coverage-empty-state">
+                <span class="empty-icon">&#9432;</span>
+                <div class="empty-text"><strong>No requirements tracked yet.</strong>
+                Add a <code>requirements</code> field to test YAML frontmatter, or create a <code>_requirements.yaml</code> file in your docs directory.</div>
+            </div>`;
+        }
+        return null;
+    }
+
+    if (label.startsWith('Automation')) {
+        if (total === 0 || (sectionData.covered === 0 && (!sectionData.details || sectionData.details.length === 0))) {
+            return `<div class="coverage-empty-state">
+                <span class="empty-icon">&#9432;</span>
+                <div class="empty-text"><strong>No automation links detected.</strong>
+                Run <code>spectra ai analyze --coverage --auto-link</code> to scan your automation code and link tests automatically.</div>
+            </div>`;
+        }
+        return null;
+    }
+
+    return null;
+}
+
+/**
+ * Toggle expand/collapse of a coverage detail list.
+ */
+function toggleCoverageDetails(sectionId) {
+    const list = document.getElementById('details-' + sectionId);
+    const btn = list?.previousElementSibling;
+    if (!list || !btn) return;
+
+    if (list.classList.contains('collapsed')) {
+        list.classList.remove('collapsed');
+        btn.textContent = 'Hide details';
+    } else {
+        list.classList.add('collapsed');
+        btn.textContent = 'Show details';
+    }
+}
+
+/**
+ * Render documentation detail list items.
+ */
+function renderDocDetails(section) {
+    let html = '';
+    for (const d of section.details) {
+        const icon = d.covered
+            ? '<span class="detail-icon coverage-green">&#10003;</span>'
+            : '<span class="detail-icon coverage-red">&#10007;</span>';
+        html += `<li>
+            <span class="detail-name" title="${escapeHtml(d.doc)}">${escapeHtml(d.doc)}</span>
+            <span class="detail-meta">${d.test_count} test${d.test_count !== 1 ? 's' : ''}</span>
+            ${icon}
+        </li>`;
+    }
+    return html;
+}
+
+/**
+ * Render requirements detail list items.
+ */
+function renderReqDetails(section) {
+    let html = '';
+    for (const d of section.details) {
+        const icon = d.covered
+            ? '<span class="detail-icon coverage-green">&#10003;</span>'
+            : '<span class="detail-icon coverage-red">&#10007;</span>';
+        const testList = d.tests && d.tests.length > 0 ? d.tests.join(', ') : 'none';
+        html += `<li>
+            <span class="detail-name" title="${escapeHtml(d.title || d.id)}">${escapeHtml(d.id)}: ${escapeHtml(d.title || '')}</span>
+            <span class="detail-meta">${testList}</span>
+            ${icon}
+        </li>`;
+    }
+    return html;
+}
+
+/**
+ * Render automation detail list items (per-suite breakdown).
+ */
+function renderAutoDetails(section) {
+    let html = '';
+    for (const d of section.details) {
+        const suiteColor = d.percentage >= 80 ? 'coverage-green' : d.percentage >= 50 ? 'coverage-yellow' : 'coverage-red';
+        html += `<li>
+            <span class="detail-name">${escapeHtml(d.suite)}</span>
+            <span class="detail-meta ${suiteColor}">${d.automated}/${d.total} (${d.percentage.toFixed(1)}%)</span>
+        </li>`;
+    }
+
+    // Show unlinked tests if available
+    if (section.unlinked_tests && section.unlinked_tests.length > 0) {
+        const count = section.unlinked_tests.length;
+        const preview = section.unlinked_tests.slice(0, 5).map(t => t.test_id).join(', ');
+        const more = count > 5 ? `, +${count - 5} more` : '';
+        html += `<li style="color: var(--text-muted); font-style: italic;">
+            <span class="detail-name">Unlinked: ${preview}${more}</span>
+        </li>`;
+    }
+    return html;
+}
+
+/**
+ * Render donut chart showing test health distribution.
+ */
+function renderDonutChart() {
+    if (!allTests || allTests.length === 0) return '';
+
+    let automated = 0, manualOnly = 0, unlinked = 0;
+    for (const t of allTests) {
+        if (t.has_automation || (t.automated_by && t.automated_by.length > 0)) {
+            automated++;
+        } else if (t.source_refs && t.source_refs.length > 0) {
+            manualOnly++;
+        } else {
+            unlinked++;
+        }
+    }
+
+    const total = allTests.length;
+    if (total === 0) return '';
+
+    const size = 180;
+    const strokeWidth = 30;
+    const radius = (size - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const cx = size / 2;
+    const cy = size / 2;
+
+    // Calculate segment lengths
+    const segments = [
+        { count: automated, pct: (automated / total) * 100, color: 'var(--color-success)', label: 'Automated' },
+        { count: manualOnly, pct: (manualOnly / total) * 100, color: 'var(--color-warning)', label: 'Manual Only' },
+        { count: unlinked, pct: (unlinked / total) * 100, color: 'var(--color-danger)', label: 'Unlinked' }
+    ].filter(s => s.count > 0);
+
+    let svgSegments = '';
+    let offset = 0;
+    for (const seg of segments) {
+        const dashLen = (seg.count / total) * circumference;
+        const dashGap = circumference - dashLen;
+        svgSegments += `<circle class="donut-segment" cx="${cx}" cy="${cy}" r="${radius}"
+            fill="none" stroke="${seg.color}" stroke-width="${strokeWidth}"
+            stroke-dasharray="${dashLen} ${dashGap}"
+            stroke-dashoffset="${-offset}"
+            transform="rotate(-90 ${cx} ${cy})">
+            <title>${seg.label}: ${seg.count} (${seg.pct.toFixed(1)}%)</title>
+        </circle>`;
+        offset += dashLen;
+    }
+
+    const legendItems = segments.map(s => {
+        const dotClass = s.label === 'Automated' ? 'automated' : s.label === 'Manual Only' ? 'manual' : 'unlinked';
+        return `<span class="donut-legend-item"><span class="donut-legend-dot ${dotClass}"></span>${s.label}: ${s.count} (${s.pct.toFixed(1)}%)</span>`;
+    }).join('');
+
+    return `
+        <div class="donut-chart-container">
+            <h3>Test Health Distribution</h3>
+            <div class="donut-chart">
+                <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+                    <circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="#e5e7eb" stroke-width="${strokeWidth}"/>
+                    ${svgSegments}
+                </svg>
+                <div class="donut-center">
+                    <span class="donut-center-count">${total}</span>
+                    <span class="donut-center-label">tests</span>
+                </div>
+            </div>
+            <div class="donut-legend">${legendItems}</div>
+        </div>
+    `;
 }
 
 /**
