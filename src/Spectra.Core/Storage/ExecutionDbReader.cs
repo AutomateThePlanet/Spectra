@@ -85,9 +85,11 @@ public sealed class ExecutionDbReader : IAsyncDisposable
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
         {
-            var startedAt = DateTime.Parse(reader.GetString(3));
+            var startedAt = DateTime.Parse(reader.GetString(3), null, System.Globalization.DateTimeStyles.AdjustToUniversal);
             var completedAtStr = reader.IsDBNull(5) ? null : reader.GetString(5);
-            var completedAt = completedAtStr is not null ? DateTime.Parse(completedAtStr) : (DateTime?)null;
+            var completedAt = completedAtStr is not null
+                ? DateTime.Parse(completedAtStr, null, System.Globalization.DateTimeStyles.AdjustToUniversal)
+                : (DateTime?)null;
 
             runs.Add(new RunSummary
             {
@@ -98,7 +100,7 @@ public sealed class ExecutionDbReader : IAsyncDisposable
                 StartedBy = reader.GetString(4),
                 CompletedAt = completedAt,
                 DurationSeconds = completedAt.HasValue
-                    ? (int)(completedAt.Value - startedAt).TotalSeconds
+                    ? Math.Max(0, (int)(completedAt.Value - startedAt).TotalSeconds)
                     : null,
                 Total = reader.GetInt32(6),
                 Passed = reader.GetInt32(7),

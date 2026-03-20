@@ -303,7 +303,7 @@ public sealed class DataCollector
             CompletedAt = completedAt,
             StartedBy = report.GetStartedBy(),
             DurationSeconds = completedAt.HasValue
-                ? (int)(completedAt.Value - startedAt).TotalSeconds
+                ? Math.Max(0, (int)(completedAt.Value.ToUniversalTime() - startedAt.ToUniversalTime()).TotalSeconds)
                 : null,
             Total = total,
             Passed = passed,

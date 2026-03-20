@@ -195,6 +195,33 @@ function render() {
 }
 
 /**
+ * Get tests belonging to a suite (by name match)
+ */
+function getTestsForSuite(suiteName) {
+    return allTests.filter(t => t.suite === suiteName);
+}
+
+/**
+ * Check if a suite matches current filters
+ */
+function suiteMatchesFilters(suite) {
+    const suiteTests = getTestsForSuite(suite.name);
+    if (filters.priority && !suiteTests.some(t => t.priority === filters.priority)) return false;
+    if (filters.component && !suiteTests.some(t => t.component === filters.component)) return false;
+    if (filters.search) {
+        const s = filters.search.toLowerCase();
+        if (!suite.name.toLowerCase().includes(s) &&
+            !suiteTests.some(t => t.title.toLowerCase().includes(s) || t.id.toLowerCase().includes(s))) {
+            return false;
+        }
+    }
+    if (filters.tags.length > 0) {
+        if (!suiteTests.some(t => filters.tags.every(tag => (t.tags || []).includes(tag)))) return false;
+    }
+    return true;
+}
+
+/**
  * Render suite cards
  */
 function renderSuites() {
@@ -207,9 +234,20 @@ function renderSuites() {
         `;
     }
 
+    const filtered = data.suites.filter(s => suiteMatchesFilters(s));
+
+    if (!filtered.length) {
+        return `
+            <div class="empty-state">
+                <h2>No suites match filters</h2>
+                <p>Try adjusting your filters.</p>
+            </div>
+        `;
+    }
+
     return `
         <div class="card-grid">
-            ${data.suites.map(s => `
+            ${filtered.map(s => `
                 <div class="card" onclick="showSuiteTests('${escapeHtml(s.name)}')">
                     <div class="card-title">${escapeHtml(s.name)}</div>
                     <div class="card-meta">
@@ -288,6 +326,28 @@ function renderTests() {
 }
 
 /**
+ * Check if a run matches current filters (by cross-referencing suite metadata)
+ */
+function runMatchesFilters(run) {
+    const suite = data.suites.find(s => s.name.toLowerCase() === (run.suite || '').toLowerCase());
+    const suiteTests = getTestsForSuite(run.suite);
+
+    if (filters.search) {
+        const s = filters.search.toLowerCase();
+        if (!(run.suite || '').toLowerCase().includes(s) &&
+            !(run.run_id || '').toLowerCase().includes(s)) {
+            return false;
+        }
+    }
+    if (filters.priority && suiteTests.length > 0 && !suiteTests.some(t => t.priority === filters.priority)) return false;
+    if (filters.component && suiteTests.length > 0 && !suiteTests.some(t => t.component === filters.component)) return false;
+    if (filters.tags.length > 0 && suiteTests.length > 0) {
+        if (!suiteTests.some(t => filters.tags.every(tag => (t.tags || []).includes(tag)))) return false;
+    }
+    return true;
+}
+
+/**
  * Render execution run history with table and trend chart
  */
 function renderRuns() {
@@ -300,6 +360,7 @@ function renderRuns() {
         `;
     }
 
+    const filteredRuns = data.runs.filter(r => runMatchesFilters(r));
     const trendChart = renderTrendChart();
     const trendSummary = renderTrendSummary();
 
@@ -308,8 +369,14 @@ function renderRuns() {
         ${trendSummary}
         <div class="section-header">
             <h3 class="section-title">Run History</h3>
-            <span class="section-count">${data.runs.length} runs</span>
+            <span class="section-count">${filteredRuns.length} runs</span>
         </div>
+        ${filteredRuns.length === 0 ? `
+            <div class="empty-state">
+                <h2>No runs match filters</h2>
+                <p>Try adjusting your filters.</p>
+            </div>
+        ` : `
         <div class="run-table-container">
             <table class="run-table">
                 <thead>
@@ -327,7 +394,7 @@ function renderRuns() {
                     </tr>
                 </thead>
                 <tbody>
-                    ${data.runs.map(r => {
+                    ${filteredRuns.map(r => {
                         const passRate = r.total > 0 ? ((r.passed / r.total) * 100).toFixed(1) : 0;
                         const duration = r.duration_seconds ? formatDuration(r.duration_seconds) : '-';
                         const dateStr = new Date(r.started_at).toLocaleString();
@@ -357,11 +424,12 @@ function renderRuns() {
                 </tbody>
             </table>
         </div>
+        `}
     `;
 }
 
 /**
- * Render trend chart (simple SVG bar chart)
+ * Render trend chart (line + area chart)
  */
 function renderTrendChart() {
     const trends = data.trends;
@@ -370,39 +438,65 @@ function renderTrendChart() {
     }
 
     const points = trends.points.slice(-14); // Last 14 days
-    const maxRate = 100;
-    const chartHeight = 120;
-    const chartWidth = 100;
-    const barWidth = chartWidth / points.length;
+    const w = 600, h = 200;
+    const pad = { top: 20, right: 20, bottom: 30, left: 45 };
+    const plotW = w - pad.left - pad.right;
+    const plotH = h - pad.top - pad.bottom;
 
-    const bars = points.map((p, i) => {
-        const height = (p.pass_rate / maxRate) * chartHeight;
-        const x = i * barWidth;
-        const y = chartHeight - height;
-        const color = p.pass_rate >= 80 ? 'var(--color-success)' :
-                      p.pass_rate >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
-        const dateStr = new Date(p.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        return `
-            <g class="trend-bar" data-date="${dateStr}" data-rate="${p.pass_rate}%">
-                <rect x="${x}%" y="${y}" width="${barWidth - 1}%" height="${height}"
-                      fill="${color}" rx="2"/>
-            </g>
-        `;
+    // Determine line color from trend direction
+    const lineColor = trends.direction === 'improving' ? 'var(--color-success)' :
+                      trends.direction === 'declining' ? 'var(--color-danger)' : 'var(--color-warning)';
+
+    // Map points to coordinates
+    const coords = points.map((p, i) => {
+        const x = pad.left + (points.length === 1 ? plotW / 2 : (i / (points.length - 1)) * plotW);
+        const y = pad.top + plotH - (p.pass_rate / 100) * plotH;
+        return { x, y, p };
+    });
+
+    // Grid lines at 0%, 25%, 50%, 75%, 100%
+    const gridLines = [0, 25, 50, 75, 100].map(pct => {
+        const y = pad.top + plotH - (pct / 100) * plotH;
+        return `<line x1="${pad.left}" y1="${y}" x2="${w - pad.right}" y2="${y}" stroke="#e2e8f0" stroke-dasharray="4 2"/>
+                ${pct % 50 === 0 ? `<text x="${pad.left - 8}" y="${y + 4}" text-anchor="end" fill="#64748b" font-size="11">${pct}%</text>` : ''}`;
     }).join('');
+
+    // Polyline points string
+    const linePoints = coords.map(c => `${c.x},${c.y}`).join(' ');
+
+    // Area polygon (line + bottom edge)
+    const areaPoints = coords.map(c => `${c.x},${c.y}`).join(' ') +
+        ` ${coords[coords.length - 1].x},${pad.top + plotH} ${coords[0].x},${pad.top + plotH}`;
+
+    // Data point circles with tooltips
+    const circles = coords.map(c => {
+        const dateStr = new Date(c.p.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return `<circle cx="${c.x}" cy="${c.y}" r="4" fill="${lineColor}" stroke="white" stroke-width="2">
+                    <title>${dateStr}: ${c.p.pass_rate}% (${c.p.passed}/${c.p.total})</title>
+                </circle>`;
+    }).join('');
+
+    // X-axis labels (first, middle, last)
+    const xLabels = [];
+    if (points.length > 0) {
+        const indices = points.length <= 2 ? points.map((_, i) => i) : [0, Math.floor(points.length / 2), points.length - 1];
+        indices.forEach(i => {
+            const dateStr = new Date(points[i].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            xLabels.push(`<text x="${coords[i].x}" y="${h - 5}" text-anchor="middle" fill="#64748b" font-size="11">${dateStr}</text>`);
+        });
+    }
 
     return `
         <div class="trend-chart-container">
             <h3 class="section-title">Pass Rate Trend (Last 14 Days)</h3>
             <div class="trend-chart">
-                <svg viewBox="0 0 100 ${chartHeight}" preserveAspectRatio="none" class="trend-svg">
-                    ${bars}
+                <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" class="trend-svg">
+                    ${gridLines}
+                    <polygon points="${areaPoints}" fill="${lineColor}" opacity="0.1"/>
+                    <polyline points="${linePoints}" fill="none" stroke="${lineColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    ${circles}
+                    ${xLabels.join('')}
                 </svg>
-                <div class="trend-chart-labels">
-                    ${points.length > 0 ? `
-                        <span>${new Date(points[0].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                        <span>${new Date(points[points.length - 1].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                    ` : ''}
-                </div>
             </div>
         </div>
     `;
@@ -461,27 +555,26 @@ function showRunDetail(runId) {
     content.innerHTML = `
         <div class="card run-detail">
             <button class="back-btn" onclick="render()">← Back to Runs</button>
-            ${run.report_path ? `<a class="open-report-btn" href="${escapeHtml(run.report_path)}" target="_blank">Open Full Report</a>` : ''}
             <h2>Run: ${escapeHtml(run.run_id)}</h2>
             <div class="run-detail-meta">
                 <div class="stat">
-                    <span class="stat-label">Suite</span>
+                    <span class="stat-label">Suite:</span>
                     <span class="stat-value">${escapeHtml(run.suite)}</span>
                 </div>
                 <div class="stat">
-                    <span class="stat-label">Status</span>
+                    <span class="stat-label">Status:</span>
                     <span class="stat-value badge ${run.status}">${escapeHtml(run.status)}</span>
                 </div>
                 <div class="stat">
-                    <span class="stat-label">Started</span>
+                    <span class="stat-label">Started:</span>
                     <span class="stat-value">${new Date(run.started_at).toLocaleString()}</span>
                 </div>
                 <div class="stat">
-                    <span class="stat-label">Duration</span>
+                    <span class="stat-label">Duration:</span>
                     <span class="stat-value">${duration}</span>
                 </div>
                 <div class="stat">
-                    <span class="stat-label">Executed By</span>
+                    <span class="stat-label">Executed By:</span>
                     <span class="stat-value">${escapeHtml(run.started_by)}</span>
                 </div>
             </div>
@@ -537,12 +630,24 @@ function showRunDetail(runId) {
 }
 
 /**
- * Render individual result row with expandable details
+ * Render individual result row with expandable details.
+ * Cross-references parsed test content from allTests for full detail.
  */
 function renderResultRow(r) {
     const statusLower = (r.status || '').toLowerCase();
-    const hasDetails = r.notes || r.blocked_by || r.attempt > 1;
     const durationStr = r.duration_ms ? formatDurationMs(r.duration_ms) : '';
+
+    // Cross-reference with parsed test data for full content
+    const testData = allTests.find(t => t.id === r.test_id);
+    const preconditions = r.preconditions || (testData && testData.preconditions);
+    const steps = r.steps || (testData && testData.steps);
+    const expectedResult = r.expected_result || (testData && testData.expected_result);
+    const testDataStr = r.test_data || (testData && testData.test_data);
+    const screenshots = r.screenshot_paths;
+
+    const hasDetails = r.notes || r.blocked_by || r.attempt > 1 ||
+                       preconditions || (steps && steps.length > 0) ||
+                       expectedResult || testDataStr || (screenshots && screenshots.length > 0);
 
     if (hasDetails) {
         return `
@@ -550,13 +655,18 @@ function renderResultRow(r) {
                 <summary>
                     <span class="result-status badge ${statusLower}">${escapeHtml(r.status)}</span>
                     <span class="result-id">${escapeHtml(r.test_id)}</span>
-                    <span class="result-title">${escapeHtml(r.title || '')}</span>
+                    <span class="result-title">${escapeHtml(r.title || (testData && testData.title) || '')}</span>
                     ${r.attempt > 1 ? `<span class="result-attempt">Attempt ${r.attempt}</span>` : ''}
                     ${durationStr ? `<span class="result-duration">${durationStr}</span>` : ''}
                 </summary>
                 <div class="result-details">
-                    ${r.notes ? `<div class="result-notes"><strong>Notes:</strong> ${escapeHtml(r.notes)}</div>` : ''}
+                    ${preconditions ? `<div class="result-section"><strong>Preconditions:</strong><div class="result-section-text">${escapeHtml(preconditions)}</div></div>` : ''}
+                    ${steps && steps.length > 0 ? `<div class="result-section"><strong>Steps:</strong><ol class="result-steps-list">${steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ol></div>` : ''}
+                    ${expectedResult ? `<div class="result-section"><strong>Expected Result:</strong><div class="result-section-text">${escapeHtml(expectedResult)}</div></div>` : ''}
+                    ${testDataStr ? `<div class="result-section"><strong>Test Data:</strong><pre class="result-test-data">${escapeHtml(testDataStr)}</pre></div>` : ''}
+                    ${r.notes ? `<div class="result-notes"><strong>Actual Result / Notes:</strong> ${escapeHtml(r.notes)}</div>` : ''}
                     ${r.blocked_by ? `<div class="result-blocked-by"><strong>Blocked by:</strong> ${escapeHtml(r.blocked_by)}</div>` : ''}
+                    ${screenshots && screenshots.length > 0 ? `<div class="result-section"><strong>Screenshots:</strong><div class="result-screenshots">${screenshots.map(s => `<a href="${escapeHtml(s)}" target="_blank" class="screenshot-thumb"><img src="${escapeHtml(s)}" alt="Screenshot" /></a>`).join('')}</div></div>` : ''}
                 </div>
             </details>
         `;
@@ -565,7 +675,7 @@ function renderResultRow(r) {
             <div class="result-row ${statusLower}" data-status="${r.status}">
                 <span class="result-status badge ${statusLower}">${escapeHtml(r.status)}</span>
                 <span class="result-id">${escapeHtml(r.test_id)}</span>
-                <span class="result-title">${escapeHtml(r.title || '')}</span>
+                <span class="result-title">${escapeHtml(r.title || (testData && testData.title) || '')}</span>
                 ${durationStr ? `<span class="result-duration">${durationStr}</span>` : ''}
             </div>
         `;
@@ -624,7 +734,7 @@ function formatDuration(seconds) {
 }
 
 /**
- * Render coverage visualization
+ * Render coverage visualization with summary panel
  */
 function renderCoverage() {
     if (!data.coverage || !data.coverage.nodes || data.coverage.nodes.length === 0) {
@@ -636,13 +746,51 @@ function renderCoverage() {
         `;
     }
 
+    // Calculate coverage stats from nodes and links
+    const docNodes = data.coverage.nodes.filter(n => n.type === 'Document');
+    const testNodes = data.coverage.nodes.filter(n => n.type === 'Test');
+    const automationNodes = data.coverage.nodes.filter(n => n.type === 'Automation');
+    const docToTestLinks = data.coverage.links.filter(l => l.type === 'DocumentToTest');
+
+    const docsWithTests = new Set(docToTestLinks.map(l => l.source)).size;
+    const totalDocs = docNodes.length;
+    const docCoverage = totalDocs > 0 ? ((docsWithTests / totalDocs) * 100).toFixed(1) : 0;
+
+    const testsWithAutomation = testNodes.filter(n => n.status === 'Covered').length;
+    const totalTests = testNodes.length;
+    const autoCoverage = totalTests > 0 ? ((testsWithAutomation / totalTests) * 100).toFixed(1) : 0;
+
+    const unlinkedTests = testNodes.filter(t => {
+        return !data.coverage.links.some(l => l.target === t.id && l.type === 'DocumentToTest');
+    }).length;
+
+    const summaryPanel = `
+        <div class="coverage-summary">
+            <div class="coverage-summary-card">
+                <span class="coverage-summary-label">Documentation Coverage</span>
+                <span class="coverage-summary-value">${docCoverage}%</span>
+                <span class="coverage-summary-detail">${docsWithTests} of ${totalDocs} documents have linked tests</span>
+            </div>
+            <div class="coverage-summary-card">
+                <span class="coverage-summary-label">Automation Coverage</span>
+                <span class="coverage-summary-value">${autoCoverage}%</span>
+                <span class="coverage-summary-detail">${testsWithAutomation} of ${totalTests} tests have automation</span>
+            </div>
+            <div class="coverage-summary-card">
+                <span class="coverage-summary-label">Unlinked Tests</span>
+                <span class="coverage-summary-value">${unlinkedTests}</span>
+                <span class="coverage-summary-detail">Tests without source document references</span>
+            </div>
+        </div>
+    `;
+
     // Use the coverage map visualization from coverage-map.js
     if (typeof window.renderCoverageMap === 'function') {
-        return window.renderCoverageMap();
+        return summaryPanel + window.renderCoverageMap();
     }
 
     // Fallback if coverage-map.js not loaded
-    return `
+    return summaryPanel + `
         <div class="empty-state">
             <h2>Coverage Visualization</h2>
             <p>Coverage map script not loaded.</p>
