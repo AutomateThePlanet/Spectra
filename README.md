@@ -9,230 +9,52 @@ SPECTRA reads your product documentation, generates comprehensive manual test su
 
 It doesn't replace your existing tools — it adds an AI layer. Bugs go to Azure DevOps, notifications to Teams, tests live in GitHub.
 
-## What SPECTRA Does
-
-**Generates tests from documentation.** Point the CLI at your docs folder. The AI agent discovers relevant documentation, understands the system, and produces a complete batch of manual test cases as Markdown files with structured metadata.
-
-**Keeps tests in sync.** When documentation changes, SPECTRA sweeps your test suites, identifies outdated, orphaned, and redundant tests, and proposes batch updates.
-
-**Executes tests deterministically.** An MCP-based execution engine provides a deterministic state machine that any LLM orchestrator (GitHub Copilot, Claude, custom agents) can drive without holding state. The AI navigates; the engine enforces.
-
-**Integrates without migration.** The orchestrator connects to Azure DevOps, Jira, Teams, or Slack through their own MCP servers. No bidirectional sync. No data migration. Each system does what it's good at.
-
 ## Architecture
 
 ```
-docs/                        ← Source documentation
-  ↓
-docs/_index.md               ← Pre-built document index (incremental)
-  ↓
-AI Test Generation CLI       ← GitHub Copilot SDK (sole AI runtime)
-  ↓                            Supports: github-models, azure-openai,
-tests/                       ←          azure-anthropic, openai, anthropic
-  ↓
-MCP Execution Engine         ← Deterministic state machine
-  ↓
-LLM Orchestrator             ← Copilot Chat, Claude, any MCP client
-  ↓ (as needed)
-Azure DevOps / Jira / Teams  ← Bug logging, notifications via their MCPs
+docs/                        <- Source documentation
+  |
+docs/_index.md               <- Pre-built document index (incremental)
+  |
+AI Test Generation CLI       <- GitHub Copilot SDK (sole AI runtime)
+  |                            Supports: github-models, azure-openai,
+tests/                       <-          azure-anthropic, openai, anthropic
+  |
+MCP Execution Engine         <- Deterministic state machine
+  |
+LLM Orchestrator             <- Copilot Chat, Claude, any MCP client
+  | (as needed)
+Azure DevOps / Jira / Teams  <- Bug logging, notifications via their MCPs
 ```
 
-### Two Independent Subsystems
-
-| Subsystem | Purpose | Can be used independently |
-|---|---|---|
-| **AI CLI** | Generate, update, and analyze test cases from documentation | Yes — tests are useful even without the execution engine |
-| **MCP Engine** | Execute tests through deterministic AI-orchestrated protocol | Yes — works with any Markdown tests, not just AI-generated ones |
+| Subsystem | Purpose | Independent? |
+|-----------|---------|:------------:|
+| **AI CLI** | Generate, update, and analyze test cases from documentation | Yes |
+| **MCP Engine** | Execute tests through deterministic AI-orchestrated protocol | Yes |
 
 ## Quick Start
-
-> **Note:** SPECTRA is under active development. The instructions below describe the target experience.
 
 ```bash
 # Install
 dotnet tool install -g spectra
 
-# Initialize a repo
+# Initialize and generate
 spectra init
-
-# Build/update the documentation index
 spectra docs index
-
-# Generate tests from documentation
 spectra ai generate checkout --count 10
 
-# Generate with focus on specific scenarios
-spectra ai generate checkout --focus "negative payment validation"
-
-# Validate all tests
+# Validate
 spectra validate
-
-# Rebuild indexes
-spectra index
 ```
 
-### Prerequisites
-
-- .NET 8.0+
-- GitHub Copilot CLI installed (`copilot --version` to verify)
-
-SPECTRA uses the GitHub Copilot SDK as its AI runtime. All providers (GitHub Models, Azure OpenAI, Azure Anthropic, OpenAI, Anthropic) are accessed through the Copilot SDK.
-
-### Quick Auth Check
-
-```bash
-spectra auth
-```
-
-This verifies Copilot SDK availability and shows supported providers.
-
-## Test Case Format
-
-Tests are Markdown files with YAML frontmatter, stored in `tests/{suite}/`:
-
-```markdown
----
-id: TC-102
-priority: high
-tags: [payments, negative]
-component: checkout
-source_refs: [docs/features/checkout/payment-methods.md]
-requirements: [REQ-042]
-automated_by:
-  - tests/e2e/CheckoutTests.cs
-grounding:
-  verdict: grounded
-  score: 0.95
-  generator: claude-sonnet-4
-  critic: gemini-2.0-flash
-  verified_at: 2026-03-19T10:30:00Z
----
-
-# Checkout with expired card
-
-## Steps
-1. Navigate to checkout
-2. Enter expired card details (exp: 01/2020)
-3. Click "Pay Now"
-
-## Expected Result
-- Payment is rejected
-- Error message displays: card expired
-```
-
-## CLI Reference
-
-### Test Generation
-
-SPECTRA supports two modes for test generation:
-
-**Interactive Mode** - Guided prompts for exploratory generation:
-```bash
-spectra ai generate
-```
-
-This launches a guided session that:
-1. Lists available suites with test counts (or create a new suite)
-2. Asks what kind of tests you want (full coverage, negative only, specific area)
-3. Shows existing tests matching your focus
-4. Identifies coverage gaps in your documentation
-5. Generates tests and writes them directly
-6. Prompts to generate more for remaining gaps
-
-**Direct Mode** - Specify suite and options upfront:
-```bash
-# Generate tests for a specific suite
-spectra ai generate checkout --count 10
-
-# Focus on specific scenarios
-spectra ai generate checkout --focus "error handling"
-spectra ai generate payments --focus "negative validation edge cases"
-
-# Skip grounding verification (faster)
-spectra ai generate checkout --skip-critic
-
-# CI mode (no interactive prompts)
-spectra ai generate checkout --count 10 --no-interaction --no-review
-
-# Preview without writing files
-spectra ai generate checkout --count 5 --dry-run
-```
-
-### Test Updates
-
-```bash
-# Interactive mode
-spectra ai update
-
-# Update specific suite
-spectra ai update checkout
-
-# Show diff of proposed changes
-spectra ai update checkout --diff
-
-# Auto-delete orphaned tests
-spectra ai update checkout --delete-orphaned
-
-# CI mode
-spectra ai update checkout --no-interaction
-```
-
-### Documentation Index
-
-```bash
-# Build or incrementally update the documentation index
-spectra docs index
-
-# Force a full rebuild (re-indexes all files)
-spectra docs index --force
-```
-
-The `docs index` command creates `docs/_index.md` — a lightweight index with per-document metadata (title, sections with summaries, key entities, word/token counts, content hashes). The AI agent reads this index (~1-2K tokens) instead of scanning all files. Content hashes enable incremental updates so only changed files are re-indexed.
-
-The index is also auto-refreshed before `spectra ai generate` runs.
-
-### Coverage Analysis
-
-SPECTRA produces a unified coverage report with three sections:
-- **Documentation Coverage** — which docs have linked tests (via `source_refs`)
-- **Requirements Coverage** — which requirements are covered (via `requirements` field + `_requirements.yaml`)
-- **Automation Coverage** — which tests have automation links (via `automated_by` field + code scanning)
-
-```bash
-# Unified three-section coverage report
-spectra ai analyze --coverage
-
-# Output as JSON (three top-level keys: documentation_coverage, requirements_coverage, automation_coverage)
-spectra ai analyze --coverage --format json --output coverage.json
-
-# Output as Markdown
-spectra ai analyze --coverage --format markdown --output coverage.md
-
-# Auto-link: scan automation code and write automated_by back into test files
-spectra ai analyze --coverage --auto-link
-```
-
-### Global Options
-
-| Option | Description |
-|--------|-------------|
-| `--verbosity`, `-v` | Output level: quiet, minimal, normal, detailed, diagnostic |
-| `--dry-run` | Preview changes without executing |
-| `--no-review` | Skip interactive review (CI mode) |
-
-### Test ID Allocation
-
-Test IDs are unique globally across all suites. When you generate tests:
-- SPECTRA scans all `_index.json` files to find existing IDs
-- New tests continue from the global maximum (e.g., if TC-150 exists anywhere, new tests start at TC-151)
-- This prevents ID collisions when tests are moved between suites
+**Prerequisites:** .NET 8.0+ and GitHub Copilot CLI (`copilot --version`). See [Getting Started](docs/getting-started.md) for auth setup and detailed instructions.
 
 ## How It Fits
 
 SPECTRA is part of the [Automate The Planet](https://www.automatetheplanet.com/) ecosystem:
 
 | Tool | Purpose |
-|---|---|
+|------|---------|
 | [BELLATRIX](https://bellatrix.solutions) | Test automation framework |
 | [Testimize](https://github.com/AntoanAngelov/Testimize) | Test case optimization (hybrid ABC algorithm) |
 | **SPECTRA** | AI test generation and execution protocol |
@@ -241,100 +63,30 @@ SPECTRA is part of the [Automate The Planet](https://www.automatetheplanet.com/)
 
 ## Documentation
 
-- [Development Guide](docs/DEVELOPMENT.md) — Building, testing, and running locally
-- [CLI Quickstart](specs/001-ai-test-generation-cli/quickstart.md) — Using the AI test generation CLI
-- [MCP Server Quickstart](specs/002-mcp-execution-server/quickstart.md) — Using the MCP execution server
-- [Architecture Specification](spec-kit/architecture.md) — Full system design
-- [ADR Index](spec-kit/adr/) — Architecture Decision Records
+| Guide | Description |
+|-------|-------------|
+| [Getting Started](docs/getting-started.md) | Install, prerequisites, auth setup, first run |
+| [CLI Reference](docs/cli-reference.md) | All commands, flags, and options |
+| [Configuration](docs/configuration.md) | Full `spectra.config.json` reference |
+| [Test Format](docs/test-format.md) | Markdown format, YAML frontmatter, metadata schema |
+| [Coverage Analysis](docs/coverage.md) | Documentation, Requirements, and Automation coverage |
+| [Generation Profiles](docs/generation-profiles.md) | Customize AI output style and quality |
+| [Grounding Verification](docs/grounding-verification.md) | Dual-model critic for hallucination detection |
+| [Document Index](docs/document-index.md) | Pre-built doc index for efficient generation |
+| [Execution Agent](docs/execution-agent/overview.md) | MCP tools and AI-driven test execution |
+| [Architecture](docs/architecture/overview.md) | System design and key decisions |
+| [Development Guide](docs/DEVELOPMENT.md) | Building, testing, and running locally |
 
 ## Project Status
 
-SPECTRA is in active development. See the [roadmap](#roadmap) for current priorities.
+SPECTRA is in active development.
 
-### Roadmap
-
-**Phase 1: AI Test Generation CLI** ✓ *complete*
-- Markdown test format with metadata schema
-- Document map builder + selective loading
-- Batch generation and batch update
-- Unified AI runtime (GitHub Copilot SDK)
-- Multi-provider support via SDK configuration
-- Validation, indexing, deduplication
-
-**Phase 2: MCP Execution Engine** ✓ *complete*
-- Deterministic state machine
-- SQLite execution storage
-- Test handles, run lifecycle
-- Orchestrator-agnostic MCP API
-
-**Phase 3: Dashboard & Coverage Analysis** ✓ *complete*
-- Interactive HTML dashboard with three-section coverage display
-- Unified coverage report: Documentation, Requirements, and Automation coverage
-- `--auto-link` flag to write `automated_by` back into test files
-- `requirements` and `automated_by` fields in test frontmatter
-- `_requirements.yaml` for formal requirements tracking
-- Configurable scan patterns for automation code detection
-
-**Phase 4: Test Generation Profiles** ✓ *complete*
-- Repository-level profiles (`spectra.profile.md`)
-- Suite-level profiles (`_profile.md`)
-- Profile management commands
-
-**Phase 5: Grounding Verification** ✓ *complete*
-- Dual-model critic flow (generator + verifier)
-- Three verdicts: grounded, partial, hallucinated
-- Grounding metadata in test frontmatter
-- Configurable critic provider (Google, OpenAI, Anthropic, GitHub)
-
-**Phase 6: Integrations and Ecosystem** ← *current*
-- Cross-MCP patterns (Azure DevOps, Teams, Slack)
-- Copilot Spaces as knowledge source
-- Optional Runner UI
-
-## Configuration
-
-SPECTRA is configured via `spectra.config.json` at the repository root. See [Configuration Reference](spec-kit/configuration.md) for the full schema.
-
-```json
-{
-  "source": {
-    "mode": "local",
-    "local_dir": "docs/",
-    "doc_index": "docs/_index.md"
-  },
-  "tests": {
-    "dir": "tests/"
-  },
-  "ai": {
-    "providers": [
-      { "name": "github-models", "model": "gpt-4o", "enabled": true }
-    ],
-    "critic": {
-      "enabled": true,
-      "provider": "github-models",
-      "model": "gpt-4o-mini"
-    }
-  },
-  "coverage": {
-    "automation_dirs": ["tests", "test", "spec", "e2e"],
-    "scan_patterns": ["[TestCase(\"{id}\")]", "@pytest.mark.manual_test(\"{id}\")"],
-    "file_extensions": [".cs", ".java", ".py", ".ts"],
-    "requirements_file": "docs/requirements/_requirements.yaml"
-  }
-}
-```
-
-### Supported Providers (via Copilot SDK)
-
-| Provider | Description |
-|----------|-------------|
-| `github-models` | GitHub Models API (default) |
-| `azure-openai` | Azure OpenAI Service |
-| `azure-anthropic` | Azure AI with Anthropic models |
-| `openai` | OpenAI API (BYOK) |
-| `anthropic` | Anthropic API (BYOK) |
-
-For BYOK providers, set `api_key_env` to the environment variable name containing your API key.
+**Phase 1: AI Test Generation CLI** ✓
+**Phase 2: MCP Execution Engine** ✓
+**Phase 3: Dashboard & Coverage Analysis** ✓
+**Phase 4: Test Generation Profiles** ✓
+**Phase 5: Grounding Verification** ✓
+**Phase 6: Integrations and Ecosystem** <- *current*
 
 ## Contributing
 

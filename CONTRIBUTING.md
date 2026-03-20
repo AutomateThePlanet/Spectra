@@ -2,27 +2,14 @@
 
 Thank you for your interest in contributing to SPECTRA.
 
-## Project Structure
-
-```
-src/
-├── Spectra.CLI/           # AI test generation CLI
-├── Spectra.MCP/           # MCP execution server
-├── Spectra.Core/          # Shared library (parsing, validation, models)
-└── Spectra.GitHub/        # GitHub integration (Octokit)
-
-spec-kit/                  # Architecture specs, ADRs
-tests/                     # Sample test cases (also used for testing)
-docs/                      # Sample documentation (used for testing generation)
-```
-
 ## Development Setup
 
 1. Install .NET 8.0+ SDK
-2. Install GitHub Copilot CLI (`copilot --version` to verify) - required for all AI features
-3. Clone the repo
-4. `dotnet build` from the repo root
-5. `dotnet test` to verify setup
+2. Clone the repo
+3. `dotnet build` from the repo root
+4. `dotnet test` to verify setup
+
+See [Development Guide](docs/DEVELOPMENT.md) for detailed build and run instructions.
 
 ### AI Runtime
 
@@ -39,8 +26,13 @@ SPECTRA uses the GitHub Copilot SDK as its sole AI runtime. All AI generation an
 - Fork the repo and create a feature branch
 - Follow existing code style
 - Add tests for new functionality
-- Update spec-kit documentation if the change affects architecture
+- Update documentation in `docs/` if the change affects user-facing behavior
+- Update `spec-kit/` if the change affects architecture
 - Keep PRs focused — one concern per PR
+
+### Documentation
+
+User-facing documentation lives in `docs/`. See the [documentation index](README.md#documentation) for the full list. Each piece of information should live in one place — don't duplicate content between files.
 
 ### Architecture Changes
 - Propose significant changes as an ADR (Architecture Decision Record) in `spec-kit/adr/`
