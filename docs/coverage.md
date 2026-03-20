@@ -169,6 +169,38 @@ Full coverage settings in `spectra.config.json`:
 
 See [Configuration Reference](configuration.md) for all coverage options.
 
-## Dashboard Display
+## Dashboard Visualizations
 
-The [dashboard](cli-reference.md#spectra-dashboard) includes a Coverage tab with three stacked sections showing progress bars and detail lists. Color coding: green >= 80%, yellow >= 50%, red < 50%.
+The [dashboard](cli-reference.md#spectra-dashboard) Coverage tab provides four visualizations:
+
+### Donut Chart
+
+A test health distribution chart at the top of the Coverage tab:
+- **Green** — Automated tests (have `automated_by`)
+- **Yellow** — Manual-only tests (have `source_refs` but no `automated_by`)
+- **Red** — Unlinked tests (neither `source_refs` nor `automated_by`)
+- Center label shows total test count; hover segments for tooltips
+
+### Progress Bars with Drill-Down
+
+Three stacked cards — one per coverage type — with:
+- Percentage and fill bar (green >= 80%, yellow >= 50%, red < 50%)
+- "Show details" toggle that expands a per-item breakdown list
+- Documentation: each doc file with test count and covered/uncovered icon
+- Requirements: each requirement ID, title, linked test IDs
+- Automation: per-suite breakdown (suite name, automated/total, percentage)
+
+### Empty State Guidance
+
+When coverage data is missing or unconfigured, cards show actionable messages:
+- **Requirements**: "No requirements tracked yet" with setup instructions
+- **Automation**: "No automation links detected" with `--auto-link` instructions
+- **Documentation**: "All documents have test coverage!" success message when at 100%
+
+### Treemap
+
+A block visualization below the progress bars showing suites sized by test count and colored by automation coverage:
+- **Green** — >= 50% automated
+- **Yellow** — > 0% but < 50% automated
+- **Red** — 0% automated
+- Hover for suite details; click to navigate to suite test list

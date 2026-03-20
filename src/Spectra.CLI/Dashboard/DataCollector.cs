@@ -550,37 +550,58 @@ public sealed class DataCollector
     {
         try
         {
-            // Documentation coverage: docs with at least one test
-            var allDocRefs = testEntries
-                .SelectMany(t => t.SourceRefs)
-                .Distinct()
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            // Build a lookup from test ID → index entry for requirements/automated_by
+            var indexEntryLookup = suiteIndexes.Values
+                .SelectMany(idx => idx.Tests)
+                .ToDictionary(ti => ti.Id, ti => ti, StringComparer.OrdinalIgnoreCase);
 
+            // ── Documentation coverage ──
+            // Map each doc path → test IDs that reference it
+            var docToTests = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var test in testEntries)
+            {
+                foreach (var docRef in test.SourceRefs)
+                {
+                    if (!docToTests.TryGetValue(docRef, out var list))
+                    {
+                        list = [];
+                        docToTests[docRef] = list;
+                    }
+                    list.Add(test.Id);
+                }
+            }
+
+            var docDetails = new List<DocumentationCoverageDetail>();
             var docsDir = Path.Combine(_basePath, "docs");
-            var totalDocs = 0;
-            var coveredDocs = 0;
-
             if (Directory.Exists(docsDir))
             {
                 var docFiles = Directory.GetFiles(docsDir, "*.md", SearchOption.AllDirectories);
                 foreach (var docFile in docFiles)
                 {
                     var relativePath = Path.GetRelativePath(_basePath, docFile).Replace('\\', '/');
-                    totalDocs++;
-                    if (allDocRefs.Contains(relativePath))
+                    var testIds = docToTests.TryGetValue(relativePath, out var ids)
+                        ? ids.OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList()
+                        : [];
+                    docDetails.Add(new DocumentationCoverageDetail
                     {
-                        coveredDocs++;
-                    }
+                        Doc = relativePath,
+                        TestCount = testIds.Count,
+                        Covered = testIds.Count > 0,
+                        TestIds = testIds
+                    });
                 }
             }
+            docDetails.Sort((a, b) => string.Compare(a.Doc, b.Doc, StringComparison.OrdinalIgnoreCase));
 
+            var coveredDocs = docDetails.Count(d => d.Covered);
+            var totalDocs = docDetails.Count;
             var docPercentage = totalDocs > 0
                 ? Math.Round((coveredDocs * 100m) / totalDocs, 2) : 0m;
 
-            // Requirements coverage: requirements referenced by tests
+            // ── Requirements coverage ──
             var configPath = Path.Combine(_basePath, "spectra.config.json");
-            var reqTotal = 0;
-            var reqCovered = 0;
+            var reqDetails = new List<Core.Models.Coverage.RequirementCoverageDetail>();
+            var hasRequirementsFile = false;
 
             if (File.Exists(configPath))
             {
@@ -593,22 +614,38 @@ public sealed class DataCollector
                         var reqFilePath = Path.Combine(_basePath, config.Coverage.RequirementsFile);
                         var reqParser = new RequirementsParser();
                         var requirements = await reqParser.ParseAsync(reqFilePath);
+                        hasRequirementsFile = File.Exists(reqFilePath) && requirements.Count > 0;
 
-                        if (requirements.Count > 0)
+                        // Build requirement ID → covering test IDs
+                        var reqToTests = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var test in testEntries)
                         {
-                            var allReqRefs = testEntries
-                                .SelectMany(t =>
+                            if (indexEntryLookup.TryGetValue(test.Id, out var idxEntry))
+                            {
+                                foreach (var reqId in idxEntry.Requirements)
                                 {
-                                    // Read requirements from index entries
-                                    var index = suiteIndexes.Values
-                                        .SelectMany(idx => idx.Tests)
-                                        .FirstOrDefault(ti => ti.Id == t.Id);
-                                    return index?.Requirements ?? [];
-                                })
-                                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                                    if (!reqToTests.TryGetValue(reqId, out var list))
+                                    {
+                                        list = [];
+                                        reqToTests[reqId] = list;
+                                    }
+                                    list.Add(test.Id);
+                                }
+                            }
+                        }
 
-                            reqTotal = requirements.Count;
-                            reqCovered = requirements.Count(r => allReqRefs.Contains(r.Id));
+                        foreach (var req in requirements)
+                        {
+                            var testIds = reqToTests.TryGetValue(req.Id, out var ids)
+                                ? ids.OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList()
+                                : [];
+                            reqDetails.Add(new Core.Models.Coverage.RequirementCoverageDetail
+                            {
+                                Id = req.Id,
+                                Title = req.Title ?? "",
+                                Tests = testIds,
+                                Covered = testIds.Count > 0
+                            });
                         }
                     }
                 }
@@ -617,11 +654,51 @@ public sealed class DataCollector
                     // Config read failure is non-fatal for dashboard
                 }
             }
+            reqDetails.Sort((a, b) => string.Compare(a.Id, b.Id, StringComparison.OrdinalIgnoreCase));
 
+            var reqCovered = reqDetails.Count(r => r.Covered);
+            var reqTotal = reqDetails.Count;
             var reqPercentage = reqTotal > 0
                 ? Math.Round((reqCovered * 100m) / reqTotal, 2) : 0m;
 
-            // Automation coverage: tests with automation links
+            // ── Automation coverage ──
+            // Per-suite breakdown
+            var suiteGroups = testEntries
+                .GroupBy(t => t.Suite, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase);
+
+            var autoDetails = new List<AutomationSuiteDetail>();
+            var unlinkedTests = new List<UnlinkedTestDetail>();
+
+            foreach (var group in suiteGroups)
+            {
+                var suiteTests = group.ToList();
+                var suiteTotal = suiteTests.Count;
+                var suiteAutomated = suiteTests.Count(t => t.HasAutomation);
+                var suitePct = suiteTotal > 0
+                    ? Math.Round((suiteAutomated * 100m) / suiteTotal, 2) : 0m;
+
+                autoDetails.Add(new AutomationSuiteDetail
+                {
+                    Suite = group.Key,
+                    Total = suiteTotal,
+                    Automated = suiteAutomated,
+                    Percentage = suitePct
+                });
+
+                // Collect unlinked tests from this suite
+                foreach (var test in suiteTests.Where(t => !t.HasAutomation))
+                {
+                    unlinkedTests.Add(new UnlinkedTestDetail
+                    {
+                        TestId = test.Id,
+                        Suite = test.Suite,
+                        Title = test.Title,
+                        Priority = test.Priority
+                    });
+                }
+            }
+
             var totalTests = testEntries.Count;
             var automatedTests = testEntries.Count(t => t.HasAutomation);
             var autoPercentage = totalTests > 0
@@ -629,23 +706,28 @@ public sealed class DataCollector
 
             return new CoverageSummaryData
             {
-                Documentation = new CoverageSectionData
+                Documentation = new DocumentationSectionData
                 {
                     Covered = coveredDocs,
                     Total = totalDocs,
-                    Percentage = docPercentage
+                    Percentage = docPercentage,
+                    Details = docDetails
                 },
-                Requirements = new CoverageSectionData
+                Requirements = new RequirementsSectionData
                 {
                     Covered = reqCovered,
                     Total = reqTotal,
-                    Percentage = reqPercentage
+                    Percentage = reqPercentage,
+                    HasRequirementsFile = hasRequirementsFile,
+                    Details = reqDetails
                 },
-                Automation = new CoverageSectionData
+                Automation = new AutomationSectionData
                 {
                     Covered = automatedTests,
                     Total = totalTests,
-                    Percentage = autoPercentage
+                    Percentage = autoPercentage,
+                    Details = autoDetails,
+                    UnlinkedTests = unlinkedTests.Count > 0 ? unlinkedTests : null
                 }
             };
         }
