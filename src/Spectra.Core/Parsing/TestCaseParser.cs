@@ -98,6 +98,8 @@ public sealed partial class TestCaseParser
             ScenarioFromDoc = frontmatter.ScenarioFromDoc,
             RelatedWorkItems = frontmatter.RelatedWorkItems,
             Custom = frontmatter.Custom,
+            AutomatedBy = frontmatter.AutomatedBy,
+            Requirements = frontmatter.Requirements,
             Grounding = frontmatter.Grounding?.ToMetadata(),
             Title = title,
             Steps = steps,

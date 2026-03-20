@@ -76,6 +76,16 @@ public sealed class TestCase
     public IReadOnlyDictionary<string, object>? Custom { get; init; }
 
     /// <summary>
+    /// Automation file paths linked to this test.
+    /// </summary>
+    public IReadOnlyList<string> AutomatedBy { get; init; } = [];
+
+    /// <summary>
+    /// Requirement IDs this test covers.
+    /// </summary>
+    public IReadOnlyList<string> Requirements { get; init; } = [];
+
+    /// <summary>
     /// Test status (e.g., "orphaned" when documentation is removed).
     /// </summary>
     public string? Status { get; init; }

@@ -1,11 +1,11 @@
 using System.Text.Json;
 using Spectra.CLI.Coverage;
-using CoverageModels = Spectra.Core.Models.Coverage;
+using Spectra.Core.Models.Coverage;
 
 namespace Spectra.CLI.Tests.Coverage;
 
 /// <summary>
-/// Unit tests for CoverageReportWriter.
+/// Unit tests for CoverageReportWriter (unified three-section report).
 /// </summary>
 public class CoverageReportWriterTests : IDisposable
 {
@@ -37,44 +37,56 @@ public class CoverageReportWriterTests : IDisposable
         var json = _writer.FormatAsJson(report);
 
         Assert.NotEmpty(json);
-        // Should be parseable as JSON
         var parsed = JsonDocument.Parse(json);
         Assert.NotNull(parsed);
     }
 
     [Fact]
-    public void FormatAsJson_IncludesSummary()
+    public void FormatAsJson_IncludesThreeSections()
     {
         var report = CreateMinimalReport();
 
         var json = _writer.FormatAsJson(report);
 
-        Assert.Contains("\"summary\"", json);
+        Assert.Contains("\"documentation_coverage\"", json);
+        Assert.Contains("\"requirements_coverage\"", json);
+        Assert.Contains("\"automation_coverage\"", json);
+    }
+
+    [Fact]
+    public void FormatAsJson_IncludesDocumentationDetails()
+    {
+        var report = CreateReportWithDocs();
+
+        var json = _writer.FormatAsJson(report);
+
+        Assert.Contains("\"total_docs\"", json);
+        Assert.Contains("\"covered_docs\"", json);
+        Assert.Contains("docs/auth.md", json);
+    }
+
+    [Fact]
+    public void FormatAsJson_IncludesRequirementsDetails()
+    {
+        var report = CreateReportWithRequirements();
+
+        var json = _writer.FormatAsJson(report);
+
+        Assert.Contains("\"total_requirements\"", json);
+        Assert.Contains("\"has_requirements_file\"", json);
+        Assert.Contains("REQ-001", json);
+    }
+
+    [Fact]
+    public void FormatAsJson_IncludesAutomationDetails()
+    {
+        var report = CreateReportWithAutomation();
+
+        var json = _writer.FormatAsJson(report);
+
         Assert.Contains("\"total_tests\"", json);
         Assert.Contains("\"automated\"", json);
-        Assert.Contains("\"manual_only\"", json);
-    }
-
-    [Fact]
-    public void FormatAsJson_IncludesBySuite()
-    {
-        var report = CreateReportWithSuites();
-
-        var json = _writer.FormatAsJson(report);
-
-        Assert.Contains("\"by_suite\"", json);
         Assert.Contains("checkout", json);
-    }
-
-    [Fact]
-    public void FormatAsJson_IncludesUnlinkedTests()
-    {
-        var report = CreateReportWithUnlinked();
-
-        var json = _writer.FormatAsJson(report);
-
-        Assert.Contains("\"unlinked_tests\"", json);
-        Assert.Contains("TC-001", json);
     }
 
     [Fact]
@@ -85,9 +97,8 @@ public class CoverageReportWriterTests : IDisposable
         var json = _writer.FormatAsJson(report);
 
         Assert.Contains("\"generated_at\"", json);
-        Assert.Contains("\"coverage_percentage\"", json);
-        Assert.DoesNotContain("\"generatedAt\"", json);
-        Assert.DoesNotContain("\"coveragePercentage\"", json);
+        Assert.Contains("\"documentation_coverage\"", json);
+        Assert.DoesNotContain("\"documentationCoverage\"", json);
     }
 
     [Fact]
@@ -108,55 +119,41 @@ public class CoverageReportWriterTests : IDisposable
         var markdown = _writer.FormatAsMarkdown(report);
 
         Assert.NotEmpty(markdown);
-        Assert.StartsWith("# Automation Coverage Report", markdown);
+        Assert.StartsWith("# Unified Coverage Report", markdown);
     }
 
     [Fact]
-    public void FormatAsMarkdown_IncludesGeneratedDate()
+    public void FormatAsMarkdown_IncludesDocumentationSection()
     {
-        var report = CreateMinimalReport();
+        var report = CreateReportWithDocs();
 
         var markdown = _writer.FormatAsMarkdown(report);
 
-        Assert.Contains("Generated:", markdown);
+        Assert.Contains("## Documentation Coverage", markdown);
+        Assert.Contains("docs/auth.md", markdown);
     }
 
     [Fact]
-    public void FormatAsMarkdown_IncludesSummaryTable()
+    public void FormatAsMarkdown_IncludesRequirementsSection()
     {
-        var report = CreateMinimalReport();
+        var report = CreateReportWithRequirements();
 
         var markdown = _writer.FormatAsMarkdown(report);
 
-        Assert.Contains("## Summary", markdown);
-        Assert.Contains("| Metric | Value |", markdown);
-        Assert.Contains("| Total Tests |", markdown);
-        Assert.Contains("| Automated |", markdown);
-        Assert.Contains("| Coverage |", markdown);
+        Assert.Contains("## Requirements Coverage", markdown);
+        Assert.Contains("REQ-001", markdown);
     }
 
     [Fact]
-    public void FormatAsMarkdown_IncludesSuiteTable()
+    public void FormatAsMarkdown_IncludesAutomationSection()
     {
-        var report = CreateReportWithSuites();
+        var report = CreateReportWithAutomation();
 
         var markdown = _writer.FormatAsMarkdown(report);
 
-        Assert.Contains("## Coverage by Suite", markdown);
-        Assert.Contains("| Suite | Total | Automated | Coverage |", markdown);
+        Assert.Contains("## Automation Coverage", markdown);
+        Assert.Contains("### By Suite", markdown);
         Assert.Contains("checkout", markdown);
-    }
-
-    [Fact]
-    public void FormatAsMarkdown_IncludesComponentTable()
-    {
-        var report = CreateReportWithComponents();
-
-        var markdown = _writer.FormatAsMarkdown(report);
-
-        Assert.Contains("## Coverage by Component", markdown);
-        Assert.Contains("| Component | Total | Automated | Coverage |", markdown);
-        Assert.Contains("cart", markdown);
     }
 
     [Fact]
@@ -168,7 +165,6 @@ public class CoverageReportWriterTests : IDisposable
 
         Assert.Contains("### Unlinked Tests", markdown);
         Assert.Contains("TC-001", markdown);
-        Assert.Contains("Verify checkout", markdown);
     }
 
     [Fact]
@@ -180,7 +176,6 @@ public class CoverageReportWriterTests : IDisposable
 
         Assert.Contains("### Orphaned Automation", markdown);
         Assert.Contains("test.cs", markdown);
-        Assert.Contains("TC-999", markdown);
     }
 
     [Fact]
@@ -196,17 +191,13 @@ public class CoverageReportWriterTests : IDisposable
     }
 
     [Fact]
-    public void FormatAsMarkdown_IncludesMismatches()
+    public void FormatAsMarkdown_NoRequirementsFile_ShowsMessage()
     {
-        var report = CreateReportWithMismatches();
+        var report = CreateMinimalReport();
 
         var markdown = _writer.FormatAsMarkdown(report);
 
-        Assert.Contains("### Link Mismatches", markdown);
-        Assert.Contains("TC-001", markdown);
-        Assert.Contains("Different file", markdown);
-        Assert.Contains("a.cs", markdown);
-        Assert.Contains("b.cs", markdown);
+        Assert.Contains("No requirements file found", markdown);
     }
 
     [Fact]
@@ -229,7 +220,7 @@ public class CoverageReportWriterTests : IDisposable
 
         Assert.True(File.Exists(path));
         var content = await File.ReadAllTextAsync(path);
-        Assert.Contains("\"summary\"", content);
+        Assert.Contains("\"documentation_coverage\"", content);
     }
 
     [Fact]
@@ -242,7 +233,7 @@ public class CoverageReportWriterTests : IDisposable
 
         Assert.True(File.Exists(path));
         var content = await File.ReadAllTextAsync(path);
-        Assert.StartsWith("# Automation Coverage Report", content);
+        Assert.StartsWith("# Unified Coverage Report", content);
     }
 
     [Fact]
@@ -285,167 +276,252 @@ public class CoverageReportWriterTests : IDisposable
 
     #endregion
 
+    #region FormatAsText Tests
+
+    [Fact]
+    public void FormatAsText_ReturnsValidText()
+    {
+        var report = CreateMinimalReport();
+
+        var text = _writer.FormatAsText(report);
+
+        Assert.NotEmpty(text);
+        Assert.Contains("UNIFIED COVERAGE REPORT", text);
+        Assert.Contains("DOCUMENTATION COVERAGE", text);
+        Assert.Contains("REQUIREMENTS COVERAGE", text);
+        Assert.Contains("AUTOMATION COVERAGE", text);
+    }
+
+    #endregion
+
     #region Helpers
 
-    private static CoverageModels.CoverageReport CreateMinimalReport()
+    private static UnifiedCoverageReport CreateMinimalReport()
     {
-        return new CoverageModels.CoverageReport
+        return new UnifiedCoverageReport
         {
             GeneratedAt = DateTime.UtcNow,
-            Summary = new CoverageModels.CoverageSummary
+            DocumentationCoverage = new DocumentationCoverage
+            {
+                TotalDocs = 2,
+                CoveredDocs = 1,
+                Percentage = 50m
+            },
+            RequirementsCoverage = new RequirementsCoverage
+            {
+                TotalRequirements = 0,
+                CoveredRequirements = 0,
+                Percentage = 0m,
+                HasRequirementsFile = false
+            },
+            AutomationCoverage = new AutomationCoverage
             {
                 TotalTests = 10,
                 Automated = 8,
-                ManualOnly = 2,
-                CoveragePercentage = 80m
+                Percentage = 80m
             }
         };
     }
 
-    private static CoverageModels.CoverageReport CreateReportWithSuites()
+    private static UnifiedCoverageReport CreateReportWithDocs()
     {
-        return new CoverageModels.CoverageReport
+        return new UnifiedCoverageReport
         {
             GeneratedAt = DateTime.UtcNow,
-            Summary = new CoverageModels.CoverageSummary
+            DocumentationCoverage = new DocumentationCoverage
             {
-                TotalTests = 10,
-                Automated = 8,
-                ManualOnly = 2,
-                CoveragePercentage = 80m
+                TotalDocs = 2,
+                CoveredDocs = 1,
+                Percentage = 50m,
+                Details =
+                [
+                    new DocumentCoverageDetail
+                    {
+                        Doc = "docs/auth.md",
+                        TestCount = 3,
+                        Covered = true,
+                        TestIds = ["TC-001", "TC-002", "TC-003"]
+                    },
+                    new DocumentCoverageDetail
+                    {
+                        Doc = "docs/admin.md",
+                        TestCount = 0,
+                        Covered = false
+                    }
+                ]
             },
-            BySuite =
-            [
-                new CoverageModels.SuiteCoverage
-                {
-                    Suite = "checkout",
-                    Total = 5,
-                    Automated = 4,
-                    CoveragePercentage = 80m
-                }
-            ]
+            RequirementsCoverage = new RequirementsCoverage
+            {
+                TotalRequirements = 0,
+                CoveredRequirements = 0,
+                Percentage = 0m,
+                HasRequirementsFile = false
+            },
+            AutomationCoverage = new AutomationCoverage
+            {
+                TotalTests = 3,
+                Automated = 2,
+                Percentage = 66.67m
+            }
         };
     }
 
-    private static CoverageModels.CoverageReport CreateReportWithComponents()
+    private static UnifiedCoverageReport CreateReportWithRequirements()
     {
-        return new CoverageModels.CoverageReport
+        return new UnifiedCoverageReport
         {
             GeneratedAt = DateTime.UtcNow,
-            Summary = new CoverageModels.CoverageSummary
+            DocumentationCoverage = new DocumentationCoverage
             {
-                TotalTests = 10,
-                Automated = 8,
-                ManualOnly = 2,
-                CoveragePercentage = 80m
+                TotalDocs = 1,
+                CoveredDocs = 1,
+                Percentage = 100m
             },
-            ByComponent =
-            [
-                new CoverageModels.ComponentCoverage
-                {
-                    Component = "cart",
-                    Total = 5,
-                    Automated = 4,
-                    CoveragePercentage = 80m
-                }
-            ]
+            RequirementsCoverage = new RequirementsCoverage
+            {
+                TotalRequirements = 2,
+                CoveredRequirements = 1,
+                Percentage = 50m,
+                HasRequirementsFile = true,
+                Details =
+                [
+                    new RequirementCoverageDetail
+                    {
+                        Id = "REQ-001",
+                        Title = "Login must work",
+                        Tests = ["TC-001"],
+                        Covered = true
+                    },
+                    new RequirementCoverageDetail
+                    {
+                        Id = "REQ-002",
+                        Title = "Logout must work",
+                        Tests = [],
+                        Covered = false
+                    }
+                ]
+            },
+            AutomationCoverage = new AutomationCoverage
+            {
+                TotalTests = 1,
+                Automated = 1,
+                Percentage = 100m
+            }
         };
     }
 
-    private static CoverageModels.CoverageReport CreateReportWithUnlinked()
+    private static UnifiedCoverageReport CreateReportWithAutomation()
     {
-        return new CoverageModels.CoverageReport
+        return new UnifiedCoverageReport
         {
             GeneratedAt = DateTime.UtcNow,
-            Summary = new CoverageModels.CoverageSummary
+            DocumentationCoverage = new DocumentationCoverage
             {
-                TotalTests = 10,
-                Automated = 8,
-                ManualOnly = 2,
-                CoveragePercentage = 80m
+                TotalDocs = 1,
+                CoveredDocs = 1,
+                Percentage = 100m
             },
-            UnlinkedTests =
-            [
-                new CoverageModels.UnlinkedTest
-                {
-                    TestId = "TC-001",
-                    Title = "Verify checkout",
-                    Suite = "checkout",
-                    Priority = "high"
-                }
-            ]
+            RequirementsCoverage = new RequirementsCoverage
+            {
+                TotalRequirements = 0,
+                CoveredRequirements = 0,
+                Percentage = 0m,
+                HasRequirementsFile = false
+            },
+            AutomationCoverage = new AutomationCoverage
+            {
+                TotalTests = 5,
+                Automated = 4,
+                Percentage = 80m,
+                BySuite =
+                [
+                    new SuiteCoverage
+                    {
+                        Suite = "checkout",
+                        Total = 5,
+                        Automated = 4,
+                        CoveragePercentage = 80m
+                    }
+                ]
+            }
         };
     }
 
-    private static CoverageModels.CoverageReport CreateReportWithOrphans()
+    private static UnifiedCoverageReport CreateReportWithUnlinked()
     {
-        return new CoverageModels.CoverageReport
+        var report = CreateMinimalReport();
+        return new UnifiedCoverageReport
         {
-            GeneratedAt = DateTime.UtcNow,
-            Summary = new CoverageModels.CoverageSummary
+            GeneratedAt = report.GeneratedAt,
+            DocumentationCoverage = report.DocumentationCoverage,
+            RequirementsCoverage = report.RequirementsCoverage,
+            AutomationCoverage = new AutomationCoverage
             {
                 TotalTests = 10,
                 Automated = 8,
-                ManualOnly = 2,
-                CoveragePercentage = 80m
-            },
-            OrphanedAutomation =
-            [
-                new CoverageModels.OrphanedAutomation
-                {
-                    File = "test.cs",
-                    ReferencedIds = ["TC-999"]
-                }
-            ]
+                Percentage = 80m,
+                UnlinkedTests =
+                [
+                    new UnlinkedTest
+                    {
+                        TestId = "TC-001",
+                        Title = "Verify checkout",
+                        Suite = "checkout",
+                        Priority = "high"
+                    }
+                ]
+            }
         };
     }
 
-    private static CoverageModels.CoverageReport CreateReportWithBrokenLinks()
+    private static UnifiedCoverageReport CreateReportWithOrphans()
     {
-        return new CoverageModels.CoverageReport
+        var report = CreateMinimalReport();
+        return new UnifiedCoverageReport
         {
-            GeneratedAt = DateTime.UtcNow,
-            Summary = new CoverageModels.CoverageSummary
+            GeneratedAt = report.GeneratedAt,
+            DocumentationCoverage = report.DocumentationCoverage,
+            RequirementsCoverage = report.RequirementsCoverage,
+            AutomationCoverage = new AutomationCoverage
             {
                 TotalTests = 10,
                 Automated = 8,
-                ManualOnly = 2,
-                CoveragePercentage = 80m
-            },
-            BrokenLinks =
-            [
-                new CoverageModels.BrokenLink
-                {
-                    TestId = "TC-001",
-                    AutomatedBy = "missing.cs",
-                    Reason = "File not found"
-                }
-            ]
+                Percentage = 80m,
+                OrphanedAutomation =
+                [
+                    new OrphanedAutomation
+                    {
+                        File = "test.cs",
+                        ReferencedIds = ["TC-999"]
+                    }
+                ]
+            }
         };
     }
 
-    private static CoverageModels.CoverageReport CreateReportWithMismatches()
+    private static UnifiedCoverageReport CreateReportWithBrokenLinks()
     {
-        return new CoverageModels.CoverageReport
+        var report = CreateMinimalReport();
+        return new UnifiedCoverageReport
         {
-            GeneratedAt = DateTime.UtcNow,
-            Summary = new CoverageModels.CoverageSummary
+            GeneratedAt = report.GeneratedAt,
+            DocumentationCoverage = report.DocumentationCoverage,
+            RequirementsCoverage = report.RequirementsCoverage,
+            AutomationCoverage = new AutomationCoverage
             {
                 TotalTests = 10,
                 Automated = 8,
-                ManualOnly = 2,
-                CoveragePercentage = 80m
-            },
-            Mismatches =
-            [
-                new CoverageModels.LinkMismatch
-                {
-                    TestId = "TC-001",
-                    Issue = "Different file",
-                    TestAutomatedBy = "a.cs",
-                    AutomationFile = "b.cs"
-                }
-            ]
+                Percentage = 80m,
+                BrokenLinks =
+                [
+                    new BrokenLink
+                    {
+                        TestId = "TC-001",
+                        AutomatedBy = "missing.cs",
+                        Reason = "File not found"
+                    }
+                ]
+            }
         };
     }
 

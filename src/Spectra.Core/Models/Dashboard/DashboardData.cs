@@ -38,4 +38,8 @@ public sealed record DashboardData
     /// <summary>Trend data for pass rate over time.</summary>
     [JsonPropertyName("trends")]
     public TrendData? Trends { get; init; }
+
+    /// <summary>Three-section coverage summary (documentation, requirements, automation).</summary>
+    [JsonPropertyName("coverage_summary")]
+    public CoverageSummaryData? CoverageSummary { get; init; }
 }

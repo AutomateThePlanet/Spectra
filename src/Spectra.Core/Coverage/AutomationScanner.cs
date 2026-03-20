@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Spectra.Core.Models.Config;
 
 namespace Spectra.Core.Coverage;
 
@@ -11,6 +12,43 @@ public sealed class AutomationScanner
     private readonly IReadOnlyList<string> _searchDirectories;
     private readonly IReadOnlyList<string> _filePatterns;
     private readonly IReadOnlyList<Regex> _attributePatterns;
+
+    /// <summary>
+    /// Creates a scanner from CoverageConfig. Uses ScanPatterns if non-empty,
+    /// falling back to AttributePatterns. Uses FileExtensions if non-empty,
+    /// falling back to FilePatterns.
+    /// </summary>
+    public static AutomationScanner FromConfig(string basePath, CoverageConfig config)
+    {
+        // Convert ScanPatterns templates to regex
+        var patterns = new List<string>();
+        if (config.ScanPatterns.Count > 0)
+        {
+            foreach (var template in config.ScanPatterns)
+            {
+                var escaped = Regex.Escape(template);
+                var regex = escaped.Replace(@"\{id\}", $"({config.TestIdPattern})");
+                patterns.Add(regex);
+            }
+        }
+
+        // Fall back to AttributePatterns if no scan patterns produced
+        if (patterns.Count == 0)
+        {
+            patterns.AddRange(config.AttributePatterns);
+        }
+
+        // Use FileExtensions → glob patterns, or fall back to FilePatterns
+        var filePatterns = config.FileExtensions.Count > 0
+            ? config.FileExtensions.Select(ext => ext.StartsWith('.') ? $"*{ext}" : $"*.{ext}").ToList()
+            : config.FilePatterns.ToList();
+
+        return new AutomationScanner(
+            basePath,
+            config.AutomationDirs,
+            filePatterns,
+            patterns);
+    }
 
     /// <summary>
     /// Creates a new scanner with default patterns.

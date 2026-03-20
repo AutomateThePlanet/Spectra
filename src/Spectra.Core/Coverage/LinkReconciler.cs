@@ -47,7 +47,8 @@ public sealed class LinkReconciler
     }
 
     /// <summary>
-    /// Builds a map from test ID to automation file path (from automated_by field).
+    /// Builds a map from test ID to automation file path.
+    /// Prefers AutomatedBy field; falls back to SourceRefs + IsAutomationFile heuristic.
     /// </summary>
     private static Dictionary<string, string> BuildTestToAutomationMap(
         IReadOnlyDictionary<string, MetadataIndex> suiteIndexes)
@@ -58,9 +59,14 @@ public sealed class LinkReconciler
         {
             foreach (var test in index.Tests)
             {
-                // Look for automated_by in test metadata
-                // Note: TestIndexEntry doesn't have automated_by yet, we'll need to extend it
-                // For now, we check source_refs for automation file patterns
+                // Prefer automated_by field if present
+                if (test.AutomatedBy.Count > 0)
+                {
+                    map[test.Id] = NormalizePath(test.AutomatedBy[0]);
+                    continue;
+                }
+
+                // Fall back to source_refs with automation file heuristic
                 var automationRef = test.SourceRefs
                     .FirstOrDefault(r => IsAutomationFile(r));
 
@@ -167,18 +173,36 @@ public sealed class LinkReconciler
         {
             foreach (var test in index.Tests)
             {
-                var automationRef = test.SourceRefs
-                    .FirstOrDefault(r => IsAutomationFile(r));
-
-                if (!string.IsNullOrEmpty(automationRef) &&
-                    !normalizedAutomationFiles.ContainsKey(NormalizePath(automationRef)))
+                // Check automated_by field first
+                foreach (var autoRef in test.AutomatedBy)
                 {
-                    broken.Add(new CoverageModels.BrokenLink
+                    if (!normalizedAutomationFiles.ContainsKey(NormalizePath(autoRef)))
                     {
-                        TestId = test.Id,
-                        AutomatedBy = automationRef,
-                        Reason = "File not found"
-                    });
+                        broken.Add(new CoverageModels.BrokenLink
+                        {
+                            TestId = test.Id,
+                            AutomatedBy = autoRef,
+                            Reason = "File not found"
+                        });
+                    }
+                }
+
+                // Fall back to source_refs heuristic if no automated_by
+                if (test.AutomatedBy.Count == 0)
+                {
+                    var automationRef = test.SourceRefs
+                        .FirstOrDefault(r => IsAutomationFile(r));
+
+                    if (!string.IsNullOrEmpty(automationRef) &&
+                        !normalizedAutomationFiles.ContainsKey(NormalizePath(automationRef)))
+                    {
+                        broken.Add(new CoverageModels.BrokenLink
+                        {
+                            TestId = test.Id,
+                            AutomatedBy = automationRef,
+                            Reason = "File not found"
+                        });
+                    }
                 }
             }
         }

@@ -737,6 +737,12 @@ function formatDuration(seconds) {
  * Render coverage visualization with summary panel
  */
 function renderCoverage() {
+    // Use coverage_summary (new three-section data) if available
+    if (data.coverage_summary) {
+        return renderThreeSectionCoverage(data.coverage_summary);
+    }
+
+    // Fallback: compute from old coverage nodes/links
     if (!data.coverage || !data.coverage.nodes || data.coverage.nodes.length === 0) {
         return `
             <div class="empty-state">
@@ -746,10 +752,9 @@ function renderCoverage() {
         `;
     }
 
-    // Calculate coverage stats from nodes and links
+    // Legacy: calculate from nodes and links
     const docNodes = data.coverage.nodes.filter(n => n.type === 'Document');
     const testNodes = data.coverage.nodes.filter(n => n.type === 'Test');
-    const automationNodes = data.coverage.nodes.filter(n => n.type === 'Automation');
     const docToTestLinks = data.coverage.links.filter(l => l.type === 'DocumentToTest');
 
     const docsWithTests = new Set(docToTestLinks.map(l => l.source)).size;
@@ -760,42 +765,67 @@ function renderCoverage() {
     const totalTests = testNodes.length;
     const autoCoverage = totalTests > 0 ? ((testsWithAutomation / totalTests) * 100).toFixed(1) : 0;
 
-    const unlinkedTests = testNodes.filter(t => {
-        return !data.coverage.links.some(l => l.target === t.id && l.type === 'DocumentToTest');
-    }).length;
+    // Build a synthetic coverage_summary and render
+    return renderThreeSectionCoverage({
+        documentation: { covered: docsWithTests, total: totalDocs, percentage: parseFloat(docCoverage) },
+        requirements: { covered: 0, total: 0, percentage: 0 },
+        automation: { covered: testsWithAutomation, total: totalTests, percentage: parseFloat(autoCoverage) }
+    });
+}
 
-    const summaryPanel = `
-        <div class="coverage-summary">
-            <div class="coverage-summary-card">
-                <span class="coverage-summary-label">Documentation Coverage</span>
-                <span class="coverage-summary-value">${docCoverage}%</span>
-                <span class="coverage-summary-detail">${docsWithTests} of ${totalDocs} documents have linked tests</span>
-            </div>
-            <div class="coverage-summary-card">
-                <span class="coverage-summary-label">Automation Coverage</span>
-                <span class="coverage-summary-value">${autoCoverage}%</span>
-                <span class="coverage-summary-detail">${testsWithAutomation} of ${totalTests} tests have automation</span>
-            </div>
-            <div class="coverage-summary-card">
-                <span class="coverage-summary-label">Unlinked Tests</span>
-                <span class="coverage-summary-value">${unlinkedTests}</span>
-                <span class="coverage-summary-detail">Tests without source document references</span>
-            </div>
-        </div>
-    `;
+/**
+ * Render three stacked coverage sections with progress bars.
+ */
+function renderThreeSectionCoverage(summary) {
+    const sections = [
+        { label: 'Documentation Coverage', data: summary.documentation, unit: 'documents' },
+        { label: 'Requirements Coverage', data: summary.requirements, unit: 'requirements' },
+        { label: 'Automation Coverage', data: summary.automation, unit: 'tests' }
+    ];
 
-    // Use the coverage map visualization from coverage-map.js
-    if (typeof window.renderCoverageMap === 'function') {
-        return summaryPanel + window.renderCoverageMap();
+    let html = '<div class="coverage-sections">';
+
+    for (const section of sections) {
+        const pct = section.data.percentage || 0;
+        const colorClass = pct >= 80 ? 'coverage-green' : pct >= 50 ? 'coverage-yellow' : 'coverage-red';
+        const covered = section.data.covered || 0;
+        const total = section.data.total || 0;
+
+        html += `
+            <div class="coverage-section">
+                <div class="coverage-section-header">
+                    <span class="coverage-section-label">${section.label}</span>
+                    <span class="coverage-section-pct ${colorClass}">${pct.toFixed(1)}%</span>
+                </div>
+                <div class="coverage-progress-bar">
+                    <div class="coverage-bar-fill ${colorClass}" style="width: ${Math.min(pct, 100)}%"></div>
+                </div>
+                <span class="coverage-section-detail">${covered} of ${total} ${section.unit} covered</span>
+        `;
+
+        // Render detail list if available
+        if (section.data.details && section.data.details.length > 0) {
+            html += '<ul class="coverage-detail-list">';
+            for (const detail of section.data.details) {
+                const name = detail.doc || detail.id || detail.suite || '';
+                const count = detail.test_count != null ? ` — ${detail.test_count} tests` : '';
+                const mark = detail.covered !== false ? '<span class="coverage-green">&#10003;</span>' : '<span class="coverage-red">&#10007;</span>';
+                html += `<li>${name}${count} ${mark}</li>`;
+            }
+            html += '</ul>';
+        }
+
+        html += '</div>';
     }
 
-    // Fallback if coverage-map.js not loaded
-    return summaryPanel + `
-        <div class="empty-state">
-            <h2>Coverage Visualization</h2>
-            <p>Coverage map script not loaded.</p>
-        </div>
-    `;
+    html += '</div>';
+
+    // Still show coverage map visualization if available
+    if (typeof window.renderCoverageMap === 'function') {
+        html += window.renderCoverageMap();
+    }
+
+    return html;
 }
 
 /**

@@ -25,15 +25,21 @@ public sealed class AnalyzeCommand : Command
             ["--coverage", "-c"],
             "Analyze automation coverage (test-to-automation linking)");
 
+        var autoLinkOption = new Option<bool>(
+            ["--auto-link"],
+            "Scan automation code and update test automated_by fields");
+
         AddOption(outputOption);
         AddOption(formatOption);
         AddOption(coverageOption);
+        AddOption(autoLinkOption);
 
         this.SetHandler(async (context) =>
         {
             var output = context.ParseResult.GetValueForOption(outputOption);
             var format = context.ParseResult.GetValueForOption(formatOption);
             var coverage = context.ParseResult.GetValueForOption(coverageOption);
+            var autoLink = context.ParseResult.GetValueForOption(autoLinkOption);
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
 
             var handler = new AnalyzeHandler(verbosity);
@@ -41,6 +47,7 @@ public sealed class AnalyzeCommand : Command
                 output,
                 format,
                 coverage,
+                autoLink,
                 context.GetCancellationToken());
         });
     }

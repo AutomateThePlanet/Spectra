@@ -97,6 +97,9 @@ priority: high
 tags: [payments, negative]
 component: checkout
 source_refs: [docs/features/checkout/payment-methods.md]
+requirements: [REQ-042]
+automated_by:
+  - tests/e2e/CheckoutTests.cs
 grounding:
   verdict: grounded
   score: 0.95
@@ -190,15 +193,23 @@ The index is also auto-refreshed before `spectra ai generate` runs.
 
 ### Coverage Analysis
 
+SPECTRA produces a unified coverage report with three sections:
+- **Documentation Coverage** — which docs have linked tests (via `source_refs`)
+- **Requirements Coverage** — which requirements are covered (via `requirements` field + `_requirements.yaml`)
+- **Automation Coverage** — which tests have automation links (via `automated_by` field + code scanning)
+
 ```bash
-# Analyze coverage gaps
+# Unified three-section coverage report
 spectra ai analyze --coverage
 
-# Output as JSON
+# Output as JSON (three top-level keys: documentation_coverage, requirements_coverage, automation_coverage)
 spectra ai analyze --coverage --format json --output coverage.json
 
 # Output as Markdown
 spectra ai analyze --coverage --format markdown --output coverage.md
+
+# Auto-link: scan automation code and write automated_by back into test files
+spectra ai analyze --coverage --auto-link
 ```
 
 ### Global Options
@@ -257,9 +268,12 @@ SPECTRA is in active development. See the [roadmap](#roadmap) for current priori
 - Orchestrator-agnostic MCP API
 
 **Phase 3: Dashboard & Coverage Analysis** ✓ *complete*
-- Interactive HTML dashboard
-- Coverage reports (JSON, Markdown)
-- Test-to-automation linking
+- Interactive HTML dashboard with three-section coverage display
+- Unified coverage report: Documentation, Requirements, and Automation coverage
+- `--auto-link` flag to write `automated_by` back into test files
+- `requirements` and `automated_by` fields in test frontmatter
+- `_requirements.yaml` for formal requirements tracking
+- Configurable scan patterns for automation code detection
 
 **Phase 4: Test Generation Profiles** ✓ *complete*
 - Repository-level profiles (`spectra.profile.md`)
@@ -300,6 +314,12 @@ SPECTRA is configured via `spectra.config.json` at the repository root. See [Con
       "provider": "github-models",
       "model": "gpt-4o-mini"
     }
+  },
+  "coverage": {
+    "automation_dirs": ["tests", "test", "spec", "e2e"],
+    "scan_patterns": ["[TestCase(\"{id}\")]", "@pytest.mark.manual_test(\"{id}\")"],
+    "file_extensions": [".cs", ".java", ".py", ".ts"],
+    "requirements_file": "docs/requirements/_requirements.yaml"
   }
 }
 ```

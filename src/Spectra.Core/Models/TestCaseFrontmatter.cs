@@ -47,4 +47,10 @@ public sealed class TestCaseFrontmatter
 
     [YamlMember(Alias = "grounding")]
     public GroundingFrontmatter? Grounding { get; set; }
+
+    [YamlMember(Alias = "automated_by")]
+    public List<string> AutomatedBy { get; set; } = [];
+
+    [YamlMember(Alias = "requirements")]
+    public List<string> Requirements { get; set; } = [];
 }

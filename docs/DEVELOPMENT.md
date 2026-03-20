@@ -17,6 +17,7 @@ This guide explains how to build, test, and run Spectra locally.
   - [Step 6: View History](#step-6-view-execution-history)
 - **[Documentation Index](#documentation-index)**
 - **[Dashboard Portal](#dashboard-portal-setup)**
+- **[Coverage Analysis](#coverage-analysis)**
 - **[Test Generation Profiles](#test-generation-profiles)**
 - [Running Locally (Debug Mode)](#running-locally-debug-mode)
 - [Troubleshooting](#troubleshooting)
@@ -1018,6 +1019,7 @@ The generated dashboard includes:
 
 - **Suite Overview**: All test suites with test counts and status
 - **Execution History**: Recent test runs with pass/fail metrics
+- **Coverage Analysis**: Three-section display (Documentation, Requirements, Automation) with progress bars
 - **Coverage Map**: Visual representation of test coverage (D3.js)
 - **Test Browser**: Browse and search individual test cases
 - **Trend Analysis**: Pass rate trends over time
@@ -1052,6 +1054,92 @@ Your template directory should have:
 - `index.html` with `{{DASHBOARD_DATA}}` placeholder
 - `styles/` directory for CSS
 - `scripts/` directory for JavaScript
+
+---
+
+# Coverage Analysis
+
+SPECTRA produces a unified coverage report with three sections: Documentation Coverage, Requirements Coverage, and Automation Coverage.
+
+## Run Coverage Analysis
+
+```bash
+# Unified three-section coverage report (console output)
+spectra ai analyze --coverage
+
+# Output as JSON (three top-level keys: documentation_coverage, requirements_coverage, automation_coverage)
+spectra ai analyze --coverage --format json --output coverage.json
+
+# Output as Markdown
+spectra ai analyze --coverage --format markdown --output coverage.md
+
+# Detailed output
+spectra ai analyze --coverage --verbosity detailed
+```
+
+## Three Coverage Types
+
+| Type | What it measures | Data source |
+|------|-----------------|-------------|
+| **Documentation** | Which docs have linked tests | `source_refs` field in test frontmatter matched against `docs/` |
+| **Requirements** | Which requirements are covered | `requirements` field in test frontmatter + `_requirements.yaml` |
+| **Automation** | Which tests have automation code | `automated_by` field in test frontmatter + code scanning |
+
+## Auto-Link: Connect Tests to Automation Code
+
+The `--auto-link` flag scans your automation code for test ID references and writes `automated_by` back into test file frontmatter:
+
+```bash
+spectra ai analyze --coverage --auto-link
+```
+
+This scans files matching your configured `scan_patterns` and `file_extensions`, finds test ID references (e.g., `[TestCase("TC-001")]`), and updates the `automated_by` field in each matched test's YAML frontmatter.
+
+## Requirements File
+
+Create `docs/requirements/_requirements.yaml` to define formal requirements:
+
+```yaml
+requirements:
+  - id: REQ-001
+    title: "User can log in with valid credentials"
+    source: docs/authentication.md
+    priority: high
+  - id: REQ-002
+    title: "System rejects invalid passwords"
+    source: docs/authentication.md
+    priority: high
+```
+
+When this file exists, SPECTRA cross-references it with `requirements` fields in test frontmatter to report covered vs. uncovered requirements. Without it, requirements are discovered from tests only.
+
+## Coverage Configuration
+
+Add a `coverage` section to `spectra.config.json`:
+
+```json
+{
+  "coverage": {
+    "automation_dirs": ["tests", "test", "spec", "e2e"],
+    "scan_patterns": [
+      "[TestCase(\"{id}\")]",
+      "[ManualTestCase(\"{id}\")]",
+      "@pytest.mark.manual_test(\"{id}\")",
+      "groups = {\"{id}\"}"
+    ],
+    "file_extensions": [".cs", ".java", ".py", ".ts"],
+    "requirements_file": "docs/requirements/_requirements.yaml"
+  }
+}
+```
+
+- **`scan_patterns`**: Templates where `{id}` is replaced with a test ID regex pattern. Used to find test references in automation code.
+- **`file_extensions`**: File types to scan for automation references.
+- **`requirements_file`**: Path to the formal requirements YAML file.
+
+## Dashboard Coverage Display
+
+The dashboard (`spectra dashboard --output ./site`) includes a Coverage tab with three stacked sections showing progress bars and detail lists for each coverage type. Color coding: green >= 80%, yellow >= 50%, red < 50%.
 
 ---
 
@@ -1471,6 +1559,9 @@ priority: high
 tags: [smoke, checkout]
 component: checkout
 source_refs: [docs/features/checkout.md]
+requirements: [REQ-042]
+automated_by:
+  - tests/e2e/CheckoutTests.cs
 ---
 
 # Checkout with valid Visa card
@@ -1501,6 +1592,7 @@ tags: [negative, checkout, payments]
 component: checkout
 depends_on: [TC-001]
 source_refs: [docs/features/checkout.md]
+requirements: [REQ-043]
 ---
 
 # Checkout with expired card

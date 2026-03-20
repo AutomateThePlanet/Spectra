@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Spectra.Core.Coverage;
 using Spectra.Core.Models;
+using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Coverage;
 using Spectra.Core.Models.Dashboard;
 using Spectra.Core.Models.Execution;
@@ -43,6 +45,7 @@ public sealed class DataCollector
         var suiteStats = BuildSuiteStats(suiteIndexes, runSummaries);
         var trends = CalculateTrends(runSummaries);
         var coverage = BuildCoverageData(testEntries);
+        var coverageSummary = await BuildCoverageSummaryAsync(suiteIndexes, testEntries);
 
         return new DashboardData
         {
@@ -52,7 +55,8 @@ public sealed class DataCollector
             Runs = runSummaries,
             Tests = testEntries,
             Coverage = coverage,
-            Trends = trends
+            Trends = trends,
+            CoverageSummary = coverageSummary
         };
     }
 
@@ -535,6 +539,120 @@ public sealed class DataCollector
             Nodes = nodes.OrderBy(n => n.Type).ThenBy(n => n.Id).ToList(),
             Links = links.OrderBy(l => l.Source).ThenBy(l => l.Target).ToList()
         };
+    }
+
+    /// <summary>
+    /// Builds the three-section coverage summary for the dashboard.
+    /// </summary>
+    private async Task<CoverageSummaryData?> BuildCoverageSummaryAsync(
+        Dictionary<string, MetadataIndex> suiteIndexes,
+        IReadOnlyList<TestEntry> testEntries)
+    {
+        try
+        {
+            // Documentation coverage: docs with at least one test
+            var allDocRefs = testEntries
+                .SelectMany(t => t.SourceRefs)
+                .Distinct()
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var docsDir = Path.Combine(_basePath, "docs");
+            var totalDocs = 0;
+            var coveredDocs = 0;
+
+            if (Directory.Exists(docsDir))
+            {
+                var docFiles = Directory.GetFiles(docsDir, "*.md", SearchOption.AllDirectories);
+                foreach (var docFile in docFiles)
+                {
+                    var relativePath = Path.GetRelativePath(_basePath, docFile).Replace('\\', '/');
+                    totalDocs++;
+                    if (allDocRefs.Contains(relativePath))
+                    {
+                        coveredDocs++;
+                    }
+                }
+            }
+
+            var docPercentage = totalDocs > 0
+                ? Math.Round((coveredDocs * 100m) / totalDocs, 2) : 0m;
+
+            // Requirements coverage: requirements referenced by tests
+            var configPath = Path.Combine(_basePath, "spectra.config.json");
+            var reqTotal = 0;
+            var reqCovered = 0;
+
+            if (File.Exists(configPath))
+            {
+                try
+                {
+                    var configJson = await File.ReadAllTextAsync(configPath);
+                    var config = JsonSerializer.Deserialize<SpectraConfig>(configJson, s_jsonOptions);
+                    if (config is not null)
+                    {
+                        var reqFilePath = Path.Combine(_basePath, config.Coverage.RequirementsFile);
+                        var reqParser = new RequirementsParser();
+                        var requirements = await reqParser.ParseAsync(reqFilePath);
+
+                        if (requirements.Count > 0)
+                        {
+                            var allReqRefs = testEntries
+                                .SelectMany(t =>
+                                {
+                                    // Read requirements from index entries
+                                    var index = suiteIndexes.Values
+                                        .SelectMany(idx => idx.Tests)
+                                        .FirstOrDefault(ti => ti.Id == t.Id);
+                                    return index?.Requirements ?? [];
+                                })
+                                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                            reqTotal = requirements.Count;
+                            reqCovered = requirements.Count(r => allReqRefs.Contains(r.Id));
+                        }
+                    }
+                }
+                catch
+                {
+                    // Config read failure is non-fatal for dashboard
+                }
+            }
+
+            var reqPercentage = reqTotal > 0
+                ? Math.Round((reqCovered * 100m) / reqTotal, 2) : 0m;
+
+            // Automation coverage: tests with automation links
+            var totalTests = testEntries.Count;
+            var automatedTests = testEntries.Count(t => t.HasAutomation);
+            var autoPercentage = totalTests > 0
+                ? Math.Round((automatedTests * 100m) / totalTests, 2) : 0m;
+
+            return new CoverageSummaryData
+            {
+                Documentation = new CoverageSectionData
+                {
+                    Covered = coveredDocs,
+                    Total = totalDocs,
+                    Percentage = docPercentage
+                },
+                Requirements = new CoverageSectionData
+                {
+                    Covered = reqCovered,
+                    Total = reqTotal,
+                    Percentage = reqPercentage
+                },
+                Automation = new CoverageSectionData
+                {
+                    Covered = automatedTests,
+                    Total = totalTests,
+                    Percentage = autoPercentage
+                }
+            };
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>

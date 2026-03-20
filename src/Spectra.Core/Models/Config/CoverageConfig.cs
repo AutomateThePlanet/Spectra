@@ -68,4 +68,31 @@ public sealed class CoverageConfig
     /// </summary>
     [JsonPropertyName("report_mismatches")]
     public bool ReportMismatches { get; init; } = true;
+
+    /// <summary>
+    /// Template-based scan patterns for detecting test IDs in automation files.
+    /// Use {id} as placeholder for the test ID pattern.
+    /// When non-empty, these take priority over AttributePatterns.
+    /// </summary>
+    [JsonPropertyName("scan_patterns")]
+    public IReadOnlyList<string> ScanPatterns { get; init; } =
+    [
+        "[TestCase(\"{id}\")]",
+        "[ManualTestCase(\"{id}\")]",
+        "@pytest.mark.manual_test(\"{id}\")",
+        "groups = {\"{id}\"}"
+    ];
+
+    /// <summary>
+    /// File extensions to scan for automation references.
+    /// Mapped to glob patterns (e.g., ".cs" → "*.cs").
+    /// </summary>
+    [JsonPropertyName("file_extensions")]
+    public IReadOnlyList<string> FileExtensions { get; init; } = [".cs", ".java", ".py", ".ts"];
+
+    /// <summary>
+    /// Path to the requirements definition YAML file.
+    /// </summary>
+    [JsonPropertyName("requirements_file")]
+    public string RequirementsFile { get; init; } = "docs/requirements/_requirements.yaml";
 }

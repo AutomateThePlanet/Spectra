@@ -42,12 +42,12 @@ src/
 ├── Spectra.Core/             # Shared library
 │   ├── Models/               # TestCase, Suite, Config models
 │   │   ├── Dashboard/        # DashboardData, SuiteStats, TestEntry, etc.
-│   │   ├── Coverage/         # CoverageReport, CoverageLink, etc.
+│   │   ├── Coverage/         # UnifiedCoverageReport, CoverageReport, CoverageLink, etc.
 │   │   ├── Execution/        # Run, TestResult, ExecutionReport, McpToolResponse
 │   │   └── Grounding/        # GroundingMetadata, VerificationVerdict, VerificationResult
-│   ├── Coverage/             # AutomationScanner, LinkReconciler, CoverageCalculator
+│   ├── Coverage/             # AutomationScanner, LinkReconciler, CoverageCalculator, DocumentationCoverageAnalyzer, RequirementsCoverageAnalyzer, UnifiedCoverageBuilder, AutoLinkService
 │   ├── Storage/              # ExecutionDbReader
-│   ├── Parsing/              # Markdown + YAML parser, DocumentIndexExtractor
+│   ├── Parsing/              # Markdown + YAML parser, DocumentIndexExtractor, RequirementsParser, FrontmatterUpdater
 │   ├── Validation/           # Schema validation
 │   ├── Update/               # TestClassifier for test updates
 │   └── Index/                # Index read/write (DocumentIndexReader, DocumentIndexWriter)
@@ -77,15 +77,15 @@ dashboard-site/               # Static dashboard template
 └── access-denied.html        # Auth error page
 
 tests/
-├── Spectra.Core.Tests/       # Unit tests (318 tests)
-│   ├── Coverage/             # AutomationScanner, LinkReconciler, Calculator tests
+├── Spectra.Core.Tests/       # Unit tests (349 tests)
+│   ├── Coverage/             # AutomationScanner, LinkReconciler, Calculator, DocCoverageAnalyzer, ReqCoverageAnalyzer, AutoLinkService tests
 │   ├── Index/                # DocumentIndexReader, DocumentIndexWriter tests
-│   └── Parsing/              # DocumentIndexExtractor tests
-├── Spectra.CLI.Tests/        # Integration tests (339 tests)
+│   └── Parsing/              # DocumentIndexExtractor, RequirementsParser, FrontmatterUpdater tests
+├── Spectra.CLI.Tests/        # Integration tests (329 tests)
 │   ├── Commands/             # DocsIndexCommand tests
 │   ├── Dashboard/            # DataCollector, Generator tests
 │   ├── Source/               # DocumentIndexService tests
-│   └── Coverage/             # CoverageReportWriter tests
+│   └── Coverage/             # CoverageReportWriter (unified), CoverageAnalysis tests
 ├── Spectra.MCP.Tests/        # MCP server tests (306 tests)
 │   ├── Tools/                # Individual tool tests
 │   ├── Integration/          # Full execution flow tests
@@ -128,10 +128,11 @@ spectra dashboard --dry-run  # Preview without generating
 spectra docs index                               # Incremental update (only changed files)
 spectra docs index --force                       # Full rebuild
 
-# Coverage Analysis (003)
-spectra ai analyze --coverage
+# Coverage Analysis (003 + unified coverage overhaul)
+spectra ai analyze --coverage                                    # Unified three-section report (doc, req, auto)
 spectra ai analyze --coverage --format json --output coverage.json
 spectra ai analyze --coverage --format markdown --output coverage.md
+spectra ai analyze --coverage --auto-link                        # Write automated_by back into test files
 spectra ai analyze --coverage --verbosity detailed
 ```
 
@@ -144,6 +145,7 @@ spectra ai analyze --coverage --verbosity detailed
 - **Tests:** xUnit with structured results (never throw on validation errors)
 
 ## Recent Changes
+- 011-coverage-overhaul: ✅ COMPLETE - Unified three-type coverage system (Documentation, Requirements, Automation) in one report. Added `automated_by` and `requirements` fields to TestCase/TestCaseFrontmatter/TestIndexEntry. New models: `UnifiedCoverageReport`, `DocumentationCoverage`, `RequirementsCoverage`, `AutomationCoverage`, `RequirementDefinition`. New services: `DocumentationCoverageAnalyzer`, `RequirementsCoverageAnalyzer`, `UnifiedCoverageBuilder`, `AutoLinkService`, `RequirementsParser`, `FrontmatterUpdater`. New config: `scan_patterns`, `file_extensions`, `requirements_file` in CoverageConfig. CLI: `--auto-link` flag writes `automated_by` back into test files. Dashboard: three stacked coverage sections with progress bars. `spectra init` creates `docs/requirements/_requirements.yaml` template.
 - 010-document-index: ✅ COMPLETE - Persistent `docs/_index.md` with per-document metadata (sections, entities, tokens, content hashes). Incremental updates via SHA-256 hashing. `spectra docs index [--force]` CLI command. Auto-refresh before `ai generate`. `GetDocumentMapTool` prefers index when available. Models: `DocumentIndex`, `DocumentIndexEntry`, `SectionSummary`. Services: `DocumentIndexExtractor`, `DocumentIndexWriter`, `DocumentIndexReader`, `DocumentIndexService`.
 - 009-copilot-sdk-consolidation: ✅ COMPLETE - Unified all AI operations under GitHub Copilot SDK as the sole runtime. Removed legacy agent implementations (OpenAiAgent, AnthropicAgent, GitHubModelsAgent, MockAgent) and critic implementations (GoogleCritic, OpenAiCritic, AnthropicCritic, GitHubCritic). Provider selection now via spectra.config.json with CopilotGenerationAgent and CopilotCritic handling all providers.
 - 008-grounding-verification: ✅ COMPLETE - Dual-model critic flow (generator + verifier), three verdicts (grounded/partial/hallucinated), grounding metadata in YAML frontmatter, configurable critic provider, --skip-critic flag

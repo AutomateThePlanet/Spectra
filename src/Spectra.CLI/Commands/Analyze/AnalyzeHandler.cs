@@ -7,12 +7,14 @@ using Spectra.CLI.Source;
 using Spectra.Core.Coverage;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
-using CoverageModels = Spectra.Core.Models.Coverage;
+using Spectra.Core.Models.Coverage;
+using Spectra.Core.Parsing;
+using LegacyModels = Spectra.Core.Models;
 
 namespace Spectra.CLI.Commands.Analyze;
 
 /// <summary>
-/// Handles the analyze command execution.
+/// Handles the analyze command execution with unified three-section coverage.
 /// </summary>
 public sealed class AnalyzeHandler
 {
@@ -30,6 +32,7 @@ public sealed class AnalyzeHandler
         string? outputPath,
         ReportFormat format,
         bool analyzeAutomationCoverage = false,
+        bool autoLink = false,
         CancellationToken ct = default)
     {
         try
@@ -66,122 +69,120 @@ public sealed class AnalyzeHandler
             // Load all tests
             var testsDir = Path.Combine(basePath, config.Tests?.Dir ?? "tests");
             var allTests = new List<TestCase>();
-            var suiteCoverages = new List<SuiteCoverage>();
 
             if (Directory.Exists(testsDir))
             {
                 foreach (var suiteDir in Directory.GetDirectories(testsDir))
                 {
-                    var suiteName = Path.GetFileName(suiteDir);
                     var batchReader = new BatchReadTestsTool();
                     var readResult = await batchReader.ExecuteAsync(suiteDir, ct: ct);
 
                     if (readResult.Success && readResult.Tests is not null)
                     {
                         allTests.AddRange(readResult.Tests);
-
-                        var coveredDocs = readResult.Tests
-                            .SelectMany(t => t.SourceRefs)
-                            .Distinct()
-                            .ToList();
-
-                        suiteCoverages.Add(new SuiteCoverage
-                        {
-                            Name = suiteName,
-                            TestCount = readResult.Tests.Count,
-                            DocumentsCovered = coveredDocs.Count,
-                            CoveredDocuments = coveredDocs
-                        });
                     }
                 }
             }
 
-            // Analyze coverage
-            var documentCoverages = new List<DocumentCoverage>();
-            var gaps = new List<CoverageGap>();
-
-            foreach (var doc in documentMap.Documents)
+            if (!analyzeAutomationCoverage && !autoLink)
             {
-                var testsForDoc = allTests
-                    .Where(t => t.SourceRefs.Contains(doc.Path))
-                    .ToList();
-
-                var isCovered = testsForDoc.Count > 0;
-
-                documentCoverages.Add(new DocumentCoverage
-                {
-                    Path = doc.Path,
-                    IsCovered = isCovered,
-                    TestCount = testsForDoc.Count,
-                    TestIds = testsForDoc.Select(t => t.Id).ToList()
-                });
-
-                if (!isCovered)
-                {
-                    gaps.Add(new CoverageGap
-                    {
-                        DocumentPath = doc.Path,
-                        Reason = "No tests reference this document",
-                        Severity = DetermineSeverity(doc),
-                        Suggestion = $"Create tests for {doc.Path}"
-                    });
-                }
+                // Legacy doc-only coverage mode
+                return await RunLegacyCoverageAsync(
+                    documentMap, allTests, outputPath, format, ct);
             }
 
-            // Build report
-            var report = new CoverageReport
-            {
-                GeneratedAt = DateTime.UtcNow,
-                TotalDocuments = documentMap.Documents.Count,
-                TotalTests = allTests.Count,
-                CoveredDocuments = documentCoverages.Count(d => d.IsCovered),
-                UncoveredDocuments = documentCoverages.Count(d => !d.IsCovered),
-                Suites = suiteCoverages,
-                Documents = documentCoverages,
-                Gaps = gaps.OrderByDescending(g => g.Severity).ToList()
-            };
+            // === Unified three-section coverage analysis ===
 
-            // Output report
-            if (outputPath is not null)
-            {
-                var writer = new ReportWriter();
-                await writer.WriteAsync(outputPath, report, format, ct);
+            // 1. Documentation coverage
+            var docAnalyzer = new DocumentationCoverageAnalyzer();
+            var docCoverage = docAnalyzer.Analyze(documentMap, allTests);
 
-                if (_verbosity >= VerbosityLevel.Normal)
+            // 2. Requirements coverage
+            var reqFilePath = Path.Combine(basePath, config.Coverage.RequirementsFile);
+            var reqAnalyzer = new RequirementsCoverageAnalyzer();
+            var reqCoverage = await reqAnalyzer.AnalyzeAsync(reqFilePath, allTests, ct);
+
+            // 3. Automation coverage
+            var suiteIndexes = await LoadSuiteIndexesAsync(testsDir, ct);
+            AutomationCoverage autoCoverage;
+
+            if (suiteIndexes.Count > 0)
+            {
+                var scanner = AutomationScanner.FromConfig(basePath, config.Coverage);
+                var automationFiles = await scanner.ScanAsync(ct);
+
+                if (_verbosity >= VerbosityLevel.Detailed)
                 {
-                    Console.WriteLine($"Report written to: {outputPath}");
+                    Console.WriteLine($"  Scanned {automationFiles.Count} automation files");
+                }
+
+                var reconciler = new LinkReconciler();
+                var reconciliation = reconciler.Reconcile(suiteIndexes, automationFiles);
+
+                var calculator = new CoverageCalculator();
+                var calcReport = calculator.Calculate(suiteIndexes, reconciliation);
+
+                autoCoverage = UnifiedCoverageBuilder.FromCalculatorReport(calcReport);
+
+                // Auto-link if requested
+                if (autoLink)
+                {
+                    await RunAutoLinkAsync(
+                        basePath, testsDir, suiteIndexes, automationFiles, ct);
                 }
             }
             else
             {
-                // Print to console
-                var writer = new ReportWriter();
+                autoCoverage = new AutomationCoverage
+                {
+                    TotalTests = allTests.Count,
+                    Automated = 0,
+                    Percentage = 0m
+                };
+            }
+
+            // Build unified report
+            var builder = new UnifiedCoverageBuilder();
+            var unifiedReport = builder.Build(docCoverage, reqCoverage, autoCoverage);
+
+            // Output
+            var reportWriter = new CoverageReportWriter();
+
+            if (outputPath is not null)
+            {
+                var coverageFormat = format switch
+                {
+                    ReportFormat.Json => CoverageReportFormat.Json,
+                    ReportFormat.Markdown => CoverageReportFormat.Markdown,
+                    _ => CoverageReportFormat.Json
+                };
+
+                var extension = coverageFormat == CoverageReportFormat.Markdown ? ".md" : ".json";
+                var finalPath = Path.HasExtension(outputPath) ? outputPath : outputPath + extension;
+
+                await reportWriter.WriteAsync(finalPath, unifiedReport, coverageFormat, ct);
+
+                if (_verbosity >= VerbosityLevel.Normal)
+                {
+                    Console.WriteLine($"Report written to: {finalPath}");
+                }
+            }
+            else
+            {
                 var content = format switch
                 {
-                    ReportFormat.Json => writer.FormatAsJson(report),
-                    ReportFormat.Markdown => writer.FormatAsMarkdown(report),
-                    _ => writer.FormatAsText(report)
+                    ReportFormat.Json => reportWriter.FormatAsJson(unifiedReport),
+                    ReportFormat.Markdown => reportWriter.FormatAsMarkdown(unifiedReport),
+                    _ => reportWriter.FormatAsText(unifiedReport)
                 };
                 Console.WriteLine(content);
             }
 
             // Summary
             Console.WriteLine();
-            Console.WriteLine($"Coverage: {report.CoveragePercentage:F1}%");
-            Console.WriteLine($"  {report.CoveredDocuments}/{report.TotalDocuments} documents covered");
-            Console.WriteLine($"  {report.TotalTests} tests across {suiteCoverages.Count} suite(s)");
-
-            if (gaps.Count > 0)
-            {
-                Console.WriteLine($"  {gaps.Count} coverage gap(s) identified");
-            }
-
-            // Automation coverage analysis
-            if (analyzeAutomationCoverage)
-            {
-                Console.WriteLine();
-                await AnalyzeAutomationCoverageAsync(basePath, config, testsDir, format, outputPath, ct);
-            }
+            Console.WriteLine($"Documentation Coverage: {docCoverage.Percentage:F1}% ({docCoverage.CoveredDocs}/{docCoverage.TotalDocs} documents)");
+            Console.WriteLine($"Requirements Coverage:  {reqCoverage.Percentage:F1}% ({reqCoverage.CoveredRequirements}/{reqCoverage.TotalRequirements} requirements)");
+            Console.WriteLine($"Automation Coverage:    {autoCoverage.Percentage:F1}% ({autoCoverage.Automated}/{autoCoverage.TotalTests} tests)");
 
             return ExitCodes.Success;
         }
@@ -197,210 +198,218 @@ public sealed class AnalyzeHandler
         }
     }
 
-    private static GapSeverity DetermineSeverity(DocumentEntry doc)
+    /// <summary>
+    /// Legacy doc-only coverage mode (when --coverage is not specified).
+    /// </summary>
+    private async Task<int> RunLegacyCoverageAsync(
+        DocumentMap documentMap,
+        List<TestCase> allTests,
+        string? outputPath,
+        ReportFormat format,
+        CancellationToken ct)
     {
-        // Use file size and heading count as heuristics
-        if (doc.SizeKb > 10 || doc.Headings.Count > 5)
+        var suiteCoverages = new List<LegacyModels.SuiteCoverage>();
+        var documentCoverages = new List<LegacyModels.DocumentCoverage>();
+        var gaps = new List<LegacyModels.CoverageGap>();
+
+        // Build suite coverages from allTests
+        var bySuite = allTests.GroupBy(t =>
         {
-            return GapSeverity.High;
+            var parts = t.FilePath.Split('/', '\\');
+            return parts.Length > 1 ? parts[0] : "default";
+        });
+
+        foreach (var group in bySuite)
+        {
+            var coveredDocs = group
+                .SelectMany(t => t.SourceRefs)
+                .Distinct()
+                .ToList();
+
+            suiteCoverages.Add(new LegacyModels.SuiteCoverage
+            {
+                Name = group.Key,
+                TestCount = group.Count(),
+                DocumentsCovered = coveredDocs.Count,
+                CoveredDocuments = coveredDocs
+            });
         }
 
-        if (doc.SizeKb > 5 || doc.Headings.Count > 2)
+        foreach (var doc in documentMap.Documents)
         {
-            return GapSeverity.Medium;
+            var testsForDoc = allTests
+                .Where(t => t.SourceRefs.Contains(doc.Path))
+                .ToList();
+
+            var isCovered = testsForDoc.Count > 0;
+
+            documentCoverages.Add(new LegacyModels.DocumentCoverage
+            {
+                Path = doc.Path,
+                IsCovered = isCovered,
+                TestCount = testsForDoc.Count,
+                TestIds = testsForDoc.Select(t => t.Id).ToList()
+            });
+
+            if (!isCovered)
+            {
+                gaps.Add(new LegacyModels.CoverageGap
+                {
+                    DocumentPath = doc.Path,
+                    Reason = "No tests reference this document",
+                    Severity = DetermineSeverity(doc),
+                    Suggestion = $"Create tests for {doc.Path}"
+                });
+            }
         }
+
+        var report = new LegacyModels.CoverageReport
+        {
+            GeneratedAt = DateTime.UtcNow,
+            TotalDocuments = documentMap.Documents.Count,
+            TotalTests = allTests.Count,
+            CoveredDocuments = documentCoverages.Count(d => d.IsCovered),
+            UncoveredDocuments = documentCoverages.Count(d => !d.IsCovered),
+            Suites = suiteCoverages,
+            Documents = documentCoverages,
+            Gaps = gaps.OrderByDescending(g => g.Severity).ToList()
+        };
+
+        if (outputPath is not null)
+        {
+            var writer = new ReportWriter();
+            await writer.WriteAsync(outputPath, report, format, ct);
+
+            if (_verbosity >= VerbosityLevel.Normal)
+            {
+                Console.WriteLine($"Report written to: {outputPath}");
+            }
+        }
+        else
+        {
+            var writer = new ReportWriter();
+            var content = format switch
+            {
+                ReportFormat.Json => writer.FormatAsJson(report),
+                ReportFormat.Markdown => writer.FormatAsMarkdown(report),
+                _ => writer.FormatAsText(report)
+            };
+            Console.WriteLine(content);
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"Coverage: {report.CoveragePercentage:F1}%");
+        Console.WriteLine($"  {report.CoveredDocuments}/{report.TotalDocuments} documents covered");
+        Console.WriteLine($"  {report.TotalTests} tests across {suiteCoverages.Count} suite(s)");
+
+        if (gaps.Count > 0)
+        {
+            Console.WriteLine($"  {gaps.Count} coverage gap(s) identified");
+        }
+
+        return ExitCodes.Success;
+    }
+
+    private static GapSeverity DetermineSeverity(DocumentEntry doc)
+    {
+        if (doc.SizeKb > 10 || doc.Headings.Count > 5)
+            return GapSeverity.High;
+
+        if (doc.SizeKb > 5 || doc.Headings.Count > 2)
+            return GapSeverity.Medium;
 
         return GapSeverity.Low;
     }
 
-    /// <summary>
-    /// Analyzes automation coverage using bidirectional link reconciliation.
-    /// </summary>
-    private async Task AnalyzeAutomationCoverageAsync(
-        string basePath,
-        SpectraConfig config,
+    private static async Task<Dictionary<string, MetadataIndex>> LoadSuiteIndexesAsync(
         string testsDir,
-        ReportFormat format,
-        string? outputPath,
         CancellationToken ct)
     {
-        if (_verbosity >= VerbosityLevel.Normal)
+        var suiteIndexes = new Dictionary<string, MetadataIndex>(StringComparer.OrdinalIgnoreCase);
+
+        if (!Directory.Exists(testsDir))
         {
-            Console.WriteLine("Analyzing automation coverage...");
+            return suiteIndexes;
         }
 
-        // Load suite indexes
-        var suiteIndexes = new Dictionary<string, MetadataIndex>(StringComparer.OrdinalIgnoreCase);
-        if (Directory.Exists(testsDir))
+        foreach (var suiteDir in Directory.GetDirectories(testsDir))
         {
-            foreach (var suiteDir in Directory.GetDirectories(testsDir))
+            var indexPath = Path.Combine(suiteDir, "_index.json");
+            if (!File.Exists(indexPath))
             {
-                var indexPath = Path.Combine(suiteDir, "_index.json");
-                if (File.Exists(indexPath))
-                {
-                    var indexJson = await File.ReadAllTextAsync(indexPath, ct);
-                    var index = JsonSerializer.Deserialize<MetadataIndex>(indexJson, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
+                continue;
+            }
 
-                    if (index is not null)
-                    {
-                        var suiteName = Path.GetFileName(suiteDir);
-                        suiteIndexes[suiteName] = index;
+            var indexJson = await File.ReadAllTextAsync(indexPath, ct);
+            var index = JsonSerializer.Deserialize<MetadataIndex>(indexJson, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
 
-                        if (_verbosity >= VerbosityLevel.Detailed)
-                        {
-                            Console.WriteLine($"  Loaded index for suite: {suiteName} ({index.Tests.Count} tests)");
-                        }
-                    }
-                }
+            if (index is not null)
+            {
+                var suiteName = Path.GetFileName(suiteDir);
+                suiteIndexes[suiteName] = index;
             }
         }
 
-        if (suiteIndexes.Count == 0)
+        return suiteIndexes;
+    }
+
+    private async Task RunAutoLinkAsync(
+        string basePath,
+        string testsDir,
+        Dictionary<string, MetadataIndex> suiteIndexes,
+        IReadOnlyDictionary<string, AutomationFileInfo> automationFiles,
+        CancellationToken ct)
+    {
+        // Build test file map: testId → (suite, filePath)
+        var testFileMap = new Dictionary<string, (string Suite, string FilePath)>(
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (suite, index) in suiteIndexes)
         {
-            Console.WriteLine("  No test suite indexes found. Run 'spectra index' first.");
+            foreach (var test in index.Tests)
+            {
+                var absolutePath = Path.Combine(testsDir, test.File);
+                testFileMap[test.Id] = (suite, absolutePath);
+            }
+        }
+
+        var autoLinker = new AutoLinkService();
+        var links = autoLinker.GenerateLinks(automationFiles, testFileMap);
+
+        if (links.Count == 0)
+        {
+            Console.WriteLine("  No auto-link matches found.");
             return;
         }
 
-        // Scan automation files
-        var scanner = new AutomationScanner(basePath);
-        var automationFiles = await scanner.ScanAsync(ct);
+        // Group by test file so we can batch updates
+        var byTestFile = links
+            .GroupBy(l => l.TestFilePath, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Select(l => l.AutomationFilePath).Distinct().ToList());
 
-        if (_verbosity >= VerbosityLevel.Detailed)
+        var updater = new FrontmatterUpdater();
+        var updatedCount = 0;
+
+        foreach (var (testFile, autoPaths) in byTestFile)
         {
-            Console.WriteLine($"  Scanned {automationFiles.Count} automation files");
-        }
+            // Convert to relative paths
+            var relativePaths = autoPaths
+                .Select(p => Path.GetRelativePath(basePath, Path.Combine(basePath, p))
+                    .Replace('\\', '/'))
+                .ToList();
 
-        // Reconcile links
-        var reconciler = new LinkReconciler();
-        var reconciliation = reconciler.Reconcile(suiteIndexes, automationFiles);
-
-        // Calculate coverage
-        var calculator = new CoverageCalculator();
-        var coverageReport = calculator.Calculate(suiteIndexes, reconciliation);
-
-        // Output results
-        OutputAutomationCoverageReport(coverageReport, format, outputPath);
-    }
-
-    /// <summary>
-    /// Outputs the automation coverage report.
-    /// </summary>
-    private void OutputAutomationCoverageReport(
-        CoverageModels.CoverageReport report,
-        ReportFormat format,
-        string? outputPath)
-    {
-        Console.WriteLine("Automation Coverage Analysis");
-        Console.WriteLine("============================");
-        Console.WriteLine();
-        Console.WriteLine($"Total Tests: {report.Summary.TotalTests}");
-        Console.WriteLine($"Automated: {report.Summary.Automated}");
-        Console.WriteLine($"Manual Only: {report.Summary.ManualOnly}");
-        Console.WriteLine($"Coverage: {report.Summary.CoveragePercentage:F1}%");
-        Console.WriteLine();
-
-        // Coverage by suite
-        if (report.BySuite.Count > 0)
-        {
-            Console.WriteLine("Coverage by Suite:");
-            foreach (var suite in report.BySuite)
+            if (await updater.UpdateFileAsync(testFile, relativePaths, ct))
             {
-                Console.WriteLine($"  {suite.Suite}: {suite.CoveragePercentage:F1}% ({suite.Automated}/{suite.Total})");
-            }
-            Console.WriteLine();
-        }
-
-        // Coverage by component
-        if (report.ByComponent.Count > 0)
-        {
-            Console.WriteLine("Coverage by Component:");
-            foreach (var component in report.ByComponent)
-            {
-                Console.WriteLine($"  {component.Component}: {component.CoveragePercentage:F1}% ({component.Automated}/{component.Total})");
-            }
-            Console.WriteLine();
-        }
-
-        // Issues
-        if (report.UnlinkedTests.Count > 0)
-        {
-            Console.WriteLine($"Unlinked Tests ({report.UnlinkedTests.Count}):");
-            foreach (var test in report.UnlinkedTests.Take(10))
-            {
-                Console.WriteLine($"  {test.TestId}: {test.Title}");
-            }
-            if (report.UnlinkedTests.Count > 10)
-            {
-                Console.WriteLine($"  ... and {report.UnlinkedTests.Count - 10} more");
-            }
-            Console.WriteLine();
-        }
-
-        if (report.OrphanedAutomation.Count > 0)
-        {
-            Console.WriteLine($"Orphaned Automation ({report.OrphanedAutomation.Count}):");
-            foreach (var orphan in report.OrphanedAutomation.Take(10))
-            {
-                Console.WriteLine($"  {orphan.File}: references {string.Join(", ", orphan.ReferencedIds)}");
-            }
-            if (report.OrphanedAutomation.Count > 10)
-            {
-                Console.WriteLine($"  ... and {report.OrphanedAutomation.Count - 10} more");
-            }
-            Console.WriteLine();
-        }
-
-        if (report.BrokenLinks.Count > 0)
-        {
-            Console.WriteLine($"Broken Links ({report.BrokenLinks.Count}):");
-            foreach (var broken in report.BrokenLinks.Take(10))
-            {
-                Console.WriteLine($"  {broken.TestId}: {broken.AutomatedBy} ({broken.Reason})");
-            }
-            if (report.BrokenLinks.Count > 10)
-            {
-                Console.WriteLine($"  ... and {report.BrokenLinks.Count - 10} more");
-            }
-            Console.WriteLine();
-        }
-
-        if (report.Mismatches.Count > 0)
-        {
-            Console.WriteLine($"Link Mismatches ({report.Mismatches.Count}):");
-            foreach (var mismatch in report.Mismatches.Take(10))
-            {
-                Console.WriteLine($"  {mismatch.TestId}: {mismatch.Issue}");
-            }
-            if (report.Mismatches.Count > 10)
-            {
-                Console.WriteLine($"  ... and {report.Mismatches.Count - 10} more");
+                updatedCount++;
             }
         }
 
-        // Write report to file if output specified
-        if (outputPath is not null)
+        if (_verbosity >= VerbosityLevel.Normal)
         {
-            var writer = new CoverageReportWriter();
-            var coverageFormat = format switch
-            {
-                ReportFormat.Json => CoverageReportFormat.Json,
-                ReportFormat.Markdown => CoverageReportFormat.Markdown,
-                _ => CoverageReportFormat.Json
-            };
-
-            // Ensure proper file extension
-            var extension = coverageFormat == CoverageReportFormat.Markdown ? ".md" : ".json";
-            var finalPath = outputPath;
-            if (!Path.HasExtension(outputPath))
-            {
-                finalPath = outputPath + extension;
-            }
-
-            writer.WriteAsync(finalPath, report, coverageFormat).GetAwaiter().GetResult();
-            Console.WriteLine($"Report written to: {finalPath}");
+            Console.WriteLine($"  Auto-linked {links.Count} tests to automation code ({updatedCount} files updated)");
         }
     }
 }

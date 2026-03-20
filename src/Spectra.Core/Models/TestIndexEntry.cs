@@ -44,4 +44,12 @@ public sealed class TestIndexEntry
     [JsonPropertyName("redundant_reason")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? RedundantReason { get; init; }
+
+    [JsonPropertyName("automated_by")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public IReadOnlyList<string> AutomatedBy { get; init; } = [];
+
+    [JsonPropertyName("requirements")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public IReadOnlyList<string> Requirements { get; init; } = [];
 }

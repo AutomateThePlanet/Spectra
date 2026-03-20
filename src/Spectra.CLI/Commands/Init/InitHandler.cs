@@ -382,7 +382,8 @@ public sealed class InitHandler
         {
             Path.Combine(_workingDirectory, DocsDir),
             Path.Combine(_workingDirectory, TestsDir),
-            Path.Combine(_workingDirectory, ".github", "skills", "test-generation")
+            Path.Combine(_workingDirectory, ".github", "skills", "test-generation"),
+            Path.Combine(_workingDirectory, DocsDir, "requirements")
         };
 
         foreach (var dir in directories)
@@ -393,6 +394,36 @@ public sealed class InitHandler
                 _logger.LogDebug("Created directory: {Directory}", dir);
             }
         }
+
+        // Create requirements template
+        await CreateRequirementsTemplateAsync(ct);
+    }
+
+    private async Task CreateRequirementsTemplateAsync(CancellationToken ct)
+    {
+        var reqPath = Path.Combine(_workingDirectory, DocsDir, "requirements", "_requirements.yaml");
+        if (File.Exists(reqPath))
+        {
+            return;
+        }
+
+        const string template = """
+            # Requirements definition file for Spectra coverage analysis
+            # Uncomment and customize the examples below
+            #
+            # requirements:
+            #   - id: REQ-001
+            #     title: "User can log in with valid credentials"
+            #     source: docs/authentication.md
+            #     priority: high
+            #   - id: REQ-002
+            #     title: "System rejects invalid passwords"
+            #     source: docs/authentication.md
+            #     priority: high
+            """;
+
+        await File.WriteAllTextAsync(reqPath, template, ct);
+        _logger.LogDebug("Created requirements template: {Path}", reqPath);
     }
 
     private async Task CreateConfigFileAsync(string configPath, CancellationToken ct)
