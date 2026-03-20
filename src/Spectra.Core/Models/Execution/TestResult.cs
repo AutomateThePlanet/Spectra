@@ -42,4 +42,8 @@ public sealed class TestResult
     /// <summary>Test ID that caused this test to be blocked.</summary>
     [JsonPropertyName("blocked_by")]
     public string? BlockedBy { get; set; }
+
+    /// <summary>Screenshot file paths attached to this test result.</summary>
+    [JsonPropertyName("screenshot_paths")]
+    public IReadOnlyList<string>? ScreenshotPaths { get; set; }
 }

@@ -19,6 +19,7 @@ public sealed class FinalizeExecutionRunTool : IMcpTool
     private readonly ReportGenerator _reportGenerator;
     private readonly ReportWriter _reportWriter;
     private readonly Func<string, IEnumerable<TestIndexEntry>> _indexLoader;
+    private readonly Func<string, string, TestCase?>? _testCaseLoader;
 
     public string Description => "Completes the run and generates reports";
 
@@ -37,12 +38,14 @@ public sealed class FinalizeExecutionRunTool : IMcpTool
         ExecutionEngine engine,
         ReportGenerator reportGenerator,
         ReportWriter reportWriter,
-        Func<string, IEnumerable<TestIndexEntry>> indexLoader)
+        Func<string, IEnumerable<TestIndexEntry>> indexLoader,
+        Func<string, string, TestCase?>? testCaseLoader = null)
     {
         _engine = engine;
         _reportGenerator = reportGenerator;
         _reportWriter = reportWriter;
         _indexLoader = indexLoader;
+        _testCaseLoader = testCaseLoader;
     }
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
@@ -82,7 +85,22 @@ public sealed class FinalizeExecutionRunTool : IMcpTool
             var testTitles = _indexLoader(finalizedRun.Suite)
                 .ToDictionary(e => e.Id, e => e.Title, StringComparer.OrdinalIgnoreCase);
 
-            var report = _reportGenerator.Generate(finalizedRun, results, testTitles);
+            // Load full test cases for report content
+            Dictionary<string, TestCase>? testCases = null;
+            if (_testCaseLoader is not null)
+            {
+                testCases = new Dictionary<string, TestCase>(StringComparer.OrdinalIgnoreCase);
+                foreach (var testId in results.Select(r => r.TestId).Distinct())
+                {
+                    var tc = _testCaseLoader(finalizedRun.Suite, testId);
+                    if (tc is not null)
+                    {
+                        testCases[testId] = tc;
+                    }
+                }
+            }
+
+            var report = _reportGenerator.Generate(finalizedRun, results, testTitles, testCases);
             var (jsonPath, mdPath, htmlPath) = await _reportWriter.WriteAsync(report);
 
             var data = new

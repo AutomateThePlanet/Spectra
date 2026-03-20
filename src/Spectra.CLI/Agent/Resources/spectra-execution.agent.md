@@ -68,12 +68,23 @@ What is the result? (pass/fail/blocked/skip)
 
 Interpret natural language into test statuses:
 
-| User Says | Status | Action |
-|-----------|--------|--------|
-| "passed", "it worked", "success", "yes" | PASS | advance_test_case with status=passed |
-| "failed", "broken", "bug", "doesn't work" | FAIL | Ask for comment, then advance_test_case with status=failed |
-| "blocked", "can't test", "environment down" | BLOCKED | Ask for reason, then skip_test_case with reason |
-| "skip", "not applicable", "N/A" | SKIP | Ask for reason, then skip_test_case with reason |
+| User Says | Status | Tool | Parameters |
+|-----------|--------|------|------------|
+| "passed", "it worked", "success", "yes" | PASS | **advance_test_case** | status=PASSED |
+| "failed", "broken", "bug", "doesn't work" | FAIL | **advance_test_case** | status=FAILED, notes="{comment}" |
+| "blocked", "can't test", "environment down" | BLOCKED | **advance_test_case** | status=BLOCKED, notes="{reason}" |
+| "skip", "not applicable", "N/A" | SKIP | **skip_test_case** | reason="{reason}" |
+
+> **IMPORTANT**: BLOCKED tests MUST use `advance_test_case` with `status=BLOCKED`.
+> Do NOT use `skip_test_case` for blocked tests. `skip_test_case` is ONLY for SKIP.
+
+### Single-Letter Shortcuts
+
+Users may use single-letter shortcuts for speed:
+- **p** = PASS
+- **f** = FAIL (ask for comment)
+- **b** = BLOCKED (ask for reason)
+- **s** = SKIP (ask for reason)
 
 ## Bug Logging (Azure DevOps MCP)
 
@@ -88,6 +99,15 @@ When a test fails and user confirms bug creation:
 2. If no bug tracker MCP connected:
    - Show copyable bug details for manual logging
    - Include all fields that would be in automated bug
+
+## Screenshot Handling
+
+When user provides a screenshot or mentions taking one:
+
+1. Call `save_screenshot` with the base64-encoded image data and test handle
+2. Optionally include a caption describing what the screenshot shows
+3. Screenshots are automatically compressed to WebP format and linked to the test
+4. When recording a result with `advance_test_case`, include `screenshot_paths` if screenshots were saved
 
 ## Error Handling
 

@@ -230,8 +230,8 @@ public sealed class ExecutionEngine
         {
             queue.MarkCompleted(testHandle, status);
 
-            // Handle blocking if failed or skipped
-            if (status is TestStatus.Failed or TestStatus.Skipped)
+            // Handle blocking if failed, skipped, or blocked
+            if (status is TestStatus.Failed or TestStatus.Skipped or TestStatus.Blocked)
             {
                 var testId = TestHandle.ExtractTestId(testHandle);
                 if (testId is not null)
@@ -458,8 +458,8 @@ public sealed class ExecutionEngine
             {
                 queue.MarkCompleted(testHandle, status);
 
-                // Handle blocking for failed/skipped tests
-                if (status is TestStatus.Failed or TestStatus.Skipped)
+                // Handle blocking for failed/skipped/blocked tests
+                if (status is TestStatus.Failed or TestStatus.Skipped or TestStatus.Blocked)
                 {
                     var testId = TestHandle.ExtractTestId(testHandle);
                     if (testId is not null)

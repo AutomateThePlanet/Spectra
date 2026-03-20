@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Spectra.Core.Models.Execution;
 
@@ -24,8 +25,8 @@ public sealed class ResultRepository
         await using var command = connection.CreateCommand();
 
         command.CommandText = """
-            INSERT INTO test_results (run_id, test_id, test_handle, status, notes, started_at, completed_at, attempt, blocked_by)
-            VALUES (@run_id, @test_id, @test_handle, @status, @notes, @started_at, @completed_at, @attempt, @blocked_by)
+            INSERT INTO test_results (run_id, test_id, test_handle, status, notes, started_at, completed_at, attempt, blocked_by, screenshot_paths)
+            VALUES (@run_id, @test_id, @test_handle, @status, @notes, @started_at, @completed_at, @attempt, @blocked_by, @screenshot_paths)
             """;
 
         command.Parameters.AddWithValue("@run_id", result.RunId);
@@ -37,6 +38,9 @@ public sealed class ResultRepository
         command.Parameters.AddWithValue("@completed_at", result.CompletedAt?.ToString("O") ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@attempt", result.Attempt);
         command.Parameters.AddWithValue("@blocked_by", (object?)result.BlockedBy ?? DBNull.Value);
+        command.Parameters.AddWithValue("@screenshot_paths", result.ScreenshotPaths is { Count: > 0 }
+            ? JsonSerializer.Serialize(result.ScreenshotPaths)
+            : (object)DBNull.Value);
 
         await command.ExecuteNonQueryAsync();
     }
@@ -57,8 +61,8 @@ public sealed class ResultRepository
                 command.Transaction = (SqliteTransaction)transaction;
 
                 command.CommandText = """
-                    INSERT INTO test_results (run_id, test_id, test_handle, status, notes, started_at, completed_at, attempt, blocked_by)
-                    VALUES (@run_id, @test_id, @test_handle, @status, @notes, @started_at, @completed_at, @attempt, @blocked_by)
+                    INSERT INTO test_results (run_id, test_id, test_handle, status, notes, started_at, completed_at, attempt, blocked_by, screenshot_paths)
+                    VALUES (@run_id, @test_id, @test_handle, @status, @notes, @started_at, @completed_at, @attempt, @blocked_by, @screenshot_paths)
                     """;
 
                 command.Parameters.AddWithValue("@run_id", result.RunId);
@@ -70,6 +74,9 @@ public sealed class ResultRepository
                 command.Parameters.AddWithValue("@completed_at", result.CompletedAt?.ToString("O") ?? (object)DBNull.Value);
                 command.Parameters.AddWithValue("@attempt", result.Attempt);
                 command.Parameters.AddWithValue("@blocked_by", (object?)result.BlockedBy ?? DBNull.Value);
+                command.Parameters.AddWithValue("@screenshot_paths", result.ScreenshotPaths is { Count: > 0 }
+                    ? JsonSerializer.Serialize(result.ScreenshotPaths)
+                    : (object)DBNull.Value);
 
                 await command.ExecuteNonQueryAsync();
             }
@@ -250,8 +257,51 @@ public sealed class ResultRepository
         return result is DBNull or null ? 0 : Convert.ToInt32(result);
     }
 
+    /// <summary>
+    /// Appends a screenshot path to an existing test result.
+    /// </summary>
+    public async Task AppendScreenshotPathAsync(string testHandle, string path)
+    {
+        var connection = await _db.GetConnectionAsync();
+
+        // Read current paths
+        await using var readCmd = connection.CreateCommand();
+        readCmd.CommandText = "SELECT screenshot_paths FROM test_results WHERE test_handle = @test_handle";
+        readCmd.Parameters.AddWithValue("@test_handle", testHandle);
+
+        var existing = await readCmd.ExecuteScalarAsync();
+        var paths = new List<string>();
+        if (existing is string json && !string.IsNullOrEmpty(json))
+        {
+            paths = JsonSerializer.Deserialize<List<string>>(json) ?? [];
+        }
+        paths.Add(path);
+
+        await using var updateCmd = connection.CreateCommand();
+        updateCmd.CommandText = "UPDATE test_results SET screenshot_paths = @paths WHERE test_handle = @test_handle";
+        updateCmd.Parameters.AddWithValue("@test_handle", testHandle);
+        updateCmd.Parameters.AddWithValue("@paths", JsonSerializer.Serialize(paths));
+
+        await updateCmd.ExecuteNonQueryAsync();
+    }
+
     private static TestResult MapResult(SqliteDataReader reader)
     {
+        IReadOnlyList<string>? screenshotPaths = null;
+        try
+        {
+            var ssOrdinal = reader.GetOrdinal("screenshot_paths");
+            if (!reader.IsDBNull(ssOrdinal))
+            {
+                var json = reader.GetString(ssOrdinal);
+                screenshotPaths = JsonSerializer.Deserialize<List<string>>(json);
+            }
+        }
+        catch (IndexOutOfRangeException)
+        {
+            // Column doesn't exist yet (pre-migration)
+        }
+
         return new TestResult
         {
             RunId = reader.GetString(reader.GetOrdinal("run_id")),
@@ -262,7 +312,8 @@ public sealed class ResultRepository
             StartedAt = reader.IsDBNull(reader.GetOrdinal("started_at")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("started_at"))),
             CompletedAt = reader.IsDBNull(reader.GetOrdinal("completed_at")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("completed_at"))),
             Attempt = reader.GetInt32(reader.GetOrdinal("attempt")),
-            BlockedBy = reader.IsDBNull(reader.GetOrdinal("blocked_by")) ? null : reader.GetString(reader.GetOrdinal("blocked_by"))
+            BlockedBy = reader.IsDBNull(reader.GetOrdinal("blocked_by")) ? null : reader.GetString(reader.GetOrdinal("blocked_by")),
+            ScreenshotPaths = screenshotPaths
         };
     }
 }

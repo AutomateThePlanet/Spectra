@@ -28,7 +28,7 @@ public sealed class DataCollector
     {
         _basePath = basePath;
         _testsPath = Path.Combine(basePath, "tests");
-        _reportsPath = Path.Combine(basePath, "reports");
+        _reportsPath = Path.Combine(basePath, ".execution", "reports");
         _dbReader = new ExecutionDbReader(basePath);
     }
 
@@ -134,6 +134,36 @@ public sealed class DataCollector
                 catch (JsonException)
                 {
                     // Skip malformed report files
+                }
+            }
+        }
+
+        // Enrich with report paths
+        for (var i = 0; i < runs.Count; i++)
+        {
+            var run = runs[i];
+            if (run.ReportPath is null)
+            {
+                var htmlPath = Path.Combine(_reportsPath, $"{run.RunId}.html");
+                if (File.Exists(htmlPath))
+                {
+                    runs[i] = new RunSummary
+                    {
+                        RunId = run.RunId,
+                        Suite = run.Suite,
+                        Status = run.Status,
+                        StartedAt = run.StartedAt,
+                        CompletedAt = run.CompletedAt,
+                        StartedBy = run.StartedBy,
+                        DurationSeconds = run.DurationSeconds,
+                        Total = run.Total,
+                        Passed = run.Passed,
+                        Failed = run.Failed,
+                        Skipped = run.Skipped,
+                        Blocked = run.Blocked,
+                        Results = run.Results,
+                        ReportPath = $".execution/reports/{run.RunId}.html"
+                    };
                 }
             }
         }
@@ -252,7 +282,7 @@ public sealed class DataCollector
     /// <summary>
     /// Converts a JSON execution report to a run summary.
     /// </summary>
-    private static RunSummary ConvertReportToSummary(ExecutionReportJson report)
+    private RunSummary ConvertReportToSummary(ExecutionReportJson report)
     {
         // Use summary object if available, otherwise use legacy fields
         var total = report.Summary?.Total ?? report.Total;
@@ -280,7 +310,10 @@ public sealed class DataCollector
             Failed = failed,
             Skipped = skipped,
             Blocked = blocked,
-            Results = report.Results
+            Results = report.Results,
+            ReportPath = File.Exists(Path.Combine(_reportsPath, $"{report.GetRunId()}.html"))
+                ? $".execution/reports/{report.GetRunId()}.html"
+                : null
         };
     }
 

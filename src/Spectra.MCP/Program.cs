@@ -107,17 +107,17 @@ public static class Program
         registry.Register("pause_execution_run", new PauseExecutionRunTool(engine));
         registry.Register("resume_execution_run", new ResumeExecutionRunTool(engine));
         registry.Register("cancel_execution_run", new CancelExecutionRunTool(engine));
-        registry.Register("finalize_execution_run", new FinalizeExecutionRunTool(engine, reportGenerator, reportWriter, indexLoader));
+        registry.Register("finalize_execution_run", new FinalizeExecutionRunTool(engine, reportGenerator, reportWriter, indexLoader, testCaseLoader));
         registry.Register("list_available_suites", new ListAvailableSuitesTool(suiteLoader));
 
         // Test execution tools
         registry.Register("get_test_case_details", new GetTestCaseDetailsTool(engine, testCaseLoader));
-        registry.Register("advance_test_case", new AdvanceTestCaseTool(engine));
+        registry.Register("advance_test_case", new AdvanceTestCaseTool(engine, resultRepo));
         registry.Register("skip_test_case", new SkipTestCaseTool(engine));
         registry.Register("bulk_record_results", new BulkRecordResultsTool(engine));
         registry.Register("add_test_note", new AddTestNoteTool(engine));
         registry.Register("retest_test_case", new RetestTestCaseTool(engine));
-        registry.Register("save_screenshot", new SaveScreenshotTool(engine, config.ReportsPath));
+        registry.Register("save_screenshot", new SaveScreenshotTool(engine, config.ReportsPath, resultRepo));
 
         // Reporting tools
         registry.Register("get_run_history", new GetRunHistoryTool(runRepo));

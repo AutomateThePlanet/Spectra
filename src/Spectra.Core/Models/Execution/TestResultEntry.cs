@@ -38,4 +38,29 @@ public sealed record TestResultEntry
     [JsonPropertyName("blocked_by")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? BlockedBy { get; init; }
+
+    /// <summary>Test preconditions.</summary>
+    [JsonPropertyName("preconditions")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Preconditions { get; init; }
+
+    /// <summary>Test steps.</summary>
+    [JsonPropertyName("steps")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? Steps { get; init; }
+
+    /// <summary>Expected result.</summary>
+    [JsonPropertyName("expected_result")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExpectedResult { get; init; }
+
+    /// <summary>Test data.</summary>
+    [JsonPropertyName("test_data")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TestData { get; init; }
+
+    /// <summary>Screenshot paths for this test.</summary>
+    [JsonPropertyName("screenshot_paths")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? ScreenshotPaths { get; init; }
 }

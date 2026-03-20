@@ -84,7 +84,7 @@ public class StateMachineTests
     [InlineData(TestStatus.InProgress, TestStatus.Passed, true)]
     [InlineData(TestStatus.InProgress, TestStatus.Failed, true)]
     [InlineData(TestStatus.InProgress, TestStatus.Skipped, true)]
-    [InlineData(TestStatus.InProgress, TestStatus.Blocked, false)]
+    [InlineData(TestStatus.InProgress, TestStatus.Blocked, true)]
     [InlineData(TestStatus.Passed, TestStatus.Failed, false)]
     [InlineData(TestStatus.Failed, TestStatus.Passed, false)]
     [InlineData(TestStatus.Skipped, TestStatus.InProgress, false)]

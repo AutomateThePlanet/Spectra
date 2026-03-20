@@ -27,7 +27,7 @@ public static class StateMachine
     private static readonly Dictionary<TestStatus, HashSet<TestStatus>> ValidTestTransitions = new()
     {
         [TestStatus.Pending] = [TestStatus.InProgress, TestStatus.Blocked],
-        [TestStatus.InProgress] = [TestStatus.Passed, TestStatus.Failed, TestStatus.Skipped],
+        [TestStatus.InProgress] = [TestStatus.Passed, TestStatus.Failed, TestStatus.Skipped, TestStatus.Blocked],
         [TestStatus.Passed] = [],
         [TestStatus.Failed] = [],
         [TestStatus.Skipped] = [],

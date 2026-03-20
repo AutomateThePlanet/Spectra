@@ -43,7 +43,7 @@ public class DataCollectorTests : IDisposable
     public async Task CollectAsync_NoTestsDirectory_ReturnsEmptyData()
     {
         // Create only reports directory
-        Directory.CreateDirectory(Path.Combine(_testDir, "reports"));
+        Directory.CreateDirectory(Path.Combine(_testDir, ".execution", "reports"));
         var collector = new DataCollector(_testDir);
 
         var data = await collector.CollectAsync();
@@ -140,7 +140,7 @@ public class DataCollectorTests : IDisposable
     [Fact]
     public async Task CollectAsync_WithReportFiles_ReturnsRunHistory()
     {
-        var reportsPath = Path.Combine(_testDir, "reports");
+        var reportsPath = Path.Combine(_testDir, ".execution", "reports");
         Directory.CreateDirectory(reportsPath);
 
         var report = new
@@ -512,7 +512,7 @@ public class DataCollectorTests : IDisposable
         int skipped,
         int blocked)
     {
-        var reportsPath = Path.Combine(_testDir, "reports");
+        var reportsPath = Path.Combine(_testDir, ".execution", "reports");
         Directory.CreateDirectory(reportsPath);
 
         var report = new

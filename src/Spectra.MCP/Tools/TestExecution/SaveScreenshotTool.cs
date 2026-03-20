@@ -1,19 +1,28 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Webp;
+using SixLabors.ImageSharp.Processing;
 using Spectra.Core.Models.Execution;
 using Spectra.MCP.Execution;
 using Spectra.MCP.Server;
+using Spectra.MCP.Storage;
 
 namespace Spectra.MCP.Tools.TestExecution;
 
 /// <summary>
 /// MCP tool: save_screenshot
-/// Saves a base64-encoded screenshot as an attachment.
+/// Saves a base64-encoded screenshot as a compressed WebP attachment.
 /// </summary>
 public sealed class SaveScreenshotTool : IMcpTool
 {
     private readonly ExecutionEngine _engine;
+    private readonly ResultRepository _resultRepo;
     private readonly string _reportsPath;
+
+    private const int MaxWidth = 1920;
+    private const int MaxHeight = 1080;
+    private const int WebPQuality = 80;
 
     public string Description => "Saves a screenshot as an attachment for the current test";
 
@@ -24,15 +33,17 @@ public sealed class SaveScreenshotTool : IMcpTool
         {
             test_handle = new { type = "string", description = "Test handle to attach screenshot to" },
             image_data = new { type = "string", description = "Base64-encoded image data (PNG, JPG, or WebP)" },
-            filename = new { type = "string", description = "Optional filename (default: screenshot_<timestamp>.png)" }
+            caption = new { type = "string", description = "Optional caption describing what the screenshot shows" },
+            filename = new { type = "string", description = "Optional filename override" }
         },
         required = new[] { "test_handle", "image_data" }
     };
 
-    public SaveScreenshotTool(ExecutionEngine engine, string reportsPath)
+    public SaveScreenshotTool(ExecutionEngine engine, string reportsPath, ResultRepository? resultRepo = null)
     {
         _engine = engine;
         _reportsPath = reportsPath;
+        _resultRepo = resultRepo!;
     }
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
@@ -89,32 +100,67 @@ public sealed class SaveScreenshotTool : IMcpTool
                     "image_data must be valid base64-encoded image data"));
             }
 
-            // Detect image format from magic bytes
-            var extension = DetectImageExtension(imageBytes);
+            // Count existing screenshots for this test to generate index
+            var existingPaths = result.ScreenshotPaths?.Count ?? 0;
+            var index = existingPaths + 1;
 
-            // Generate filename if not provided
-            var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+            // Generate WebP filename: {testId}-{date}-{index}.webp
+            var testIdSafe = result.TestId.Replace("/", "-").Replace("\\", "-");
+            var datePart = DateTime.UtcNow.ToString("yyyyMMdd");
             var filename = string.IsNullOrEmpty(request.Filename)
-                ? $"screenshot_{timestamp}{extension}"
-                : request.Filename;
-
-            // Ensure filename has correct extension
-            if (!filename.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
-            {
-                filename = Path.GetFileNameWithoutExtension(filename) + extension;
-            }
+                ? $"{testIdSafe}-{datePart}-{index}.webp"
+                : Path.GetFileNameWithoutExtension(request.Filename) + ".webp";
 
             // Create attachments directory: reports/{run_id}/attachments/
             var attachmentsDir = Path.Combine(_reportsPath, result.RunId, "attachments");
             Directory.CreateDirectory(attachmentsDir);
 
-            // Save the image
             var filePath = Path.Combine(attachmentsDir, filename);
-            await File.WriteAllBytesAsync(filePath, imageBytes);
+            var originalSize = imageBytes.Length;
 
-            // Add a note referencing the screenshot
-            var relativePath = $"attachments/{filename}";
-            await _engine.AddNoteAsync(request.TestHandle, $"[Screenshot: {relativePath}]");
+            // Compress: load with ImageSharp → resize if needed → encode as WebP
+            byte[] compressedBytes;
+            try
+            {
+                using var image = Image.Load(imageBytes);
+
+                // Resize if larger than max dimensions
+                if (image.Width > MaxWidth || image.Height > MaxHeight)
+                {
+                    image.Mutate(x => x.Resize(new ResizeOptions
+                    {
+                        Size = new Size(MaxWidth, MaxHeight),
+                        Mode = ResizeMode.Max
+                    }));
+                }
+
+                using var ms = new MemoryStream();
+                await image.SaveAsync(ms, new WebpEncoder { Quality = WebPQuality });
+                compressedBytes = ms.ToArray();
+            }
+            catch
+            {
+                // If ImageSharp fails (corrupt/unsupported), save raw bytes with original extension
+                compressedBytes = imageBytes;
+                var ext = DetectImageExtension(imageBytes);
+                filename = Path.GetFileNameWithoutExtension(filename) + ext;
+                filePath = Path.Combine(attachmentsDir, filename);
+            }
+
+            await File.WriteAllBytesAsync(filePath, compressedBytes);
+
+            // Build relative path from reports/ directory (where the HTML report lives)
+            var relativePath = $"{result.RunId}/attachments/{filename}";
+            var noteText = string.IsNullOrEmpty(request.Caption)
+                ? $"[Screenshot: {relativePath}]"
+                : $"[Screenshot: {relativePath}] {request.Caption}";
+            await _engine.AddNoteAsync(request.TestHandle, noteText);
+
+            // Store screenshot path in DB
+            if (_resultRepo is not null)
+            {
+                await _resultRepo.AppendScreenshotPathAsync(request.TestHandle, relativePath);
+            }
 
             var queue = await _engine.GetQueueAsync(result.RunId);
             var progress = queue?.GetProgress() ?? "?/?";
@@ -125,7 +171,9 @@ public sealed class SaveScreenshotTool : IMcpTool
                 screenshot_saved = true,
                 path = filePath,
                 relative_path = relativePath,
-                size_bytes = imageBytes.Length
+                size_bytes = compressedBytes.Length,
+                original_size_bytes = originalSize,
+                format = "webp"
             };
 
             var nextAction = result.Status == TestStatus.InProgress ? "advance_test_case" : "get_test_case_details";
@@ -176,6 +224,9 @@ internal sealed class SaveScreenshotRequest
 
     [JsonPropertyName("image_data")]
     public string? ImageData { get; set; }
+
+    [JsonPropertyName("caption")]
+    public string? Caption { get; set; }
 
     [JsonPropertyName("filename")]
     public string? Filename { get; set; }

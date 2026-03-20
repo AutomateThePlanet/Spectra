@@ -96,6 +96,18 @@ public sealed class ExecutionDb : IAsyncDisposable
         await using var command = connection.CreateCommand();
         command.CommandText = schema;
         await command.ExecuteNonQueryAsync();
+
+        // Migration: add screenshot_paths column if not exists
+        try
+        {
+            await using var migration = connection.CreateCommand();
+            migration.CommandText = "ALTER TABLE test_results ADD COLUMN screenshot_paths TEXT";
+            await migration.ExecuteNonQueryAsync();
+        }
+        catch (SqliteException)
+        {
+            // Column already exists — ignore
+        }
     }
 
     /// <summary>

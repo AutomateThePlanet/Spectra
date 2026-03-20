@@ -1,0 +1,297 @@
+{
+  "generated_at": "2026-03-20T14:46:47.6512977Z",
+  "summary": {
+    "total_tests": 40,
+    "automated": 0,
+    "manual_only": 40,
+    "coverage_percentage": 0,
+    "broken_links": 0,
+    "orphaned_automation": 0,
+    "mismatches": 0
+  },
+  "by_suite": [
+    {
+      "suite": "authentication",
+      "total": 28,
+      "automated": 0,
+      "coverage_percentage": 0
+    },
+    {
+      "suite": "citizen-registration",
+      "total": 6,
+      "automated": 0,
+      "coverage_percentage": 0
+    },
+    {
+      "suite": "payment-processing",
+      "total": 6,
+      "automated": 0,
+      "coverage_percentage": 0
+    }
+  ],
+  "by_component": [
+    {
+      "component": "authentication",
+      "total": 28,
+      "automated": 0,
+      "coverage_percentage": 0
+    },
+    {
+      "component": "citizen-registration",
+      "total": 6,
+      "automated": 0,
+      "coverage_percentage": 0
+    },
+    {
+      "component": "payment-processing",
+      "total": 6,
+      "automated": 0,
+      "coverage_percentage": 0
+    }
+  ],
+  "unlinked_tests": [
+    {
+      "test_id": "TC-100",
+      "suite": "authentication",
+      "title": "Successful login with valid username and password",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-101",
+      "suite": "authentication",
+      "title": "Login fails with incorrect password",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-102",
+      "suite": "authentication",
+      "title": "Login fails with non-existent username",
+      "priority": "medium"
+    },
+    {
+      "test_id": "TC-103",
+      "suite": "authentication",
+      "title": "Account lockout after 5 consecutive failed login attempts",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-104",
+      "suite": "authentication",
+      "title": "Account remains locked for 30 minutes after lockout",
+      "priority": "medium"
+    },
+    {
+      "test_id": "TC-105",
+      "suite": "authentication",
+      "title": "Administrator manually unlocks locked account",
+      "priority": "medium"
+    },
+    {
+      "test_id": "TC-106",
+      "suite": "authentication",
+      "title": "Password meets minimum complexity requirements",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-107",
+      "suite": "authentication",
+      "title": "Password rejected when missing uppercase letter",
+      "priority": "medium"
+    },
+    {
+      "test_id": "TC-108",
+      "suite": "authentication",
+      "title": "Password rejected when less than 12 characters",
+      "priority": "medium"
+    },
+    {
+      "test_id": "TC-109",
+      "suite": "authentication",
+      "title": "Password rejected when reusing one of last 5 passwords",
+      "priority": "medium"
+    },
+    {
+      "test_id": "TC-110",
+      "suite": "authentication",
+      "title": "Temporary password expires after 24 hours",
+      "priority": "medium"
+    },
+    {
+      "test_id": "TC-111",
+      "suite": "authentication",
+      "title": "Temporary password must be changed on first login",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-112",
+      "suite": "authentication",
+      "title": "MFA enrollment forced for internal user without MFA",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-113",
+      "suite": "authentication",
+      "title": "TOTP MFA code successfully validates login",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-114",
+      "suite": "authentication",
+      "title": "SMS OTP code sent and valid for 5 minutes",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-115",
+      "suite": "authentication",
+      "title": "Email OTP code sent and valid for 10 minutes",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-116",
+      "suite": "authentication",
+      "title": "MFA session invalidated after 3 failed code attempts",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-117",
+      "suite": "authentication",
+      "title": "SSO authentication via Azure AD SAML 2.0",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-118",
+      "suite": "authentication",
+      "title": "SSO auto-provisions new user from SAML assertion",
+      "priority": "medium"
+    },
+    {
+      "test_id": "TC-119",
+      "suite": "authentication",
+      "title": "Session timeout after 30 minutes of inactivity for internal users",
+      "priority": "medium"
+    },
+    {
+      "test_id": "TC-120",
+      "suite": "authentication",
+      "title": "Session timeout after 60 minutes of inactivity for citizens",
+      "priority": "medium"
+    },
+    {
+      "test_id": "TC-121",
+      "suite": "authentication",
+      "title": "Fourth concurrent session terminates oldest session",
+      "priority": "medium"
+    },
+    {
+      "test_id": "TC-122",
+      "suite": "authentication",
+      "title": "Session invalidated when IP address changes mid-session",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-123",
+      "suite": "authentication",
+      "title": "Remember me extends session to 14 days",
+      "priority": "medium"
+    },
+    {
+      "test_id": "TC-124",
+      "suite": "authentication",
+      "title": "Self-service password reset link sent and valid for 1 hour",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-125",
+      "suite": "authentication",
+      "title": "Password reset link can only be used once",
+      "priority": "medium"
+    },
+    {
+      "test_id": "TC-126",
+      "suite": "authentication",
+      "title": "All active sessions terminated after password change",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-127",
+      "suite": "authentication",
+      "title": "Rate limiting blocks IP after 10 login attempts per minute",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-100",
+      "suite": "citizen-registration",
+      "title": "Complete citizen registration with valid Bulgarian EGN and QES verification",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-101",
+      "suite": "citizen-registration",
+      "title": "Register citizen with document upload identity verification",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-102",
+      "suite": "citizen-registration",
+      "title": "Attempt registration with invalid EGN checksum",
+      "priority": "medium"
+    },
+    {
+      "test_id": "TC-103",
+      "suite": "citizen-registration",
+      "title": "Register with email verification code expiration and retry",
+      "priority": "medium"
+    },
+    {
+      "test_id": "TC-104",
+      "suite": "citizen-registration",
+      "title": "Attempt registration with duplicate EGN for active account",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-105",
+      "suite": "citizen-registration",
+      "title": "Register citizen with in-person verification and resume wizard after 12 hours",
+      "priority": "medium"
+    },
+    {
+      "test_id": "TC-100",
+      "suite": "payment-processing",
+      "title": "Successful card payment with 3D Secure authentication",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-101",
+      "suite": "payment-processing",
+      "title": "Bank transfer payment with exact amount match",
+      "priority": "medium"
+    },
+    {
+      "test_id": "TC-102",
+      "suite": "payment-processing",
+      "title": "Fee waiver automatically applied for eligible citizen",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-103",
+      "suite": "payment-processing",
+      "title": "Payment timeout handling and retry mechanism",
+      "priority": "high"
+    },
+    {
+      "test_id": "TC-104",
+      "suite": "payment-processing",
+      "title": "Refund processing for rejected application",
+      "priority": "medium"
+    },
+    {
+      "test_id": "TC-105",
+      "suite": "payment-processing",
+      "title": "Multiple failed payment attempts trigger lockout",
+      "priority": "high"
+    }
+  ],
+  "orphaned_automation": [],
+  "broken_links": [],
+  "mismatches": []
+}

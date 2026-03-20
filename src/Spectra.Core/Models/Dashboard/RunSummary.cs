@@ -60,4 +60,9 @@ public sealed class RunSummary
     [JsonPropertyName("results")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<TestResultEntry>? Results { get; init; }
+
+    /// <summary>Relative path to the HTML report file, if available.</summary>
+    [JsonPropertyName("report_path")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReportPath { get; init; }
 }
