@@ -21,6 +21,9 @@ public sealed class TestCaseFrontmatter
     [YamlMember(Alias = "component")]
     public string? Component { get; set; }
 
+    [YamlMember(Alias = "description")]
+    public string? Description { get; set; }
+
     [YamlMember(Alias = "preconditions")]
     public string? Preconditions { get; set; }
 

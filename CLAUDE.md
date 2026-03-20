@@ -145,6 +145,7 @@ spectra ai analyze --coverage --verbosity detailed
 - **Tests:** xUnit with structured results (never throw on validation errors)
 
 ## Recent Changes
+- 010-smart-test-selection: ✅ COMPLETE - Cross-suite test search and filtering via `find_test_cases` MCP tool (free-text query, priority/tag/component/automation filters, AND between types, OR within arrays). Extended `start_execution_run` with `test_ids` (custom test ID list) and `selection` (saved selection by name) modes alongside existing `suite` mode. New `get_test_execution_history` tool for per-test execution statistics (pass rate, last status, total runs). New `list_saved_selections` tool reads named selections from `spectra.config.json`. Added `description` field to TestCaseFrontmatter/TestCase/TestIndexEntry. Index writer now populates description, estimated_duration, automated_by, requirements fields. Default config includes "smoke" saved selection. Agent prompt updated with smart selection workflow and risk-based recommendations.
 - 009-coverage-dashboard-viz: ✅ COMPLETE - Enhanced dashboard coverage visualizations. Typed detail models replacing `IReadOnlyList<object>` (`DocumentationSectionData`, `RequirementsSectionData`, `AutomationSectionData` with per-item detail classes). `DataCollector` populates detail lists for all three sections. Dashboard: expandable progress bar drill-down with per-item breakdown, donut chart (SVG, automated/manual/unlinked distribution), D3.js treemap (suites sized by test count, colored by automation %), empty state guidance with setup instructions. CSS transitions for expand/collapse animations.
 - 011-coverage-overhaul: ✅ COMPLETE - Unified three-type coverage system (Documentation, Requirements, Automation) in one report. Added `automated_by` and `requirements` fields to TestCase/TestCaseFrontmatter/TestIndexEntry. New models: `UnifiedCoverageReport`, `DocumentationCoverage`, `RequirementsCoverage`, `AutomationCoverage`, `RequirementDefinition`. New services: `DocumentationCoverageAnalyzer`, `RequirementsCoverageAnalyzer`, `UnifiedCoverageBuilder`, `AutoLinkService`, `RequirementsParser`, `FrontmatterUpdater`. New config: `scan_patterns`, `file_extensions`, `requirements_file` in CoverageConfig. CLI: `--auto-link` flag writes `automated_by` back into test files. Dashboard: three stacked coverage sections with progress bars. `spectra init` creates `docs/requirements/_requirements.yaml` template.
 - 010-document-index: ✅ COMPLETE - Persistent `docs/_index.md` with per-document metadata (sections, entities, tokens, content hashes). Incremental updates via SHA-256 hashing. `spectra docs index [--force]` CLI command. Auto-refresh before `ai generate`. `GetDocumentMapTool` prefers index when available. Models: `DocumentIndex`, `DocumentIndexEntry`, `SectionSummary`. Services: `DocumentIndexExtractor`, `DocumentIndexWriter`, `DocumentIndexReader`, `DocumentIndexService`.
@@ -182,6 +183,9 @@ The MCP server (`Spectra.MCP`) provides test execution tools for AI agents.
 - `validate_tests` - Validate test files
 - `rebuild_indexes` - Rebuild _index.json files
 - `analyze_coverage_gaps` - Analyze test coverage
+- `find_test_cases` - Cross-suite search and filter by query, priority, tags, component, automation
+- `get_test_execution_history` - Per-test execution statistics (pass rate, last status, run count)
+- `list_saved_selections` - List named selections from config with estimated test counts
 
 **Reporting:**
 - `get_run_history` - Get execution history

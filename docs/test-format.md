@@ -16,6 +16,8 @@ id: TC-102
 priority: high
 tags: [payments, negative]
 component: checkout
+description: Verify that expired credit cards are rejected at checkout
+estimated_duration: 5m
 source_refs: [docs/features/checkout/payment-methods.md]
 requirements: [REQ-042]
 automated_by:
@@ -53,6 +55,8 @@ grounding:
 | `title` | string | No | Derived from the first `#` heading if not in frontmatter |
 | `tags` | string[] | No | Categorization tags (e.g., `[smoke, payments]`) |
 | `component` | string | No | Feature area or component name |
+| `description` | string | No | Short description of what the test verifies (indexed and searchable) |
+| `estimated_duration` | string | No | Estimated execution time (e.g., `5m`, `1h 30m`) |
 | `depends_on` | string[] | No | Test IDs that must pass first |
 
 ## Documentation & Traceability Fields
@@ -112,9 +116,11 @@ Each suite directory contains an `_index.json` with metadata for all tests:
     {
       "id": "TC-001",
       "title": "Checkout with valid Visa card",
+      "description": "Verify standard Visa card checkout flow",
       "priority": "high",
       "file": "TC-001.md",
       "tags": ["smoke", "checkout"],
+      "estimated_duration": "5m",
       "source_refs": ["docs/features/checkout.md"],
       "requirements": ["REQ-042"],
       "automated_by": ["tests/e2e/CheckoutTests.cs"]
@@ -123,4 +129,4 @@ Each suite directory contains an `_index.json` with metadata for all tests:
 }
 ```
 
-The `requirements` and `automated_by` fields are only included when populated.
+The `description`, `estimated_duration`, `requirements`, and `automated_by` fields are only included when populated.
