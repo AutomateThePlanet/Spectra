@@ -23,7 +23,7 @@
         "enabled": true,
         "priority": 1,
         "api_key_env": "AZURE_ANTHROPIC_API_KEY",
-        "base_url": "https://angel-mdnhzlaw-swedencentral.services.ai.azure.com/anthropic/v1/messages/"
+        "base_url": "https://angel-mdnhzlaw-swedencentral.services.ai.azure.com/"
       }
     ],
     "fallback_strategy": "auto"

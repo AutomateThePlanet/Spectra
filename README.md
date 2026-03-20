@@ -24,9 +24,9 @@ It doesn't replace your existing tools — it adds an AI layer. Bugs go to Azure
 ```
 docs/                        ← Source documentation
   ↓
-AI Test Generation CLI       ← Copilot SDK + custom tools
-  ↓
-tests/                       ← Markdown test cases in GitHub
+AI Test Generation CLI       ← GitHub Copilot SDK (sole AI runtime)
+  ↓                            Supports: github-models, azure-openai,
+tests/                       ←          azure-anthropic, openai, anthropic
   ↓
 MCP Execution Engine         ← Deterministic state machine
   ↓
@@ -69,10 +69,9 @@ spectra index
 ### Prerequisites
 
 - .NET 8.0+
-- One of the following authentication options:
-  - GitHub CLI authenticated (`gh auth login`), OR
-  - `GITHUB_TOKEN` environment variable, OR
-  - `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` for alternative providers
+- GitHub Copilot CLI installed (`copilot --version` to verify)
+
+SPECTRA uses the GitHub Copilot SDK as its AI runtime. All providers (GitHub Models, Azure OpenAI, Azure Anthropic, OpenAI, Anthropic) are accessed through the Copilot SDK.
 
 ### Quick Auth Check
 
@@ -80,7 +79,7 @@ spectra index
 spectra auth
 ```
 
-This shows authentication status for all configured providers.
+This verifies Copilot SDK availability and shows supported providers.
 
 ## Test Case Format
 
@@ -228,7 +227,8 @@ SPECTRA is in active development. See the [roadmap](#roadmap) for current priori
 - Markdown test format with metadata schema
 - Document map builder + selective loading
 - Batch generation and batch update
-- Provider chain (Copilot + BYOK fallback)
+- Unified AI runtime (GitHub Copilot SDK)
+- Multi-provider support via SDK configuration
 - Validation, indexing, deduplication
 
 **Phase 2: MCP Execution Engine** ✓ *complete*
@@ -273,18 +273,28 @@ SPECTRA is configured via `spectra.config.json` at the repository root. See [Con
   },
   "ai": {
     "providers": [
-      { "name": "copilot", "model": "gpt-5", "priority": 1 },
-      { "name": "anthropic", "model": "claude-sonnet-4-5", "api_key_env": "ANTHROPIC_API_KEY", "priority": 2 }
+      { "name": "github-models", "model": "gpt-4o", "enabled": true }
     ],
-    "fallback_strategy": "auto",
     "critic": {
       "enabled": true,
-      "provider": "google",
-      "model": "gemini-2.0-flash"
+      "provider": "github-models",
+      "model": "gpt-4o-mini"
     }
   }
 }
 ```
+
+### Supported Providers (via Copilot SDK)
+
+| Provider | Description |
+|----------|-------------|
+| `github-models` | GitHub Models API (default) |
+| `azure-openai` | Azure OpenAI Service |
+| `azure-anthropic` | Azure AI with Anthropic models |
+| `openai` | OpenAI API (BYOK) |
+| `anthropic` | Anthropic API (BYOK) |
+
+For BYOK providers, set `api_key_env` to the environment variable name containing your API key.
 
 ## Contributing
 

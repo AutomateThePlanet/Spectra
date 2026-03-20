@@ -66,7 +66,24 @@
       "Bash(claude mcp remove:*)",
       "Bash(timeout 5 dotnet:*)",
       "Bash(powershell:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(dir \"C:\\\\SourceCode\\\\Spectra\\\\*.md\")",
+      "Read(//c/SourceCode/Spectra/$USERPROFILE/.dotnet/tools/**)",
+      "Bash(\"$USERPROFILE/.dotnet/tools/spectra.exe\" --version 2>&1)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(gh api:*)",
+      "Bash(where copilot:*)",
+      "Bash(python3 -c \"\nimport sys\nwith open\\(sys.argv[1], 'rb'\\) as f:\n    data = f.read\\(\\)\nfor term in [b'PermissionHandler', b'ApproveAll', b'UseLoggedInUser', b'OnPermissionRequest', b'CliPath']:\n    idx = data.find\\(term\\)\n    print\\(f'{term.decode\\(\\)}: {\\\\\"found at \\\\\" + str\\(idx\\) if idx >= 0 else \\\\\"NOT FOUND\\\\\"}'\\)\" \"$USERPROFILE/.nuget/packages/github.copilot.sdk/0.1.10/lib/net8.0/GitHub.Copilot.SDK.dll\" 2>&1)",
+      "Bash(dotnet package:*)",
+      "Bash(\"$USERPROFILE/.dotnet/tools/spectra.exe\" auth:*)",
+      "Bash(export PATH=\"$HOME/.dotnet/tools:$PATH\" && spectra --version 2>&1)",
+      "Read(//c/SourceCode/Spectra/test_app_documentation/$HOME/.dotnet/tools/**)",
+      "Read(//c/SourceCode/Spectra/test_app_documentation/$USERPROFILE/.dotnet/tools/**)",
+      "Bash(\"$HOME/.dotnet/tools/spectra\" --version 2>&1)",
+      "Bash(export PATH=\"$HOME/.dotnet/tools:$PATH\" && cd /c/SourceCode/Spectra/test_app_documentation && spectra auth 2>&1)",
+      "Bash(export PATH=\"$HOME/.dotnet/tools:$PATH\" && spectra ai generate spectra-test-docs --no-interaction --count 3 2>&1)",
+      "Bash(cd /c/SourceCode/Spectra && sed -i 's/1.10.6/1.10.7/' src/Spectra.CLI/Spectra.CLI.csproj && dotnet build src/Spectra.CLI -c Release --no-incremental -p:NoWarn=CA1062 2>&1 | tail -3)",
+      "Bash(export PATH=\"$HOME/.dotnet/tools:$PATH\" && cd /c/SourceCode/Spectra/test_app_documentation && spectra ai generate spectra-test-docs --no-interaction --count 5 2>&1)"
     ]
   }
 }

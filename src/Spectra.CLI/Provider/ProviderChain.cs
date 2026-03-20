@@ -6,32 +6,39 @@ namespace Spectra.CLI.Provider;
 
 /// <summary>
 /// Manages a chain of AI providers with automatic fallback.
+/// Note: With the Copilot SDK consolidation, provider fallback is handled by the SDK itself.
+/// This class is kept for backwards compatibility but will use the single Copilot runtime.
 /// </summary>
 public sealed class ProviderChain
 {
     private readonly IReadOnlyList<ProviderConfig> _providers;
     private readonly RecoverableErrorDetector _errorDetector;
-    private readonly Func<ProviderConfig, IAgentRuntime> _agentFactory;
+    private readonly SpectraConfig? _config;
 
     public ProviderChain(
         IReadOnlyList<ProviderConfig> providers,
-        Func<ProviderConfig, IAgentRuntime>? agentFactory = null)
+        SpectraConfig? config = null)
     {
         _providers = providers ?? throw new ArgumentNullException(nameof(providers));
         _errorDetector = new RecoverableErrorDetector();
-        _agentFactory = agentFactory ?? (config => AgentFactory.CreateFromProvider(config));
+        _config = config;
     }
 
     /// <summary>
     /// Event raised when falling back to next provider.
     /// </summary>
+#pragma warning disable CS0067 // Event is never used
     public event Action<string, string, string>? OnFallback;
+#pragma warning restore CS0067
 
     /// <summary>
     /// Executes an operation with automatic provider fallback.
+    /// With Copilot SDK, this now uses a single runtime.
     /// </summary>
     public async Task<ChainResult<T>> ExecuteAsync<T>(
         Func<IAgentRuntime, CancellationToken, Task<T>> operation,
+        string basePath,
+        string testsPath,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(operation);
@@ -41,64 +48,68 @@ public sealed class ProviderChain
             return ChainResult<T>.Failure("No providers configured");
         }
 
-        var attempts = new List<ProviderAttempt>();
-
-        foreach (var provider in _providers)
+        if (_config is null)
         {
-            ct.ThrowIfCancellationRequested();
-
-            var agent = _agentFactory(provider);
-            var attempt = new ProviderAttempt
-            {
-                ProviderName = provider.Name,
-                StartedAt = DateTime.UtcNow
-            };
-
-            try
-            {
-                if (!await agent.IsAvailableAsync(ct))
-                {
-                    attempt.Success = false;
-                    attempt.Error = "Provider not available";
-                    attempts.Add(attempt);
-                    continue;
-                }
-
-                var result = await operation(agent, ct);
-                attempt.Success = true;
-                attempts.Add(attempt);
-
-                return ChainResult<T>.Success(result, provider.Name, attempts);
-            }
-            catch (Exception ex)
-            {
-                attempt.Success = false;
-                attempt.Error = ex.Message;
-                attempts.Add(attempt);
-
-                var errorResult = _errorDetector.Analyze(ex);
-
-                if (!errorResult.IsRecoverable)
-                {
-                    return ChainResult<T>.Failure($"Unrecoverable error: {ex.Message}", attempts);
-                }
-
-                // Notify about fallback
-                var nextProvider = _providers.SkipWhile(p => p != provider).Skip(1).FirstOrDefault();
-                if (nextProvider is not null)
-                {
-                    OnFallback?.Invoke(provider.Name, nextProvider.Name, errorResult.Reason);
-
-                    // Wait before retry if suggested
-                    if (errorResult.SuggestedWait > TimeSpan.Zero)
-                    {
-                        await Task.Delay(errorResult.SuggestedWait, ct);
-                    }
-                }
-            }
+            return ChainResult<T>.Failure("SpectraConfig is required for Copilot SDK agent creation");
         }
 
-        return ChainResult<T>.Failure("All providers failed", attempts);
+        var attempts = new List<ProviderAttempt>();
+
+        // With Copilot SDK, we create a single agent and try once
+        var createResult = await AgentFactory.CreateAgentAsync(
+            _config,
+            basePath,
+            testsPath,
+            null,
+            ct);
+
+        var attempt = new ProviderAttempt
+        {
+            ProviderName = createResult.ProviderName ?? "copilot-sdk",
+            StartedAt = DateTime.UtcNow
+        };
+
+        if (!createResult.Success)
+        {
+            attempt.Success = false;
+            attempt.Error = createResult.AuthResult?.ErrorMessage ?? "Failed to create agent";
+            attempts.Add(attempt);
+            return ChainResult<T>.Failure(attempt.Error, attempts);
+        }
+
+        var agent = createResult.Agent!;
+
+        try
+        {
+            if (!await agent.IsAvailableAsync(ct))
+            {
+                attempt.Success = false;
+                attempt.Error = "Provider not available";
+                attempts.Add(attempt);
+                return ChainResult<T>.Failure("Provider not available", attempts);
+            }
+
+            var result = await operation(agent, ct);
+            attempt.Success = true;
+            attempts.Add(attempt);
+
+            return ChainResult<T>.Success(result, createResult.ProviderName ?? "copilot-sdk", attempts);
+        }
+        catch (Exception ex)
+        {
+            attempt.Success = false;
+            attempt.Error = ex.Message;
+            attempts.Add(attempt);
+
+            var errorResult = _errorDetector.Analyze(ex);
+
+            if (!errorResult.IsRecoverable)
+            {
+                return ChainResult<T>.Failure($"Unrecoverable error: {ex.Message}", attempts);
+            }
+
+            return ChainResult<T>.Failure($"Error: {ex.Message}", attempts);
+        }
     }
 }
 

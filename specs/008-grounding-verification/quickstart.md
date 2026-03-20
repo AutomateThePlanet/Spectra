@@ -31,23 +31,28 @@ Add the `critic` section to your `spectra.config.json`:
 }
 ```
 
-### Supported Providers
+### Supported Providers (via Copilot SDK)
 
-| Provider | Model | Environment Variable |
-|----------|-------|---------------------|
-| `google` | `gemini-2.0-flash` | `GOOGLE_API_KEY` |
-| `openai` | `gpt-4o-mini` | `OPENAI_API_KEY` |
-| `anthropic` | `claude-3.5-haiku` | `ANTHROPIC_API_KEY` |
-| `github` | `gpt-4o-mini` | `GITHUB_TOKEN` |
+All providers are accessed through the GitHub Copilot SDK runtime:
 
-### Set API Key
+| Provider | Default Model | Notes |
+|----------|---------------|-------|
+| `github-models` | `gpt-4o-mini` | Default, uses Copilot CLI auth |
+| `azure-openai` | `gpt-4o-mini` | Requires `base_url` and `api_key_env` |
+| `azure-anthropic` | `claude-haiku-4-5` | Requires `base_url` and `api_key_env` |
+| `openai` | `gpt-4o-mini` | Requires `api_key_env` (BYOK) |
+| `anthropic` | `claude-haiku-4-5` | Requires `api_key_env` (BYOK) |
+
+### Authentication
+
+The Copilot SDK handles authentication. For BYOK providers, set the appropriate environment variable:
 
 ```bash
-# For Google Gemini
-export GOOGLE_API_KEY="your-api-key"
-
-# For OpenAI
+# For OpenAI BYOK
 export OPENAI_API_KEY="sk-..."
+
+# For Anthropic BYOK
+export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
 ---

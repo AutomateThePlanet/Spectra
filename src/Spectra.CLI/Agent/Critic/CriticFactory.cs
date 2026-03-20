@@ -1,3 +1,4 @@
+using Spectra.CLI.Agent.Copilot;
 using Spectra.Core.Models.Config;
 
 namespace Spectra.CLI.Agent.Critic;
@@ -55,7 +56,7 @@ public sealed record CriticCreateResult
 }
 
 /// <summary>
-/// Factory for creating critic runtime instances.
+/// Factory for creating critic runtime instances using the Copilot SDK.
 /// </summary>
 public static class CriticFactory
 {
@@ -63,10 +64,10 @@ public static class CriticFactory
     /// Gets the list of supported critic providers.
     /// </summary>
     public static IReadOnlyList<string> SupportedProviders { get; } =
-        ["google", "openai", "anthropic", "github"];
+        ["github-models", "openai", "azure-openai", "anthropic", "azure-anthropic", "google"];
 
     /// <summary>
-    /// Tries to create a critic from configuration with detailed error information.
+    /// Tries to create a critic from configuration using the Copilot SDK.
     /// </summary>
     public static CriticCreateResult TryCreate(CriticConfig? config)
     {
@@ -75,71 +76,33 @@ public static class CriticFactory
             return CriticCreateResult.Failed("none", "Critic not configured or disabled");
         }
 
-        var provider = config.Provider?.ToLowerInvariant();
-
-        if (string.IsNullOrEmpty(provider))
-        {
-            return CriticCreateResult.Failed("none",
-                "Critic provider not specified",
-                "Add 'provider' to the critic configuration in spectra.config.json");
-        }
-
-        if (!SupportedProviders.Contains(provider))
-        {
-            return CriticCreateResult.Failed(provider,
-                $"Unknown critic provider: {provider}",
-                $"Supported providers: {string.Join(", ", SupportedProviders)}");
-        }
-
-        // Get API key
-        var envVar = config.ApiKeyEnv ?? config.GetDefaultApiKeyEnv();
-        var apiKey = Environment.GetEnvironmentVariable(envVar);
-
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            return CriticCreateResult.Failed(provider,
-                $"{provider} API key not found",
-                $"Set the {envVar} environment variable",
-                GetProviderHelpUrl(provider));
-        }
-
-        try
-        {
-            var critic = CreateCritic(provider, config, apiKey);
-            return CriticCreateResult.Succeeded(critic, provider);
-        }
-        catch (Exception ex)
-        {
-            return CriticCreateResult.Failed(provider, $"Failed to create critic: {ex.Message}");
-        }
+        // Use CopilotCritic for all providers
+        var critic = new CopilotCritic(config);
+        return CriticCreateResult.Succeeded(critic, config.Provider ?? "github-models");
     }
 
     /// <summary>
-    /// Creates a critic instance for the given provider.
+    /// Tries to create a critic asynchronously with availability check.
     /// </summary>
-    private static ICriticRuntime CreateCritic(string provider, CriticConfig config, string apiKey)
+    public static async Task<CriticCreateResult> TryCreateAsync(
+        CriticConfig? config,
+        CancellationToken ct = default)
     {
-        return provider switch
+        if (config is null || !config.Enabled)
         {
-            "google" => new GoogleCritic(config, apiKey),
-            "openai" => new OpenAiCritic(config, apiKey),
-            "anthropic" => new AnthropicCritic(config, apiKey),
-            "github" => new GitHubCritic(config, apiKey),
-            _ => throw new ArgumentException($"Unknown provider: {provider}")
-        };
-    }
+            return CriticCreateResult.Failed("none", "Critic not configured or disabled");
+        }
 
-    /// <summary>
-    /// Gets the help URL for a provider.
-    /// </summary>
-    private static string GetProviderHelpUrl(string provider) => provider switch
-    {
-        "google" => "See: https://ai.google.dev/gemini-api/docs/api-key",
-        "openai" => "See: https://platform.openai.com/api-keys",
-        "anthropic" => "See: https://console.anthropic.com/settings/keys",
-        "github" => "See: https://github.com/settings/tokens",
-        _ => "See documentation for API key setup"
-    };
+        // Check Copilot availability
+        var (available, error) = await CopilotService.CheckAvailabilityAsync(ct);
+        if (!available)
+        {
+            return CriticCreateResult.Failed("copilot-sdk", error ?? "Copilot SDK not available");
+        }
+
+        var critic = new CopilotCritic(config);
+        return CriticCreateResult.Succeeded(critic, config.Provider ?? "github-models");
+    }
 
     /// <summary>
     /// Checks if a provider is supported.

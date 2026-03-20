@@ -1,0 +1,105 @@
+{
+  "suite": "payment-processing",
+  "generated_at": "2026-03-20T13:19:45.1609157Z",
+  "test_count": 6,
+  "tests": [
+    {
+      "id": "TC-100",
+      "file": "payment-processing\\TC-100.md",
+      "title": "Successful card payment with 3D Secure authentication",
+      "priority": "high",
+      "tags": [
+        "payment",
+        "card-payment",
+        "3d-secure",
+        "happy-path"
+      ],
+      "component": "payment-processing",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/payments/payment-processing.md#Payment-Methods",
+        "docs/spectra-test-docs/docs/payments/payment-processing.md#Payment-Flow",
+        "docs/spectra-test-docs/docs/payments/payment-processing.md#Receipts"
+      ]
+    },
+    {
+      "id": "TC-101",
+      "file": "payment-processing\\TC-101.md",
+      "title": "Bank transfer payment with exact amount match",
+      "priority": "medium",
+      "tags": [
+        "payment",
+        "bank-transfer",
+        "payment-matching"
+      ],
+      "component": "payment-processing",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/payments/payment-processing.md#Payment-Methods",
+        "docs/spectra-test-docs/docs/payments/payment-processing.md#Payment-Flow"
+      ]
+    },
+    {
+      "id": "TC-102",
+      "file": "payment-processing\\TC-102.md",
+      "title": "Fee waiver automatically applied for eligible citizen",
+      "priority": "high",
+      "tags": [
+        "payment",
+        "fee-waiver",
+        "eligibility"
+      ],
+      "component": "payment-processing",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/payments/payment-processing.md#Fee-Structure",
+        "docs/spectra-test-docs/docs/payments/payment-processing.md#Payment-Flow"
+      ]
+    },
+    {
+      "id": "TC-103",
+      "file": "payment-processing\\TC-103.md",
+      "title": "Payment timeout handling and retry mechanism",
+      "priority": "high",
+      "tags": [
+        "payment",
+        "error-handling",
+        "timeout",
+        "retry"
+      ],
+      "component": "payment-processing",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/payments/payment-processing.md#Timeout-and-Error-Handling"
+      ]
+    },
+    {
+      "id": "TC-104",
+      "file": "payment-processing\\TC-104.md",
+      "title": "Refund processing for rejected application",
+      "priority": "medium",
+      "tags": [
+        "payment",
+        "refund",
+        "card-refund"
+      ],
+      "component": "payment-processing",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/payments/payment-processing.md#Refunds"
+      ]
+    },
+    {
+      "id": "TC-105",
+      "file": "payment-processing\\TC-105.md",
+      "title": "Multiple failed payment attempts trigger lockout",
+      "priority": "high",
+      "tags": [
+        "payment",
+        "error-handling",
+        "security",
+        "lockout",
+        "negative"
+      ],
+      "component": "payment-processing",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/payments/payment-processing.md#Timeout-and-Error-Handling"
+      ]
+    }
+  ]
+}

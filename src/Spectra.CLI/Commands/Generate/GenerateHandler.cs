@@ -185,8 +185,13 @@ public sealed class GenerateHandler
             await Task.Delay(100, ct); // Small delay for UX
         });
 
-        // Create agent with graceful auth handling
-        var createResult = await AgentFactory.TryCreateWithDetailsAsync(config.Ai, ct);
+        // Create agent using Copilot SDK
+        var createResult = await AgentFactory.CreateAgentAsync(
+            config,
+            currentDir,
+            testsPath,
+            status => _progress.Info($"  {status}"),
+            ct);
 
         if (!createResult.Success)
         {
@@ -517,8 +522,13 @@ public sealed class GenerateHandler
         {
             session.StartGenerating();
 
-            // Create agent
-            var createResult = await AgentFactory.TryCreateWithDetailsAsync(config.Ai, ct);
+            // Create agent using Copilot SDK
+            var createResult = await AgentFactory.CreateAgentAsync(
+                config,
+                currentDir,
+                testsPath,
+                status => _progress.Info($"  {status}"),
+                ct);
 
             if (!createResult.Success)
             {

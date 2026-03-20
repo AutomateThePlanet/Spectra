@@ -4,7 +4,13 @@ using Spectra.CLI.Options;
 
 namespace Spectra.CLI.Tests.Commands;
 
+/// <summary>
+/// Integration tests for the generate command.
+/// These tests require Copilot SDK to be available.
+/// Tests will fail if Copilot SDK is not installed or authenticated.
+/// </summary>
 [Collection("Sequential Command Tests")]
+[Trait("Category", "Integration")]
 public class GenerateCommandTests : IDisposable
 {
     private readonly string _testDir;
@@ -226,13 +232,12 @@ public class GenerateCommandTests : IDisposable
               "ai": {
                 "providers": [
                   {
-                    "name": "mock",
-                    "model": "mock-model",
+                    "name": "github-models",
+                    "model": "gpt-4o-mini",
                     "enabled": true,
                     "priority": 1
                   }
-                ],
-                "fallback_strategy": "auto"
+                ]
               },
               "generation": {
                 "default_count": 5,

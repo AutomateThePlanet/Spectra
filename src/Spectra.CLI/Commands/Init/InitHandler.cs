@@ -181,9 +181,9 @@ public sealed class InitHandler
         AnsiConsole.MarkupLine($"[green]Updated[/] {ConfigFileName} with [cyan]{provider}[/] / [cyan]{selectedModel}[/]");
         AnsiConsole.WriteLine();
 
-        AnsiConsole.MarkupLine($"Checking {provider} authentication...");
+        AnsiConsole.MarkupLine("Checking Copilot SDK authentication...");
 
-        var authResult = await AgentFactory.GetAuthStatusAsync(provider, null, ct);
+        var authResult = await AgentFactory.GetAuthStatusAsync(ct);
 
         if (authResult.IsAuthenticated)
         {

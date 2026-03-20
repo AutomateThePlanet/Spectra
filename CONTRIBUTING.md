@@ -19,9 +19,14 @@ docs/                      # Sample documentation (used for testing generation)
 ## Development Setup
 
 1. Install .NET 8.0+ SDK
-2. Install GitHub Copilot CLI (for AI features)
+2. Install GitHub Copilot CLI (`copilot --version` to verify) - required for all AI features
 3. Clone the repo
 4. `dotnet build` from the repo root
+5. `dotnet test` to verify setup
+
+### AI Runtime
+
+SPECTRA uses the GitHub Copilot SDK as its sole AI runtime. All AI generation and verification flows through the Copilot SDK, which supports multiple providers (github-models, azure-openai, azure-anthropic, openai, anthropic) via configuration.
 
 ## How to Contribute
 

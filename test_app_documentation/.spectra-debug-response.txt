@@ -1,0 +1,166 @@
+--- Spectra AI Response Debug ---
+Timestamp: 2026-03-20T13:19:22.5508439Z
+Provider: azure-anthropic
+Model: claude-sonnet-4-5
+Response length: 11659 chars
+---
+
+```json
+[
+  {
+    "id": "TC-100",
+    "title": "Successful card payment with 3D Secure authentication",
+    "priority": "high",
+    "tags": ["payment", "card-payment", "3d-secure", "happy-path"],
+    "component": "payment-processing",
+    "preconditions": "Citizen has submitted a service application with a fee of at least 0.50 BGN. Citizen has a valid Visa or Mastercard.",
+    "steps": [
+      "Navigate to the payment page for the submitted application",
+      "Select 'Bank Card (Visa/Mastercard)' as the payment method",
+      "Click 'Proceed to Payment'",
+      "Verify redirect to ePay.bg payment gateway",
+      "Enter valid card details (card number, expiry, CVV)",
+      "Complete 3D Secure authentication (enter OTP or use biometric)",
+      "Verify callback redirects back to the system",
+      "Check payment status changes to PAID",
+      "Verify application status changes to IN_PROCESSING",
+      "Verify receipt PDF is generated and available for download",
+      "Verify confirmation email is sent with receipt attached"
+    ],
+    "expected_result": "Payment is successfully processed. Application status changes to IN_PROCESSING. Receipt is generated with unique receipt number (R-YYYY-XXXXXX), contains masked card number (last 4 digits only), digital signature, and all required fields. Citizen receives confirmation email with PDF receipt.",
+    "test_data": "Service: Certificate of Birth, Fee: 5.00 BGN, Card: Visa ending in 1234",
+    "source_refs": ["docs/spectra-test-docs/docs/payments/payment-processing.md#Payment-Methods", "docs/spectra-test-docs/docs/payments/payment-processing.md#Payment-Flow", "docs/spectra-test-docs/docs/payments/payment-processing.md#Receipts"],
+    "scenario_from_doc": "For card payments: redirect to ePay.bg → 3D Secure → callback to system. Upon successful payment confirmation: Payment status changes to PAID, Application status changes to IN_PROCESSING, Receipt is generated (PDF) and emailed to the citizen.",
+    "estimated_duration": "8m"
+  },
+  {
+    "id": "TC-101",
+    "title": "Bank transfer payment with exact amount match",
+    "priority": "medium",
+    "tags": ["payment", "bank-transfer", "payment-matching"],
+    "component": "payment-processing",
+    "preconditions": "Citizen has submitted a service application requiring payment. Bank transfer is selected as payment method.",
+    "steps": [
+      "Submit a service application (e.g., Address Registration, 3.00 BGN)",
+      "Select 'Bank Transfer' as payment method",
+      "Verify system generates unique payment reference in format PR-YYYYMMDD-XXXXXX",
+      "Verify payment reference and bank details are displayed on screen",
+      "Verify confirmation email is sent with payment reference and bank details",
+      "Simulate bank transfer arrival with exact amount (3.00 BGN) and correct payment reference",
+      "Verify payment is matched automatically",
+      "Verify payment status changes to PAID",
+      "Verify application status changes to IN_PROCESSING",
+      "Verify receipt is generated and emailed to citizen"
+    ],
+    "expected_result": "System generates unique payment reference (PR-YYYYMMDD-XXXXXX). Payment reference and bank details are displayed and emailed. When bank transfer arrives with exact amount and correct reference, payment is automatically matched. Application proceeds to IN_PROCESSING status. Receipt is generated.",
+    "test_data": "Service: Address Registration, Fee: 3.00 BGN, Payment Reference: PR-20260320-123456",
+    "source_refs": ["docs/spectra-test-docs/docs/payments/payment-processing.md#Payment-Methods", "docs/spectra-test-docs/docs/payments/payment-processing.md#Payment-Flow"],
+    "scenario_from_doc": "The system generates a unique payment reference (PR-YYYYMMDD-XXXXXX) for each transaction. Payment is matched automatically when the bank transfer arrives with the correct reference.",
+    "estimated_duration": "6m"
+  },
+  {
+    "id": "TC-102",
+    "title": "Fee waiver automatically applied for eligible citizen",
+    "priority": "high",
+    "tags": ["payment", "fee-waiver", "eligibility"],
+    "component": "payment-processing",
+    "preconditions": "Citizen profile indicates eligibility for fee waiver (e.g., age over 70 for birth certificate, or disabled person with TELK ≥ 50% for address registration).",
+    "steps": [
+      "Log in as a citizen over 70 years old",
+      "Submit an application for Certificate of Birth (standard fee: 5.00 BGN)",
+      "Verify system calculates the fee",
+      "Verify fee waiver is automatically applied",
+      "Verify fee is set to 0.00 BGN",
+      "Verify waiver reason is logged (e.g., 'Free for citizens over 70')",
+      "Verify citizen proceeds without payment step",
+      "Verify application status changes directly to IN_PROCESSING",
+      "Verify no receipt is generated (since no payment was made)"
+    ],
+    "expected_result": "System automatically detects citizen eligibility for fee waiver. Fee is set to 0.00 BGN. Waiver reason is logged. Citizen bypasses payment step entirely. Application proceeds directly to IN_PROCESSING status without requiring payment or generating a receipt.",
+    "test_data": "Citizen: Age 72, Service: Certificate of Birth, Waiver Condition: Free for citizens over 70",
+    "source_refs": ["docs/spectra-test-docs/docs/payments/payment-processing.md#Fee-Structure", "docs/spectra-test-docs/docs/payments/payment-processing.md#Payment-Flow"],
+    "scenario_from_doc": "If a fee waiver applies, the fee is automatically set to 0.00 BGN and the citizen proceeds without payment. The waiver reason is logged.",
+    "estimated_duration": "5m"
+  },
+  {
+    "id": "TC-103",
+    "title": "Payment timeout handling and retry mechanism",
+    "priority": "high",
+    "tags": ["payment", "error-handling", "timeout", "retry"],
+    "component": "payment-processing",
+    "preconditions": "Citizen has submitted a service application and selected card payment. ePay.bg gateway is configured to simulate timeout (no response within 30 seconds).",
+    "steps": [
+      "Submit a service application with a fee",
+      "Select 'Bank Card (Visa/Mastercard)' as payment method",
+      "Click 'Proceed to Payment'",
+      "Simulate ePay.bg gateway timeout (no response within 30 seconds)",
+      "Verify transaction is marked as PENDING",
+      "Verify citizen sees message: 'Payment is being processed. You will receive a confirmation email within 15 minutes.'",
+      "Wait 15 minutes (or simulate time passage)",
+      "Verify system queries ePay.bg for transaction status",
+      "Simulate ePay.bg confirms failure",
+      "Verify application returns to 'Awaiting Payment' status",
+      "Verify citizen can retry payment",
+      "Attempt payment again and verify retry is allowed"
+    ],
+    "expected_result": "When ePay.bg does not respond within 30 seconds, transaction is marked PENDING and citizen sees processing message. After 15 minutes without callback, system queries ePay.bg. If failure is confirmed, application returns to 'Awaiting Payment' status. Citizen can retry payment.",
+    "test_data": "Service: Certificate of Marital Status, Fee: 5.00 BGN",
+    "source_refs": ["docs/spectra-test-docs/docs/payments/payment-processing.md#Timeout-and-Error-Handling"],
+    "scenario_from_doc": "If the ePay.bg gateway does not respond within 30 seconds, the transaction is marked as PENDING and the citizen is shown: 'Payment is being processed. You will receive a confirmation email within 15 minutes.' If the callback is not received within 15 minutes, the system queries ePay.bg for status. If ePay.bg confirms failure, the application returns to 'Awaiting Payment' status.",
+    "estimated_duration": "10m"
+  },
+  {
+    "id": "TC-104",
+    "title": "Refund processing for rejected application",
+    "priority": "medium",
+    "tags": ["payment", "refund", "card-refund"],
+    "component": "payment-processing",
+    "preconditions": "Citizen has submitted and paid for a service application using a bank card. Application has been rejected by administration.",
+    "steps": [
+      "Submit a service application and complete card payment (e.g., Criminal Record Certificate, 5.00 BGN)",
+      "Verify payment status is PAID and application is IN_PROCESSING",
+      "Administrator rejects the application with a reason",
+      "Verify refund is automatically triggered",
+      "Verify refund is processed back to the original card",
+      "Verify refund amount equals the original payment amount (5.00 BGN)",
+      "Verify citizen is notified of refund via email",
+      "Verify refund processing time is stated as 5-10 business days",
+      "Verify refund transaction is logged in audit trail"
+    ],
+    "expected_result": "When application is rejected, refund is automatically processed. For card payments, refund goes back to the original card. Refund amount equals original payment. Citizen receives email notification. Processing time is 5-10 business days. Transaction is fully audited.",
+    "test_data": "Service: Criminal Record Certificate, Fee: 5.00 BGN, Payment Method: Visa ending in 5678, Rejection Reason: Incomplete documentation",
+    "source_refs": ["docs/spectra-test-docs/docs/payments/payment-processing.md#Refunds"],
+    "scenario_from_doc": "Refunds are processed when an application is rejected by the administration. Card payments: Refund is processed back to the original card. Processing time: 5-10 business days. The refund amount can never exceed the original payment amount.",
+    "estimated_duration": "7m"
+  },
+  {
+    "id": "TC-105",
+    "title": "Multiple failed payment attempts trigger lockout",
+    "priority": "high",
+    "tags": ["payment", "error-handling", "security", "lockout", "negative"],
+    "component": "payment-processing",
+    "preconditions": "Citizen has submitted a service application requiring payment. Citizen will attempt payment with invalid card details.",
+    "steps": [
+      "Submit a service application with a fee (e.g., Certificate of Birth, 5.00 BGN)",
+      "Select 'Bank Card (Visa/Mastercard)' as payment method",
+      "Attempt payment with invalid card details (first attempt)",
+      "Verify payment fails and application remains in 'Awaiting Payment' status",
+      "Attempt payment with invalid card details (second attempt)",
+      "Verify payment fails again",
+      "Attempt payment with invalid card details (third attempt)",
+      "Verify payment fails for the third time",
+      "Verify application is locked for 1 hour",
+      "Verify citizen sees message: 'Multiple payment attempts detected. Please try again later or contact support.'",
+      "Attempt payment again immediately",
+      "Verify payment is blocked and lockout message is displayed",
+      "Wait 1 hour (or simulate time passage)",
+      "Verify citizen can attempt payment again after lockout period expires"
+    ],
+    "expected_result": "After 3 failed payment attempts, application is locked for 1 hour. Citizen sees message: 'Multiple payment attempts detected. Please try again later or contact support.' Payment attempts during lockout period are blocked. After 1 hour, citizen can retry payment.",
+    "test_data": "Service: Certificate of Birth, Fee: 5.00 BGN, Invalid Card: 4111111111111112 (test card that fails)",
+    "source_refs": ["docs/spectra-test-docs/docs/payments/payment-processing.md#Timeout-and-Error-Handling"],
+    "scenario_from_doc": "The citizen can retry payment up to 3 times for the same application. After 3 failed payment attempts, the application is locked for 1 hour with a message: 'Multiple payment attempts detected. Please try again later or contact support.'",
+    "estimated_duration": "8m"
+  }
+]
+```

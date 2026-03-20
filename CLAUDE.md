@@ -3,22 +3,14 @@
 Auto-generated from all feature plans. Last updated: 2026-03-19
 
 ## Active Technologies
-- C# 12, .NET 8+ + ASP.NET Core (MCP server), Microsoft.Data.Sqlite (state storage), System.Text.Json (serialization) (002-mcp-execution-server)
-- SQLite database (`.execution/spectra.db`) for execution state; file system for reports (002-mcp-execution-server)
-- C# 12, .NET 8+ (CLI and coverage analysis); HTML/CSS/JS (dashboard output) + Spectra.Core (parsing, indexes), Spectra.CLI (command integration), System.Text.Json, Microsoft.Data.Sqlite (reading .execution DB) (003-dashboard-coverage-analysis)
-- Reads from `tests/*/_index.json`, `reports/*.json`, `.execution/spectra.db`; Writes to output directory (static files) (003-dashboard-coverage-analysis)
-- C# 12, .NET 8+ + Spectra.CLI (command integration), Spectra.Core (config, parsing), System.CommandLine (interactive prompts) (004-test-generation-profile)
-- File-based (spectra.profile.md at repo root, _profile.md in suites) (004-test-generation-profile)
-- C# 12, .NET 8+ + System.CommandLine (CLI), Spectra.Core (parsing, indexes), Spectra.CLI.Review (terminal UI), Microsoft.Extensions.AI (AI agents) (006-interactive-generation)
-- File-based (tests/, docs/, spectra.config.json, _index.json) (006-interactive-generation)
-- C# 12, .NET 8+ + System.CommandLine (CLI), Spectre.Console (terminal UX), Microsoft.Extensions.AI (AI tools) (006-conversational-generation)
-- File system (tests/{suite}/*.md), JSON indexes (_index.json) (006-conversational-generation)
-- C# 12, .NET 8+ + Spectra.Core (parsing, validation, indexing), Spectra.MCP (tool registry, protocol), System.Text.Json, System.CommandLine (007-execution-agent-mcp-tools)
-- File system (Markdown test files, JSON indexes), embedded resources for bundled agent prompts (007-execution-agent-mcp-tools)
-- C# 12, .NET 8+ + ICriticRuntime (multi-provider), Microsoft.Extensions.AI, System.Text.Json (008-grounding-verification)
-- Dual-model verification: Generator (Claude/GPT) + Critic (Gemini Flash/GPT-4o-mini) (008-grounding-verification)
+- C# 12, .NET 8+ + GitHub Copilot SDK (sole AI runtime for generation and verification)
+- System.CommandLine (CLI), Spectre.Console (terminal UX), System.Text.Json (serialization)
+- ASP.NET Core (MCP server), Microsoft.Data.Sqlite (state storage)
+- SQLite database (`.execution/spectra.db`) for execution state; file system for reports
+- File-based (tests/, docs/, spectra.config.json, _index.json, profiles)
+- Dual-model verification: Generator (any provider) + Critic (any provider) via Copilot SDK
 
-- C# 12, .NET 8+ + System.CommandLine (CLI), Microsoft.Extensions.AI (AI tools), Markdig (Markdown parsing), YamlDotNet (frontmatter), GitHub Copilot SDK (AI runtime) (001-ai-test-generation-cli)
+**AI Runtime**: All AI operations use the GitHub Copilot SDK as the single runtime. Multiple providers (github-models, azure-openai, azure-anthropic, openai, anthropic) are supported through the SDK's provider configuration - no separate agent implementations.
 
 ## Project Structure
 
@@ -30,8 +22,9 @@ src/
 │   │   ├── Dashboard/        # Dashboard generation command
 │   │   ├── Generate/         # Test generation (direct + interactive modes)
 │   │   └── Update/           # Test update (direct + interactive modes)
-│   ├── Agent/                # AI provider integration (GitHub Models, OpenAI, Anthropic)
-│   │   └── Critic/           # Grounding verification (ICriticRuntime implementations)
+│   ├── Agent/                # AI provider integration (Copilot SDK)
+│   │   ├── Copilot/          # CopilotGenerationAgent, CopilotCritic, tools
+│   │   └── Critic/           # ICriticRuntime, CriticFactory, prompt builder
 │   ├── Source/               # Document map builder
 │   ├── Index/                # _index.json operations
 │   ├── Validation/           # Test validation, dedup
@@ -141,8 +134,9 @@ spectra ai analyze --coverage --verbosity detailed
 - **Tests:** xUnit with structured results (never throw on validation errors)
 
 ## Recent Changes
-- 008-grounding-verification: ✅ COMPLETE - Dual-model critic flow (generator + verifier), three verdicts (grounded/partial/hallucinated), grounding metadata in YAML frontmatter, configurable critic provider (Google/OpenAI/Anthropic/GitHub), --skip-critic flag
-- 007-execution-agent-mcp-tools: Added C# 12, .NET 8+ + Spectra.Core (parsing, validation, indexing), Spectra.MCP (tool registry, protocol), System.Text.Json, System.CommandLine
+- 009-copilot-sdk-consolidation: ✅ COMPLETE - Unified all AI operations under GitHub Copilot SDK as the sole runtime. Removed legacy agent implementations (OpenAiAgent, AnthropicAgent, GitHubModelsAgent, MockAgent) and critic implementations (GoogleCritic, OpenAiCritic, AnthropicCritic, GitHubCritic). Provider selection now via spectra.config.json with CopilotGenerationAgent and CopilotCritic handling all providers.
+- 008-grounding-verification: ✅ COMPLETE - Dual-model critic flow (generator + verifier), three verdicts (grounded/partial/hallucinated), grounding metadata in YAML frontmatter, configurable critic provider, --skip-critic flag
+- 007-execution-agent-mcp-tools: Added MCP tools for execution agents
 - 006-conversational-generation: ✅ COMPLETE - Two-mode test generation (Direct/Interactive), test updates with classification (UP_TO_DATE, OUTDATED, ORPHANED, REDUNDANT), rich terminal UX with Spectre.Console
 - 004-test-generation-profile: Added profile support for test generation settings
 

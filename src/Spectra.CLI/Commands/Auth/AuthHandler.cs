@@ -1,4 +1,5 @@
 using Spectra.CLI.Agent;
+using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Infrastructure;
 using Spectra.Core.Models.Config;
 
@@ -22,24 +23,34 @@ public sealed class AuthHandler
         Console.WriteLine(new string('=', 40));
         Console.WriteLine();
 
-        var providers = string.IsNullOrEmpty(provider)
-            ? AgentFactory.GetAvailableProviders().Where(p => p != "mock").ToList()
-            : new List<string> { provider };
-
-        var hasErrors = false;
-
-        foreach (var providerName in providers)
+        // Show resolved CLI path for diagnostics
+        var cliPath = CopilotService.ResolveCopilotCliPath();
+        if (cliPath is not null)
         {
-            var authResult = await AgentFactory.GetAuthStatusAsync(providerName, null, ct);
-            WriteProviderStatus(providerName, authResult);
+            Console.WriteLine($"Copilot CLI:  {cliPath}");
+        }
+        else
+        {
+            Console.WriteLine("Copilot CLI:  NOT FOUND");
+            Console.WriteLine("  Install with: npm install -g @github/copilot");
+        }
+        Console.WriteLine();
 
-            if (!authResult.IsAuthenticated)
+        // Check Copilot SDK availability (the sole runtime)
+        var authResult = await AgentFactory.GetAuthStatusAsync(ct);
+        WriteProviderStatus("copilot-sdk", authResult);
+
+        if (authResult.IsAuthenticated)
+        {
+            Console.WriteLine("Supported providers via Copilot SDK:");
+            foreach (var p in AgentFactory.GetAvailableProviders())
             {
-                hasErrors = true;
+                Console.WriteLine($"  - {p}");
             }
+            Console.WriteLine();
         }
 
-        return hasErrors ? ExitCodes.Error : ExitCodes.Success;
+        return authResult.IsAuthenticated ? ExitCodes.Success : ExitCodes.Error;
     }
 
     private void WriteProviderStatus(string providerName, AuthResult authResult)

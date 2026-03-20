@@ -261,5 +261,10 @@ Done.
 
 ### Dependencies
 
-- Spectre.Console (existing) — Rich terminal UX
-- System.CommandLine (existing) — CLI parsing
+- GitHub.Copilot.SDK — Sole AI runtime for all providers
+- Spectre.Console — Rich terminal UX
+- System.CommandLine — CLI parsing
+
+### AI Runtime
+
+All AI operations use the GitHub Copilot SDK. Provider selection is done via `spectra.config.json`, not via separate agent implementations.

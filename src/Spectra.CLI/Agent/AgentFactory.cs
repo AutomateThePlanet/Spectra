@@ -1,3 +1,4 @@
+using Spectra.CLI.Agent.Copilot;
 using Spectra.Core.Models.Config;
 
 namespace Spectra.CLI.Agent;
@@ -49,264 +50,129 @@ public sealed record AgentCreateResult
 }
 
 /// <summary>
-/// Factory for creating AI agent instances.
+/// Factory for creating AI agent instances using the Copilot SDK.
 /// </summary>
 public static class AgentFactory
 {
     /// <summary>
-    /// Creates an agent based on configuration.
+    /// Creates an agent using the Copilot SDK.
+    /// This is the primary method for creating agents.
     /// </summary>
-    public static IAgentRuntime Create(AiConfig? config)
-    {
-        // Get the first enabled provider or default to mock
-        var providerConfig = config?.Providers?.FirstOrDefault(p => p.Enabled);
-        if (providerConfig is null)
-        {
-            return new MockAgent();
-        }
-
-        return CreateFromProvider(providerConfig);
-    }
-
-    /// <summary>
-    /// Creates an agent from a specific provider configuration.
-    /// </summary>
-    public static IAgentRuntime CreateFromProvider(ProviderConfig provider)
-    {
-        ArgumentNullException.ThrowIfNull(provider);
-
-        return provider.Name.ToLowerInvariant() switch
-        {
-            "github-models" or "github-copilot" or "copilot" => new GitHubModelsAgent(provider),
-            "openai" or "azure-openai" => new OpenAiAgent(provider),
-            "anthropic" or "azure-anthropic" => new AnthropicAgent(provider),
-            "mock" => new MockAgent(),
-            _ => new MockAgent() // Default to mock for unknown providers
-        };
-    }
-
-    /// <summary>
-    /// Tries to create an agent with detailed auth information on failure.
-    /// </summary>
-    public static async Task<AgentCreateResult> TryCreateWithDetailsAsync(
-        ProviderConfig provider,
+    public static async Task<AgentCreateResult> CreateAgentAsync(
+        SpectraConfig config,
+        string basePath,
+        string testsPath,
+        Action<string>? onStatus = null,
         CancellationToken ct = default)
     {
-        ArgumentNullException.ThrowIfNull(provider);
+        // Get provider config (or use default)
+        var providerConfig = config.Ai?.Providers?.FirstOrDefault(p => p.Enabled)
+            ?? new ProviderConfig { Name = "github-models", Model = "gpt-4o", Enabled = true };
 
-        var providerName = provider.Name.ToLowerInvariant();
+        var isByok = IsByokProvider(providerConfig);
 
-        return providerName switch
+        if (isByok)
         {
-            "github-models" or "github-copilot" or "copilot" =>
-                await TryCreateGitHubModelsAgentAsync(provider, ct),
-            "openai" or "azure-openai" => TryCreateOpenAiAgent(provider),
-            "anthropic" or "azure-anthropic" => TryCreateAnthropicAgent(provider),
-            "mock" => AgentCreateResult.Succeeded(new MockAgent()),
-            _ => AgentCreateResult.Succeeded(new MockAgent())
-        };
-    }
-
-    /// <summary>
-    /// Tries to create an agent based on configuration with detailed results.
-    /// </summary>
-    public static async Task<AgentCreateResult> TryCreateWithDetailsAsync(
-        AiConfig? config,
-        CancellationToken ct = default)
-    {
-        var providerConfig = config?.Providers?.FirstOrDefault(p => p.Enabled);
-        if (providerConfig is null)
+            // BYOK providers only need the CLI binary present — no Copilot auth required.
+            // Per SDK docs: BYOK "bypasses GitHub Copilot authentication."
+            var (cliAvailable, cliError) = CopilotService.CheckCliAvailable();
+            if (!cliAvailable)
+            {
+                return AgentCreateResult.Failed(providerConfig.Name ?? "copilot-sdk",
+                    AuthResult.Failure(
+                        cliError ?? "Copilot CLI not available",
+                        "Ensure the 'copilot' CLI is installed and in PATH",
+                        "Run: npm install -g @github/copilot"));
+            }
+        }
+        else
         {
-            return AgentCreateResult.Succeeded(new MockAgent());
+            // GitHub Models / Copilot requires full auth check (ping)
+            var (available, error) = await CopilotService.CheckAvailabilityAsync(ct);
+            if (!available)
+            {
+                return AgentCreateResult.Failed(providerConfig.Name ?? "copilot-sdk",
+                    AuthResult.Failure(
+                        error ?? "Copilot SDK not available",
+                        "Ensure the 'copilot' CLI is installed and in PATH",
+                        "Run: copilot --version"));
+            }
         }
 
-        return await TryCreateWithDetailsAsync(providerConfig, ct);
-    }
-
-    /// <summary>
-    /// Tries to create an agent, returning null if initialization fails.
-    /// </summary>
-    public static IAgentRuntime? TryCreateFromProvider(ProviderConfig provider)
-    {
-        try
+        // Validate provider (API key, base_url for Azure, etc.)
+        var (valid, validationError) = CopilotService.ValidateProvider(providerConfig);
+        if (!valid)
         {
-            return CreateFromProvider(provider);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// Gets all available provider names.
-    /// </summary>
-    public static IReadOnlyList<string> GetAvailableProviders()
-    {
-        return ["github-models", "openai", "azure-openai", "anthropic", "azure-anthropic", "mock"];
-    }
-
-    /// <summary>
-    /// Gets authentication status for a provider.
-    /// </summary>
-    public static async Task<AuthResult> GetAuthStatusAsync(
-        string providerName,
-        string? apiKeyEnv = null,
-        CancellationToken ct = default)
-    {
-        return providerName.ToLowerInvariant() switch
-        {
-            "github-models" or "github-copilot" or "copilot" =>
-                await GitHubCliTokenProvider.TryGetTokenAsync(apiKeyEnv, ct),
-            "openai" => GetSimpleAuthStatus(apiKeyEnv ?? "OPENAI_API_KEY", "openai"),
-            "azure-openai" => GetSimpleAuthStatus(apiKeyEnv ?? "AZURE_OPENAI_API_KEY", "azure-openai"),
-            "anthropic" => GetSimpleAuthStatus(apiKeyEnv ?? "ANTHROPIC_API_KEY", "anthropic"),
-            "azure-anthropic" => GetSimpleAuthStatus(apiKeyEnv ?? "AZURE_ANTHROPIC_API_KEY", "azure-anthropic"),
-            "mock" => AuthResult.Success("mock", "built-in"),
-            _ => AuthResult.Failure($"Unknown provider: {providerName}")
-        };
-    }
-
-    private static async Task<AgentCreateResult> TryCreateGitHubModelsAgentAsync(
-        ProviderConfig provider,
-        CancellationToken ct)
-    {
-        var authResult = await GitHubCliTokenProvider.TryGetTokenAsync(provider.ApiKeyEnv, ct);
-
-        if (!authResult.IsAuthenticated)
-        {
-            return AgentCreateResult.Failed("github-models", authResult);
+            return AgentCreateResult.Failed(providerConfig.Name ?? "copilot-sdk",
+                AuthResult.Failure(validationError ?? "Provider validation failed"));
         }
 
         try
         {
-            var agent = new GitHubModelsAgent(provider, authResult.Token!);
+            var agent = new CopilotGenerationAgent(
+                providerConfig,
+                config,
+                basePath,
+                testsPath,
+                onStatus);
+
             return AgentCreateResult.Succeeded(agent);
         }
         catch (Exception ex)
         {
-            return AgentCreateResult.Failed("github-models",
-                AuthResult.Failure($"Failed to create agent: {ex.Message}"));
+            return AgentCreateResult.Failed(providerConfig.Name ?? "copilot-sdk",
+                AuthResult.Failure($"Failed to create Copilot agent: {ex.Message}"));
         }
     }
 
-    private static AgentCreateResult TryCreateOpenAiAgent(ProviderConfig provider)
+    /// <summary>
+    /// Determines if a provider is BYOK (Bring Your Own Key) — i.e. not GitHub Models/Copilot.
+    /// BYOK providers bypass GitHub Copilot authentication.
+    /// </summary>
+    private static bool IsByokProvider(ProviderConfig? config)
     {
-        var isAzure = IsAzureEndpoint(provider.BaseUrl);
-        var providerName = isAzure ? "azure-openai" : "openai";
-        var defaultEnv = isAzure ? "AZURE_OPENAI_API_KEY" : "OPENAI_API_KEY";
-        var envVar = provider.ApiKeyEnv ?? defaultEnv;
-        var apiKey = Environment.GetEnvironmentVariable(envVar);
-
-        if (string.IsNullOrEmpty(apiKey))
-        {
-            var displayName = isAzure ? "Azure OpenAI" : "OpenAI";
-            return AgentCreateResult.Failed(providerName,
-                AuthResult.Failure(
-                    $"{displayName} API key not found",
-                    $"Set the {envVar} environment variable",
-                    "",
-                    "For more information: spectra auth --help"));
-        }
-
-        try
-        {
-            var agent = new OpenAiAgent(provider);
-            return AgentCreateResult.Succeeded(agent);
-        }
-        catch (Exception ex)
-        {
-            return AgentCreateResult.Failed(providerName,
-                AuthResult.Failure($"Failed to create agent: {ex.Message}"));
-        }
+        var name = config?.Name?.ToLowerInvariant() ?? "";
+        return name is not ("github-models" or "github-copilot" or "copilot" or "");
     }
 
-    private static bool IsAzureEndpoint(string? baseUrl)
+    /// <summary>
+    /// Gets all available provider names supported by the Copilot SDK.
+    /// </summary>
+    public static IReadOnlyList<string> GetAvailableProviders() =>
+        ["github-models", "azure-openai", "azure-anthropic", "openai", "anthropic"];
+
+    /// <summary>
+    /// Checks if Copilot SDK is available and configured.
+    /// </summary>
+    public static async Task<(bool Available, string? Error)> CheckCopilotAvailabilityAsync(
+        CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(baseUrl)) return false;
-        return baseUrl.Contains(".openai.azure.com", StringComparison.OrdinalIgnoreCase) ||
-               baseUrl.Contains(".cognitiveservices.azure.com", StringComparison.OrdinalIgnoreCase);
+        return await CopilotService.CheckAvailabilityAsync(ct);
     }
 
-    private static AgentCreateResult TryCreateAnthropicAgent(ProviderConfig provider)
+    /// <summary>
+    /// Gets authentication status for the Copilot SDK.
+    /// </summary>
+    public static async Task<AuthResult> GetAuthStatusAsync(CancellationToken ct = default)
     {
-        var isAzure = IsAzureAnthropicEndpoint(provider.BaseUrl);
-        var providerName = isAzure ? "azure-anthropic" : "anthropic";
-        var defaultEnv = isAzure ? "AZURE_ANTHROPIC_API_KEY" : "ANTHROPIC_API_KEY";
-        var envVar = provider.ApiKeyEnv ?? defaultEnv;
-        var apiKey = Environment.GetEnvironmentVariable(envVar);
-
-        if (string.IsNullOrEmpty(apiKey))
+        // First check CLI is present
+        var (cliAvailable, cliError) = CopilotService.CheckCliAvailable();
+        if (!cliAvailable)
         {
-            var displayName = isAzure ? "Azure Anthropic" : "Anthropic";
-            return AgentCreateResult.Failed(providerName,
-                AuthResult.Failure(
-                    $"{displayName} API key not found",
-                    $"Set the {envVar} environment variable",
-                    "",
-                    "For more information: spectra auth --help"));
+            return AuthResult.Failure(
+                cliError ?? "Copilot CLI not available",
+                "Ensure the 'copilot' CLI is installed and in PATH",
+                "Run: npm install -g @github/copilot");
         }
 
-        try
+        // Try full auth check (for GitHub Models)
+        var (available, error) = await CopilotService.CheckAvailabilityAsync(ct);
+        if (available)
         {
-            var agent = new AnthropicAgent(provider);
-            return AgentCreateResult.Succeeded(agent);
-        }
-        catch (Exception ex)
-        {
-            return AgentCreateResult.Failed(providerName,
-                AuthResult.Failure($"Failed to create agent: {ex.Message}"));
-        }
-    }
-
-    private static bool IsAzureAnthropicEndpoint(string? baseUrl)
-    {
-        if (string.IsNullOrEmpty(baseUrl)) return false;
-        return baseUrl.Contains(".azure.com", StringComparison.OrdinalIgnoreCase) ||
-               baseUrl.Contains(".cognitiveservices.azure.com", StringComparison.OrdinalIgnoreCase) ||
-               baseUrl.Contains(".inference.ai.azure.com", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static AuthResult GetSimpleAuthStatus(string envVar, string providerName)
-    {
-        var apiKey = Environment.GetEnvironmentVariable(envVar);
-
-        if (!string.IsNullOrEmpty(apiKey))
-        {
-            return AuthResult.Success(apiKey, $"environment ({envVar})");
+            return AuthResult.Success("copilot-sdk", "Copilot CLI (authenticated)");
         }
 
-        var instructions = providerName switch
-        {
-            "openai" => new[]
-            {
-                $"Set the {envVar} environment variable",
-                "",
-                "For more information: spectra auth --help"
-            },
-            "azure-openai" => new[]
-            {
-                $"Set the {envVar} environment variable",
-                "Also set base_url in spectra.config.json to your Azure OpenAI endpoint",
-                "",
-                "For more information: spectra auth --help"
-            },
-            "anthropic" => new[]
-            {
-                $"Set the {envVar} environment variable",
-                "",
-                "For more information: spectra auth --help"
-            },
-            "azure-anthropic" => new[]
-            {
-                $"Set the {envVar} environment variable",
-                "Also set base_url in spectra.config.json to your Azure AI endpoint",
-                "",
-                "For more information: spectra auth --help"
-            },
-            _ => new[] { $"Set the {envVar} environment variable" }
-        };
-
-        return AuthResult.Failure($"{providerName} API key not found", instructions);
+        // CLI is present but ping failed — still OK for BYOK providers
+        return AuthResult.Success("copilot-sdk", "Copilot CLI (BYOK mode — no GitHub auth)");
     }
 }
