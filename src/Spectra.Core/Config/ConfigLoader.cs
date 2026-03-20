@@ -127,7 +127,7 @@ public sealed class ConfigLoader
     /// <summary>
     /// Generates a configuration JSON string with custom provider and model.
     /// </summary>
-    public static string GenerateConfig(string providerName, string model, string? apiKeyEnv = null)
+    public static string GenerateConfig(string providerName, string model, string? apiKeyEnv = null, string? baseUrl = null)
     {
         var config = new SpectraConfig
         {
@@ -142,6 +142,7 @@ public sealed class ConfigLoader
                         Name = providerName,
                         Model = model,
                         ApiKeyEnv = apiKeyEnv,
+                        BaseUrl = baseUrl,
                         Enabled = true,
                         Priority = 1
                     }

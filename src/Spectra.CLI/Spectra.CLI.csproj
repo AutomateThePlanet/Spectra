@@ -7,6 +7,7 @@
   <ItemGroup>
     <PackageReference Include="Anthropic" Version="12.9.0" />
     <PackageReference Include="Azure.AI.Inference" Version="1.0.0-beta.5" />
+    <PackageReference Include="Azure.AI.OpenAI" Version="2.1.0" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.4.1" />
     <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.4.1" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.4.1" />
@@ -26,7 +27,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>spectra</ToolCommandName>
     <PackageId>Spectra.CLI</PackageId>
-    <Version>1.9.4</Version>
+    <Version>1.9.10</Version>
     <Authors>Spectra</Authors>
     <Description>AI-native test generation and management CLI</Description>
     <PackageOutputPath>./nupkg</PackageOutputPath>

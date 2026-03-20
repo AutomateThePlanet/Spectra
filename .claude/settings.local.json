@@ -64,7 +64,9 @@
       "Bash(claude mcp add:*)",
       "Bash(claude mcp list:*)",
       "Bash(claude mcp remove:*)",
-      "Bash(timeout 5 dotnet:*)"
+      "Bash(timeout 5 dotnet:*)",
+      "Bash(powershell:*)",
+      "Bash(findstr:*)"
     ]
   }
 }

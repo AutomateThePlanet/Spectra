@@ -78,8 +78,8 @@ public static class AgentFactory
         return provider.Name.ToLowerInvariant() switch
         {
             "github-models" or "github-copilot" or "copilot" => new GitHubModelsAgent(provider),
-            "openai" => new OpenAiAgent(provider),
-            "anthropic" => new AnthropicAgent(provider),
+            "openai" or "azure-openai" => new OpenAiAgent(provider),
+            "anthropic" or "azure-anthropic" => new AnthropicAgent(provider),
             "mock" => new MockAgent(),
             _ => new MockAgent() // Default to mock for unknown providers
         };
@@ -100,8 +100,8 @@ public static class AgentFactory
         {
             "github-models" or "github-copilot" or "copilot" =>
                 await TryCreateGitHubModelsAgentAsync(provider, ct),
-            "openai" => TryCreateOpenAiAgent(provider),
-            "anthropic" => TryCreateAnthropicAgent(provider),
+            "openai" or "azure-openai" => TryCreateOpenAiAgent(provider),
+            "anthropic" or "azure-anthropic" => TryCreateAnthropicAgent(provider),
             "mock" => AgentCreateResult.Succeeded(new MockAgent()),
             _ => AgentCreateResult.Succeeded(new MockAgent())
         };
@@ -143,7 +143,7 @@ public static class AgentFactory
     /// </summary>
     public static IReadOnlyList<string> GetAvailableProviders()
     {
-        return ["github-models", "openai", "anthropic", "mock"];
+        return ["github-models", "openai", "azure-openai", "anthropic", "azure-anthropic", "mock"];
     }
 
     /// <summary>
@@ -159,7 +159,9 @@ public static class AgentFactory
             "github-models" or "github-copilot" or "copilot" =>
                 await GitHubCliTokenProvider.TryGetTokenAsync(apiKeyEnv, ct),
             "openai" => GetSimpleAuthStatus(apiKeyEnv ?? "OPENAI_API_KEY", "openai"),
+            "azure-openai" => GetSimpleAuthStatus(apiKeyEnv ?? "AZURE_OPENAI_API_KEY", "azure-openai"),
             "anthropic" => GetSimpleAuthStatus(apiKeyEnv ?? "ANTHROPIC_API_KEY", "anthropic"),
+            "azure-anthropic" => GetSimpleAuthStatus(apiKeyEnv ?? "AZURE_ANTHROPIC_API_KEY", "azure-anthropic"),
             "mock" => AuthResult.Success("mock", "built-in"),
             _ => AuthResult.Failure($"Unknown provider: {providerName}")
         };
@@ -190,14 +192,18 @@ public static class AgentFactory
 
     private static AgentCreateResult TryCreateOpenAiAgent(ProviderConfig provider)
     {
-        var envVar = provider.ApiKeyEnv ?? "OPENAI_API_KEY";
+        var isAzure = IsAzureEndpoint(provider.BaseUrl);
+        var providerName = isAzure ? "azure-openai" : "openai";
+        var defaultEnv = isAzure ? "AZURE_OPENAI_API_KEY" : "OPENAI_API_KEY";
+        var envVar = provider.ApiKeyEnv ?? defaultEnv;
         var apiKey = Environment.GetEnvironmentVariable(envVar);
 
         if (string.IsNullOrEmpty(apiKey))
         {
-            return AgentCreateResult.Failed("openai",
+            var displayName = isAzure ? "Azure OpenAI" : "OpenAI";
+            return AgentCreateResult.Failed(providerName,
                 AuthResult.Failure(
-                    "OpenAI API key not found",
+                    $"{displayName} API key not found",
                     $"Set the {envVar} environment variable",
                     "",
                     "For more information: spectra auth --help"));
@@ -210,21 +216,32 @@ public static class AgentFactory
         }
         catch (Exception ex)
         {
-            return AgentCreateResult.Failed("openai",
+            return AgentCreateResult.Failed(providerName,
                 AuthResult.Failure($"Failed to create agent: {ex.Message}"));
         }
     }
 
+    private static bool IsAzureEndpoint(string? baseUrl)
+    {
+        if (string.IsNullOrEmpty(baseUrl)) return false;
+        return baseUrl.Contains(".openai.azure.com", StringComparison.OrdinalIgnoreCase) ||
+               baseUrl.Contains(".cognitiveservices.azure.com", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static AgentCreateResult TryCreateAnthropicAgent(ProviderConfig provider)
     {
-        var envVar = provider.ApiKeyEnv ?? "ANTHROPIC_API_KEY";
+        var isAzure = IsAzureAnthropicEndpoint(provider.BaseUrl);
+        var providerName = isAzure ? "azure-anthropic" : "anthropic";
+        var defaultEnv = isAzure ? "AZURE_ANTHROPIC_API_KEY" : "ANTHROPIC_API_KEY";
+        var envVar = provider.ApiKeyEnv ?? defaultEnv;
         var apiKey = Environment.GetEnvironmentVariable(envVar);
 
         if (string.IsNullOrEmpty(apiKey))
         {
-            return AgentCreateResult.Failed("anthropic",
+            var displayName = isAzure ? "Azure Anthropic" : "Anthropic";
+            return AgentCreateResult.Failed(providerName,
                 AuthResult.Failure(
-                    "Anthropic API key not found",
+                    $"{displayName} API key not found",
                     $"Set the {envVar} environment variable",
                     "",
                     "For more information: spectra auth --help"));
@@ -237,9 +254,17 @@ public static class AgentFactory
         }
         catch (Exception ex)
         {
-            return AgentCreateResult.Failed("anthropic",
+            return AgentCreateResult.Failed(providerName,
                 AuthResult.Failure($"Failed to create agent: {ex.Message}"));
         }
+    }
+
+    private static bool IsAzureAnthropicEndpoint(string? baseUrl)
+    {
+        if (string.IsNullOrEmpty(baseUrl)) return false;
+        return baseUrl.Contains(".azure.com", StringComparison.OrdinalIgnoreCase) ||
+               baseUrl.Contains(".cognitiveservices.azure.com", StringComparison.OrdinalIgnoreCase) ||
+               baseUrl.Contains(".inference.ai.azure.com", StringComparison.OrdinalIgnoreCase);
     }
 
     private static AuthResult GetSimpleAuthStatus(string envVar, string providerName)
@@ -259,9 +284,23 @@ public static class AgentFactory
                 "",
                 "For more information: spectra auth --help"
             },
+            "azure-openai" => new[]
+            {
+                $"Set the {envVar} environment variable",
+                "Also set base_url in spectra.config.json to your Azure OpenAI endpoint",
+                "",
+                "For more information: spectra auth --help"
+            },
             "anthropic" => new[]
             {
                 $"Set the {envVar} environment variable",
+                "",
+                "For more information: spectra auth --help"
+            },
+            "azure-anthropic" => new[]
+            {
+                $"Set the {envVar} environment variable",
+                "Also set base_url in spectra.config.json to your Azure AI endpoint",
                 "",
                 "For more information: spectra auth --help"
             },

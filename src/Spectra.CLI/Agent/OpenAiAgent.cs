@@ -1,6 +1,7 @@
 using System.ClientModel;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Azure.AI.OpenAI;
 using Microsoft.Extensions.AI;
 using OpenAI;
 using Spectra.Core.Models;
@@ -17,8 +18,9 @@ public sealed class OpenAiAgent : IAgentRuntime
     private readonly ProviderConfig _provider;
     private readonly IChatClient _client;
     private readonly string _model;
+    private readonly bool _isAzure;
 
-    public string ProviderName => "openai";
+    public string ProviderName => _isAzure ? "azure-openai" : "openai";
 
     public OpenAiAgent(ProviderConfig provider)
     {
@@ -27,13 +29,34 @@ public sealed class OpenAiAgent : IAgentRuntime
         var apiKey = GetApiKey(provider);
         if (string.IsNullOrEmpty(apiKey))
         {
+            var defaultEnv = IsAzureEndpoint(provider.BaseUrl) ? "AZURE_OPENAI_API_KEY" : "OPENAI_API_KEY";
             throw new InvalidOperationException(
-                $"API key not found. Set the {provider.ApiKeyEnv ?? "OPENAI_API_KEY"} environment variable.");
+                $"API key not found. Set the {provider.ApiKeyEnv ?? defaultEnv} environment variable.");
         }
 
         _model = provider.Model ?? "gpt-4o";
-        var openAiClient = new OpenAIClient(new ApiKeyCredential(apiKey));
-        _client = openAiClient.GetChatClient(_model).AsIChatClient();
+        _isAzure = IsAzureEndpoint(provider.BaseUrl);
+
+        if (_isAzure)
+        {
+            // Azure OpenAI - use AzureOpenAIClient with endpoint
+            var endpoint = new Uri(provider.BaseUrl!);
+            var azureClient = new AzureOpenAIClient(endpoint, new ApiKeyCredential(apiKey));
+            _client = azureClient.GetChatClient(_model).AsIChatClient();
+        }
+        else
+        {
+            // Standard OpenAI
+            var openAiClient = new OpenAIClient(new ApiKeyCredential(apiKey));
+            _client = openAiClient.GetChatClient(_model).AsIChatClient();
+        }
+    }
+
+    private static bool IsAzureEndpoint(string? baseUrl)
+    {
+        if (string.IsNullOrEmpty(baseUrl)) return false;
+        return baseUrl.Contains(".openai.azure.com", StringComparison.OrdinalIgnoreCase) ||
+               baseUrl.Contains(".cognitiveservices.azure.com", StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task<bool> IsAvailableAsync(CancellationToken ct = default)
@@ -157,7 +180,9 @@ public sealed class OpenAiAgent : IAgentRuntime
 
     private static string GetApiKey(ProviderConfig provider)
     {
-        var envVar = provider.ApiKeyEnv ?? "OPENAI_API_KEY";
+        // Determine default env var based on endpoint type
+        var defaultEnv = IsAzureEndpoint(provider.BaseUrl) ? "AZURE_OPENAI_API_KEY" : "OPENAI_API_KEY";
+        var envVar = provider.ApiKeyEnv ?? defaultEnv;
         return Environment.GetEnvironmentVariable(envVar) ?? string.Empty;
     }
 

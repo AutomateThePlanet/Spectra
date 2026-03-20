@@ -1,4 +1,6 @@
+using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Anthropic;
 using Anthropic.Models.Messages;
@@ -9,28 +11,57 @@ namespace Spectra.CLI.Agent;
 
 /// <summary>
 /// Anthropic Claude agent implementation using the official SDK.
+/// Supports direct Anthropic API or Azure AI-hosted Claude models.
 /// </summary>
 public sealed class AnthropicAgent : IAgentRuntime
 {
     private readonly ProviderConfig _provider;
-    private readonly AnthropicClient _client;
+    private readonly AnthropicClient? _anthropicClient;
+    private readonly HttpClient? _azureHttpClient;
+    private readonly string? _azureApiKey;
+    private readonly bool _isAzure;
 
-    public string ProviderName => "anthropic";
+    public string ProviderName => _isAzure ? "azure-anthropic" : "anthropic";
 
     public AnthropicAgent(ProviderConfig provider)
     {
         _provider = provider ?? throw new ArgumentNullException(nameof(provider));
+        _isAzure = IsAzureEndpoint(provider.BaseUrl);
 
         var apiKey = GetApiKey(provider);
         if (string.IsNullOrEmpty(apiKey))
         {
+            var defaultEnv = _isAzure ? "AZURE_ANTHROPIC_API_KEY" : "ANTHROPIC_API_KEY";
             throw new InvalidOperationException(
-                $"API key not found. Set the {provider.ApiKeyEnv ?? "ANTHROPIC_API_KEY"} environment variable.");
+                $"API key not found. Set the {provider.ApiKeyEnv ?? defaultEnv} environment variable.");
         }
 
-        // Set environment variable for SDK to pick up
-        Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", apiKey);
-        _client = new AnthropicClient();
+        if (_isAzure)
+        {
+            // Azure AI-hosted Claude - use direct HTTP with Anthropic Messages API format
+            _azureApiKey = apiKey;
+            _azureHttpClient = new HttpClient();
+
+            // Azure Claude uses x-api-key header (per Azure docs)
+            _azureHttpClient.DefaultRequestHeaders.Add("x-api-key", apiKey);
+
+            // Anthropic API requires version header
+            _azureHttpClient.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+        }
+        else
+        {
+            // Direct Anthropic API
+            Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", apiKey);
+            _anthropicClient = new AnthropicClient();
+        }
+    }
+
+    private static bool IsAzureEndpoint(string? baseUrl)
+    {
+        if (string.IsNullOrEmpty(baseUrl)) return false;
+        return baseUrl.Contains(".azure.com", StringComparison.OrdinalIgnoreCase) ||
+               baseUrl.Contains(".cognitiveservices.azure.com", StringComparison.OrdinalIgnoreCase) ||
+               baseUrl.Contains(".inference.ai.azure.com", StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task<bool> IsAvailableAsync(CancellationToken ct = default)
@@ -54,47 +85,14 @@ public sealed class AnthropicAgent : IAgentRuntime
             var model = _provider.Model ?? "claude-sonnet-4-5-20250514";
             var maxTokens = GetMaxTokensForModel(model);
 
-            var parameters = new MessageCreateParams
+            if (_isAzure)
             {
-                Model = model,
-                MaxTokens = maxTokens,
-                System = systemPrompt,
-                Messages =
-                [
-                    new()
-                    {
-                        Role = Role.User,
-                        Content = userPrompt
-                    }
-                ]
-            };
-
-            var response = await _client.Messages.Create(parameters, cancellationToken: ct);
-
-            if (response.Content is null || response.Content.Count == 0)
-            {
-                return new GenerationResult
-                {
-                    Tests = [],
-                    Errors = ["No response received from Anthropic"]
-                };
+                return await GenerateWithAzureAsync(systemPrompt, userPrompt, model, maxTokens, ct);
             }
-
-            // The response ToString() provides convenient access to text content
-            var responseText = response.ToString() ?? "";
-
-            var tests = ParseTestsFromResponse(responseText);
-
-            var tokenUsage = new TokenUsage(
-                (int)(response.Usage?.InputTokens ?? 0),
-                (int)(response.Usage?.OutputTokens ?? 0),
-                (int)((response.Usage?.InputTokens ?? 0) + (response.Usage?.OutputTokens ?? 0)));
-
-            return new GenerationResult
+            else
             {
-                Tests = tests,
-                TokenUsage = tokenUsage
-            };
+                return await GenerateWithAnthropicAsync(systemPrompt, userPrompt, model, maxTokens, ct);
+            }
         }
         catch (HttpRequestException ex) when (ex.Message.Contains("429"))
         {
@@ -161,9 +159,168 @@ public sealed class AnthropicAgent : IAgentRuntime
         }
     }
 
-    private static string GetApiKey(ProviderConfig provider)
+    private async Task<GenerationResult> GenerateWithAnthropicAsync(
+        string systemPrompt,
+        string userPrompt,
+        string model,
+        int maxTokens,
+        CancellationToken ct)
     {
-        var envVar = provider.ApiKeyEnv ?? "ANTHROPIC_API_KEY";
+        var parameters = new MessageCreateParams
+        {
+            Model = model,
+            MaxTokens = maxTokens,
+            System = systemPrompt,
+            Messages =
+            [
+                new()
+                {
+                    Role = Role.User,
+                    Content = userPrompt
+                }
+            ]
+        };
+
+        var response = await _anthropicClient!.Messages.Create(parameters, cancellationToken: ct);
+
+        if (response.Content is null || response.Content.Count == 0)
+        {
+            return new GenerationResult
+            {
+                Tests = [],
+                Errors = ["No response received from Anthropic"]
+            };
+        }
+
+        var responseText = response.ToString() ?? "";
+        var tests = ParseTestsFromResponse(responseText);
+
+        var tokenUsage = new TokenUsage(
+            (int)(response.Usage?.InputTokens ?? 0),
+            (int)(response.Usage?.OutputTokens ?? 0),
+            (int)((response.Usage?.InputTokens ?? 0) + (response.Usage?.OutputTokens ?? 0)));
+
+        return new GenerationResult
+        {
+            Tests = tests,
+            TokenUsage = tokenUsage
+        };
+    }
+
+    private async Task<GenerationResult> GenerateWithAzureAsync(
+        string systemPrompt,
+        string userPrompt,
+        string model,
+        int maxTokens,
+        CancellationToken ct)
+    {
+        // Azure AI-hosted Claude uses Anthropic's Messages API format
+        var requestBody = new
+        {
+            model = model,
+            max_tokens = maxTokens,
+            system = systemPrompt,
+            messages = new[]
+            {
+                new { role = "user", content = userPrompt }
+            }
+        };
+
+        var jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+
+        var content = new StringContent(
+            JsonSerializer.Serialize(requestBody, jsonOptions),
+            System.Text.Encoding.UTF8,
+            "application/json");
+
+        // Determine the endpoint URL
+        // If base_url already contains /messages, use it directly
+        // Otherwise, append the standard path
+        var baseUrl = _provider.BaseUrl!.TrimEnd('/');
+        string endpoint;
+        if (baseUrl.EndsWith("/messages", StringComparison.OrdinalIgnoreCase))
+        {
+            endpoint = baseUrl;
+        }
+        else if (baseUrl.Contains("/anthropic/", StringComparison.OrdinalIgnoreCase))
+        {
+            endpoint = baseUrl + "/messages";
+        }
+        else
+        {
+            endpoint = baseUrl + "/anthropic/v1/messages";
+        }
+
+        var response = await _azureHttpClient!.PostAsync(endpoint, content, ct);
+        var responseContent = await response.Content.ReadAsStringAsync(ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var keyPreview = !string.IsNullOrEmpty(_azureApiKey) && _azureApiKey.Length > 8
+                ? $"{_azureApiKey[..4]}...{_azureApiKey[^4..]}"
+                : "(not set)";
+
+            return new GenerationResult
+            {
+                Tests = [],
+                Errors = [
+                    $"Azure Claude API error: {response.StatusCode}",
+                    $"Endpoint: {endpoint}",
+                    $"API Key: {keyPreview}",
+                    $"Response: {responseContent}"
+                ]
+            };
+        }
+
+        // Parse Anthropic Messages API response
+        using var doc = JsonDocument.Parse(responseContent);
+        var root = doc.RootElement;
+
+        string? responseText = null;
+        if (root.TryGetProperty("content", out var contentArray) && contentArray.GetArrayLength() > 0)
+        {
+            var firstContent = contentArray[0];
+            if (firstContent.TryGetProperty("text", out var textProp))
+            {
+                responseText = textProp.GetString();
+            }
+        }
+
+        if (string.IsNullOrEmpty(responseText))
+        {
+            return new GenerationResult
+            {
+                Tests = [],
+                Errors = ["No response received from Azure Claude"]
+            };
+        }
+
+        var tests = ParseTestsFromResponse(responseText);
+
+        // Parse usage if available
+        TokenUsage? tokenUsage = null;
+        if (root.TryGetProperty("usage", out var usage))
+        {
+            var inputTokens = usage.TryGetProperty("input_tokens", out var inp) ? inp.GetInt32() : 0;
+            var outputTokens = usage.TryGetProperty("output_tokens", out var outp) ? outp.GetInt32() : 0;
+            tokenUsage = new TokenUsage(inputTokens, outputTokens, inputTokens + outputTokens);
+        }
+
+        return new GenerationResult
+        {
+            Tests = tests,
+            TokenUsage = tokenUsage
+        };
+    }
+
+    private string GetApiKey(ProviderConfig provider)
+    {
+        var defaultEnv = _isAzure ? "AZURE_ANTHROPIC_API_KEY" : "ANTHROPIC_API_KEY";
+        var envVar = provider.ApiKeyEnv ?? defaultEnv;
         return Environment.GetEnvironmentVariable(envVar) ?? string.Empty;
     }
 

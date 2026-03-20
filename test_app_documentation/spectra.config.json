@@ -18,10 +18,12 @@
   "ai": {
     "providers": [
       {
-        "name": "github-models",
-        "model": "gpt-4o",
+        "name": "azure-anthropic",
+        "model": "claude-sonnet-4-5",
         "enabled": true,
-        "priority": 1
+        "priority": 1,
+        "api_key_env": "AZURE_ANTHROPIC_API_KEY",
+        "base_url": "https://angel-mdnhzlaw-swedencentral.services.ai.azure.com/anthropic/v1/messages/"
       }
     ],
     "fallback_strategy": "auto"

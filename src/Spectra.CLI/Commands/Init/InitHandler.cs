@@ -99,12 +99,14 @@ public sealed class InitHandler
         AnsiConsole.WriteLine();
 
         // Provider selection with arrow keys
-        var providerChoices = new Dictionary<string, (string Provider, string? ApiKeyEnv)>
+        var providerChoices = new Dictionary<string, (string Provider, string? ApiKeyEnv, bool NeedsEndpoint)>
         {
-            ["GitHub Models (GITHUB_TOKEN or gh CLI)"] = ("github-models", null),
-            ["OpenAI (OPENAI_API_KEY)"] = ("openai", "OPENAI_API_KEY"),
-            ["Anthropic (ANTHROPIC_API_KEY)"] = ("anthropic", "ANTHROPIC_API_KEY"),
-            ["Skip for now"] = (null!, null)
+            ["GitHub Models (GITHUB_TOKEN or gh CLI)"] = ("github-models", null, false),
+            ["OpenAI (OPENAI_API_KEY)"] = ("openai", "OPENAI_API_KEY", false),
+            ["Azure OpenAI (AZURE_OPENAI_API_KEY)"] = ("azure-openai", "AZURE_OPENAI_API_KEY", true),
+            ["Anthropic (ANTHROPIC_API_KEY)"] = ("anthropic", "ANTHROPIC_API_KEY", false),
+            ["Azure Anthropic (AZURE_ANTHROPIC_API_KEY)"] = ("azure-anthropic", "AZURE_ANTHROPIC_API_KEY", true),
+            ["Skip for now"] = (null!, null, false)
         };
 
         var providerChoice = AnsiConsole.Prompt(
@@ -114,7 +116,7 @@ public sealed class InitHandler
                 .HighlightStyle(Style.Parse("cyan"))
                 .AddChoices(providerChoices.Keys));
 
-        var (provider, apiKeyEnv) = providerChoices[providerChoice];
+        var (provider, apiKeyEnv, needsEndpoint) = providerChoices[providerChoice];
 
         if (provider is null)
         {
@@ -125,22 +127,54 @@ public sealed class InitHandler
 
         AnsiConsole.WriteLine();
 
-        // Model selection with arrow keys
-        var models = GetModelsForProvider(provider);
-        var modelChoices = models.ToDictionary(m => $"{m.Name} [grey]({m.Id})[/]", m => m.Id);
+        // Azure providers need endpoint configuration
+        string? baseUrl = null;
+        if (needsEndpoint)
+        {
+            baseUrl = await PromptForAzureEndpointAsync(provider, ct);
+            if (baseUrl is null)
+            {
+                AnsiConsole.MarkupLine("[grey]Skipped. You can configure the endpoint later in spectra.config.json.[/]");
+                return;
+            }
+            AnsiConsole.WriteLine();
+        }
 
-        var modelChoice = AnsiConsole.Prompt(
-            new SelectionPrompt<string>()
-                .Title($"Select a [cyan]model[/] for {provider}:")
-                .PageSize(20)
-                .HighlightStyle(Style.Parse("cyan"))
-                .AddChoices(modelChoices.Keys));
+        // Model selection - for Azure providers, prompt for deployment name
+        string selectedModel;
+        if (needsEndpoint)
+        {
+            // Azure providers need deployment name input
+            AnsiConsole.MarkupLine("Enter your [cyan]deployment name[/] (the name you gave your model deployment in Azure):");
+            selectedModel = AnsiConsole.Prompt(
+                new TextPrompt<string>("Deployment name:")
+                    .PromptStyle("green")
+                    .Validate(name =>
+                    {
+                        if (string.IsNullOrWhiteSpace(name))
+                            return ValidationResult.Error("[red]Deployment name is required[/]");
+                        return ValidationResult.Success();
+                    }));
+        }
+        else
+        {
+            // Standard providers - select from list
+            var models = GetModelsForProvider(provider);
+            var modelChoices = models.ToDictionary(m => $"{m.Name} [grey]({m.Id})[/]", m => m.Id);
 
-        var selectedModel = modelChoices[modelChoice];
+            var modelChoice = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title($"Select a [cyan]model[/] for {provider}:")
+                    .PageSize(20)
+                    .HighlightStyle(Style.Parse("cyan"))
+                    .AddChoices(modelChoices.Keys));
+
+            selectedModel = modelChoices[modelChoice];
+        }
 
         // Update config file with selected provider and model
         var configPath = Path.Combine(_workingDirectory, ConfigFileName);
-        var configContent = ConfigLoader.GenerateConfig(provider, selectedModel, apiKeyEnv);
+        var configContent = ConfigLoader.GenerateConfig(provider, selectedModel, apiKeyEnv, baseUrl);
         await File.WriteAllTextAsync(configPath, configContent, ct);
 
         AnsiConsole.WriteLine();
@@ -172,6 +206,55 @@ public sealed class InitHandler
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine("Run [cyan]spectra auth[/] to verify authentication after setup.");
         }
+    }
+
+    private static async Task<string?> PromptForAzureEndpointAsync(string provider, CancellationToken ct)
+    {
+        var displayName = provider == "azure-openai" ? "Azure OpenAI" : "Azure Anthropic";
+        var exampleUrl = provider == "azure-openai"
+            ? "https://your-resource.openai.azure.com/"
+            : "https://your-resource.inference.ai.azure.com/";
+
+        AnsiConsole.MarkupLine($"[cyan]{displayName}[/] requires your Azure endpoint URL.");
+        AnsiConsole.MarkupLine($"[grey]Example: {exampleUrl}[/]");
+        AnsiConsole.WriteLine();
+
+        var endpoint = AnsiConsole.Prompt(
+            new TextPrompt<string>("Enter your [cyan]Azure endpoint URL[/]:")
+                .PromptStyle("green")
+                .AllowEmpty()
+                .Validate(url =>
+                {
+                    if (string.IsNullOrWhiteSpace(url))
+                        return ValidationResult.Success(); // Allow empty to skip
+
+                    if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                        return ValidationResult.Error("[red]Invalid URL format[/]");
+
+                    if (uri.Scheme != "https")
+                        return ValidationResult.Error("[red]URL must use HTTPS[/]");
+
+                    return ValidationResult.Success();
+                }));
+
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            return null;
+        }
+
+        // Ensure trailing slash
+        if (!endpoint.EndsWith('/'))
+        {
+            endpoint += '/';
+        }
+
+        AnsiConsole.MarkupLine($"[green]Endpoint configured:[/] {endpoint}");
+
+        // Also prompt for the deployment name (model)
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[grey]For Azure deployments, you'll need your deployment name (not the model name).[/]");
+
+        return endpoint;
     }
 
     private static List<(string Id, string Name)> GetModelsForProvider(string provider)
@@ -242,6 +325,16 @@ public sealed class InitHandler
                 ("claude-3-opus-20240229", "Claude 3 Opus"),
                 ("claude-3-sonnet-20240229", "Claude 3 Sonnet"),
                 ("claude-3-haiku-20240307", "Claude 3 Haiku"),
+            },
+            "azure-openai" => new List<(string, string)>
+            {
+                ("your-gpt4o-deployment", "GPT-4o (enter your deployment name)"),
+                ("your-gpt4-deployment", "GPT-4 (enter your deployment name)"),
+                ("your-gpt35-deployment", "GPT-3.5 Turbo (enter your deployment name)"),
+            },
+            "azure-anthropic" => new List<(string, string)>
+            {
+                ("your-claude-deployment", "Claude (enter your deployment name)"),
             },
             _ => new List<(string, string)>
             {
