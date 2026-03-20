@@ -36,7 +36,7 @@ public sealed class ToolRegistry
     /// </summary>
     public GetDocumentMapTool GetDocumentMap =>
         _getDocumentMapTool ??= new GetDocumentMapTool(
-            new DocumentMapBuilder(_config.Source));
+            new DocumentMapBuilder(_config.Source), _config.Source);
 
     /// <summary>
     /// Gets the LoadSourceDocument tool.

@@ -69,19 +69,50 @@ public sealed class DocumentTools
 
         // Return a simplified view for the AI
         var documents = result.DocumentMap?.Documents ?? [];
-        var summary = new
+        var indexEntries = result.DocumentIndex?.Entries?.ToDictionary(e => e.Path) ?? [];
+
+        object summary;
+        if (indexEntries.Count > 0)
         {
-            success = true,
-            total_documents = documents.Count,
-            documents = documents.Select(d => new
+            // Enriched response with index data
+            summary = new
             {
-                path = d.Path,
-                title = d.Title,
-                sections = d.Headings,
-                preview = d.Preview?.Length > 200 ? d.Preview[..200] + "..." : d.Preview,
-                size_kb = d.SizeKb
-            })
-        };
+                success = true,
+                total_documents = documents.Count,
+                documents = documents.Select(d =>
+                {
+                    indexEntries.TryGetValue(d.Path, out var idx);
+                    return new
+                    {
+                        path = d.Path,
+                        title = d.Title,
+                        sections = d.Headings,
+                        preview = d.Preview?.Length > 200 ? d.Preview[..200] + "..." : d.Preview,
+                        size_kb = d.SizeKb,
+                        word_count = idx?.WordCount,
+                        estimated_tokens = idx?.EstimatedTokens,
+                        key_entities = idx?.KeyEntities,
+                        last_modified = idx?.LastModified.ToString("yyyy-MM-dd")
+                    };
+                })
+            };
+        }
+        else
+        {
+            summary = new
+            {
+                success = true,
+                total_documents = documents.Count,
+                documents = documents.Select(d => new
+                {
+                    path = d.Path,
+                    title = d.Title,
+                    sections = d.Headings,
+                    preview = d.Preview?.Length > 200 ? d.Preview[..200] + "..." : d.Preview,
+                    size_kb = d.SizeKb
+                })
+            };
+        }
 
         return JsonSerializer.Serialize(summary, new JsonSerializerOptions { WriteIndented = true });
     }

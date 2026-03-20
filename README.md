@@ -24,6 +24,8 @@ It doesn't replace your existing tools — it adds an AI layer. Bugs go to Azure
 ```
 docs/                        ← Source documentation
   ↓
+docs/_index.md               ← Pre-built document index (incremental)
+  ↓
 AI Test Generation CLI       ← GitHub Copilot SDK (sole AI runtime)
   ↓                            Supports: github-models, azure-openai,
 tests/                       ←          azure-anthropic, openai, anthropic
@@ -52,6 +54,9 @@ dotnet tool install -g spectra
 
 # Initialize a repo
 spectra init
+
+# Build/update the documentation index
+spectra docs index
 
 # Generate tests from documentation
 spectra ai generate checkout --count 10
@@ -169,6 +174,20 @@ spectra ai update checkout --delete-orphaned
 spectra ai update checkout --no-interaction
 ```
 
+### Documentation Index
+
+```bash
+# Build or incrementally update the documentation index
+spectra docs index
+
+# Force a full rebuild (re-indexes all files)
+spectra docs index --force
+```
+
+The `docs index` command creates `docs/_index.md` — a lightweight index with per-document metadata (title, sections with summaries, key entities, word/token counts, content hashes). The AI agent reads this index (~1-2K tokens) instead of scanning all files. Content hashes enable incremental updates so only changed files are re-indexed.
+
+The index is also auto-refreshed before `spectra ai generate` runs.
+
 ### Coverage Analysis
 
 ```bash
@@ -266,7 +285,8 @@ SPECTRA is configured via `spectra.config.json` at the repository root. See [Con
 {
   "source": {
     "mode": "local",
-    "local_dir": "docs/"
+    "local_dir": "docs/",
+    "doc_index": "docs/_index.md"
   },
   "tests": {
     "dir": "tests/"

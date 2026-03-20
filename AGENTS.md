@@ -17,6 +17,7 @@ Key architectural rules:
 - Tests are Markdown files with YAML frontmatter in `tests/{suite}/`
 - Documentation lives in `docs/` — the CLI reads from docs, writes to tests
 - The MCP server never parses all Markdown files at runtime — it reads `_index.json`
+- The AI generation agent reads `docs/_index.md` (document index) instead of scanning all docs at runtime
 - The AI agent never writes files directly — all output goes through tool handlers that validate first
 - Every MCP response includes `next_expected_action` and is fully self-contained
 - State machine transitions are enforced — the MCP server rejects invalid tool call sequences
@@ -26,11 +27,11 @@ Key architectural rules:
 ```
 src/
 ├── Spectra.CLI/              # .NET CLI application
-│   ├── Commands/             # Command handlers (init, validate, index, ai generate, etc.)
+│   ├── Commands/             # Command handlers (init, validate, index, docs, ai generate, etc.)
 │   ├── Agent/                # Copilot SDK integration
 │   │   ├── Tools/            # Custom tools for the AI agent
 │   │   └── Skills/           # Skill loader
-│   ├── Source/               # Document map builder, source doc reader
+│   ├── Source/               # Document map builder, document index service, source doc reader
 │   ├── Index/                # _index.json builder and reader
 │   ├── Validation/           # Test case validation, dedup
 │   ├── Review/               # Interactive terminal review UI
@@ -71,6 +72,9 @@ When these exist, understand them before modifying related code:
 - `TestSuite` — Collection of tests in a folder with an _index.json
 - `MetadataIndex` — The _index.json model
 - `DocumentMap` — Lightweight listing of all docs in source folder
+- `DocumentIndex` — Pre-built document index with rich metadata (sections, entities, tokens, hashes)
+- `DocumentIndexEntry` — Per-document metadata in the index
+- `DocumentIndexService` — Orchestrates incremental/full index builds
 - `ExecutionRun` — A test execution run with state
 - `TestHandle` — Opaque reference to a test in a run
 - `SpectraConfig` — Root configuration model
@@ -108,4 +112,5 @@ This project uses [GitHub Spec Kit](https://github.com/github/spec-kit) for spec
 - File-based (spectra.profile.md at repo root, _profile.md in suites) (004-test-generation-profile)
 
 ## Recent Changes
+- 010-document-index: Added persistent `docs/_index.md` with per-document metadata, incremental updates via SHA-256 hashing, `spectra docs index` command, auto-refresh before AI generation
 - 004-test-generation-profile: Added C# 12, .NET 8+ + Spectra.CLI (command integration), Spectra.Core (config, parsing), System.CommandLine (interactive prompts)

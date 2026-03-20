@@ -102,6 +102,10 @@ public sealed class GenerateHandler
             return ExitCodes.Error;
         }
 
+        // Auto-refresh document index before generation
+        var indexService = new DocumentIndexService();
+        await indexService.EnsureIndexAsync(currentDir, config.Source, forceRebuild: false, ct);
+
         // Load source documents with full content for grounded generation
         var documents = await _progress.StatusAsync(
             $"Loading {suite} suite...",
@@ -358,6 +362,10 @@ public sealed class GenerateHandler
         {
             return ExitCodes.Error;
         }
+
+        // Auto-refresh document index before generation
+        var indexService = new DocumentIndexService();
+        await indexService.EnsureIndexAsync(currentDir, config.Source, forceRebuild: false, ct);
 
         // Initialize session
         var session = new InteractiveSession { Mode = SessionMode.Generate };

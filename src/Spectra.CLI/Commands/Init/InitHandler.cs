@@ -1,7 +1,10 @@
 using Microsoft.Extensions.Logging;
 using Spectra.CLI.Agent;
+using System.Text.Json;
 using Spectra.CLI.Infrastructure;
+using Spectra.CLI.Source;
 using Spectra.Core.Config;
+using Spectra.Core.Models.Config;
 using Spectre.Console;
 
 namespace Spectra.CLI.Commands.Init;
@@ -66,6 +69,9 @@ public sealed class InitHandler
 
             // Update .gitignore
             await UpdateGitIgnoreAsync(ct);
+
+            // Build initial document index if docs exist
+            await BuildInitialIndexAsync(configPath, ct);
 
             _logger.LogInformation("SPECTRA initialized successfully!");
             _logger.LogInformation("Created:");
@@ -341,6 +347,33 @@ public sealed class InitHandler
                 ("gpt-4o", "GPT-4o")
             }
         };
+    }
+
+    private async Task BuildInitialIndexAsync(string configPath, CancellationToken ct)
+    {
+        try
+        {
+            var json = await File.ReadAllTextAsync(configPath, ct);
+            var config = JsonSerializer.Deserialize<SpectraConfig>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+            if (config is null) return;
+
+            var docsPath = Path.Combine(_workingDirectory, config.Source.LocalDir.TrimEnd('/', '\\'));
+            if (!Directory.Exists(docsPath)) return;
+
+            var hasFiles = Directory.EnumerateFiles(docsPath, "*.md", SearchOption.AllDirectories).Any();
+            if (!hasFiles) return;
+
+            var indexService = new DocumentIndexService();
+            var index = await indexService.EnsureIndexAsync(_workingDirectory, config.Source, forceRebuild: true, ct);
+            _logger.LogInformation("  - docs/_index.md ({Count} documents indexed)", index.TotalDocuments);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to build initial document index");
+        }
     }
 
     private async Task CreateDirectoriesAsync(CancellationToken ct)

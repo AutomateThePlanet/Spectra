@@ -1,14 +1,15 @@
 # Spectra Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-19
+Auto-generated from all feature plans. Last updated: 2026-03-20
 
 ## Active Technologies
 - C# 12, .NET 8+ + GitHub Copilot SDK (sole AI runtime for generation and verification)
 - System.CommandLine (CLI), Spectre.Console (terminal UX), System.Text.Json (serialization)
 - ASP.NET Core (MCP server), Microsoft.Data.Sqlite (state storage)
 - SQLite database (`.execution/spectra.db`) for execution state; file system for reports
-- File-based (tests/, docs/, spectra.config.json, _index.json, profiles)
+- File-based (tests/, docs/, spectra.config.json, _index.json, _index.md, profiles)
 - Dual-model verification: Generator (any provider) + Critic (any provider) via Copilot SDK
+- Document index (`docs/_index.md`) for pre-built documentation metadata with incremental updates
 
 **AI Runtime**: All AI operations use the GitHub Copilot SDK as the single runtime. Multiple providers (github-models, azure-openai, azure-anthropic, openai, anthropic) are supported through the SDK's provider configuration - no separate agent implementations.
 
@@ -20,12 +21,13 @@ src/
 │   ├── Commands/             # Command handlers
 │   │   ├── Analyze/          # Coverage analysis command
 │   │   ├── Dashboard/        # Dashboard generation command
+│   │   ├── Docs/             # Documentation management (docs index)
 │   │   ├── Generate/         # Test generation (direct + interactive modes)
 │   │   └── Update/           # Test update (direct + interactive modes)
 │   ├── Agent/                # AI provider integration (Copilot SDK)
 │   │   ├── Copilot/          # CopilotGenerationAgent, CopilotCritic, tools
 │   │   └── Critic/           # ICriticRuntime, CriticFactory, prompt builder
-│   ├── Source/               # Document map builder
+│   ├── Source/               # Document map builder, document index service
 │   ├── Index/                # _index.json operations
 │   ├── Validation/           # Test validation, dedup
 │   ├── Review/               # Interactive terminal UI
@@ -45,10 +47,10 @@ src/
 │   │   └── Grounding/        # GroundingMetadata, VerificationVerdict, VerificationResult
 │   ├── Coverage/             # AutomationScanner, LinkReconciler, CoverageCalculator
 │   ├── Storage/              # ExecutionDbReader
-│   ├── Parsing/              # Markdown + YAML parser
+│   ├── Parsing/              # Markdown + YAML parser, DocumentIndexExtractor
 │   ├── Validation/           # Schema validation
 │   ├── Update/               # TestClassifier for test updates
-│   └── Index/                # Index read/write
+│   └── Index/                # Index read/write (DocumentIndexReader, DocumentIndexWriter)
 ├── Spectra.MCP/              # MCP execution server
 │   ├── Execution/            # ExecutionEngine, TestQueue, StateMachine
 │   ├── Storage/              # RunRepository, ResultRepository, ExecutionDb
@@ -75,10 +77,14 @@ dashboard-site/               # Static dashboard template
 └── access-denied.html        # Auth error page
 
 tests/
-├── Spectra.Core.Tests/       # Unit tests (284 tests)
-│   └── Coverage/             # AutomationScanner, LinkReconciler, Calculator tests
-├── Spectra.CLI.Tests/        # Integration tests (327 tests)
+├── Spectra.Core.Tests/       # Unit tests (318 tests)
+│   ├── Coverage/             # AutomationScanner, LinkReconciler, Calculator tests
+│   ├── Index/                # DocumentIndexReader, DocumentIndexWriter tests
+│   └── Parsing/              # DocumentIndexExtractor tests
+├── Spectra.CLI.Tests/        # Integration tests (339 tests)
+│   ├── Commands/             # DocsIndexCommand tests
 │   ├── Dashboard/            # DataCollector, Generator tests
+│   ├── Source/               # DocumentIndexService tests
 │   └── Coverage/             # CoverageReportWriter tests
 ├── Spectra.MCP.Tests/        # MCP server tests (306 tests)
 │   ├── Tools/                # Individual tool tests
@@ -118,6 +124,10 @@ spectra dashboard --output ./site
 spectra dashboard --output ./site --title "My Dashboard"
 spectra dashboard --dry-run  # Preview without generating
 
+# Documentation Index (010-document-index)
+spectra docs index                               # Incremental update (only changed files)
+spectra docs index --force                       # Full rebuild
+
 # Coverage Analysis (003)
 spectra ai analyze --coverage
 spectra ai analyze --coverage --format json --output coverage.json
@@ -134,6 +144,7 @@ spectra ai analyze --coverage --verbosity detailed
 - **Tests:** xUnit with structured results (never throw on validation errors)
 
 ## Recent Changes
+- 010-document-index: ✅ COMPLETE - Persistent `docs/_index.md` with per-document metadata (sections, entities, tokens, content hashes). Incremental updates via SHA-256 hashing. `spectra docs index [--force]` CLI command. Auto-refresh before `ai generate`. `GetDocumentMapTool` prefers index when available. Models: `DocumentIndex`, `DocumentIndexEntry`, `SectionSummary`. Services: `DocumentIndexExtractor`, `DocumentIndexWriter`, `DocumentIndexReader`, `DocumentIndexService`.
 - 009-copilot-sdk-consolidation: ✅ COMPLETE - Unified all AI operations under GitHub Copilot SDK as the sole runtime. Removed legacy agent implementations (OpenAiAgent, AnthropicAgent, GitHubModelsAgent, MockAgent) and critic implementations (GoogleCritic, OpenAiCritic, AnthropicCritic, GitHubCritic). Provider selection now via spectra.config.json with CopilotGenerationAgent and CopilotCritic handling all providers.
 - 008-grounding-verification: ✅ COMPLETE - Dual-model critic flow (generator + verifier), three verdicts (grounded/partial/hallucinated), grounding metadata in YAML frontmatter, configurable critic provider, --skip-critic flag
 - 007-execution-agent-mcp-tools: Added MCP tools for execution agents

@@ -14,10 +14,13 @@ public sealed partial class DocumentMapExtractor
         .Build();
 
     [GeneratedRegex(@"^#\s+(.+)$", RegexOptions.Multiline)]
-    private static partial Regex TitleRegex();
+    internal static partial Regex TitleRegex();
 
     [GeneratedRegex(@"^##\s+(.+)$", RegexOptions.Multiline)]
-    private static partial Regex H2Regex();
+    internal static partial Regex H2Regex();
+
+    [GeneratedRegex(@"^###\s+(.+)$", RegexOptions.Multiline)]
+    internal static partial Regex H3Regex();
 
     /// <summary>
     /// Extracts a DocumentEntry from a Markdown file.
