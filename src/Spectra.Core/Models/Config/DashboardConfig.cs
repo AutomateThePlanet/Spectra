@@ -47,4 +47,11 @@ public sealed class DashboardConfig
     /// </summary>
     [JsonPropertyName("max_trend_points")]
     public int MaxTrendPoints { get; init; } = 30;
+
+    /// <summary>
+    /// Cloudflare Pages project name for dashboard deployment.
+    /// Default: "spectra-dashboard"
+    /// </summary>
+    [JsonPropertyName("cloudflare_project_name")]
+    public string CloudflareProjectName { get; init; } = "spectra-dashboard";
 }

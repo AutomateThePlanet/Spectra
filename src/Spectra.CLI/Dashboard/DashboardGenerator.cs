@@ -65,7 +65,14 @@ public sealed class DashboardGenerator
             return await File.ReadAllTextAsync(_templatePath);
         }
 
-        // Return default template if file doesn't exist
+        // Fall back to embedded resource
+        var embedded = ReadEmbeddedResource("Spectra.CLI.Dashboard.Templates.index.html");
+        if (embedded is not null)
+        {
+            return embedded;
+        }
+
+        // Final fallback: hardcoded default template
         return GetDefaultTemplate();
     }
 
@@ -75,42 +82,68 @@ public sealed class DashboardGenerator
     private async Task CopyStaticAssetsAsync(string outputPath)
     {
         var templateDir = Path.GetDirectoryName(_templatePath);
-        if (string.IsNullOrEmpty(templateDir) || !Directory.Exists(templateDir))
+
+        // Try local dashboard-site directory first
+        if (!string.IsNullOrEmpty(templateDir) && Directory.Exists(templateDir))
         {
-            // Create default assets
+            var stylesSource = Path.Combine(templateDir, "styles");
+            var scriptsSource = Path.Combine(templateDir, "scripts");
+
+            if (Directory.Exists(stylesSource) && Directory.Exists(scriptsSource))
+            {
+                CopyDirectory(stylesSource, Path.Combine(outputPath, "styles"));
+                CopyDirectory(scriptsSource, Path.Combine(outputPath, "scripts"));
+                return;
+            }
+        }
+
+        // Fall back to embedded resources (used when installed as global tool)
+        await ExtractEmbeddedAssetsAsync(outputPath);
+    }
+
+    /// <summary>
+    /// Extracts embedded dashboard assets to the output directory.
+    /// </summary>
+    private async Task ExtractEmbeddedAssetsAsync(string outputPath)
+    {
+        var assets = new Dictionary<string, string>
+        {
+            ["styles/main.css"] = "Spectra.CLI.Dashboard.Templates.styles.main.css",
+            ["scripts/app.js"] = "Spectra.CLI.Dashboard.Templates.scripts.app.js",
+            ["scripts/coverage-map.js"] = "Spectra.CLI.Dashboard.Templates.scripts.coverage-map.js"
+        };
+
+        foreach (var (relativePath, resourceName) in assets)
+        {
+            var content = ReadEmbeddedResource(resourceName);
+            if (content is null) continue;
+
+            var destPath = Path.Combine(outputPath, relativePath);
+            var destDir = Path.GetDirectoryName(destPath);
+            if (!string.IsNullOrEmpty(destDir))
+            {
+                Directory.CreateDirectory(destDir);
+            }
+            await File.WriteAllTextAsync(destPath, content);
+        }
+
+        // If no embedded resources found, fall back to hardcoded defaults
+        if (!File.Exists(Path.Combine(outputPath, "styles", "main.css")))
+        {
             await CreateDefaultAssetsAsync(outputPath);
-            return;
         }
+    }
 
-        // Copy styles directory
-        var stylesSource = Path.Combine(templateDir, "styles");
-        var stylesDest = Path.Combine(outputPath, "styles");
-        if (Directory.Exists(stylesSource))
-        {
-            CopyDirectory(stylesSource, stylesDest);
-        }
-        else
-        {
-            Directory.CreateDirectory(stylesDest);
-            await File.WriteAllTextAsync(
-                Path.Combine(stylesDest, "main.css"),
-                GetDefaultCss());
-        }
-
-        // Copy scripts directory
-        var scriptsSource = Path.Combine(templateDir, "scripts");
-        var scriptsDest = Path.Combine(outputPath, "scripts");
-        if (Directory.Exists(scriptsSource))
-        {
-            CopyDirectory(scriptsSource, scriptsDest);
-        }
-        else
-        {
-            Directory.CreateDirectory(scriptsDest);
-            await File.WriteAllTextAsync(
-                Path.Combine(scriptsDest, "app.js"),
-                GetDefaultJs());
-        }
+    /// <summary>
+    /// Reads an embedded resource as a string.
+    /// </summary>
+    private static string? ReadEmbeddedResource(string resourceName)
+    {
+        var assembly = typeof(DashboardGenerator).Assembly;
+        using var stream = assembly.GetManifestResourceStream(resourceName);
+        if (stream is null) return null;
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 
     /// <summary>

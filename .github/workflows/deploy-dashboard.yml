@@ -1,0 +1,89 @@
+# SPECTRA Dashboard Auto-Deployment
+#
+# Automatically regenerates and deploys the SPECTRA dashboard to Cloudflare Pages
+# when test files, documentation, execution data, or configuration change.
+#
+# Required GitHub Secrets:
+#   CLOUDFLARE_API_TOKEN  - Cloudflare API token with "Edit Cloudflare Pages" permissions
+#   CLOUDFLARE_ACCOUNT_ID - Your Cloudflare account ID
+#
+# Required Cloudflare Pages Environment Variables:
+#   GITHUB_CLIENT_ID      - GitHub OAuth App client ID
+#   GITHUB_CLIENT_SECRET  - GitHub OAuth App client secret
+#   ALLOWED_REPOS         - Comma-separated org/repo list (e.g., "myorg/myrepo")
+#   SESSION_SECRET        - Random string for cookie signing
+#   AUTH_ENABLED          - Set to "true" to enable authentication
+#
+# For full setup instructions, see docs/deployment/cloudflare-pages-setup.md
+
+name: Deploy SPECTRA Dashboard
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'tests/**'
+      - '.execution/**'
+      - 'docs/**'
+      - 'spectra.config.json'
+
+  workflow_dispatch:
+
+concurrency:
+  group: dashboard-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Generate and Deploy Dashboard
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0'
+
+      - name: Install SPECTRA CLI
+        run: dotnet tool install -g spectra-cli
+
+      - name: Run coverage analysis with auto-linking
+        run: spectra ai analyze --coverage --auto-link
+        continue-on-error: true
+
+      - name: Generate dashboard
+        run: spectra dashboard --output ./site
+
+      - name: Copy Cloudflare Pages functions (OAuth middleware)
+        run: |
+          if [ -d "dashboard-site/functions" ]; then
+            cp -r dashboard-site/functions ./site/functions
+          fi
+
+      - name: Read project name from config
+        id: config
+        run: |
+          PROJECT_NAME=$(jq -r '.dashboard.cloudflare_project_name // "spectra-dashboard"' spectra.config.json 2>/dev/null || echo "spectra-dashboard")
+          echo "project_name=$PROJECT_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy ./site --project-name=${{ steps.config.outputs.project_name }}
+
+      - name: Post deployment summary
+        run: |
+          echo "## Dashboard Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The SPECTRA dashboard has been updated and deployed." >> $GITHUB_STEP_SUMMARY
+          echo "**Project:** ${{ steps.config.outputs.project_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY

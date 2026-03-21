@@ -23,6 +23,7 @@ public sealed class InitHandler
     private const string ExecutionAgentPath = ".github/agents/spectra-execution.agent.md";
     private const string ExecutionSkillPath = ".github/skills/spectra-execution/SKILL.md";
     private const string VsCodeMcpPath = ".vscode/mcp.json";
+    private const string DeployWorkflowPath = ".github/workflows/deploy-dashboard.yml";
     private const string DocsDir = "docs";
     private const string TestsDir = "tests";
 
@@ -64,6 +65,9 @@ public sealed class InitHandler
             // Install execution agent files
             await InstallAgentFilesAsync(force, ct);
 
+            // Create dashboard deployment workflow
+            await CreateDeployWorkflowAsync(ct);
+
             // Create VS Code MCP configuration
             await CreateVsCodeMcpConfigAsync(ct);
 
@@ -81,6 +85,10 @@ public sealed class InitHandler
             _logger.LogInformation("  - {SkillPath}", SkillPath);
             _logger.LogInformation("  - {AgentPath}", ExecutionAgentPath);
             _logger.LogInformation("  - {SkillPath}", ExecutionSkillPath);
+            _logger.LogInformation("  - {WorkflowPath}", DeployWorkflowPath);
+            _logger.LogInformation("");
+            _logger.LogInformation("Dashboard auto-deployment workflow created.");
+            _logger.LogInformation("See docs/deployment/cloudflare-pages-setup.md for setup instructions.");
             _logger.LogInformation("  - {McpPath}", VsCodeMcpPath);
 
             // Interactive auth setup
@@ -583,6 +591,26 @@ public sealed class InitHandler
         - `check_duplicates_batch`: Verify tests are unique
         - `batch_write_tests`: Submit generated tests
         """;
+
+    private async Task CreateDeployWorkflowAsync(CancellationToken ct)
+    {
+        var workflowPath = Path.Combine(_workingDirectory, DeployWorkflowPath);
+        if (File.Exists(workflowPath))
+        {
+            _logger.LogDebug("Deploy workflow already exists, skipping: {Path}", workflowPath);
+            return;
+        }
+
+        var directory = Path.GetDirectoryName(workflowPath);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var content = GetEmbeddedTemplate("deploy-dashboard.yml");
+        await File.WriteAllTextAsync(workflowPath, content, ct);
+        _logger.LogDebug("Created deploy workflow: {Path}", workflowPath);
+    }
 
     private async Task InstallAgentFilesAsync(bool force, CancellationToken ct)
     {

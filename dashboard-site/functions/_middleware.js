@@ -7,12 +7,12 @@
  * - GITHUB_CLIENT_ID: GitHub OAuth App Client ID
  * - GITHUB_CLIENT_SECRET: GitHub OAuth App Client Secret
  * - AUTH_ENABLED: Set to "true" to enable authentication (default: false)
- * - ALLOWED_REPO: Repository slug to check access (e.g., "owner/repo")
+ * - ALLOWED_REPOS: Comma-separated repository slugs to check access (e.g., "owner/repo,owner/repo2")
  * - SESSION_SECRET: Secret for signing session cookies
  */
 
 const COOKIE_NAME = 'spectra_session';
-const SESSION_DURATION = 7 * 24 * 60 * 60; // 7 days in seconds
+const SESSION_DURATION = 24 * 60 * 60; // 24 hours in seconds
 
 /**
  * Main middleware handler - runs on every request.
@@ -236,10 +236,17 @@ async function handleCallback(request, env, url) {
 
     const userData = await userResponse.json();
 
-    // Check repository access if configured
-    const allowedRepo = env.ALLOWED_REPO;
-    if (allowedRepo) {
-        const hasAccess = await checkRepoAccess(accessToken, allowedRepo);
+    // Check repository access if configured (supports comma-separated repos)
+    const allowedRepos = env.ALLOWED_REPOS;
+    if (allowedRepos) {
+        const repos = allowedRepos.split(',').map(r => r.trim()).filter(Boolean);
+        let hasAccess = false;
+        for (const repo of repos) {
+            if (await checkRepoAccess(accessToken, repo)) {
+                hasAccess = true;
+                break;
+            }
+        }
         if (!hasAccess) {
             return Response.redirect('/access-denied.html?error=no_repo_access', 302);
         }

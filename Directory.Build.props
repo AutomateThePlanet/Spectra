@@ -6,8 +6,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
-    <!-- Treat warnings as errors in release builds -->
+    <!-- Treat warnings as errors in release builds (suppress CA1062 null-check noise) -->
     <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);CA1062</NoWarn>
 
     <!-- Code analysis -->
     <EnableNETAnalyzers>true</EnableNETAnalyzers>

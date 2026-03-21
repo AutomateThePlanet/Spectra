@@ -1,3 +1,4 @@
+using Spectra.Core.Coverage;
 using Spectra.Core.Models;
 
 namespace Spectra.CLI.Coverage;
@@ -272,6 +273,6 @@ public sealed class GapAnalyzer
 
     private static string NormalizePath(string path)
     {
-        return path.Replace('\\', '/').TrimStart('/');
+        return SourceRefNormalizer.NormalizePath(path);
     }
 }
