@@ -96,7 +96,8 @@
       "Read(//c/SourceCode/Spectra/**)",
       "Bash(sqlite3 \"C:/SourceCode/Spectra/test_app_documentation/.execution/.execution/spectra.db\" \".tables\")",
       "Bash(sqlite3 \"C:/SourceCode/Spectra/test_app_documentation/.execution/.execution/spectra.db\" \"SELECT run_id, suite, status, started_at, completed_at FROM runs;\")",
-      "Bash(sqlite3 \"C:/SourceCode/Spectra/test_app_documentation/.execution/.execution/spectra.db\" \"SELECT run_id, test_id, status FROM test_results ORDER BY run_id, test_id;\")"
+      "Bash(sqlite3 \"C:/SourceCode/Spectra/test_app_documentation/.execution/.execution/spectra.db\" \"SELECT run_id, test_id, status FROM test_results ORDER BY run_id, test_id;\")",
+      "Bash(xargs cat:*)"
     ]
   }
 }
