@@ -7,9 +7,11 @@
  * The middleware intercepts requests to /auth/callback and processes
  * the OAuth flow directly.
  */
-
+ 
 export async function onRequest(context) {
     // This should not be reached as middleware handles /auth/callback
     // If we get here, redirect to home
-    return Response.redirect('/', 302);
+    const url = new URL(context.request.url);
+    return Response.redirect(`${url.origin}/`, 302);
 }
+ 

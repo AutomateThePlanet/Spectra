@@ -32,6 +32,16 @@ export async function onRequest(context) {
         return next();
     }
 
+    // Handle OAuth callback BEFORE session check to avoid redirect loop
+    if (url.pathname === '/auth/callback') {
+        return handleCallback(request, env, url);
+    }
+
+    // Handle logout
+    if (url.pathname === '/auth/logout') {
+        return handleLogout(request, url);
+    }
+
     // Check for valid session
     const session = await getSession(request, env);
     if (session && session.valid) {
@@ -39,16 +49,6 @@ export async function onRequest(context) {
         context.data = context.data || {};
         context.data.user = session.user;
         return next();
-    }
-
-    // Handle OAuth callback
-    if (url.pathname === '/auth/callback') {
-        return handleCallback(request, env, url);
-    }
-
-    // Handle logout
-    if (url.pathname === '/auth/logout') {
-        return handleLogout(request);
     }
 
     // Redirect to GitHub OAuth
@@ -61,7 +61,6 @@ export async function onRequest(context) {
 function shouldSkipAuth(pathname) {
     const skipPaths = [
         '/access-denied.html',
-        '/auth/',
         '/favicon.ico',
         '/robots.txt'
     ];
@@ -193,97 +192,105 @@ function redirectToGitHub(env, currentUrl) {
  * Handle OAuth callback from GitHub.
  */
 async function handleCallback(request, env, url) {
-    const code = url.searchParams.get('code');
-    const state = url.searchParams.get('state');
+    try {
+        const code = url.searchParams.get('code');
+        const state = url.searchParams.get('state');
 
-    if (!code) {
-        return Response.redirect('/access-denied.html?error=no_code', 302);
-    }
-
-    // Exchange code for access token
-    const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            client_id: env.GITHUB_CLIENT_ID,
-            client_secret: env.GITHUB_CLIENT_SECRET,
-            code: code
-        })
-    });
-
-    const tokenData = await tokenResponse.json();
-    if (tokenData.error) {
-        return Response.redirect(`/access-denied.html?error=${tokenData.error}`, 302);
-    }
-
-    const accessToken = tokenData.access_token;
-
-    // Get user info
-    const userResponse = await fetch('https://api.github.com/user', {
-        headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'SPECTRA-Dashboard'
+        if (!code) {
+            return Response.redirect(`${url.origin}/access-denied.html?error=no_code`, 302);
         }
-    });
 
-    if (!userResponse.ok) {
-        return Response.redirect('/access-denied.html?error=user_fetch_failed', 302);
-    }
+        // Exchange code for access token
+        const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                client_id: env.GITHUB_CLIENT_ID,
+                client_secret: env.GITHUB_CLIENT_SECRET,
+                code: code
+            })
+        });
 
-    const userData = await userResponse.json();
+        const tokenData = await tokenResponse.json();
+        if (tokenData.error) {
+            return Response.redirect(`${url.origin}/access-denied.html?error=${tokenData.error}`, 302);
+        }
 
-    // Check repository access if configured (supports comma-separated repos)
-    const allowedRepos = env.ALLOWED_REPOS;
-    if (allowedRepos) {
-        const repos = allowedRepos.split(',').map(r => r.trim()).filter(Boolean);
-        let hasAccess = false;
-        for (const repo of repos) {
-            if (await checkRepoAccess(accessToken, repo)) {
-                hasAccess = true;
-                break;
+        const accessToken = tokenData.access_token;
+
+        // Get user info
+        const userResponse = await fetch('https://api.github.com/user', {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'SPECTRA-Dashboard'
+            }
+        });
+
+        if (!userResponse.ok) {
+            return Response.redirect(`${url.origin}/access-denied.html?error=user_fetch_failed`, 302);
+        }
+
+        const userData = await userResponse.json();
+
+        // Check repository access if configured (supports comma-separated repos)
+        const allowedRepos = env.ALLOWED_REPOS;
+        if (allowedRepos) {
+            const repos = allowedRepos.split(',').map(r => r.trim()).filter(Boolean);
+            let hasAccess = false;
+            for (const repo of repos) {
+                if (await checkRepoAccess(accessToken, repo)) {
+                    hasAccess = true;
+                    break;
+                }
+            }
+            if (!hasAccess) {
+                return Response.redirect(`${url.origin}/access-denied.html?error=no_repo_access`, 302);
             }
         }
-        if (!hasAccess) {
-            return Response.redirect('/access-denied.html?error=no_repo_access', 302);
+
+        // Create session
+        const sessionPayload = {
+            user: {
+                login: userData.login,
+                name: userData.name,
+                avatar: userData.avatar_url
+            },
+            exp: Date.now() + (SESSION_DURATION * 1000)
+        };
+
+        const sessionToken = await createSessionToken(sessionPayload, env.SESSION_SECRET);
+
+        // Parse return URL from state
+        let returnTo = '/';
+        try {
+            const stateData = JSON.parse(atob(state));
+            returnTo = stateData.returnTo || '/';
+        } catch {
+            // Invalid state, use default
         }
+
+        // Set cookie and redirect
+        const redirectUrl = new URL(returnTo, url.origin).toString();
+        const response = Response.redirect(redirectUrl, 302);
+        const headers = new Headers(response.headers);
+        headers.set('Set-Cookie',
+            `${COOKIE_NAME}=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_DURATION}`
+        );
+
+        return new Response(response.body, {
+            status: response.status,
+            headers
+        });
+    } catch (err) {
+        return new Response(`OAuth Error: ${err.message}\n\n${err.stack}`, {
+            status: 500,
+            headers: { 'Content-Type': 'text/plain' }
+        });
     }
-
-    // Create session
-    const sessionPayload = {
-        user: {
-            login: userData.login,
-            name: userData.name,
-            avatar: userData.avatar_url
-        },
-        exp: Date.now() + (SESSION_DURATION * 1000)
-    };
-
-    const sessionToken = await createSessionToken(sessionPayload, env.SESSION_SECRET);
-
-    // Parse return URL from state
-    let returnTo = '/';
-    try {
-        const stateData = JSON.parse(atob(state));
-        returnTo = stateData.returnTo || '/';
-    } catch {
-        // Invalid state, use default
-    }
-
-    // Set cookie and redirect
-    const response = Response.redirect(new URL(returnTo, url.origin).toString(), 302);
-    const headers = new Headers(response.headers);
-    headers.set('Set-Cookie',
-        `${COOKIE_NAME}=${sessionToken}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_DURATION}`
-    );
-
-    return new Response(response.body, {
-        status: response.status,
-        headers
-    });
 }
 
 /**
@@ -305,8 +312,9 @@ async function checkRepoAccess(accessToken, repoSlug) {
 /**
  * Handle logout request.
  */
-function handleLogout(request) {
-    const response = Response.redirect('/', 302);
+function handleLogout(request, url) {
+    const redirectUrl = new URL('/', url.origin).toString();
+    const response = Response.redirect(redirectUrl, 302);
     const headers = new Headers(response.headers);
     headers.set('Set-Cookie',
         `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`

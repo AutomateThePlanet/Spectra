@@ -934,6 +934,7 @@ function buildCoverageHierarchy(tests, docDetails) {
     const domains = {};
     const testsByDoc = {};
     const seenTests = new Set();
+    const linkedTestIds = new Set();
 
     // Map tests to docs (strip fragment anchors)
     for (const t of tests) {
@@ -945,6 +946,7 @@ function buildCoverageHierarchy(tests, docDetails) {
             if (!seenTests.has(compositeKey)) {
                 seenTests.add(compositeKey);
                 testsByDoc[docPath].push(t);
+                linkedTestIds.add(compositeKey);
             }
         }
     }
@@ -981,6 +983,34 @@ function buildCoverageHierarchy(tests, docDetails) {
         }
     }
 
+    // Build "Unlinked Tests" domain for tests without source_refs
+    const unlinkedTests = tests.filter(t => {
+        const refs = t.source_refs || [];
+        return refs.length === 0;
+    });
+
+    if (unlinkedTests.length > 0) {
+        const unlinkedAreas = {};
+        for (const t of unlinkedTests) {
+            const areaName = t.component || 'general';
+            if (!unlinkedAreas[areaName]) {
+                unlinkedAreas[areaName] = { name: areaName, tests: [] };
+            }
+            unlinkedAreas[areaName].tests.push(t);
+        }
+        domains['Unlinked Tests'] = {
+            name: 'Unlinked Tests',
+            features: {
+                '_unlinked': {
+                    name: 'Tests without source_refs',
+                    path: '',
+                    areas: unlinkedAreas,
+                    tests: unlinkedTests
+                }
+            }
+        };
+    }
+
     return domains;
 }
 
@@ -1013,7 +1043,11 @@ function renderCoverageTree(summary) {
 
     let html = `<div class="cov-tree-container">
         <h3>Coverage Hierarchy</h3>
-        <input type="text" class="cov-tree-search" placeholder="Filter by name..." oninput="filterCoverageTree(this.value)">
+        <div class="cov-tree-controls">
+            <input type="text" class="cov-tree-search" placeholder="Filter by name..." oninput="filterCoverageTree(this.value)">
+            <button class="cov-tree-btn" onclick="expandAllTreeNodes()">Expand All</button>
+            <button class="cov-tree-btn" onclick="collapseAllTreeNodes()">Collapse All</button>
+        </div>
         <div id="cov-tree-root">`;
 
     let nodeId = 0;
@@ -1035,6 +1069,7 @@ function renderCoverageTree(summary) {
                 <span class="cov-tree-expand" id="exp-${domId}">&#9654;</span>
                 <span class="cov-tree-icon domain">D</span>
                 <span class="cov-tree-name">${escapeHtml(domain.name)}</span>
+                <span class="cov-tree-count">${domainTests.length} tests</span>
                 <div class="cov-tree-minibar"><div class="cov-tree-minibar-fill ${domainColor}" style="width:${domainPct.toFixed(0)}%"></div></div>
                 <span class="cov-tree-badge ${domainColor}">${domainPct.toFixed(0)}%</span>
             </div>
@@ -1054,6 +1089,7 @@ function renderCoverageTree(summary) {
                     <span class="cov-tree-expand" id="exp-${featId}">&#9654;</span>
                     <span class="cov-tree-icon feature">F</span>
                     <span class="cov-tree-name" title="${escapeHtml(feature.path)}">${escapeHtml(feature.name)}</span>
+                    <span class="cov-tree-count">${featureTests.length} tests</span>
                     <div class="cov-tree-minibar"><div class="cov-tree-minibar-fill ${featureColor}" style="width:${featurePct.toFixed(0)}%"></div></div>
                     <span class="cov-tree-badge ${featureColor}">${featurePct.toFixed(0)}%</span>
                 </div>
@@ -1129,6 +1165,30 @@ function toggleTreeNode(id) {
 
     children.classList.toggle('expanded');
     if (expander) expander.classList.toggle('expanded');
+}
+
+/**
+ * Expand all tree nodes.
+ */
+function expandAllTreeNodes() {
+    document.querySelectorAll('#cov-tree-root .cov-tree-children').forEach(el => {
+        el.classList.add('expanded');
+    });
+    document.querySelectorAll('#cov-tree-root .cov-tree-expand').forEach(el => {
+        if (!el.classList.contains('leaf')) el.classList.add('expanded');
+    });
+}
+
+/**
+ * Collapse all tree nodes.
+ */
+function collapseAllTreeNodes() {
+    document.querySelectorAll('#cov-tree-root .cov-tree-children').forEach(el => {
+        el.classList.remove('expanded');
+    });
+    document.querySelectorAll('#cov-tree-root .cov-tree-expand').forEach(el => {
+        el.classList.remove('expanded');
+    });
 }
 
 /**

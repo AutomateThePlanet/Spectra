@@ -602,10 +602,13 @@ body.panel-open {
 
 .trend-chart {
     margin-top: 1rem;
+    max-height: 220px;
+    overflow: hidden;
 }
 
 .trend-svg {
     width: 100%;
+    max-height: 220px;
     height: auto;
     background: var(--bg-color);
     border-radius: var(--radius-sm);
@@ -1842,15 +1845,38 @@ details.result-row[open] summary::before {
     margin-bottom: 1rem;
 }
 
+.cov-tree-controls {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    align-items: center;
+}
+
 .cov-tree-search {
-    width: 100%;
+    flex: 1;
     padding: 0.5rem 0.75rem;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
     font-size: 0.85rem;
-    margin-bottom: 1rem;
     font-family: var(--font-body);
     transition: border-color 0.2s;
+}
+
+.cov-tree-btn {
+    padding: 0.4rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--card-bg);
+    font-size: 0.75rem;
+    font-family: var(--font-body);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.cov-tree-btn:hover {
+    background: var(--bg-color);
+    border-color: var(--cov-blue);
 }
 
 .cov-tree-search:focus {
@@ -1924,6 +1950,12 @@ details.result-row[open] summary::before {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.cov-tree-count {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
 }
 
 .cov-tree-minibar {

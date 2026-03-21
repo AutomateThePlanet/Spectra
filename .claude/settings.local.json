@@ -96,7 +96,14 @@
       "Read(//c/SourceCode/Spectra/**)",
       "Bash(sqlite3 \"C:/SourceCode/Spectra/test_app_documentation/.execution/.execution/spectra.db\" \".tables\")",
       "Bash(sqlite3 \"C:/SourceCode/Spectra/test_app_documentation/.execution/.execution/spectra.db\" \"SELECT run_id, suite, status, started_at, completed_at FROM runs;\")",
-      "Bash(sqlite3 \"C:/SourceCode/Spectra/test_app_documentation/.execution/.execution/spectra.db\" \"SELECT run_id, test_id, status FROM test_results ORDER BY run_id, test_id;\")"
+      "Bash(sqlite3 \"C:/SourceCode/Spectra/test_app_documentation/.execution/.execution/spectra.db\" \"SELECT run_id, test_id, status FROM test_results ORDER BY run_id, test_id;\")",
+      "Bash(mkdir -p \"C:/SourceCode/Spectra_Demo/dashboard-site/functions/auth\")",
+      "Bash(cp dashboard-site/functions/_middleware.js \"C:/SourceCode/Spectra_Demo/dashboard-site/functions/\")",
+      "Bash(cp dashboard-site/functions/auth/callback.js \"C:/SourceCode/Spectra_Demo/dashboard-site/functions/auth/\")",
+      "Bash(cp dashboard-site/access-denied.html \"C:/SourceCode/Spectra_Demo/dashboard-site/\")",
+      "Bash(git status:*)",
+      "Bash(for branch:*)",
+      "Bash(git ls-tree:*)"
     ]
   }
 }
