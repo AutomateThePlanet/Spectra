@@ -54,4 +54,11 @@ public sealed class DashboardConfig
     /// </summary>
     [JsonPropertyName("cloudflare_project_name")]
     public string CloudflareProjectName { get; init; } = "spectra-dashboard";
+
+    /// <summary>
+    /// Branding and theming configuration.
+    /// Default: null (uses default Spectra branding)
+    /// </summary>
+    [JsonPropertyName("branding")]
+    public BrandingConfig? Branding { get; init; }
 }

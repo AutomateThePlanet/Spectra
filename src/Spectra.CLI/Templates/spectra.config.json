@@ -53,7 +53,18 @@
     "include_coverage": true,
     "include_runs": true,
     "max_trend_points": 30,
-    "cloudflare_project_name": "spectra-dashboard"
+    "cloudflare_project_name": "spectra-dashboard",
+    "branding": {
+      "company_name": null,
+      "logo": null,
+      "favicon": null,
+      "theme": "light",
+      "colors": {
+        "primary": null,
+        "accent": null
+      },
+      "custom_css": null
+    }
   },
   "git": {
     "auto_branch": true,

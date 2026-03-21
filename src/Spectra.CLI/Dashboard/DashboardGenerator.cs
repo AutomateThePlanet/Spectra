@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Dashboard;
 
 namespace Spectra.CLI.Dashboard;
@@ -11,10 +12,14 @@ public sealed class DashboardGenerator
 {
     private readonly string _templatePath;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly BrandingConfig? _brandingConfig;
+    private readonly string _configDir;
 
-    public DashboardGenerator(string? templatePath = null)
+    public DashboardGenerator(string? templatePath = null, BrandingConfig? brandingConfig = null, string? configDir = null)
     {
         _templatePath = templatePath ?? GetDefaultTemplatePath();
+        _brandingConfig = brandingConfig;
+        _configDir = configDir ?? Directory.GetCurrentDirectory();
         _jsonOptions = new JsonSerializerOptions
         {
             WriteIndented = false,
@@ -22,6 +27,11 @@ public sealed class DashboardGenerator
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
     }
+
+    /// <summary>
+    /// Warnings from the most recent generation (e.g., missing branding assets).
+    /// </summary>
+    public IReadOnlyList<string> BrandingWarnings { get; private set; } = [];
 
     /// <summary>
     /// Generates the dashboard to the specified output directory.
@@ -34,25 +44,36 @@ public sealed class DashboardGenerator
         // Ensure output directory exists
         Directory.CreateDirectory(outputPath);
 
-        // Generate HTML with embedded JSON data
+        // Generate HTML with embedded JSON data and branding
         var html = await GenerateHtmlAsync(data);
         var indexPath = Path.Combine(outputPath, "index.html");
         await File.WriteAllTextAsync(indexPath, html);
 
         // Copy static assets
         await CopyStaticAssetsAsync(outputPath);
+
+        // Copy branding assets (logo, favicon, custom CSS)
+        var injector = new BrandingInjector();
+        injector.CopyAssets(_brandingConfig, _configDir, outputPath);
+        BrandingWarnings = injector.Warnings;
     }
 
     /// <summary>
-    /// Generates the main HTML file with embedded dashboard data.
+    /// Generates the main HTML file with embedded dashboard data and branding.
     /// </summary>
     private async Task<string> GenerateHtmlAsync(DashboardData data)
     {
         var template = await LoadTemplateAsync();
         var jsonData = JsonSerializer.Serialize(data, _jsonOptions);
 
-        // Replace placeholder with actual data
-        return template.Replace("{{DASHBOARD_DATA}}", jsonData);
+        // Replace data placeholder
+        var html = template.Replace("{{DASHBOARD_DATA}}", jsonData);
+
+        // Apply branding
+        var injector = new BrandingInjector();
+        html = injector.InjectBranding(html, _brandingConfig, _configDir);
+
+        return html;
     }
 
     /// <summary>
@@ -215,13 +236,16 @@ public sealed class DashboardGenerator
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>SPECTRA Dashboard</title>
+            <title>{{COMPANY_NAME}}</title>
+            {{FAVICON_LINK}}
             <link rel="stylesheet" href="styles/main.css">
+            {{CUSTOM_CSS_LINK}}
+            {{BRANDING_STYLES}}
         </head>
         <body>
             <div id="app">
                 <header class="header">
-                    <h1>SPECTRA Dashboard</h1>
+                    {{LOGO_IMG}}<h1>{{COMPANY_NAME}}</h1>
                     <nav class="nav">
                         <button class="nav-btn active" data-view="suites">Suites</button>
                         <button class="nav-btn" data-view="tests">Tests</button>
@@ -263,6 +287,8 @@ public sealed class DashboardGenerator
                     </section>
                 </main>
             </div>
+
+            {{BRANDING_CONFIG}}
 
             <script id="dashboard-data" type="application/json">
             {{DASHBOARD_DATA}}
@@ -308,6 +334,12 @@ public sealed class DashboardGenerator
         .header h1 {
             font-size: 1.5rem;
             font-weight: 600;
+        }
+
+        .header-logo {
+            max-height: 40px;
+            margin-right: 12px;
+            vertical-align: middle;
         }
 
         .nav {

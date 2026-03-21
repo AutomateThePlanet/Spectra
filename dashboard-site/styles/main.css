@@ -67,6 +67,12 @@ body.panel-open {
     letter-spacing: -0.5px;
 }
 
+.header-logo {
+    max-height: 40px;
+    margin-right: 12px;
+    vertical-align: middle;
+}
+
 /* Navigation */
 .nav {
     display: flex;
