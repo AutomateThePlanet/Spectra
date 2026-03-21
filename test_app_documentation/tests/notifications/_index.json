@@ -1,11 +1,11 @@
 {
   "suite": "notifications",
-  "generated_at": "2026-03-21T08:55:15.2520868Z",
+  "generated_at": "2026-03-21T13:47:51.6919838Z",
   "test_count": 6,
   "tests": [
     {
       "id": "TC-100",
-      "file": "notifications\\TC-100.md",
+      "file": "TC-100.md",
       "title": "Verify email notification sent when application is submitted",
       "priority": "high",
       "tags": [
@@ -19,11 +19,13 @@
         "docs/spectra-test-docs/docs/notifications/notification-system.md#Notification-Types-and-Triggers"
       ],
       "automated_by": [],
-      "requirements": []
+      "requirements": [
+        "REQ-023"
+      ]
     },
     {
       "id": "TC-101",
-      "file": "notifications\\TC-101.md",
+      "file": "TC-101.md",
       "title": "Verify SMS notification truncation when message exceeds character limit",
       "priority": "medium",
       "tags": [
@@ -37,11 +39,13 @@
         "docs/spectra-test-docs/docs/notifications/notification-system.md#SMS"
       ],
       "automated_by": [],
-      "requirements": []
+      "requirements": [
+        "REQ-024"
+      ]
     },
     {
       "id": "TC-102",
-      "file": "notifications\\TC-102.md",
+      "file": "TC-102.md",
       "title": "Verify notification preferences take effect immediately after change",
       "priority": "high",
       "tags": [
@@ -55,11 +59,13 @@
         "docs/spectra-test-docs/docs/notifications/notification-system.md#Notification-Preferences"
       ],
       "automated_by": [],
-      "requirements": []
+      "requirements": [
+        "REQ-027"
+      ]
     },
     {
       "id": "TC-103",
-      "file": "notifications\\TC-103.md",
+      "file": "TC-103.md",
       "title": "Verify notification retry logic with exponential backoff for failed email",
       "priority": "medium",
       "tags": [
@@ -74,11 +80,13 @@
         "docs/spectra-test-docs/docs/notifications/notification-system.md#Retry-Logic"
       ],
       "automated_by": [],
-      "requirements": []
+      "requirements": [
+        "REQ-026"
+      ]
     },
     {
       "id": "TC-104",
-      "file": "notifications\\TC-104.md",
+      "file": "TC-104.md",
       "title": "Verify rate limiting blocks non-critical notifications when limit exceeded",
       "priority": "medium",
       "tags": [
@@ -92,11 +100,13 @@
         "docs/spectra-test-docs/docs/notifications/notification-system.md#Rate-Limiting"
       ],
       "automated_by": [],
-      "requirements": []
+      "requirements": [
+        "REQ-026"
+      ]
     },
     {
       "id": "TC-105",
-      "file": "notifications\\TC-105.md",
+      "file": "TC-105.md",
       "title": "Verify critical notifications bypass Do Not Disturb mode",
       "priority": "high",
       "tags": [
@@ -111,7 +121,9 @@
         "docs/spectra-test-docs/docs/notifications/notification-system.md#Do-Not-Disturb"
       ],
       "automated_by": [],
-      "requirements": []
+      "requirements": [
+        "REQ-025"
+      ]
     }
   ]
 }

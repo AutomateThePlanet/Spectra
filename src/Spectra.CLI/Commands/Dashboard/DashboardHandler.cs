@@ -89,6 +89,9 @@ public sealed class DashboardHandler
                 Console.WriteLine();
                 Console.WriteLine("Dashboard generated successfully!");
                 Console.WriteLine($"Open {Path.Combine(outputPath, "index.html")} in a browser to view.");
+                var relativePath = Path.GetRelativePath(currentDir, outputPath);
+                Console.WriteLine();
+                Console.WriteLine($"Or serve it locally:  npx serve {relativePath}");
             }
 
             return ExitCodes.Success;

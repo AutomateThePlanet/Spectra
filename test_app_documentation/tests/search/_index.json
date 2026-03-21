@@ -1,11 +1,11 @@
 {
   "suite": "search",
-  "generated_at": "2026-03-21T08:57:38.6460163Z",
+  "generated_at": "2026-03-21T13:47:51.7246432Z",
   "test_count": 6,
   "tests": [
     {
       "id": "TC-100",
-      "file": "search\\TC-100.md",
+      "file": "TC-100.md",
       "title": "Quick search autocomplete with minimum 3 characters",
       "priority": "high",
       "tags": [
@@ -18,12 +18,20 @@
       "source_refs": [
         "docs/spectra-test-docs/docs/search/search-filtering.md#Quick-Search"
       ],
-      "automated_by": [],
-      "requirements": []
+      "automated_by": [
+        "../test_app_automation/TestAppAutomation/Tests/Authentication/LoginTests.cs",
+        "../test_app_automation/TestAppAutomation/Tests/Notifications/NotificationTests.cs",
+        "../test_app_automation/TestAppAutomation/Tests/Payments/CardPaymentTests.cs",
+        "../test_app_automation/TestAppAutomation/Tests/Search/SearchTests.cs",
+        "../test_app_automation/TestAppAutomation/Tests/Search/SearchTests.cs"
+      ],
+      "requirements": [
+        "REQ-028"
+      ]
     },
     {
       "id": "TC-101",
-      "file": "search\\TC-101.md",
+      "file": "TC-101.md",
       "title": "Search using exact phrase syntax with quotes",
       "priority": "medium",
       "tags": [
@@ -36,12 +44,18 @@
       "source_refs": [
         "docs/spectra-test-docs/docs/search/search-filtering.md#Search-Query-Syntax"
       ],
-      "automated_by": [],
-      "requirements": []
+      "automated_by": [
+        "../test_app_automation/TestAppAutomation/Tests/Authentication/LoginTests.cs",
+        "../test_app_automation/TestAppAutomation/Tests/Payments/CardPaymentTests.cs",
+        "../test_app_automation/TestAppAutomation/Tests/Payments/CardPaymentTests.cs"
+      ],
+      "requirements": [
+        "REQ-029"
+      ]
     },
     {
       "id": "TC-102",
-      "file": "search\\TC-102.md",
+      "file": "TC-102.md",
       "title": "Search with invalid field-specific filter syntax",
       "priority": "medium",
       "tags": [
@@ -54,12 +68,17 @@
       "source_refs": [
         "docs/spectra-test-docs/docs/search/search-filtering.md#Search-Query-Syntax"
       ],
-      "automated_by": [],
-      "requirements": []
+      "automated_by": [
+        "../test_app_automation/TestAppAutomation/Tests/Authentication/LoginTests.cs",
+        "../test_app_automation/TestAppAutomation/Tests/Authentication/LoginTests.cs"
+      ],
+      "requirements": [
+        "REQ-029"
+      ]
     },
     {
       "id": "TC-103",
-      "file": "search\\TC-103.md",
+      "file": "TC-103.md",
       "title": "Advanced filters with AND logic across multiple filter types",
       "priority": "high",
       "tags": [
@@ -73,11 +92,13 @@
         "docs/spectra-test-docs/docs/search/search-filtering.md#Advanced-Filters-Panel"
       ],
       "automated_by": [],
-      "requirements": []
+      "requirements": [
+        "REQ-031"
+      ]
     },
     {
       "id": "TC-104",
-      "file": "search\\TC-104.md",
+      "file": "TC-104.md",
       "title": "Saved search creation exceeding maximum limit",
       "priority": "low",
       "tags": [
@@ -91,12 +112,17 @@
       "source_refs": [
         "docs/spectra-test-docs/docs/search/search-filtering.md#Saved-Searches"
       ],
-      "automated_by": [],
-      "requirements": []
+      "automated_by": [
+        "../test_app_automation/TestAppAutomation/Tests/Payments/RefundTests.cs",
+        "../test_app_automation/TestAppAutomation/Tests/Payments/RefundTests.cs"
+      ],
+      "requirements": [
+        "REQ-032"
+      ]
     },
     {
       "id": "TC-105",
-      "file": "search\\TC-105.md",
+      "file": "TC-105.md",
       "title": "Search results filtered by user permissions for clerk role",
       "priority": "high",
       "tags": [
@@ -110,8 +136,13 @@
       "source_refs": [
         "docs/spectra-test-docs/docs/search/search-filtering.md#Permission-Based-Filtering"
       ],
-      "automated_by": [],
-      "requirements": []
+      "automated_by": [
+        "../test_app_automation/TestAppAutomation/Tests/Authentication/LoginTests.cs",
+        "../test_app_automation/TestAppAutomation/Tests/Authentication/LoginTests.cs"
+      ],
+      "requirements": [
+        "REQ-030"
+      ]
     }
   ]
 }

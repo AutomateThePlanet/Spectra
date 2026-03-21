@@ -1698,8 +1698,354 @@ details.result-row[open] summary::before {
     font-size: 0.85rem;
 }
 
+/* ─── Coverage Design Tokens ─── */
+:root {
+    --cov-green: #10B981;
+    --cov-green-bg: #ecfdf5;
+    --cov-amber: #F59E0B;
+    --cov-amber-bg: #fffbeb;
+    --cov-red: #EF4444;
+    --cov-red-bg: #fef2f2;
+    --cov-blue: #3B82F6;
+    --cov-blue-bg: #eff6ff;
+    --cov-slate: #64748b;
+    --font-display: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-body: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', Monaco, Consolas, monospace;
+}
+
+/* ─── Trend Chart Enhancements ─── */
+.trend-chart .trend-svg {
+    background: white;
+    border-radius: var(--radius-md);
+}
+
+.trend-dot {
+    transition: r 0.15s ease, filter 0.15s ease;
+    cursor: pointer;
+}
+
+.trend-dot:hover {
+    r: 6;
+    filter: drop-shadow(0 0 4px rgba(0,0,0,0.2));
+}
+
+.trend-compact-summary {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    padding: 1rem 0;
+}
+
+.trend-compact-rate {
+    font-family: var(--font-display);
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.trend-compact-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+/* ─── Coverage KPI Cards ─── */
+.cov-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.cov-kpi-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1.5rem;
+    border-left: 4px solid var(--cov-slate);
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+    transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.cov-kpi-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.cov-kpi-card.green { border-left-color: var(--cov-green); }
+.cov-kpi-card.amber { border-left-color: var(--cov-amber); }
+.cov-kpi-card.red { border-left-color: var(--cov-red); }
+
+.cov-kpi-label {
+    font-family: var(--font-body);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.cov-kpi-value {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+
+.cov-kpi-value.green { color: var(--cov-green); }
+.cov-kpi-value.amber { color: var(--cov-amber); }
+.cov-kpi-value.red { color: var(--cov-red); }
+
+.cov-kpi-bar {
+    width: 100%;
+    height: 4px;
+    background: var(--bg-color);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.cov-kpi-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s ease;
+}
+
+.cov-kpi-bar-fill.green { background: var(--cov-green); }
+.cov-kpi-bar-fill.amber { background: var(--cov-amber); }
+.cov-kpi-bar-fill.red { background: var(--cov-red); }
+
+.cov-kpi-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* ─── Coverage Tree ─── */
+.cov-tree-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.cov-tree-container h3 {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.cov-tree-search {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+    font-family: var(--font-body);
+    transition: border-color 0.2s;
+}
+
+.cov-tree-search:focus {
+    outline: none;
+    border-color: var(--cov-blue);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.cov-tree-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.15s ease;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+}
+
+.cov-tree-row:hover {
+    background: var(--bg-color);
+}
+
+.cov-tree-row.uncovered {
+    background: var(--cov-red-bg);
+}
+
+.cov-tree-expand {
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.cov-tree-expand.expanded {
+    transform: rotate(90deg);
+}
+
+.cov-tree-expand.leaf {
+    visibility: hidden;
+}
+
+.cov-tree-icon {
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+}
+
+.cov-tree-icon.domain { background: var(--cov-blue); }
+.cov-tree-icon.feature { background: #8B5CF6; }
+.cov-tree-icon.area { background: var(--cov-amber); }
+.cov-tree-icon.test { background: var(--cov-green); }
+.cov-tree-icon.test.manual { background: var(--cov-slate); }
+
+.cov-tree-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cov-tree-minibar {
+    width: 60px;
+    height: 4px;
+    background: #e5e7eb;
+    border-radius: 2px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.cov-tree-minibar-fill {
+    height: 100%;
+    border-radius: 2px;
+}
+
+.cov-tree-minibar-fill.green { background: var(--cov-green); }
+.cov-tree-minibar-fill.amber { background: var(--cov-amber); }
+.cov-tree-minibar-fill.red { background: var(--cov-red); }
+
+.cov-tree-badge {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 0.1rem 0.4rem;
+    border-radius: 9999px;
+    flex-shrink: 0;
+    min-width: 36px;
+    text-align: center;
+}
+
+.cov-tree-badge.green { background: var(--cov-green-bg); color: var(--cov-green); }
+.cov-tree-badge.amber { background: var(--cov-amber-bg); color: var(--cov-amber); }
+.cov-tree-badge.red { background: var(--cov-red-bg); color: var(--cov-red); }
+
+.cov-tree-children {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    padding-left: 1.25rem;
+}
+
+.cov-tree-children.expanded {
+    max-height: 5000px;
+}
+
+.cov-tree-uncovered-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.cov-tree-uncovered-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--cov-red);
+    margin-bottom: 0.5rem;
+}
+
+/* ─── Coverage Gaps Table ─── */
+.cov-gaps-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+}
+
+.cov-gaps-table th {
+    text-align: left;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    border-bottom: 2px solid var(--border-color);
+}
+
+.cov-gaps-table td {
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cov-gaps-table tr:last-child td {
+    border-bottom: none;
+}
+
+.cov-gaps-table tr:hover td {
+    background: var(--bg-color);
+}
+
+.cov-impact-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    text-transform: uppercase;
+}
+
+.cov-impact-badge.critical { background: var(--cov-red-bg); color: var(--cov-red); }
+.cov-impact-badge.medium { background: var(--cov-amber-bg); color: var(--cov-amber); }
+.cov-impact-badge.low { background: var(--cov-green-bg); color: var(--cov-green); }
+
+/* ─── Sidebar hidden on Coverage ─── */
+.sidebar.hidden {
+    display: none;
+}
+
+/* ─── Print Styles ─── */
+@media print {
+    .cov-tree-children { max-height: none !important; overflow: visible !important; }
+    .cov-tree-container, .cov-gaps-table { break-inside: avoid; }
+    .sidebar { display: none; }
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
+    .cov-kpi-row {
+        grid-template-columns: 1fr;
+    }
     .detail-panel {
         width: 100%;
         right: -100%;

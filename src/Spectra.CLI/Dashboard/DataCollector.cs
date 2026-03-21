@@ -158,7 +158,7 @@ public sealed class DataCollector
             // Database doesn't exist, that's OK
         }
 
-        // Read from reports/ directory
+        // Read from reports/ directory - add new runs or enrich DB runs with detailed results
         if (Directory.Exists(_reportsPath))
         {
             foreach (var reportFile in Directory.GetFiles(_reportsPath, "*.json"))
@@ -170,8 +170,36 @@ public sealed class DataCollector
                     if (report is not null)
                     {
                         var runId = report.GetRunId();
-                        // Check if we already have this run from the database
-                        if (!string.IsNullOrEmpty(runId) && !runs.Any(r => r.RunId == runId))
+                        if (string.IsNullOrEmpty(runId)) continue;
+
+                        var existingIndex = runs.FindIndex(r => r.RunId == runId);
+                        if (existingIndex >= 0)
+                        {
+                            // Enrich existing DB run with detailed results from report
+                            var existing = runs[existingIndex];
+                            if (existing.Results is null)
+                            {
+                                var enriched = ConvertReportToSummary(report);
+                                runs[existingIndex] = new RunSummary
+                                {
+                                    RunId = existing.RunId,
+                                    Suite = existing.Suite,
+                                    Status = existing.Status,
+                                    StartedAt = existing.StartedAt,
+                                    CompletedAt = existing.CompletedAt,
+                                    StartedBy = existing.StartedBy,
+                                    DurationSeconds = existing.DurationSeconds,
+                                    Total = existing.Total,
+                                    Passed = existing.Passed,
+                                    Failed = existing.Failed,
+                                    Skipped = existing.Skipped,
+                                    Blocked = existing.Blocked,
+                                    Results = enriched.Results,
+                                    ReportPath = existing.ReportPath
+                                };
+                            }
+                        }
+                        else
                         {
                             runs.Add(ConvertReportToSummary(report));
                         }
@@ -615,10 +643,11 @@ public sealed class DataCollector
             {
                 foreach (var docRef in test.SourceRefs)
                 {
-                    if (!docToTests.TryGetValue(docRef, out var list))
+                    var docPath = docRef.Contains('#') ? docRef[..docRef.IndexOf('#')] : docRef;
+                    if (!docToTests.TryGetValue(docPath, out var list))
                     {
                         list = [];
-                        docToTests[docRef] = list;
+                        docToTests[docPath] = list;
                     }
                     list.Add(test.Id);
                 }

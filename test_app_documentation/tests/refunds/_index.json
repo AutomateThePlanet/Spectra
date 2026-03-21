@@ -1,11 +1,11 @@
 {
   "suite": "refunds",
-  "generated_at": "2026-03-21T08:56:23.5088977Z",
+  "generated_at": "2026-03-21T13:47:51.7140262Z",
   "test_count": 6,
   "tests": [
     {
       "id": "TC-100",
-      "file": "refunds\\TC-100.md",
+      "file": "TC-100.md",
       "title": "Refund card payment after application rejection",
       "priority": "high",
       "tags": [
@@ -19,11 +19,13 @@
         "docs/spectra-test-docs/docs/payments/payment-processing.md#Refunds"
       ],
       "automated_by": [],
-      "requirements": []
+      "requirements": [
+        "REQ-021"
+      ]
     },
     {
       "id": "TC-101",
-      "file": "refunds\\TC-101.md",
+      "file": "TC-101.md",
       "title": "Refund bank transfer payment for cancelled service within 24 hours",
       "priority": "high",
       "tags": [
@@ -37,11 +39,13 @@
         "docs/spectra-test-docs/docs/payments/payment-processing.md#Refunds"
       ],
       "automated_by": [],
-      "requirements": []
+      "requirements": [
+        "REQ-021"
+      ]
     },
     {
       "id": "TC-102",
-      "file": "refunds\\TC-102.md",
+      "file": "TC-102.md",
       "title": "Partial refund for expedited fee only",
       "priority": "medium",
       "tags": [
@@ -55,11 +59,13 @@
         "docs/spectra-test-docs/docs/payments/payment-processing.md#Refunds"
       ],
       "automated_by": [],
-      "requirements": []
+      "requirements": [
+        "REQ-021"
+      ]
     },
     {
       "id": "TC-103",
-      "file": "refunds\\TC-103.md",
+      "file": "TC-103.md",
       "title": "Refund voucher payment as credit note",
       "priority": "medium",
       "tags": [
@@ -73,11 +79,13 @@
         "docs/spectra-test-docs/docs/payments/payment-processing.md#Refunds"
       ],
       "automated_by": [],
-      "requirements": []
+      "requirements": [
+        "REQ-021"
+      ]
     },
     {
       "id": "TC-104",
-      "file": "refunds\\TC-104.md",
+      "file": "TC-104.md",
       "title": "Reject refund request exceeding original payment amount",
       "priority": "high",
       "tags": [
@@ -91,11 +99,13 @@
         "docs/spectra-test-docs/docs/payments/payment-processing.md#Refunds"
       ],
       "automated_by": [],
-      "requirements": []
+      "requirements": [
+        "REQ-021"
+      ]
     },
     {
       "id": "TC-105",
-      "file": "refunds\\TC-105.md",
+      "file": "TC-105.md",
       "title": "Reject cash refund without original receipt",
       "priority": "medium",
       "tags": [
@@ -109,7 +119,9 @@
         "docs/spectra-test-docs/docs/payments/payment-processing.md#Refunds"
       ],
       "automated_by": [],
-      "requirements": []
+      "requirements": [
+        "REQ-021"
+      ]
     }
   ]
 }

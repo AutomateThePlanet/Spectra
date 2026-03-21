@@ -1,11 +1,11 @@
 {
   "suite": "authentication",
-  "generated_at": "2026-03-20T13:16:31.8345863Z",
+  "generated_at": "2026-03-21T13:47:51.6505767Z",
   "test_count": 28,
   "tests": [
     {
       "id": "TC-100",
-      "file": "authentication\\TC-100.md",
+      "file": "TC-100.md",
       "title": "Successful login with valid username and password",
       "priority": "high",
       "tags": [
@@ -14,13 +14,18 @@
         "positive"
       ],
       "component": "authentication",
+      "estimated_duration": "3m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Login-Methods"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-001"
       ]
     },
     {
       "id": "TC-101",
-      "file": "authentication\\TC-101.md",
+      "file": "TC-101.md",
       "title": "Login fails with incorrect password",
       "priority": "high",
       "tags": [
@@ -29,13 +34,18 @@
         "negative"
       ],
       "component": "authentication",
+      "estimated_duration": "3m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Account-Lockout"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-005"
       ]
     },
     {
       "id": "TC-102",
-      "file": "authentication\\TC-102.md",
+      "file": "TC-102.md",
       "title": "Login fails with non-existent username",
       "priority": "medium",
       "tags": [
@@ -45,13 +55,18 @@
         "security"
       ],
       "component": "authentication",
+      "estimated_duration": "3m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Account-Lockout"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-005"
       ]
     },
     {
       "id": "TC-103",
-      "file": "authentication\\TC-103.md",
+      "file": "TC-103.md",
       "title": "Account lockout after 5 consecutive failed login attempts",
       "priority": "high",
       "tags": [
@@ -61,13 +76,18 @@
         "negative"
       ],
       "component": "authentication",
+      "estimated_duration": "5m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Account-Lockout"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-005"
       ]
     },
     {
       "id": "TC-104",
-      "file": "authentication\\TC-104.md",
+      "file": "TC-104.md",
       "title": "Account remains locked for 30 minutes after lockout",
       "priority": "medium",
       "tags": [
@@ -76,13 +96,18 @@
         "timing"
       ],
       "component": "authentication",
+      "estimated_duration": "35m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Account-Lockout"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-005"
       ]
     },
     {
       "id": "TC-105",
-      "file": "authentication\\TC-105.md",
+      "file": "TC-105.md",
       "title": "Administrator manually unlocks locked account",
       "priority": "medium",
       "tags": [
@@ -91,13 +116,18 @@
         "admin"
       ],
       "component": "authentication",
+      "estimated_duration": "7m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Account-Lockout"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-005"
       ]
     },
     {
       "id": "TC-106",
-      "file": "authentication\\TC-106.md",
+      "file": "TC-106.md",
       "title": "Password meets minimum complexity requirements",
       "priority": "high",
       "tags": [
@@ -106,13 +136,21 @@
         "positive"
       ],
       "component": "authentication",
+      "estimated_duration": "4m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Username-and-Password"
+      ],
+      "automated_by": [
+        "../test_app_automation/TestAppAutomation/Tests/Authentication/SessionTests.cs",
+        "../test_app_automation/TestAppAutomation/Tests/Authentication/SessionTests.cs"
+      ],
+      "requirements": [
+        "REQ-002"
       ]
     },
     {
       "id": "TC-107",
-      "file": "authentication\\TC-107.md",
+      "file": "TC-107.md",
       "title": "Password rejected when missing uppercase letter",
       "priority": "medium",
       "tags": [
@@ -121,13 +159,21 @@
         "negative"
       ],
       "component": "authentication",
+      "estimated_duration": "3m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Username-and-Password"
+      ],
+      "automated_by": [
+        "../test_app_automation/TestAppAutomation/Tests/Authentication/MfaTests.cs",
+        "../test_app_automation/TestAppAutomation/Tests/Authentication/MfaTests.cs"
+      ],
+      "requirements": [
+        "REQ-002"
       ]
     },
     {
       "id": "TC-108",
-      "file": "authentication\\TC-108.md",
+      "file": "TC-108.md",
       "title": "Password rejected when less than 12 characters",
       "priority": "medium",
       "tags": [
@@ -136,13 +182,21 @@
         "negative"
       ],
       "component": "authentication",
+      "estimated_duration": "3m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Username-and-Password"
+      ],
+      "automated_by": [
+        "../test_app_automation/TestAppAutomation/Tests/Authentication/MfaTests.cs",
+        "../test_app_automation/TestAppAutomation/Tests/Authentication/MfaTests.cs"
+      ],
+      "requirements": [
+        "REQ-002"
       ]
     },
     {
       "id": "TC-109",
-      "file": "authentication\\TC-109.md",
+      "file": "TC-109.md",
       "title": "Password rejected when reusing one of last 5 passwords",
       "priority": "medium",
       "tags": [
@@ -152,13 +206,18 @@
         "history"
       ],
       "component": "authentication",
+      "estimated_duration": "5m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Username-and-Password"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-002"
       ]
     },
     {
       "id": "TC-110",
-      "file": "authentication\\TC-110.md",
+      "file": "TC-110.md",
       "title": "Temporary password expires after 24 hours",
       "priority": "medium",
       "tags": [
@@ -170,11 +229,18 @@
       "component": "authentication",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Administrator-Reset"
+      ],
+      "automated_by": [
+        "../test_app_automation/TestAppAutomation/Tests/Authentication/MfaTests.cs",
+        "../test_app_automation/TestAppAutomation/Tests/Authentication/MfaTests.cs"
+      ],
+      "requirements": [
+        "REQ-008"
       ]
     },
     {
       "id": "TC-111",
-      "file": "authentication\\TC-111.md",
+      "file": "TC-111.md",
       "title": "Temporary password must be changed on first login",
       "priority": "high",
       "tags": [
@@ -183,13 +249,18 @@
         "positive"
       ],
       "component": "authentication",
+      "estimated_duration": "5m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Administrator-Reset"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-008"
       ]
     },
     {
       "id": "TC-112",
-      "file": "authentication\\TC-112.md",
+      "file": "TC-112.md",
       "title": "MFA enrollment forced for internal user without MFA",
       "priority": "high",
       "tags": [
@@ -198,13 +269,18 @@
         "enrollment"
       ],
       "component": "authentication",
+      "estimated_duration": "7m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Multi-Factor-Authentication-MFA"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-003"
       ]
     },
     {
       "id": "TC-113",
-      "file": "authentication\\TC-113.md",
+      "file": "TC-113.md",
       "title": "TOTP MFA code successfully validates login",
       "priority": "high",
       "tags": [
@@ -214,13 +290,18 @@
         "positive"
       ],
       "component": "authentication",
+      "estimated_duration": "4m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Multi-Factor-Authentication-MFA"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-003"
       ]
     },
     {
       "id": "TC-114",
-      "file": "authentication\\TC-114.md",
+      "file": "TC-114.md",
       "title": "SMS OTP code sent and valid for 5 minutes",
       "priority": "high",
       "tags": [
@@ -230,13 +311,18 @@
         "positive"
       ],
       "component": "authentication",
+      "estimated_duration": "6m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Multi-Factor-Authentication-MFA"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-003"
       ]
     },
     {
       "id": "TC-115",
-      "file": "authentication\\TC-115.md",
+      "file": "TC-115.md",
       "title": "Email OTP code sent and valid for 10 minutes",
       "priority": "high",
       "tags": [
@@ -246,13 +332,18 @@
         "positive"
       ],
       "component": "authentication",
+      "estimated_duration": "6m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Multi-Factor-Authentication-MFA"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-003"
       ]
     },
     {
       "id": "TC-116",
-      "file": "authentication\\TC-116.md",
+      "file": "TC-116.md",
       "title": "MFA session invalidated after 3 failed code attempts",
       "priority": "high",
       "tags": [
@@ -262,13 +353,18 @@
         "security"
       ],
       "component": "authentication",
+      "estimated_duration": "5m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Multi-Factor-Authentication-MFA"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-003"
       ]
     },
     {
       "id": "TC-117",
-      "file": "authentication\\TC-117.md",
+      "file": "TC-117.md",
       "title": "SSO authentication via Azure AD SAML 2.0",
       "priority": "high",
       "tags": [
@@ -278,13 +374,18 @@
         "positive"
       ],
       "component": "authentication",
+      "estimated_duration": "5m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Single-Sign-On-SSO"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-004"
       ]
     },
     {
       "id": "TC-118",
-      "file": "authentication\\TC-118.md",
+      "file": "TC-118.md",
       "title": "SSO auto-provisions new user from SAML assertion",
       "priority": "medium",
       "tags": [
@@ -294,13 +395,18 @@
         "positive"
       ],
       "component": "authentication",
+      "estimated_duration": "7m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Single-Sign-On-SSO"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-004"
       ]
     },
     {
       "id": "TC-119",
-      "file": "authentication\\TC-119.md",
+      "file": "TC-119.md",
       "title": "Session timeout after 30 minutes of inactivity for internal users",
       "priority": "medium",
       "tags": [
@@ -309,13 +415,18 @@
         "timeout"
       ],
       "component": "authentication",
+      "estimated_duration": "35m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Session-Management"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-006"
       ]
     },
     {
       "id": "TC-120",
-      "file": "authentication\\TC-120.md",
+      "file": "TC-120.md",
       "title": "Session timeout after 60 minutes of inactivity for citizens",
       "priority": "medium",
       "tags": [
@@ -325,13 +436,18 @@
         "citizen"
       ],
       "component": "authentication",
+      "estimated_duration": "1h 5m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Session-Management"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-006"
       ]
     },
     {
       "id": "TC-121",
-      "file": "authentication\\TC-121.md",
+      "file": "TC-121.md",
       "title": "Fourth concurrent session terminates oldest session",
       "priority": "medium",
       "tags": [
@@ -340,13 +456,18 @@
         "concurrent"
       ],
       "component": "authentication",
+      "estimated_duration": "8m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Session-Management"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-006"
       ]
     },
     {
       "id": "TC-122",
-      "file": "authentication\\TC-122.md",
+      "file": "TC-122.md",
       "title": "Session invalidated when IP address changes mid-session",
       "priority": "high",
       "tags": [
@@ -356,13 +477,18 @@
         "negative"
       ],
       "component": "authentication",
+      "estimated_duration": "6m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Session-Management"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-006"
       ]
     },
     {
       "id": "TC-123",
-      "file": "authentication\\TC-123.md",
+      "file": "TC-123.md",
       "title": "Remember me extends session to 14 days",
       "priority": "medium",
       "tags": [
@@ -372,13 +498,18 @@
         "positive"
       ],
       "component": "authentication",
+      "estimated_duration": "10m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Session-Management"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-006"
       ]
     },
     {
       "id": "TC-124",
-      "file": "authentication\\TC-124.md",
+      "file": "TC-124.md",
       "title": "Self-service password reset link sent and valid for 1 hour",
       "priority": "high",
       "tags": [
@@ -387,13 +518,18 @@
         "positive"
       ],
       "component": "authentication",
+      "estimated_duration": "6m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Self-Service-Reset"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-007"
       ]
     },
     {
       "id": "TC-125",
-      "file": "authentication\\TC-125.md",
+      "file": "TC-125.md",
       "title": "Password reset link can only be used once",
       "priority": "medium",
       "tags": [
@@ -403,13 +539,18 @@
         "negative"
       ],
       "component": "authentication",
+      "estimated_duration": "5m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Self-Service-Reset"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-007"
       ]
     },
     {
       "id": "TC-126",
-      "file": "authentication\\TC-126.md",
+      "file": "TC-126.md",
       "title": "All active sessions terminated after password change",
       "priority": "high",
       "tags": [
@@ -419,13 +560,18 @@
         "security"
       ],
       "component": "authentication",
+      "estimated_duration": "8m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Self-Service-Reset"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-007"
       ]
     },
     {
       "id": "TC-127",
-      "file": "authentication\\TC-127.md",
+      "file": "TC-127.md",
       "title": "Rate limiting blocks IP after 10 login attempts per minute",
       "priority": "high",
       "tags": [
@@ -435,8 +581,13 @@
         "negative"
       ],
       "component": "authentication",
+      "estimated_duration": "5m",
       "source_refs": [
         "docs/spectra-test-docs/docs/authentication/authentication.md#Rate-Limiting"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-009"
       ]
     }
   ]

@@ -175,6 +175,13 @@ function updateGeneratedAt() {
  */
 function render() {
     const content = document.getElementById('content');
+    const sidebar = document.querySelector('.sidebar');
+
+    // Hide sidebar on coverage tab (irrelevant for project-level metrics)
+    if (sidebar) {
+        sidebar.classList.toggle('hidden', currentView === 'coverage');
+    }
+
     switch (currentView) {
         case 'suites':
             content.innerHTML = renderSuites();
@@ -187,9 +194,8 @@ function render() {
             break;
         case 'coverage':
             content.innerHTML = renderCoverage();
-            // Initialize D3 visualizations after DOM is updated
+            // Initialize D3 treemap after DOM is updated
             setTimeout(() => {
-                if (typeof window.initCoverageMap === 'function') window.initCoverageMap();
                 if (typeof window.initTreemap === 'function') window.initTreemap();
             }, 0);
             break;
@@ -440,68 +446,151 @@ function renderTrendChart() {
     }
 
     const points = trends.points.slice(-14); // Last 14 days
-    const w = 600, h = 200;
-    const pad = { top: 20, right: 20, bottom: 30, left: 45 };
+
+    // Compact summary when ≤1 data point (no meaningful trend line)
+    if (points.length <= 1) {
+        const p = points[0];
+        const dateStr = new Date(p.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        const rateColor = p.pass_rate >= 80 ? 'var(--color-success)' : p.pass_rate >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
+        return `
+            <div class="trend-chart-container">
+                <h3 class="section-title">Pass Rate Trend</h3>
+                <div class="trend-compact-summary">
+                    <span class="trend-compact-rate" style="color: ${rateColor}">${p.pass_rate}%</span>
+                    <div class="trend-compact-meta">
+                        <span>${dateStr}</span>
+                        <span>${p.passed} passed / ${p.total} total</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    const w = 700, h = 220;
+    const pad = { top: 24, right: 80, bottom: 32, left: 48 };
     const plotW = w - pad.left - pad.right;
     const plotH = h - pad.top - pad.bottom;
 
     // Determine line color from trend direction
-    const lineColor = trends.direction === 'improving' ? 'var(--color-success)' :
-                      trends.direction === 'declining' ? 'var(--color-danger)' : 'var(--color-warning)';
+    const lineColor = trends.direction === 'improving' ? '#10B981' :
+                      trends.direction === 'declining' ? '#EF4444' : '#F59E0B';
+    const lineColorFaded = trends.direction === 'improving' ? '#10B98120' :
+                           trends.direction === 'declining' ? '#EF444420' : '#F59E0B20';
 
-    // Map points to coordinates
+    // Auto-scale Y-axis: find min/max pass rates, add 10% padding, snap to nearest 10
+    const rates = points.map(p => p.pass_rate);
+    const rawMin = Math.min(...rates);
+    const rawMax = Math.max(...rates);
+    const yMin = Math.max(0, Math.floor((rawMin - 10) / 10) * 10);
+    const yMax = Math.min(100, Math.ceil((rawMax + 10) / 10) * 10);
+    const yRange = yMax - yMin || 1;
+
+    // Map points to coordinates with auto-scaled Y
     const coords = points.map((p, i) => {
-        const x = pad.left + (points.length === 1 ? plotW / 2 : (i / (points.length - 1)) * plotW);
-        const y = pad.top + plotH - (p.pass_rate / 100) * plotH;
+        const x = pad.left + (i / (points.length - 1)) * plotW;
+        const y = pad.top + plotH - ((p.pass_rate - yMin) / yRange) * plotH;
         return { x, y, p };
     });
 
-    // Grid lines at 0%, 25%, 50%, 75%, 100%
-    const gridLines = [0, 25, 50, 75, 100].map(pct => {
-        const y = pad.top + plotH - (pct / 100) * plotH;
-        return `<line x1="${pad.left}" y1="${y}" x2="${w - pad.right}" y2="${y}" stroke="#e2e8f0" stroke-dasharray="4 2"/>
-                ${pct % 50 === 0 ? `<text x="${pad.left - 8}" y="${y + 4}" text-anchor="end" fill="#64748b" font-size="11">${pct}%</text>` : ''}`;
-    }).join('');
+    // Grid lines at dynamic intervals
+    const gridStep = yRange <= 30 ? 5 : 10;
+    const gridLines = [];
+    for (let pct = yMin; pct <= yMax; pct += gridStep) {
+        const y = pad.top + plotH - ((pct - yMin) / yRange) * plotH;
+        const isMain = pct % (gridStep * 2) === 0 || pct === yMin || pct === yMax;
+        gridLines.push(`<line x1="${pad.left}" y1="${y}" x2="${w - pad.right}" y2="${y}" stroke="${isMain ? '#e2e8f0' : '#f1f5f9'}" stroke-dasharray="${isMain ? '0' : '4 2'}"/>`);
+        if (isMain) {
+            gridLines.push(`<text x="${pad.left - 10}" y="${y + 4}" text-anchor="end" fill="#94a3b8" font-size="10" font-family="var(--font-mono, monospace)">${pct}%</text>`);
+        }
+    }
 
-    // Polyline points string
-    const linePoints = coords.map(c => `${c.x},${c.y}`).join(' ');
+    // Smooth SVG path using cardinal spline
+    const pathD = buildSmoothPath(coords);
 
-    // Area polygon (line + bottom edge)
-    const areaPoints = coords.map(c => `${c.x},${c.y}`).join(' ') +
-        ` ${coords[coords.length - 1].x},${pad.top + plotH} ${coords[0].x},${pad.top + plotH}`;
+    // Area path (smooth line + bottom edge)
+    const areaD = pathD + ` L ${coords[coords.length - 1].x},${pad.top + plotH} L ${coords[0].x},${pad.top + plotH} Z`;
 
-    // Data point circles with tooltips
-    const circles = coords.map(c => {
+    // Unique gradient ID
+    const gradId = 'trendGrad';
+
+    // Data point circles with hover interactions
+    const circles = coords.map((c, i) => {
         const dateStr = new Date(c.p.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        return `<circle cx="${c.x}" cy="${c.y}" r="4" fill="${lineColor}" stroke="white" stroke-width="2">
+        return `<circle class="trend-dot" cx="${c.x}" cy="${c.y}" r="4" fill="${lineColor}" stroke="white" stroke-width="2"
+                    data-date="${dateStr}" data-rate="${c.p.pass_rate}" data-passed="${c.p.passed}" data-total="${c.p.total}">
                     <title>${dateStr}: ${c.p.pass_rate}% (${c.p.passed}/${c.p.total})</title>
                 </circle>`;
     }).join('');
 
-    // X-axis labels (first, middle, last)
+    // X-axis labels — show every other label if many points, or all if few
     const xLabels = [];
-    if (points.length > 0) {
-        const indices = points.length <= 2 ? points.map((_, i) => i) : [0, Math.floor(points.length / 2), points.length - 1];
-        indices.forEach(i => {
-            const dateStr = new Date(points[i].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            xLabels.push(`<text x="${coords[i].x}" y="${h - 5}" text-anchor="middle" fill="#64748b" font-size="11">${dateStr}</text>`);
-        });
+    const labelStep = points.length > 10 ? 3 : points.length > 6 ? 2 : 1;
+    for (let i = 0; i < points.length; i += labelStep) {
+        const dateStr = new Date(points[i].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        xLabels.push(`<text x="${coords[i].x}" y="${h - 6}" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="var(--font-body, sans-serif)">${dateStr}</text>`);
     }
+    // Always include last label
+    if ((points.length - 1) % labelStep !== 0) {
+        const li = points.length - 1;
+        const dateStr = new Date(points[li].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        xLabels.push(`<text x="${coords[li].x}" y="${h - 6}" text-anchor="middle" fill="#94a3b8" font-size="10" font-family="var(--font-body, sans-serif)">${dateStr}</text>`);
+    }
+
+    // Current value callout on right side
+    const lastCoord = coords[coords.length - 1];
+    const lastRate = lastCoord.p.pass_rate;
+    const callout = `
+        <line x1="${lastCoord.x}" y1="${lastCoord.y}" x2="${w - pad.right + 8}" y2="${lastCoord.y}" stroke="${lineColor}" stroke-width="1" stroke-dasharray="3 2" opacity="0.5"/>
+        <rect x="${w - pad.right + 10}" y="${lastCoord.y - 12}" width="52" height="24" rx="6" fill="${lineColor}"/>
+        <text x="${w - pad.right + 36}" y="${lastCoord.y + 4}" text-anchor="middle" fill="white" font-size="11" font-weight="600" font-family="var(--font-mono, monospace)">${lastRate}%</text>
+    `;
 
     return `
         <div class="trend-chart-container">
             <h3 class="section-title">Pass Rate Trend (Last 14 Days)</h3>
             <div class="trend-chart">
                 <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" class="trend-svg">
-                    ${gridLines}
-                    <polygon points="${areaPoints}" fill="${lineColor}" opacity="0.1"/>
-                    <polyline points="${linePoints}" fill="none" stroke="${lineColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <defs>
+                        <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="${lineColor}" stop-opacity="0.2"/>
+                            <stop offset="100%" stop-color="${lineColor}" stop-opacity="0.02"/>
+                        </linearGradient>
+                    </defs>
+                    ${gridLines.join('')}
+                    <path d="${areaD}" fill="url(#${gradId})"/>
+                    <path d="${pathD}" fill="none" stroke="${lineColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
                     ${circles}
+                    ${callout}
                     ${xLabels.join('')}
                 </svg>
             </div>
         </div>
     `;
+}
+
+/**
+ * Build a smooth SVG path (monotone cubic spline) from coordinate points.
+ */
+function buildSmoothPath(coords) {
+    if (coords.length < 2) return `M ${coords[0].x},${coords[0].y}`;
+    if (coords.length === 2) return `M ${coords[0].x},${coords[0].y} L ${coords[1].x},${coords[1].y}`;
+
+    let d = `M ${coords[0].x},${coords[0].y}`;
+    for (let i = 0; i < coords.length - 1; i++) {
+        const p0 = coords[Math.max(0, i - 1)];
+        const p1 = coords[i];
+        const p2 = coords[i + 1];
+        const p3 = coords[Math.min(coords.length - 1, i + 2)];
+
+        // Catmull-Rom to cubic bezier conversion
+        const cp1x = p1.x + (p2.x - p0.x) / 6;
+        const cp1y = p1.y + (p2.y - p0.y) / 6;
+        const cp2x = p2.x - (p3.x - p1.x) / 6;
+        const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+        d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+    }
+    return d;
 }
 
 /**
@@ -776,37 +865,357 @@ function renderCoverage() {
 }
 
 /**
- * Render three stacked coverage sections with progress bars, expandable details, and empty states.
+ * Render three stacked coverage sections with KPI cards, coverage tree, treemap, gaps, and donut.
  */
 function renderThreeSectionCoverage(summary) {
     let html = '';
 
-    // Donut chart at top (if test data available)
-    html += renderDonutChart();
+    // KPI cards row
+    html += renderKPICards(summary);
 
+    // Coverage sections (progress bars + detail lists)
     html += '<div class="coverage-sections">';
-
-    // Documentation section
     html += renderCoverageSection('Documentation Coverage', summary.documentation, 'documents', renderDocDetails);
-
-    // Requirements section
     html += renderCoverageSection('Requirements Coverage', summary.requirements, 'requirements', renderReqDetails);
-
-    // Automation section
     html += renderCoverageSection('Automation Coverage', summary.automation, 'tests', renderAutoDetails);
-
     html += '</div>';
+
+    // Coverage tree (hierarchical collapsible)
+    html += renderCoverageTree(summary);
 
     // Treemap (rendered by coverage-map.js if available)
     if (typeof window.renderTreemap === 'function') {
         html += window.renderTreemap(summary);
     }
 
-    // Legacy coverage map visualization
-    if (typeof window.renderCoverageMap === 'function') {
-        html += window.renderCoverageMap();
+    // Gaps table
+    html += renderCoverageGaps(summary);
+
+    // Donut chart at bottom
+    html += renderDonutChart();
+
+    return html;
+}
+
+/**
+ * Render 3 KPI metric cards for Documentation, Requirements, Automation.
+ */
+function renderKPICards(summary) {
+    const sections = [
+        { key: 'documentation', label: 'Documentation', data: summary.documentation, target: 'documentation-coverage' },
+        { key: 'requirements', label: 'Requirements', data: summary.requirements, target: 'requirements-coverage' },
+        { key: 'automation', label: 'Automation', data: summary.automation, target: 'automation-coverage' }
+    ];
+
+    let html = '<div class="cov-kpi-row">';
+    for (const s of sections) {
+        const pct = s.data?.percentage || 0;
+        const covered = s.data?.covered || 0;
+        const total = s.data?.total || 0;
+        const colorClass = pct >= 80 ? 'green' : pct >= 50 ? 'amber' : 'red';
+
+        html += `
+            <div class="cov-kpi-card ${colorClass}" onclick="document.getElementById('details-${s.key}-coverage')?.scrollIntoView({behavior:'smooth'})">
+                <div class="cov-kpi-label">${s.label}</div>
+                <div class="cov-kpi-value ${colorClass}">${pct.toFixed(1)}%</div>
+                <div class="cov-kpi-bar"><div class="cov-kpi-bar-fill ${colorClass}" style="width:${Math.min(pct,100)}%"></div></div>
+                <div class="cov-kpi-subtitle">${covered} of ${total} covered</div>
+            </div>
+        `;
+    }
+    html += '</div>';
+    return html;
+}
+
+/**
+ * Build coverage hierarchy from tests and doc details.
+ */
+function buildCoverageHierarchy(tests, docDetails) {
+    const domains = {};
+    const testsByDoc = {};
+    const seenTests = new Set();
+
+    // Map tests to docs (strip fragment anchors)
+    for (const t of tests) {
+        const refs = t.source_refs || [];
+        for (const ref of refs) {
+            const docPath = ref.includes('#') ? ref.substring(0, ref.indexOf('#')) : ref;
+            if (!testsByDoc[docPath]) testsByDoc[docPath] = [];
+            const compositeKey = t.id + '::' + t.suite;
+            if (!seenTests.has(compositeKey)) {
+                seenTests.add(compositeKey);
+                testsByDoc[docPath].push(t);
+            }
+        }
     }
 
+    // Group docs by parent directory name (domain)
+    const allDocPaths = new Set(Object.keys(testsByDoc));
+    if (docDetails) {
+        for (const d of docDetails) {
+            allDocPaths.add(d.doc);
+        }
+    }
+
+    for (const docPath of allDocPaths) {
+        const parts = docPath.replace(/\\/g, '/').split('/');
+        const fileName = parts[parts.length - 1];
+        const domainName = parts.length >= 2 ? parts[parts.length - 2] : 'root';
+        const docTests = testsByDoc[docPath] || [];
+
+        if (!domains[domainName]) {
+            domains[domainName] = { name: domainName, features: {} };
+        }
+
+        if (!domains[domainName].features[docPath]) {
+            domains[domainName].features[docPath] = { name: fileName, path: docPath, areas: {}, tests: [] };
+        }
+
+        const feature = domains[domainName].features[docPath];
+        for (const t of docTests) {
+            const areaName = t.component || 'general';
+            if (!feature.areas[areaName]) {
+                feature.areas[areaName] = { name: areaName, tests: [] };
+            }
+            feature.areas[areaName].tests.push(t);
+        }
+    }
+
+    return domains;
+}
+
+/**
+ * Calculate automation percentage for a set of tests.
+ */
+function calcAutoPct(tests) {
+    if (!tests || tests.length === 0) return 0;
+    const automated = tests.filter(t => t.has_automation || (t.automated_by && t.automated_by.length > 0)).length;
+    return (automated / tests.length) * 100;
+}
+
+/**
+ * Get color class from percentage.
+ */
+function pctColorClass(pct) {
+    return pct >= 80 ? 'green' : pct >= 50 ? 'amber' : 'red';
+}
+
+/**
+ * Render coverage tree with collapsible hierarchy.
+ */
+function renderCoverageTree(summary) {
+    const tests = allTests || [];
+    const docDetails = summary.documentation?.details || [];
+    const domains = buildCoverageHierarchy(tests, docDetails);
+    const domainKeys = Object.keys(domains).sort();
+
+    if (domainKeys.length === 0) return '';
+
+    let html = `<div class="cov-tree-container">
+        <h3>Coverage Hierarchy</h3>
+        <input type="text" class="cov-tree-search" placeholder="Filter by name..." oninput="filterCoverageTree(this.value)">
+        <div id="cov-tree-root">`;
+
+    let nodeId = 0;
+    for (const dk of domainKeys) {
+        const domain = domains[dk];
+        const featureKeys = Object.keys(domain.features).sort();
+        const domainTests = [];
+        for (const fk of featureKeys) {
+            for (const ak of Object.keys(domain.features[fk].areas)) {
+                domainTests.push(...domain.features[fk].areas[ak].tests);
+            }
+        }
+        const domainPct = calcAutoPct(domainTests);
+        const domainColor = pctColorClass(domainPct);
+        const domId = 'tree-' + (nodeId++);
+
+        html += `<div class="cov-tree-node" data-search="${escapeHtml(domain.name.toLowerCase())}">
+            <div class="cov-tree-row" onclick="toggleTreeNode('${domId}')">
+                <span class="cov-tree-expand" id="exp-${domId}">&#9654;</span>
+                <span class="cov-tree-icon domain">D</span>
+                <span class="cov-tree-name">${escapeHtml(domain.name)}</span>
+                <div class="cov-tree-minibar"><div class="cov-tree-minibar-fill ${domainColor}" style="width:${domainPct.toFixed(0)}%"></div></div>
+                <span class="cov-tree-badge ${domainColor}">${domainPct.toFixed(0)}%</span>
+            </div>
+            <div class="cov-tree-children" id="${domId}">`;
+
+        for (const fk of featureKeys) {
+            const feature = domain.features[fk];
+            const areaKeys = Object.keys(feature.areas).sort();
+            const featureTests = [];
+            for (const ak of areaKeys) featureTests.push(...feature.areas[ak].tests);
+            const featurePct = calcAutoPct(featureTests);
+            const featureColor = pctColorClass(featurePct);
+            const featId = 'tree-' + (nodeId++);
+
+            html += `<div class="cov-tree-node" data-search="${escapeHtml(feature.name.toLowerCase())}">
+                <div class="cov-tree-row" onclick="toggleTreeNode('${featId}')">
+                    <span class="cov-tree-expand" id="exp-${featId}">&#9654;</span>
+                    <span class="cov-tree-icon feature">F</span>
+                    <span class="cov-tree-name" title="${escapeHtml(feature.path)}">${escapeHtml(feature.name)}</span>
+                    <div class="cov-tree-minibar"><div class="cov-tree-minibar-fill ${featureColor}" style="width:${featurePct.toFixed(0)}%"></div></div>
+                    <span class="cov-tree-badge ${featureColor}">${featurePct.toFixed(0)}%</span>
+                </div>
+                <div class="cov-tree-children" id="${featId}">`;
+
+            for (const ak of areaKeys) {
+                const area = feature.areas[ak];
+                const areaPct = calcAutoPct(area.tests);
+                const areaColor = pctColorClass(areaPct);
+                const areaId = 'tree-' + (nodeId++);
+
+                html += `<div class="cov-tree-node" data-search="${escapeHtml(area.name.toLowerCase())}">
+                    <div class="cov-tree-row" onclick="toggleTreeNode('${areaId}')">
+                        <span class="cov-tree-expand" id="exp-${areaId}">&#9654;</span>
+                        <span class="cov-tree-icon area">A</span>
+                        <span class="cov-tree-name">${escapeHtml(area.name)}</span>
+                        <div class="cov-tree-minibar"><div class="cov-tree-minibar-fill ${areaColor}" style="width:${areaPct.toFixed(0)}%"></div></div>
+                        <span class="cov-tree-badge ${areaColor}">${areaPct.toFixed(0)}%</span>
+                    </div>
+                    <div class="cov-tree-children" id="${areaId}">`;
+
+                for (const t of area.tests) {
+                    const isAuto = t.has_automation || (t.automated_by && t.automated_by.length > 0);
+                    const testIconClass = isAuto ? 'test' : 'test manual';
+                    const testBadge = isAuto ? '<span class="cov-tree-badge green">auto</span>' : '<span class="cov-tree-badge red">manual</span>';
+
+                    html += `<div class="cov-tree-node" data-search="${escapeHtml((t.id + ' ' + t.title).toLowerCase())}">
+                        <div class="cov-tree-row" onclick="if(typeof showTestDetail==='function')showTestDetail('${escapeHtml(t.id)}')">
+                            <span class="cov-tree-expand leaf">&#9654;</span>
+                            <span class="cov-tree-icon ${testIconClass}">T</span>
+                            <span class="cov-tree-name">${escapeHtml(t.id)}: ${escapeHtml(t.title || '')}</span>
+                            ${testBadge}
+                        </div>
+                    </div>`;
+                }
+
+                html += '</div></div>';
+            }
+
+            html += '</div></div>';
+        }
+
+        html += '</div></div>';
+    }
+
+    // Uncovered documents section
+    const uncoveredDocs = (docDetails || []).filter(d => !d.covered);
+    if (uncoveredDocs.length > 0) {
+        html += `<div class="cov-tree-uncovered-section">
+            <div class="cov-tree-uncovered-label">Uncovered Documents (${uncoveredDocs.length})</div>`;
+        for (const d of uncoveredDocs) {
+            html += `<div class="cov-tree-row uncovered">
+                <span class="cov-tree-expand leaf">&#9654;</span>
+                <span class="cov-tree-icon feature" style="background:var(--cov-red)">F</span>
+                <span class="cov-tree-name" title="${escapeHtml(d.doc)}">${escapeHtml(d.doc)}</span>
+                <span class="cov-tree-badge red">0 tests</span>
+            </div>`;
+        }
+        html += '</div>';
+    }
+
+    html += '</div></div>';
+    return html;
+}
+
+/**
+ * Toggle tree node expand/collapse.
+ */
+function toggleTreeNode(id) {
+    const children = document.getElementById(id);
+    const expander = document.getElementById('exp-' + id);
+    if (!children) return;
+
+    children.classList.toggle('expanded');
+    if (expander) expander.classList.toggle('expanded');
+}
+
+/**
+ * Filter coverage tree nodes by search query.
+ */
+function filterCoverageTree(query) {
+    const q = query.toLowerCase().trim();
+    const nodes = document.querySelectorAll('#cov-tree-root .cov-tree-node');
+
+    if (!q) {
+        nodes.forEach(n => n.style.display = '');
+        return;
+    }
+
+    nodes.forEach(n => {
+        const searchText = n.getAttribute('data-search') || '';
+        const matches = searchText.includes(q);
+        n.style.display = matches ? '' : 'none';
+        // Expand parent tree nodes if child matches
+        if (matches) {
+            let parent = n.parentElement;
+            while (parent) {
+                if (parent.classList.contains('cov-tree-children')) {
+                    parent.classList.add('expanded');
+                    const expId = 'exp-' + parent.id;
+                    const exp = document.getElementById(expId);
+                    if (exp) exp.classList.add('expanded');
+                }
+                if (parent.classList.contains('cov-tree-node')) {
+                    parent.style.display = '';
+                }
+                parent = parent.parentElement;
+            }
+        }
+    });
+}
+
+/**
+ * Render coverage gaps table.
+ */
+function renderCoverageGaps(summary) {
+    const gaps = [];
+
+    // Uncovered documents
+    const docDetails = summary.documentation?.details || [];
+    for (const d of docDetails) {
+        if (!d.covered) {
+            gaps.push({ name: d.doc, type: 'No Tests', impact: 'critical' });
+        }
+    }
+
+    // Low-automation suites
+    const autoDetails = summary.automation?.details || [];
+    for (const d of autoDetails) {
+        if (d.percentage < 30) {
+            gaps.push({
+                name: d.suite + ' suite',
+                type: 'Low Automation',
+                impact: d.percentage === 0 ? 'critical' : 'medium'
+            });
+        }
+    }
+
+    if (gaps.length === 0) return '';
+
+    // Sort by impact
+    const impactOrder = { critical: 0, medium: 1, low: 2 };
+    gaps.sort((a, b) => (impactOrder[a.impact] || 2) - (impactOrder[b.impact] || 2));
+
+    let html = `
+        <div class="cov-tree-container">
+            <h3>Coverage Gaps</h3>
+            <table class="cov-gaps-table">
+                <thead>
+                    <tr><th>Name</th><th>Gap Type</th><th>Impact</th></tr>
+                </thead>
+                <tbody>`;
+
+    for (const g of gaps) {
+        html += `<tr>
+            <td>${escapeHtml(g.name)}</td>
+            <td>${escapeHtml(g.type)}</td>
+            <td><span class="cov-impact-badge ${g.impact}">${g.impact}</span></td>
+        </tr>`;
+    }
+
+    html += '</tbody></table></div>';
     return html;
 }
 

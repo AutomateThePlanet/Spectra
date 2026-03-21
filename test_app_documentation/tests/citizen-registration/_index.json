@@ -1,11 +1,11 @@
 {
   "suite": "citizen-registration",
-  "generated_at": "2026-03-20T13:18:07.410999Z",
+  "generated_at": "2026-03-21T13:47:51.6814262Z",
   "test_count": 6,
   "tests": [
     {
       "id": "TC-100",
-      "file": "citizen-registration\\TC-100.md",
+      "file": "TC-100.md",
       "title": "Complete citizen registration with valid Bulgarian EGN and QES verification",
       "priority": "high",
       "tags": [
@@ -15,13 +15,18 @@
         "identity-verification"
       ],
       "component": "citizen-registration",
+      "estimated_duration": "8m",
       "source_refs": [
         "docs/spectra-test-docs/docs/citizen-registration/citizen-registration.md#Registration-Wizard-Steps"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-011"
       ]
     },
     {
       "id": "TC-101",
-      "file": "citizen-registration\\TC-101.md",
+      "file": "TC-101.md",
       "title": "Register citizen with document upload identity verification",
       "priority": "high",
       "tags": [
@@ -31,13 +36,18 @@
         "identity-verification"
       ],
       "component": "citizen-registration",
+      "estimated_duration": "7m",
       "source_refs": [
         "docs/spectra-test-docs/docs/citizen-registration/citizen-registration.md#Step-4-Identity-Verification"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-014"
       ]
     },
     {
       "id": "TC-102",
-      "file": "citizen-registration\\TC-102.md",
+      "file": "TC-102.md",
       "title": "Attempt registration with invalid EGN checksum",
       "priority": "medium",
       "tags": [
@@ -47,13 +57,18 @@
         "egn"
       ],
       "component": "citizen-registration",
+      "estimated_duration": "3m",
       "source_refs": [
         "docs/spectra-test-docs/docs/citizen-registration/citizen-registration.md#Step-1-Personal-Information"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-011"
       ]
     },
     {
       "id": "TC-103",
-      "file": "citizen-registration\\TC-103.md",
+      "file": "TC-103.md",
       "title": "Register with email verification code expiration and retry",
       "priority": "medium",
       "tags": [
@@ -63,13 +78,18 @@
         "timeout"
       ],
       "component": "citizen-registration",
+      "estimated_duration": "20m",
       "source_refs": [
         "docs/spectra-test-docs/docs/citizen-registration/citizen-registration.md#Step-2-Contact-Information"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-013"
       ]
     },
     {
       "id": "TC-104",
-      "file": "citizen-registration\\TC-104.md",
+      "file": "TC-104.md",
       "title": "Attempt registration with duplicate EGN for active account",
       "priority": "high",
       "tags": [
@@ -79,13 +99,18 @@
         "egn"
       ],
       "component": "citizen-registration",
+      "estimated_duration": "6m",
       "source_refs": [
         "docs/spectra-test-docs/docs/citizen-registration/citizen-registration.md#Duplicate-Detection"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-015"
       ]
     },
     {
       "id": "TC-105",
-      "file": "citizen-registration\\TC-105.md",
+      "file": "TC-105.md",
       "title": "Register citizen with in-person verification and resume wizard after 12 hours",
       "priority": "medium",
       "tags": [
@@ -94,9 +119,14 @@
         "in-person-verification"
       ],
       "component": "citizen-registration",
+      "estimated_duration": "15m",
       "source_refs": [
         "docs/spectra-test-docs/docs/citizen-registration/citizen-registration.md#Wizard-Persistence",
         "docs/spectra-test-docs/docs/citizen-registration/citizen-registration.md#Step-4-Identity-Verification"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-016"
       ]
     }
   ]

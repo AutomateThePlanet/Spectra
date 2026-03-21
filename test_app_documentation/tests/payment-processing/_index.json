@@ -1,11 +1,11 @@
 {
   "suite": "payment-processing",
-  "generated_at": "2026-03-20T13:19:45.1609157Z",
+  "generated_at": "2026-03-21T13:47:51.7033613Z",
   "test_count": 6,
   "tests": [
     {
       "id": "TC-100",
-      "file": "payment-processing\\TC-100.md",
+      "file": "TC-100.md",
       "title": "Successful card payment with 3D Secure authentication",
       "priority": "high",
       "tags": [
@@ -15,15 +15,20 @@
         "happy-path"
       ],
       "component": "payment-processing",
+      "estimated_duration": "8m",
       "source_refs": [
         "docs/spectra-test-docs/docs/payments/payment-processing.md#Payment-Methods",
         "docs/spectra-test-docs/docs/payments/payment-processing.md#Payment-Flow",
         "docs/spectra-test-docs/docs/payments/payment-processing.md#Receipts"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-017"
       ]
     },
     {
       "id": "TC-101",
-      "file": "payment-processing\\TC-101.md",
+      "file": "TC-101.md",
       "title": "Bank transfer payment with exact amount match",
       "priority": "medium",
       "tags": [
@@ -32,14 +37,19 @@
         "payment-matching"
       ],
       "component": "payment-processing",
+      "estimated_duration": "6m",
       "source_refs": [
         "docs/spectra-test-docs/docs/payments/payment-processing.md#Payment-Methods",
         "docs/spectra-test-docs/docs/payments/payment-processing.md#Payment-Flow"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-017"
       ]
     },
     {
       "id": "TC-102",
-      "file": "payment-processing\\TC-102.md",
+      "file": "TC-102.md",
       "title": "Fee waiver automatically applied for eligible citizen",
       "priority": "high",
       "tags": [
@@ -48,14 +58,19 @@
         "eligibility"
       ],
       "component": "payment-processing",
+      "estimated_duration": "5m",
       "source_refs": [
         "docs/spectra-test-docs/docs/payments/payment-processing.md#Fee-Structure",
         "docs/spectra-test-docs/docs/payments/payment-processing.md#Payment-Flow"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-019"
       ]
     },
     {
       "id": "TC-103",
-      "file": "payment-processing\\TC-103.md",
+      "file": "TC-103.md",
       "title": "Payment timeout handling and retry mechanism",
       "priority": "high",
       "tags": [
@@ -65,13 +80,18 @@
         "retry"
       ],
       "component": "payment-processing",
+      "estimated_duration": "10m",
       "source_refs": [
         "docs/spectra-test-docs/docs/payments/payment-processing.md#Timeout-and-Error-Handling"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-022"
       ]
     },
     {
       "id": "TC-104",
-      "file": "payment-processing\\TC-104.md",
+      "file": "TC-104.md",
       "title": "Refund processing for rejected application",
       "priority": "medium",
       "tags": [
@@ -80,13 +100,18 @@
         "card-refund"
       ],
       "component": "payment-processing",
+      "estimated_duration": "7m",
       "source_refs": [
         "docs/spectra-test-docs/docs/payments/payment-processing.md#Refunds"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-021"
       ]
     },
     {
       "id": "TC-105",
-      "file": "payment-processing\\TC-105.md",
+      "file": "TC-105.md",
       "title": "Multiple failed payment attempts trigger lockout",
       "priority": "high",
       "tags": [
@@ -97,8 +122,13 @@
         "negative"
       ],
       "component": "payment-processing",
+      "estimated_duration": "8m",
       "source_refs": [
         "docs/spectra-test-docs/docs/payments/payment-processing.md#Timeout-and-Error-Handling"
+      ],
+      "automated_by": [],
+      "requirements": [
+        "REQ-022"
       ]
     }
   ]
