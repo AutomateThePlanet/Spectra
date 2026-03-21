@@ -5,7 +5,7 @@ using Spectra.CLI.Options;
 
 namespace Spectra.CLI.Tests.Commands;
 
-[Collection("Sequential Command Tests")]
+[Collection("WorkingDirectory")]
 public class AnalyzeCommandTests : IDisposable
 {
     private readonly string _testDir;

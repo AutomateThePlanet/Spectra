@@ -4,98 +4,64 @@
 
 ## Entities
 
-### NextStepHint (NEW)
+### HintContext (new)
 
-A single hint displayed after a command completes.
+Contextual data passed to the hint helper to select appropriate suggestions.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| Command | string | The CLI command to suggest (e.g., `spectra ai generate`) |
-| Comment | string | Brief description of what the command does |
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| hasAutoLink | bool | false | Whether `--auto-link` was used in the current command |
+| hasGaps | bool | false | Whether coverage gaps were detected |
+| suiteCount | int | 0 | Number of test suites in the repository |
+| errorCount | int | 0 | Number of validation errors found |
+| outputPath | string? | null | Dashboard output path (for "open in browser" hint) |
+| suiteName | string? | null | Suite that was just generated/updated |
 
-### HintSet (NEW)
+### CoverageConfig (existing — no changes)
 
-A collection of hints for a specific command outcome.
+Already has `automation_dirs` field (`IReadOnlyList<string>`, default: `["tests", "test", "spec", "specs", "e2e"]`). The config subcommands modify this array in the JSON file directly.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| OnSuccess | NextStepHint[] | Hints to show when command succeeds |
-| OnFailure | NextStepHint[] | Hints to show when command fails |
+### CriticConfig (existing — no changes)
 
-### HintRegistry (NEW, static)
+Already has all needed fields: `enabled`, `provider`, `model`, `api_key_env`, `base_url`, `timeout_seconds`. The init prompt writes to these fields.
 
-Static mapping from command names to HintSets.
+## Config Modifications
 
-| Key | Type | Description |
-|-----|------|-------------|
-| CommandName → HintSet | Dictionary<string, HintSet> | Maps command identifiers (e.g., "init", "ai generate", "dashboard") to their hint sets |
+### automation_dirs Management
 
-### ContinuationAction (NEW, enum)
+The `add-automation-dir` / `remove-automation-dir` commands modify `coverage.automation_dirs` in spectra.config.json:
 
-Action selected from the post-generation continuation menu.
-
-| Value | Description |
-|-------|-------------|
-| GenerateMore | Generate more tests for the same suite |
-| SwitchSuite | Switch to a different existing suite |
-| CreateSuite | Create a new suite and continue |
-| Exit | End the session |
-
-### ContinuationResult (NEW, record)
-
-Result of the continuation menu selection.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| Action | ContinuationAction | The action chosen |
-| SuiteName | string? | Suite name (for SwitchSuite or CreateSuite) |
-| SuitePath | string? | Suite path (for SwitchSuite or CreateSuite) |
-
-## Existing Entities (unchanged)
-
-### CoverageConfig
-
-Already has `AutomationDirs` (`IReadOnlyList<string>`). No changes needed.
-
-### CriticConfig
-
-Already has `Enabled`, `Provider`, `Model`, `ApiKeyEnv`, `BaseUrl`, `TimeoutSeconds`. No changes needed.
-
-### InteractiveSession
-
-No structural changes. The continuation menu is handled outside the session lifecycle — the session is reset/recreated when switching suites.
-
-### VerbosityLevel (existing enum)
-
-Already has `Quiet` value. Hints check `verbosity < VerbosityLevel.Normal` to decide rendering.
-
-## State Transitions
-
-### Interactive Generation with Continuation (modified flow)
-
-```
-[Start]
-  │
-  ▼
-SuiteSelection ──► TestTypeSelection ──► FocusInput (optional) ──► GapAnalysis
-  │                                                                     │
-  │                                                                     ▼
-  │                                                              Generating ◄─┐
-  │                                                                     │     │
-  │                                                                     ▼     │
-  │                                                               Results     │
-  │                                                                     │     │
-  │                                                                     ▼     │
-  │                                                            GapSelection ──┘
-  │                                                                     │
-  │                                                              (Done / No gaps)
-  │                                                                     │
-  │                                                                     ▼
-  │◄─────────────────────────────────────────────────── ContinuationMenu
-  │  (GenerateMore / SwitchSuite / CreateSuite)                         │
-  │                                                                     │ (Exit)
-  │                                                                     ▼
-  │                                                                  [End]
+```json
+{
+  "coverage": {
+    "automation_dirs": ["tests", "../test_automation", "src/IntegrationTests"]
+  }
+}
 ```
 
-The `ContinuationMenu` is not a session state — it's a handler-level prompt that decides whether to reset and re-enter the session loop or exit.
+**Operations**:
+- **Add**: Append to array if not already present. Case-sensitive path comparison.
+- **Remove**: Remove exact match from array. Warn if not found.
+- **List**: Read array, print each entry with `[exists]` or `[missing]` indicator.
+
+### critic Section Written by Init
+
+```json
+{
+  "ai": {
+    "critic": {
+      "enabled": true,
+      "provider": "google",
+      "model": "gemini-2.0-flash",
+      "api_key_env": "GOOGLE_API_KEY"
+    }
+  }
+}
+```
+
+## Validation Rules
+
+- `automation_dirs` entries are stored as-is (no path normalization). Existence is checked at list-time, not at add-time.
+- `critic.provider` must be one of: `"google"`, `"anthropic"`, `"openai"`, `"github-models"`, `"azure-openai"`, `"azure-anthropic"`.
+- `critic.model` defaults via `CriticConfig.GetEffectiveModel()` based on provider.
+- `critic.api_key_env` defaults via `CriticConfig.GetDefaultApiKeyEnv()` based on provider.

@@ -643,7 +643,7 @@ public sealed class DataCollector
             {
                 foreach (var docRef in test.SourceRefs)
                 {
-                    var docPath = docRef.Contains('#') ? docRef[..docRef.IndexOf('#')] : docRef;
+                    var docPath = SourceRefNormalizer.NormalizePath(docRef);
                     if (!docToTests.TryGetValue(docPath, out var list))
                     {
                         list = [];
@@ -660,7 +660,8 @@ public sealed class DataCollector
                 var docFiles = Directory.GetFiles(docsDir, "*.md", SearchOption.AllDirectories);
                 foreach (var docFile in docFiles)
                 {
-                    var relativePath = Path.GetRelativePath(_basePath, docFile).Replace('\\', '/');
+                    var relativePath = SourceRefNormalizer.NormalizePath(
+                        Path.GetRelativePath(_basePath, docFile));
                     var testIds = docToTests.TryGetValue(relativePath, out var ids)
                         ? ids.OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList()
                         : [];

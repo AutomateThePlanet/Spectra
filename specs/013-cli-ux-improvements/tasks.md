@@ -1,9 +1,9 @@
 # Tasks: CLI UX Improvements
 
 **Input**: Design documents from `/specs/013-cli-ux-improvements/`
-**Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
+**Prerequisites**: plan.md (required), spec.md (required), research.md, data-model.md, contracts/
 
-**Tests**: Tests are included as the plan explicitly requires unit and integration tests.
+**Tests**: Tests are included — the project constitution requires tests for all public APIs and critical paths.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -13,136 +13,123 @@
 - **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)
 - Include exact file paths in descriptions
 
+---
+
 ## Phase 1: Setup (Shared Infrastructure)
 
-**Purpose**: No project initialization needed — all code lives within the existing `Spectra.CLI` project. This phase is empty.
+**Purpose**: Create the shared hint helper used by all user stories
 
-**Checkpoint**: Existing project compiles and all 984 tests pass (`dotnet test`).
+- [x] T001 Create `HintContext` record in `src/Spectra.CLI/Output/NextStepHints.cs` with fields: `hasAutoLink` (bool), `hasGaps` (bool), `suiteCount` (int), `errorCount` (int), `outputPath` (string?), `suiteName` (string?)
+- [x] T002 Create `NextStepHints` static class in `src/Spectra.CLI/Output/NextStepHints.cs` with method `Print(string commandName, bool success, VerbosityLevel verbosity, HintContext? context = null)` — checks `verbosity >= Normal` and `!Console.IsOutputRedirected` before printing; outputs blank line then "Next steps:" header then 2-3 indented dimmed hints via `AnsiConsole.MarkupLine("[grey]    {hint}[/]")`
 
 ---
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: Core utility that multiple user stories depend on — the NextStepHints helper is foundational because US1 needs it directly, and US2-US4 will also call it from their command handlers.
+**Purpose**: Define hint content for all commands — MUST complete before integrating into handlers
 
-- [ ] T001 Create `NextStepHint` record and `HintSet` record in `src/Spectra.CLI/Output/NextStepHints.cs` — hint has `Command` (string) and `Comment` (string); HintSet has `OnSuccess` (NextStepHint[]) and `OnFailure` (NextStepHint[])
-- [ ] T002 Create static `NextStepHints` class in `src/Spectra.CLI/Output/NextStepHints.cs` with `Dictionary<string, HintSet>` registry containing static hint mappings for all commands: `init`, `init-profile`, `ai generate` (success/failure), `ai update` (success/failure), `ai analyze` (success with/without auto-link), `dashboard` (success), `validate` (success/failure), `docs index` (success), `config` (success)
-- [ ] T003 Add `Render(string commandName, bool success, VerbosityLevel verbosity, IAnsiConsole console)` method to `NextStepHints` in `src/Spectra.CLI/Output/NextStepHints.cs` — return early if `verbosity < VerbosityLevel.Normal`; print blank line, then `[dim]  Next steps:[/]` header, then each hint as `[dim]    {command}  # {comment}[/]`
+**⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-**Checkpoint**: NextStepHints utility compiles. Hint registry contains entries for all commands. Render method respects verbosity.
+- [x] T003 Implement hint content for `init` command in `NextStepHints` — on success: suggest `spectra ai generate` and `spectra init-profile`
+- [x] T004 Implement hint content for `generate` command in `NextStepHints` — on success: suggest `spectra ai analyze --coverage` and `spectra ai generate` (interactive mode); include `suiteName` context
+- [x] T005 Implement hint content for `analyze` command in `NextStepHints` — on success: suggest `spectra dashboard --output ./site`; if `!hasAutoLink` suggest `spectra ai analyze --coverage --auto-link`; if `hasGaps` suggest `spectra ai generate`
+- [x] T006 Implement hint content for `dashboard` command in `NextStepHints` — on success: suggest `Open {outputPath}/index.html in your browser` and reference `docs/deployment/cloudflare-pages-setup.md`
+- [x] T007 Implement hint content for `validate` command in `NextStepHints` — on success: suggest `spectra ai generate` and `spectra index`; on failure (`errorCount > 0`): suggest fixing errors then `spectra validate`
+- [x] T008 Implement hint content for `docs-index` command in `NextStepHints` — on success: suggest `spectra ai generate`
+- [x] T009 Implement hint content for `index` command in `NextStepHints` — on success: suggest `spectra validate` and `spectra ai generate`
+- [x] T010 [P] Write unit tests for `NextStepHints` in `tests/Spectra.CLI.Tests/Output/NextStepHintsTests.cs` — test: quiet verbosity suppresses output, each command returns correct hints, context-aware hints (auto-link, gaps, errors), redirected output suppresses hints
+
+**Checkpoint**: Hint helper is complete and tested — ready to integrate into handlers
 
 ---
 
-## Phase 3: User Story 1 — Next-Step Hints After Commands (Priority: P1) 🎯 MVP
+## Phase 3: User Story 1 — Next-Step Hints (Priority: P1) 🎯 MVP
 
-**Goal**: Every Spectra command displays 2-3 contextual next-step suggestions in dimmed text after completion. Suppressed when `--verbosity quiet`.
+**Goal**: Every supported command displays contextual next-step hints after completion.
 
-**Independent Test**: Run `spectra init` and verify hints appear. Run `spectra dashboard --verbosity quiet` and verify no hints appear.
-
-### Tests for User Story 1
-
-- [ ] T004 [P] [US1] Create `tests/Spectra.CLI.Tests/Output/NextStepHintsTests.cs` — test that `Render("init", true, VerbosityLevel.Normal, console)` writes "Next steps:" and at least 2 hint lines to the test console
-- [ ] T005 [P] [US1] Add test in `tests/Spectra.CLI.Tests/Output/NextStepHintsTests.cs` — verify `Render("init", true, VerbosityLevel.Quiet, console)` writes nothing to the test console
-- [ ] T006 [P] [US1] Add tests in `tests/Spectra.CLI.Tests/Output/NextStepHintsTests.cs` — verify distinct hint sets exist for success vs failure outcomes of `ai generate`, `validate`, and `ai analyze`
-- [ ] T007 [P] [US1] Add test in `tests/Spectra.CLI.Tests/Output/NextStepHintsTests.cs` — verify `Render` with an unknown command name does not throw (graceful no-op)
+**Independent Test**: Run `spectra validate`, `spectra dashboard --output ./site`, and `spectra ai analyze --coverage`. Verify dimmed hint text appears after each. Run with `--verbosity quiet` and verify hints are suppressed.
 
 ### Implementation for User Story 1
 
-- [ ] T008 [US1] Wire `NextStepHints.Render("init", success, verbosity, AnsiConsole.Console)` into `InitHandler.ExecuteAsync()` in `src/Spectra.CLI/Commands/Init/InitHandler.cs` before returning exit code
-- [ ] T009 [P] [US1] Wire `NextStepHints.Render("ai generate", success, verbosity, AnsiConsole.Console)` into `GenerateHandler.ExecuteDirectModeAsync()` and `ExecuteInteractiveModeAsync()` in `src/Spectra.CLI/Commands/Generate/GenerateHandler.cs` before returning exit code
-- [ ] T010 [P] [US1] Wire `NextStepHints.Render("ai update", success, verbosity, AnsiConsole.Console)` into `UpdateHandler.ExecuteAsync()` in `src/Spectra.CLI/Commands/Update/UpdateHandler.cs` before returning exit code
-- [ ] T011 [P] [US1] Wire `NextStepHints.Render("ai analyze", success, verbosity, AnsiConsole.Console)` into `AnalyzeHandler.ExecuteAsync()` in `src/Spectra.CLI/Commands/Analyze/AnalyzeHandler.cs` — use `"ai analyze --auto-link"` key when auto-link flag was used, `"ai analyze"` otherwise
-- [ ] T012 [P] [US1] Wire `NextStepHints.Render("dashboard", success, verbosity, AnsiConsole.Console)` into `DashboardHandler.ExecuteAsync()` in `src/Spectra.CLI/Commands/Dashboard/DashboardHandler.cs` before returning exit code
-- [ ] T013 [P] [US1] Wire `NextStepHints.Render("validate", success, verbosity, AnsiConsole.Console)` into the validate command handler before returning exit code
-- [ ] T014 [P] [US1] Wire `NextStepHints.Render("docs index", success, verbosity, AnsiConsole.Console)` into `DocsIndexHandler.ExecuteAsync()` in `src/Spectra.CLI/Commands/Docs/DocsIndexHandler.cs` before returning exit code
-- [ ] T015 [US1] Run full test suite (`dotnet test`) and verify all existing tests still pass plus new NextStepHints tests pass
+- [x] T011 [US1] Add `NextStepHints.Print("init", true, verbosity)` call at end of successful path in `src/Spectra.CLI/Commands/Init/InitHandler.cs`
+- [x] T012 [US1] Add `NextStepHints.Print("generate", true, verbosity, context)` call at end of `ExecuteDirectModeAsync` and `ExecuteInteractiveModeAsync` in `src/Spectra.CLI/Commands/Generate/GenerateHandler.cs` with `suiteName` in context
+- [x] T013 [P] [US1] Add `NextStepHints.Print("analyze", true, verbosity, context)` call at end of `src/Spectra.CLI/Commands/Analyze/AnalyzeHandler.cs` with `hasAutoLink` and `hasGaps` context
+- [x] T014 [P] [US1] Add `NextStepHints.Print("dashboard", true, verbosity, context)` call at end of `src/Spectra.CLI/Commands/Dashboard/DashboardHandler.cs` with `outputPath` context
+- [x] T015 [P] [US1] Add `NextStepHints.Print("validate", success, verbosity, context)` call at end of `src/Spectra.CLI/Commands/Validate/ValidateHandler.cs` with `errorCount` context
+- [x] T016 [P] [US1] Add `NextStepHints.Print("docs-index", true, verbosity)` call at end of `src/Spectra.CLI/Commands/Docs/DocsIndexHandler.cs`
+- [x] T017 [P] [US1] Add `NextStepHints.Print("index", true, verbosity)` call at end of `src/Spectra.CLI/Commands/Index/IndexHandler.cs`
+- [x] T018 [US1] Verify hint suppression: confirm `--verbosity quiet` and piped output (`Console.IsOutputRedirected`) both suppress hints across all handlers
 
-**Checkpoint**: All commands show contextual hints after completion. Hints are suppressed with `--verbosity quiet`. US1 is complete and independently testable.
+**Checkpoint**: User Story 1 complete — all commands show relevant hints
 
 ---
 
 ## Phase 4: User Story 2 — Init: Configure Automation Directories (Priority: P2)
 
-**Goal**: Users can configure automation code directories during `spectra init` and manage them afterward via `spectra config add-automation-dir`, `remove-automation-dir`, and `list-automation-dirs`.
+**Goal**: Users configure automation code directories during init and manage them with config subcommands.
 
-**Independent Test**: Run `spectra config add-automation-dir ../tests` and verify the path appears in `spectra.config.json` under `coverage.automation_dirs`. Run `spectra config list-automation-dirs` to confirm.
-
-### Tests for User Story 2
-
-- [ ] T016 [P] [US2] Create `tests/Spectra.CLI.Tests/Commands/Config/AutomationDirCommandTests.cs` — test `add-automation-dir` writes path to `coverage.automation_dirs` array in a temp `spectra.config.json`
-- [ ] T017 [P] [US2] Add test in `AutomationDirCommandTests.cs` — verify `add-automation-dir` is idempotent (adding existing path prints notice, does not duplicate)
-- [ ] T018 [P] [US2] Add test in `AutomationDirCommandTests.cs` — verify `remove-automation-dir` removes an existing path from the array
-- [ ] T019 [P] [US2] Add test in `AutomationDirCommandTests.cs` — verify `remove-automation-dir` with nonexistent path returns warning
-- [ ] T020 [P] [US2] Add test in `AutomationDirCommandTests.cs` — verify `list-automation-dirs` outputs all configured paths; verify empty state message when no dirs configured
-- [ ] T021 [P] [US2] Add test in `AutomationDirCommandTests.cs` — verify all three subcommands return error when `spectra.config.json` does not exist
+**Independent Test**: Run `spectra init`, enter comma-separated paths at the automation prompt, verify `coverage.automation_dirs` is updated. Run `spectra config add-automation-dir`, `list-automation-dirs`, `remove-automation-dir` and verify each works.
 
 ### Implementation for User Story 2
 
-- [ ] T022 [P] [US2] Create `AddAutomationDirCommand` class in `src/Spectra.CLI/Commands/Config/AddAutomationDirCommand.cs` — subcommand `add-automation-dir` with required `path` argument; handler reads config JSON, navigates to `coverage.automation_dirs` array, checks for duplicate (idempotent no-op with notice), appends path, writes back
-- [ ] T023 [P] [US2] Create `RemoveAutomationDirCommand` class in `src/Spectra.CLI/Commands/Config/RemoveAutomationDirCommand.cs` — subcommand `remove-automation-dir` with required `path` argument; handler reads config JSON, removes path from array (warning if not found), writes back
-- [ ] T024 [P] [US2] Create `ListAutomationDirsCommand` class in `src/Spectra.CLI/Commands/Config/ListAutomationDirsCommand.cs` — subcommand `list-automation-dirs` with no arguments; handler reads config JSON, prints each path prefixed with `  - `, or "No automation directories configured" if empty/missing
-- [ ] T025 [US2] Register all three subcommands in `ConfigCommand` constructor in `src/Spectra.CLI/Commands/Config/ConfigCommand.cs` — add via `AddCommand(new AddAutomationDirCommand())`, etc.
-- [ ] T026 [US2] Add automation directory prompt to `InitHandler.ExecuteAsync()` in `src/Spectra.CLI/Commands/Init/InitHandler.cs` — after docs/tests directory setup and before AI provider setup: `TextPrompt` asking for comma-separated paths with examples, skip if `isInteractive == false`, parse and trim paths, write to `coverage.automation_dirs` in config JSON
-- [ ] T027 [US2] Wire `NextStepHints.Render("config", success, verbosity, AnsiConsole.Console)` into the three new config subcommand handlers
-- [ ] T028 [US2] Run full test suite (`dotnet test`) and verify all existing + new tests pass
+- [x] T019 [US2] Add automation directory prompt to `InitHandler.ExecuteAsync()` in `src/Spectra.CLI/Commands/Init/InitHandler.cs` — after existing setup, before doc index build; use `AnsiConsole.Prompt(new TextPrompt<string>())` with allow-empty; parse comma-separated input; write to config `coverage.automation_dirs`; skip when not interactive
+- [x] T020 [US2] Implement config JSON modification helper — create a private method in `ConfigHandler` (or a small utility) in `src/Spectra.CLI/Commands/Config/ConfigHandler.cs` that reads `spectra.config.json` as `JsonNode`, modifies a specific array field, and writes back preserving structure
+- [x] T021 [US2] Implement `AddAutomationDirAsync(string path)` in `src/Spectra.CLI/Commands/Config/ConfigHandler.cs` — read config, check for duplicate, append to `coverage.automation_dirs`, write back, print confirmation
+- [x] T022 [US2] Implement `RemoveAutomationDirAsync(string path)` in `src/Spectra.CLI/Commands/Config/ConfigHandler.cs` — read config, remove from `coverage.automation_dirs`, warn if not found, write back, print confirmation
+- [x] T023 [US2] Implement `ListAutomationDirsAsync()` in `src/Spectra.CLI/Commands/Config/ConfigHandler.cs` — read config, print each dir with `[exists]` or `[missing]` indicator based on `Directory.Exists()`
+- [x] T024 [US2] Register `add-automation-dir`, `remove-automation-dir`, `list-automation-dirs` subcommands in `src/Spectra.CLI/Commands/Config/ConfigCommand.cs` using System.CommandLine `Command` with appropriate arguments and handlers
+- [x] T025 [P] [US2] Write tests for automation dir init prompt in `tests/Spectra.CLI.Tests/Commands/InitCommandTests.cs` — verify config file updated with entered dirs, verify defaults when skipped
+- [x] T026 [P] [US2] Write tests for config subcommands in `tests/Spectra.CLI.Tests/Commands/ConfigCommandTests.cs` — add (success + duplicate), remove (success + not found), list (with existing + missing dirs)
 
-**Checkpoint**: Config subcommands work. Init prompts for automation dirs. Non-interactive mode skips the prompt. US2 is complete and independently testable.
+**Checkpoint**: User Story 2 complete — automation directories configurable via init and config commands
 
 ---
 
-## Phase 5: User Story 3 — Init: Configure Critic Model (Priority: P3)
+## Phase 5: User Story 3 — Init: Configure Critic Model (Priority: P2)
 
-**Goal**: Users can configure the grounding verification (critic) model during `spectra init` with a guided wizard. Critic pipeline is confirmed functional.
+**Goal**: Users enable grounding verification during init with guided provider selection.
 
-**Independent Test**: Run `spectra init`, select "Yes" for grounding verification, choose Google provider, verify `ai.critic` section in `spectra.config.json` has `enabled: true`, `provider: "google"`, `model: "gemini-2.0-flash"`.
-
-### Tests for User Story 3
-
-- [ ] T029 [P] [US3] Add test in `tests/Spectra.CLI.Tests/Commands/Init/InitCriticSetupTests.cs` — verify critic prompt writes correct `ai.critic` config for each provider option (google, anthropic, openai, same-as-primary)
-- [ ] T030 [P] [US3] Add test in `InitCriticSetupTests.cs` — verify selecting "No" for grounding verification results in `ai.critic.enabled: false` or section omitted
-- [ ] T031 [P] [US3] Add test in `InitCriticSetupTests.cs` — verify non-interactive mode skips critic prompt entirely
+**Independent Test**: Run `spectra init`, select "Yes" for grounding verification, pick a provider, verify `ai.critic` section in spectra.config.json has `enabled: true` with correct provider/model/api_key_env.
 
 ### Implementation for User Story 3
 
-- [ ] T032 [US3] Add critic setup prompts to `InitHandler.ExecuteAsync()` in `src/Spectra.CLI/Commands/Init/InitHandler.cs` — after AI provider setup: (1) `SelectionPrompt` "Enable grounding verification?" with Yes/No, (2) if Yes: `SelectionPrompt` for provider (google/anthropic/openai/same-as-primary) with descriptions, (3) `TextPrompt` for API key env var with default from `CriticConfig.GetDefaultApiKeyEnv()`, (4) check `Environment.GetEnvironmentVariable()` and warn if not set, (5) write `ai.critic` section to config JSON. Skip all if `isInteractive == false`.
-- [ ] T033 [US3] Verify critic pipeline end-to-end: trace `GenerateHandler.ShouldVerify()` → `VerifyTestsAsync()` → `CriticFactory.TryCreate()` → `CopilotCritic.VerifyTestAsync()` with a valid critic config. Confirm grounding verdicts appear in console output. Document findings and fix any issues found in `src/Spectra.CLI/Commands/Generate/GenerateHandler.cs` or `src/Spectra.CLI/Agent/Critic/CriticFactory.cs`
-- [ ] T034 [US3] Run full test suite (`dotnet test`) and verify all existing + new tests pass
+- [x] T027 [US3] Add critic configuration prompt to `InitHandler.ExecuteAsync()` in `src/Spectra.CLI/Commands/Init/InitHandler.cs` — after AI provider setup; show "Enable grounding verification?" prompt; skip if not interactive or if user skipped AI provider
+- [x] T028 [US3] Implement critic provider selection in `InitHandler` — use `SelectionPrompt<string>` with options: google (recommended), anthropic, openai, same as primary; map selection to `CriticConfig` fields using existing `GetEffectiveModel()` and `GetDefaultApiKeyEnv()` methods
+- [x] T029 [US3] Implement critic API key env var prompt in `InitHandler` — use `TextPrompt<string>` with default value from `CriticConfig.GetDefaultApiKeyEnv()`; handle "Same as primary" case (copy provider/model, skip API key prompt)
+- [x] T030 [US3] Write `ai.critic` section to config in `InitHandler` — modify the config JSON to add/update the critic block with `enabled`, `provider`, `model`, `api_key_env`; print confirmation message with provider/model and `--skip-critic` reminder
+- [x] T031 [P] [US3] Write tests for critic init prompt in `tests/Spectra.CLI.Tests/Commands/InitCommandTests.cs` — verify config updated with critic settings when enabled, verify critic absent/disabled when skipped, verify "same as primary" copies provider/model
 
-**Checkpoint**: Init wizard includes critic configuration. Critic pipeline confirmed functional during generation. US3 is complete and independently testable.
+**Checkpoint**: User Story 3 complete — critic model configurable through init
 
 ---
 
-## Phase 6: User Story 4 — Interactive Mode: Continue to Other Suites (Priority: P4)
+## Phase 6: User Story 4 — Interactive Mode Continuation (Priority: P3)
 
-**Goal**: After completing test generation in interactive mode, users can generate more for the same suite, switch to a different suite, create a new suite, or exit — without restarting the CLI.
+**Goal**: After generating tests for a suite, users can continue to other suites without restarting.
 
-**Independent Test**: Run `spectra ai generate` in interactive mode, complete generation for one suite, verify the continuation menu appears with all four options. Select "Switch to a different suite", pick another suite, verify generation flow restarts.
-
-### Tests for User Story 4
-
-- [ ] T035 [P] [US4] Create `tests/Spectra.CLI.Tests/Interactive/ContinuationSelectorTests.cs` — test that `Prompt()` returns `ContinuationResult` with `Action = Exit` when user selects "Done — exit"
-- [ ] T036 [P] [US4] Add test in `ContinuationSelectorTests.cs` — verify `Prompt()` returns `ContinuationResult` with `Action = SwitchSuite` and populated `SuiteName`/`SuitePath` when user selects "Switch to a different suite" and picks a suite
-- [ ] T037 [P] [US4] Add test in `ContinuationSelectorTests.cs` — verify `Prompt()` returns `ContinuationResult` with `Action = CreateSuite` and populated `SuiteName` when user enters a valid new suite name
-- [ ] T038 [P] [US4] Add test in `ContinuationSelectorTests.cs` — verify creating a suite with a name that already exists shows warning and returns `Action = GenerateMore` with existing suite
+**Independent Test**: Run `spectra ai generate` in interactive mode, complete one suite, verify continuation menu appears, select "Switch to a different suite", verify generation starts for the new suite, select "Done", verify session summary prints.
 
 ### Implementation for User Story 4
 
-- [ ] T039 [US4] Create `ContinuationAction` enum (`GenerateMore`, `SwitchSuite`, `CreateSuite`, `Exit`) and `ContinuationResult` record (`Action`, `SuiteName?`, `SuitePath?`) in `src/Spectra.CLI/Interactive/ContinuationSelector.cs`
-- [ ] T040 [US4] Create `ContinuationSelector` class in `src/Spectra.CLI/Interactive/ContinuationSelector.cs` — inject `IAnsiConsole` (pattern from `GapSelector`); `Prompt(string currentSuite, IReadOnlyList<SuiteInfo> availableSuites)` method: `SelectionPrompt` with 4 choices; if SwitchSuite → `SuiteSelector`-style suite picker; if CreateSuite → `TextPrompt` for name with validation (no special chars, check if exists → warn and offer existing), create directory; if GenerateMore → return current suite; if Exit → return Exit action
-- [ ] T041 [US4] Modify `GenerateHandler.ExecuteInteractiveModeAsync()` in `src/Spectra.CLI/Commands/Generate/GenerateHandler.cs` — wrap the existing interactive flow (suite selection through session completion) in a `do { ... } while (continuation.Action != ContinuationAction.Exit)` outer loop. After `session.Complete()`, call `ContinuationSelector.Prompt()`. On GenerateMore: create new session with same suite, re-enter loop. On SwitchSuite: create new session with selected suite (skip suite selection step), re-enter. On CreateSuite: create new session with new suite, re-enter. On Exit: break.
-- [ ] T042 [US4] Run full test suite (`dotnet test`) and verify all existing + new tests pass
+- [x] T032 [US4] Wrap the existing interactive generation flow in `GenerateHandler.ExecuteInteractiveModeAsync()` in `src/Spectra.CLI/Commands/Generate/GenerateHandler.cs` in an outer `while (true)` loop with a continuation menu after session completion
+- [x] T033 [US4] Implement continuation menu in `GenerateHandler` — use `SelectionPrompt<string>` with 4 options: "Generate more for {suite}", "Switch to a different suite", "Create a new suite", "Done — exit"; display remaining gaps before menu if any
+- [x] T034 [US4] Implement "Generate more" option — reset the `InteractiveSession`, restart inner loop focusing on remaining gaps for the same suite
+- [x] T035 [US4] Implement "Switch suite" option — show suite list via `SelectionPrompt` with test counts per suite, load selected suite's existing tests, restart generation flow
+- [x] T036 [US4] Implement "Create new suite" option — prompt for suite name via `TextPrompt<string>`, create directory, restart generation flow for new empty suite
+- [x] T037 [US4] Implement session tracking and summary — track list of suites worked on and total tests generated across all suites; on "Done — exit", print summary: "Session: {n} suites, {m} tests generated"
+- [x] T038 [US4] Ensure `--no-interaction` skips continuation — verify existing behavior preserved: direct mode and `--no-interaction` exit after first suite without showing menu
 
-**Checkpoint**: Interactive mode loops with continuation menu. All four options work correctly. US4 is complete and independently testable.
+**Checkpoint**: User Story 4 complete — multi-suite interactive sessions work
 
 ---
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-**Purpose**: Final validation and cleanup across all user stories.
+**Purpose**: Documentation, validation, and final quality
 
-- [ ] T043 Verify hint text content is accurate and helpful for each command — review all entries in the `NextStepHints` registry in `src/Spectra.CLI/Output/NextStepHints.cs` against the examples in spec.md
-- [ ] T044 Run full test suite (`dotnet test`) — confirm all tests pass (existing 984 + new tests)
-- [ ] T045 Update `CLAUDE.md` Recent Changes section with 013-cli-ux-improvements summary
+- [x] T039 Update CLAUDE.md Recent Changes — add 013-cli-ux-improvements entry documenting NextStepHints, automation dir config, critic init, interactive continuation
+- [x] T040 Run quickstart.md validation — execute the quickstart scenarios end-to-end to verify all features work as documented
+- [x] T041 Verify all handlers pass `--verbosity quiet` suppression — run each command with `-v quiet` and verify zero hint output
 
 ---
 
@@ -150,56 +137,46 @@
 
 ### Phase Dependencies
 
-- **Setup (Phase 1)**: Empty — existing project is ready
-- **Foundational (Phase 2)**: T001-T003 must complete before any user story — NextStepHints utility is used by all stories
-- **US1 (Phase 3)**: Depends on Phase 2 — wires hints into all command handlers
-- **US2 (Phase 4)**: Depends on Phase 2 — new config subcommands + init prompt
-- **US3 (Phase 5)**: Depends on Phase 2 — init critic prompt + pipeline verification
-- **US4 (Phase 6)**: Depends on Phase 2 — continuation selector + handler modification
+- **Setup (Phase 1)**: No dependencies — can start immediately
+- **Foundational (Phase 2)**: Depends on Phase 1 (T001-T002) — BLOCKS all user stories
+- **User Story 1 (Phase 3)**: Depends on Foundational (Phase 2)
+- **User Story 2 (Phase 4)**: Depends on Phase 1 only — can start in parallel with Phase 2
+- **User Story 3 (Phase 5)**: Depends on Phase 1 only — can start in parallel with Phase 2
+- **User Story 4 (Phase 6)**: No dependency on hint infrastructure — can start after Phase 1
 - **Polish (Phase 7)**: Depends on all user stories being complete
 
 ### User Story Dependencies
 
-- **User Story 1 (P1)**: Depends on Phase 2 only — no dependencies on other stories
-- **User Story 2 (P2)**: Depends on Phase 2 only — no dependencies on other stories
-- **User Story 3 (P3)**: Depends on Phase 2 only — no dependencies on other stories
-- **User Story 4 (P4)**: Depends on Phase 2 only — no dependencies on other stories
-
-All four user stories are fully independent and can be implemented in parallel after Phase 2.
+- **User Story 1 (P1)**: Depends on Foundational (hint content must exist before integrating)
+- **User Story 2 (P2)**: Independent — no dependency on hints or other stories
+- **User Story 3 (P2)**: Independent — no dependency on hints or other stories
+- **User Story 4 (P3)**: Independent — no dependency on hints (hints for generate are added in US1)
 
 ### Within Each User Story
 
-- Tests should be written first (T004-T007, T016-T021, T029-T031, T035-T038)
-- Implementation follows tests
-- Integration/wiring tasks last within each story
-- Full test suite run at story completion
+- Infrastructure/models before handler integration
+- Handler changes before tests
+- Core implementation before polish
 
 ### Parallel Opportunities
 
-- **Phase 2**: T001-T003 are sequential (same file)
-- **Phase 3 (US1)**: T004-T007 tests in parallel; T009-T014 handler wiring in parallel (different files)
-- **Phase 4 (US2)**: T016-T021 tests in parallel; T022-T024 command classes in parallel (different files)
-- **Phase 5 (US3)**: T029-T031 tests in parallel
-- **Phase 6 (US4)**: T035-T038 tests in parallel
-- **Cross-story**: US1, US2, US3, US4 can all run in parallel after Phase 2
+- T013-T017 can all run in parallel (different handler files)
+- T025, T026 can run in parallel (different test files)
+- T031 can run in parallel with T025/T026
+- US2, US3, US4 can all run in parallel after Phase 1 completes
+- US1 must wait for Phase 2 (hint content) but US2/US3/US4 do not
 
 ---
 
-## Parallel Example: User Story 2
+## Parallel Example: User Story 1
 
-```text
-# Launch all tests for US2 together:
-Task T016: "Test add-automation-dir writes path to config"
-Task T017: "Test add-automation-dir idempotent behavior"
-Task T018: "Test remove-automation-dir removes path"
-Task T019: "Test remove-automation-dir warning on nonexistent"
-Task T020: "Test list-automation-dirs output"
-Task T021: "Test error when config missing"
-
-# Launch all command implementations together:
-Task T022: "Create AddAutomationDirCommand"
-Task T023: "Create RemoveAutomationDirCommand"
-Task T024: "Create ListAutomationDirsCommand"
+```bash
+# After Phase 2 completes, these can all run in parallel (different handler files):
+Task T013: "Add hints to AnalyzeHandler.cs"
+Task T014: "Add hints to DashboardHandler.cs"
+Task T015: "Add hints to ValidateHandler.cs"
+Task T016: "Add hints to DocsIndexHandler.cs"
+Task T017: "Add hints to IndexHandler.cs"
 ```
 
 ---
@@ -208,27 +185,24 @@ Task T024: "Create ListAutomationDirsCommand"
 
 ### MVP First (User Story 1 Only)
 
-1. Complete Phase 2: Foundational (T001-T003) — NextStepHints utility
-2. Complete Phase 3: User Story 1 (T004-T015) — Wire hints into all handlers
-3. **STOP and VALIDATE**: Run any command and verify hints appear. Run with `--verbosity quiet` and verify suppression.
-4. Deploy/demo if ready — immediate user value from every command invocation.
+1. Complete Phase 1: Setup (T001-T002)
+2. Complete Phase 2: Foundational — hint content (T003-T010)
+3. Complete Phase 3: User Story 1 — integrate hints into all handlers (T011-T018)
+4. **STOP and VALIDATE**: Run several commands and verify hints appear
+5. Deploy/demo if ready
 
 ### Incremental Delivery
 
-1. Phase 2 → NextStepHints utility ready
-2. US1 → Hints on all commands (MVP!)
-3. US2 → Automation dir config during init + config subcommands
-4. US3 → Critic model config during init + pipeline verification
-5. US4 → Interactive continuation menu
-6. Polish → Final validation and CLAUDE.md update
+1. Setup + Foundational → Hint helper ready
+2. Add User Story 1 → Hints work everywhere → Deploy (MVP!)
+3. Add User Story 2 → Automation dir config works → Deploy
+4. Add User Story 3 → Critic init works → Deploy
+5. Add User Story 4 → Interactive continuation works → Deploy
+6. Polish → Documentation, final validation
 
-### Parallel Team Strategy
+### Recommended Order (Solo Developer)
 
-With multiple developers after Phase 2:
-- Developer A: User Story 1 (hints wiring — touches many files but only adds one line each)
-- Developer B: User Story 2 (config subcommands — self-contained new files)
-- Developer C: User Story 3 (init critic prompt — contained in InitHandler)
-- Developer D: User Story 4 (continuation selector — contained in Interactive/ + GenerateHandler)
+P1 (hints) → P2 (automation dirs) → P2 (critic init) → P3 (interactive continuation) → Polish
 
 ---
 
@@ -237,9 +211,6 @@ With multiple developers after Phase 2:
 - [P] tasks = different files, no dependencies
 - [Story] label maps task to specific user story for traceability
 - Each user story is independently completable and testable
-- Design decision D1: Use `--verbosity quiet` instead of new `--quiet` flag
-- Design decision D3: Continuation menu is handler-level outer loop, not new session states
-- Design decision D4: Hints are static dictionary, no file I/O
-- Design decision D5: Config modification via JsonDocument read-modify-write
 - Commit after each task or logical group
 - Stop at any checkpoint to validate story independently
+- Total: 41 tasks across 7 phases

@@ -43,5 +43,36 @@ public sealed class ConfigCommand : Command
                 showRaw,
                 context.GetCancellationToken());
         });
+
+        // Automation directory subcommands
+        var addAutoDirCmd = new Command("add-automation-dir", "Add an automation code directory for coverage analysis");
+        var addPathArg = new Argument<string>("path", "Directory path to add");
+        addAutoDirCmd.AddArgument(addPathArg);
+        addAutoDirCmd.SetHandler(async (context) =>
+        {
+            var path = context.ParseResult.GetValueForArgument(addPathArg);
+            var handler = new ConfigHandler();
+            context.ExitCode = await handler.AddAutomationDirAsync(path, context.GetCancellationToken());
+        });
+        AddCommand(addAutoDirCmd);
+
+        var removeAutoDirCmd = new Command("remove-automation-dir", "Remove an automation code directory");
+        var removePathArg = new Argument<string>("path", "Directory path to remove");
+        removeAutoDirCmd.AddArgument(removePathArg);
+        removeAutoDirCmd.SetHandler(async (context) =>
+        {
+            var path = context.ParseResult.GetValueForArgument(removePathArg);
+            var handler = new ConfigHandler();
+            context.ExitCode = await handler.RemoveAutomationDirAsync(path, context.GetCancellationToken());
+        });
+        AddCommand(removeAutoDirCmd);
+
+        var listAutoDirsCmd = new Command("list-automation-dirs", "List configured automation code directories");
+        listAutoDirsCmd.SetHandler(async (context) =>
+        {
+            var handler = new ConfigHandler();
+            context.ExitCode = await handler.ListAutomationDirsAsync(context.GetCancellationToken());
+        });
+        AddCommand(listAutoDirsCmd);
     }
 }

@@ -1,5 +1,9 @@
+using System.Text.Json;
 using Spectra.CLI.Dashboard;
 using Spectra.CLI.Infrastructure;
+using Spectra.CLI.Output;
+using Spectra.Core.Models.Config;
+using Spectra.Core.Models.Dashboard;
 
 namespace Spectra.CLI.Commands.Dashboard;
 
@@ -21,6 +25,7 @@ public sealed class DashboardHandler
         string outputPath,
         string? title,
         string? templatePath,
+        bool preview = false,
         CancellationToken ct = default)
     {
         var currentDir = Directory.GetCurrentDirectory();
@@ -33,34 +38,75 @@ public sealed class DashboardHandler
 
         try
         {
-            if (_verbosity >= VerbosityLevel.Normal)
+            // Load config for branding
+            BrandingConfig? brandingConfig = null;
+            var configPath = Path.Combine(currentDir, "spectra.config.json");
+            if (File.Exists(configPath))
             {
-                Console.WriteLine("Collecting dashboard data...");
+                try
+                {
+                    var configJson = await File.ReadAllTextAsync(configPath, ct);
+                    var config = JsonSerializer.Deserialize<SpectraConfig>(configJson, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                    brandingConfig = config?.Dashboard.Branding;
+                }
+                catch
+                {
+                    // Config parsing failure should not block dashboard generation
+                }
             }
 
-            // Collect data
-            var collector = new DataCollector(currentDir);
-            var data = await collector.CollectAsync();
-
-            // Override repository name with title if provided
-            if (!string.IsNullOrEmpty(title))
+            // Log branding status
+            if (_verbosity >= VerbosityLevel.Normal && brandingConfig is not null)
             {
-                data = data with { Repository = title };
+                var name = brandingConfig.CompanyName ?? "custom";
+                Console.WriteLine($"Branding: Applying \"{name}\" branding" +
+                    (brandingConfig.Theme?.Equals("dark", StringComparison.OrdinalIgnoreCase) == true ? " with dark theme" : ""));
             }
 
-            // Report statistics
-            if (_verbosity >= VerbosityLevel.Normal)
-            {
-                Console.WriteLine($"  Suites: {data.Suites.Count}");
-                Console.WriteLine($"  Tests: {data.Tests.Count}");
-                Console.WriteLine($"  Runs: {data.Runs.Count}");
-            }
+            DashboardData data;
 
-            if (data.Suites.Count == 0)
+            if (preview)
             {
-                Console.WriteLine();
-                Console.WriteLine("No test suites found. Run 'spectra index' to generate indexes.");
-                return ExitCodes.Error;
+                if (_verbosity >= VerbosityLevel.Normal)
+                {
+                    Console.WriteLine("Preview mode: using sample data");
+                }
+                data = SampleDataFactory.CreateSampleData();
+            }
+            else
+            {
+                if (_verbosity >= VerbosityLevel.Normal)
+                {
+                    Console.WriteLine("Collecting dashboard data...");
+                }
+
+                // Collect data
+                var collector = new DataCollector(currentDir);
+                data = await collector.CollectAsync();
+
+                // Override repository name with title if provided
+                if (!string.IsNullOrEmpty(title))
+                {
+                    data = data with { Repository = title };
+                }
+
+                // Report statistics
+                if (_verbosity >= VerbosityLevel.Normal)
+                {
+                    Console.WriteLine($"  Suites: {data.Suites.Count}");
+                    Console.WriteLine($"  Tests: {data.Tests.Count}");
+                    Console.WriteLine($"  Runs: {data.Runs.Count}");
+                }
+
+                if (data.Suites.Count == 0 && !preview)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("No test suites found. Run 'spectra index' to generate indexes.");
+                    return ExitCodes.Error;
+                }
             }
 
             if (_dryRun)
@@ -70,6 +116,10 @@ public sealed class DashboardHandler
                 Console.WriteLine($"  index.html with {data.Tests.Count} tests embedded");
                 Console.WriteLine($"  styles/main.css");
                 Console.WriteLine($"  scripts/app.js");
+                if (brandingConfig is not null)
+                {
+                    Console.WriteLine($"  branding: {brandingConfig.CompanyName ?? "default"}");
+                }
                 return ExitCodes.Success;
             }
 
@@ -81,8 +131,16 @@ public sealed class DashboardHandler
             }
 
             var generator = new DashboardGenerator(
-                templatePath is not null ? Path.Combine(templatePath, "index.html") : null);
+                templatePath is not null ? Path.Combine(templatePath, "index.html") : null,
+                brandingConfig,
+                currentDir);
             await generator.GenerateAsync(data, outputPath);
+
+            // Report branding warnings
+            foreach (var warning in generator.BrandingWarnings)
+            {
+                Console.WriteLine($"Branding: Warning — {warning}");
+            }
 
             if (_verbosity >= VerbosityLevel.Normal)
             {
@@ -94,6 +152,7 @@ public sealed class DashboardHandler
                 Console.WriteLine($"Or serve it locally:  npx serve {relativePath}");
             }
 
+            NextStepHints.Print("dashboard", true, _verbosity, new HintContext { OutputPath = Path.GetRelativePath(currentDir, outputPath) });
             return ExitCodes.Success;
         }
         catch (Exception ex)

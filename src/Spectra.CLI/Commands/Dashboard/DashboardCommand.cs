@@ -24,20 +24,26 @@ public sealed class DashboardCommand : Command
             ["--template"],
             "Path to custom dashboard template directory");
 
+        var previewOption = new Option<bool>(
+            ["--preview"],
+            "Generate dashboard with sample data for branding verification");
+
         AddOption(outputOption);
         AddOption(titleOption);
         AddOption(templateOption);
+        AddOption(previewOption);
 
         this.SetHandler(async (context) =>
         {
             var output = context.ParseResult.GetValueForOption(outputOption)!;
             var title = context.ParseResult.GetValueForOption(titleOption);
             var template = context.ParseResult.GetValueForOption(templateOption);
+            var preview = context.ParseResult.GetValueForOption(previewOption);
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
             var dryRun = context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption);
 
             var handler = new DashboardHandler(verbosity, dryRun);
-            context.ExitCode = await handler.ExecuteAsync(output, title, template, context.GetCancellationToken());
+            context.ExitCode = await handler.ExecuteAsync(output, title, template, preview, context.GetCancellationToken());
         });
     }
 }

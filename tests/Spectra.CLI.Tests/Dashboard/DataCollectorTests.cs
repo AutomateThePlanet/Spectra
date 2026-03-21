@@ -471,6 +471,116 @@ public class DataCollectorTests : IDisposable
 
     #endregion
 
+    #region Coverage Fragment Anchor Tests
+
+    [Fact]
+    public async Task CollectAsync_SourceRefsWithFragmentAnchors_MatchesDocPaths()
+    {
+        // Create docs directory with a doc file
+        var docsDir = Path.Combine(_testDir, "docs");
+        Directory.CreateDirectory(docsDir);
+        await File.WriteAllTextAsync(Path.Combine(docsDir, "checkout.md"), "# Checkout\nPayment flow docs.");
+
+        // Create a suite with test entries that have fragment-anchored source_refs
+        var index = new MetadataIndex
+        {
+            Suite = "checkout",
+            GeneratedAt = DateTime.UtcNow,
+            Tests =
+            [
+                new TestIndexEntry
+                {
+                    Id = "TC-001", Title = "Payment Flow", File = "TC-001.md",
+                    Priority = "high", Tags = [],
+                    SourceRefs = ["docs/checkout.md#Payment-Flow"]
+                },
+                new TestIndexEntry
+                {
+                    Id = "TC-002", Title = "Cart Total", File = "TC-002.md",
+                    Priority = "high", Tags = [],
+                    SourceRefs = ["docs/checkout.md#Cart-Total"]
+                }
+            ]
+        };
+        await WriteIndexAsync("checkout", index);
+
+        var collector = new DataCollector(_testDir);
+        var data = await collector.CollectAsync();
+
+        // Documentation coverage should be non-zero since tests reference docs/checkout.md via fragments
+        Assert.NotNull(data.CoverageSummary);
+        Assert.True(data.CoverageSummary.Documentation.Percentage > 0,
+            "Documentation coverage should be non-zero when source_refs have fragment anchors");
+        Assert.Equal(1, data.CoverageSummary.Documentation.Covered);
+        Assert.Equal(1, data.CoverageSummary.Documentation.Total);
+        Assert.Equal(100m, data.CoverageSummary.Documentation.Percentage);
+    }
+
+    [Fact]
+    public async Task CollectAsync_SourceRefsWithoutFragments_StillMatches()
+    {
+        var docsDir = Path.Combine(_testDir, "docs");
+        Directory.CreateDirectory(docsDir);
+        await File.WriteAllTextAsync(Path.Combine(docsDir, "checkout.md"), "# Checkout");
+
+        var index = new MetadataIndex
+        {
+            Suite = "checkout",
+            GeneratedAt = DateTime.UtcNow,
+            Tests =
+            [
+                new TestIndexEntry
+                {
+                    Id = "TC-001", Title = "Test 1", File = "TC-001.md",
+                    Priority = "high", Tags = [],
+                    SourceRefs = ["docs/checkout.md"]
+                }
+            ]
+        };
+        await WriteIndexAsync("checkout", index);
+
+        var collector = new DataCollector(_testDir);
+        var data = await collector.CollectAsync();
+
+        Assert.NotNull(data.CoverageSummary);
+        Assert.Equal(1, data.CoverageSummary.Documentation.Covered);
+    }
+
+    [Fact]
+    public async Task CollectAsync_SourceRefToNonExistentDoc_DoesNotInflateCoverage()
+    {
+        var docsDir = Path.Combine(_testDir, "docs");
+        Directory.CreateDirectory(docsDir);
+        await File.WriteAllTextAsync(Path.Combine(docsDir, "real.md"), "# Real Doc");
+
+        var index = new MetadataIndex
+        {
+            Suite = "checkout",
+            GeneratedAt = DateTime.UtcNow,
+            Tests =
+            [
+                new TestIndexEntry
+                {
+                    Id = "TC-001", Title = "Test 1", File = "TC-001.md",
+                    Priority = "high", Tags = [],
+                    SourceRefs = ["docs/nonexistent.md#Section"]
+                }
+            ]
+        };
+        await WriteIndexAsync("checkout", index);
+
+        var collector = new DataCollector(_testDir);
+        var data = await collector.CollectAsync();
+
+        Assert.NotNull(data.CoverageSummary);
+        // The real doc exists but isn't referenced, the referenced doc doesn't exist
+        Assert.Equal(0, data.CoverageSummary.Documentation.Covered);
+        Assert.Equal(1, data.CoverageSummary.Documentation.Total);
+        Assert.Equal(0m, data.CoverageSummary.Documentation.Percentage);
+    }
+
+    #endregion
+
     private async Task CreateSuiteIndexAsync(string suiteName, string[] testIds)
     {
         var index = new MetadataIndex

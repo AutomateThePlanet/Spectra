@@ -1,87 +1,70 @@
-# Research: Open-Source Readiness
+# Research: Open Source Ready
 
-**Feature**: 014-open-source-ready
-**Date**: 2026-03-21
+**Date**: 2026-03-21 | **Feature**: 014-open-source-ready
 
-## Current State Audit
+## Finding 1: NuGet Packaging Already Configured
 
-### Decision: README Redesign Approach
-**Chosen**: Full rewrite following Testimize progressive disclosure pattern
-**Rationale**: The current README (90 lines) is functional but plain. Testimize uses banner + badges + emoji features + comparison tables + code examples. SPECTRA should match this visual quality for the AutomateThePlanet ecosystem consistency.
+**Decision**: Use existing .csproj packaging configuration. No changes needed to PackAsTool/PackageId/ToolCommandName.
+
+**Rationale**: Both projects are already fully configured:
+- `Spectra.CLI`: PackAsTool=true, ToolCommandName=spectra, PackageId=Spectra.CLI, Version=1.11.1
+- `Spectra.MCP`: PackAsTool=true, ToolCommandName=spectra-mcp, PackageId=Spectra.MCP, Version=1.11.0
+
+**Alternatives considered**: Centralizing version in Directory.Build.props — rejected because CLI and MCP have different versions intentionally.
+
+## Finding 2: Existing Infrastructure Inventory
+
+**Decision**: Leverage existing files, don't recreate. Only add what's missing.
+
+**Rationale**: Research found these already exist and are well-configured:
+- LICENSE — MIT, correct copyright (Automate The Planet Ltd.)
+- .editorconfig — 59 lines, full C# 12 config with naming conventions
+- CONTRIBUTING.md — 44 lines, build/test/PR instructions
+- docs/ — 17 guide files covering all major features
+- README.md — 97 lines, has architecture diagram, ecosystem table, doc links
+
+**Missing** (to create):
+- `.github/workflows/ci.yml` — no CI pipeline
+- `.github/workflows/publish.yml` — no release pipeline
+- `.github/ISSUE_TEMPLATE/` — no issue templates
+- `.github/pull_request_template.md` — no PR template
+- `.github/dependabot.yml` — no dependency updates
+- README visual redesign (existing is functional but plain)
+
+## Finding 3: Test Failure Analysis
+
+**Decision**: Fix 20 failing tests in Spectra.CLI.Tests. Root causes are auth-dependent tests and integration tests requiring external setup.
+
+**Rationale**: From the test run:
+- 7 `CriticFactoryTests` failures — test `TryCreate_ValidProvider_NoApiKey_Fails` for various providers. These expect the CriticFactory to fail when no API key env var is set, but the current implementation uses CopilotCritic which doesn't validate API keys at creation time.
+- 1 `QuickstartWorkflowTests` failure — `Step6_Show_DisplaysTestDetails` likely needs test data setup.
+- 1 `GenerateCommandTests` failure — `Generate_WithExistingTests_AvoidsIdConflict` likely a test isolation issue.
+- 11 other assorted failures — need individual diagnosis.
+
+**Alternatives considered**: Skipping auth-dependent tests — rejected per spec (no unexplained skips).
+
+## Finding 4: Version Strategy for Publishing
+
+**Decision**: Use git tag to set package version at build time via `/p:Version=$VERSION`.
+
+**Rationale**: The .csproj files already have hardcoded versions (1.11.1, 1.11.0). The publish workflow will override these with the tag version using `dotnet pack /p:Version=$VERSION`. This means:
+- Development builds use the .csproj version
+- Release builds use the git tag version
+- No need to maintain version in two places
+
 **Alternatives considered**:
-- Minimal update (add badges only) — rejected: doesn't meet the visual standard set by Testimize
-- GitHub Pages docs site — rejected as future enhancement; README is the priority
+- GitVersion tool — rejected (adds complexity, requires git history analysis)
+- Manual version bump commits — rejected (error-prone, tag is authoritative)
 
-### Decision: CI Workflow Configuration
-**Chosen**: Single `ci.yml` workflow on ubuntu-latest with `dotnet restore → build → test → upload artifacts`
-**Rationale**: Standard .NET CI pattern. Ubuntu is fastest/cheapest. Single workflow keeps configuration simple.
-**Alternatives considered**:
-- Matrix build (Windows + Linux + macOS) — rejected: adds cost and complexity; defer until cross-platform issues emerge
-- Separate build and test workflows — rejected: unnecessary split for a single-solution project
+## Finding 5: README Style Reference (Testimize)
 
-### Decision: NuGet Version Strategy
-**Chosen**: Extract version from git tag in the publish workflow using `${GITHUB_REF_NAME#v}` to strip the `v` prefix, passed via `/p:Version=`
-**Rationale**: Git tags are the source of truth for releases. No need to maintain version in multiple places. The `.csproj` files already have `PackAsTool=true` and correct `ToolCommandName` values.
-**Alternatives considered**:
-- GitVersion tool — rejected: over-engineered for this project's needs (Principle V: YAGNI)
-- Manual version in Directory.Build.props — rejected: creates risk of tag/prop version mismatch
+**Decision**: Follow Testimize README structure: centered banner, badge row, emoji-icon value props, feature blocks with headings, concise quickstart.
 
-### Decision: Two NuGet Packages (not three)
-**Chosen**: Publish `Spectra.CLI` and `Spectra.MCP` only
-**Rationale**: `Spectra.Core` is a shared library consumed internally by CLI and MCP. It's not useful standalone. Publishing it would create a public API surface to maintain.
-**Alternatives considered**:
-- Publish all three projects — rejected: Core has no standalone use case
-- Single unified package — rejected: MCP server should be independently installable
+**Rationale**: Testimize (https://github.com/AutomateThePlanet/Testimize) from the same organization provides a proven, visually appealing template. Key elements to replicate:
+- Full-width banner image (centered)
+- Badge row with shields.io badges
+- Value proposition section with emoji icons
+- Feature sections with emoji headings and brief descriptions
+- Clean quickstart with code blocks
 
-### Decision: Documentation Strategy
-**Chosen**: Keep existing `docs/` folder structure as-is; verify links and content quality
-**Rationale**: All 16 documentation files are substantive (58-430 lines each). No stubs detected. The structure already covers getting started, CLI reference, configuration, test format, coverage, profiles, grounding, document index, deployment guides, and architecture.
-**Alternatives considered**:
-- Add deployment/cloudflare-pages-setup.md — already covered by dashboard.yml.template documentation
-- Generate docs site with docfx/mkdocs — deferred to future enhancement
-
-### Decision: License Approach
-**Chosen**: MIT license at repo root only, no individual file headers
-**Rationale**: The LICENSE file already contains correct MIT text with "Copyright (c) 2026 Automate The Planet Ltd." Adding headers to 400+ source files is noisy, error-prone, and not required by MIT license terms.
-**Alternatives considered**:
-- SPDX headers in every file — rejected: maintenance burden outweighs legal benefit for MIT
-
-### Decision: .editorconfig
-**Chosen**: Keep existing .editorconfig as-is (59 lines, comprehensive C# 12 rules)
-**Rationale**: Already covers naming conventions, code style, indentation (4 for code, 2 for JSON/YAML/XML), and code quality warnings. No gaps identified.
-**Alternatives considered**:
-- Add more rules — rejected: current set is comprehensive and matches CLAUDE.md code style guidelines
-
-## Existing Asset Inventory
-
-| Asset | Status | Action |
-|-------|--------|--------|
-| README.md | Exists (90 lines, plain) | Full rewrite |
-| LICENSE | Exists (MIT, correct) | Verify only |
-| CONTRIBUTING.md | Exists (basic) | Expand |
-| .editorconfig | Exists (comprehensive) | Verify only |
-| Directory.Build.props | Exists (v0.1.0) | Verify only |
-| assets/spectra_github_readme_banner.png | Exists (463 KB) | Use in README |
-| docs/ (16 files) | Exists (all substantive) | Link from README |
-| .github/workflows/ci.yml | Missing | Create |
-| .github/workflows/publish.yml | Missing | Create |
-| .github/ISSUE_TEMPLATE/ | Missing | Create |
-| .github/PULL_REQUEST_TEMPLATE.md | Missing | Create |
-| .github/dependabot.yml | Missing | Create |
-| .github/workflows/dashboard.yml.template | Exists | Keep (not part of this feature) |
-
-## Test Health Research
-
-Test suite composition:
-- **Spectra.Core.Tests**: ~349 unit tests (parsing, validation, coverage, index operations)
-- **Spectra.CLI.Tests**: ~329 integration tests (commands, dashboard, source, coverage)
-- **Spectra.MCP.Tests**: ~306 tests (tools, integration flows, reports)
-- **Total**: ~984 tests
-
-Common test failure patterns in .NET projects:
-- Path separator issues (Windows backslash vs Linux forward slash)
-- Missing test fixtures or temp directory assumptions
-- Environment-dependent configuration loading
-- DateTime/timezone assumptions
-
-Mitigation strategy: Run `dotnet test`, categorize failures, fix in order of frequency.
+**Alternatives considered**: Custom design — rejected (consistency with org style is better).

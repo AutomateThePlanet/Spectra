@@ -259,4 +259,46 @@ public class InitCommandTests : IDisposable
         var content = await File.ReadAllTextAsync(agentPath);
         Assert.Contains("<!-- SPECTRA Execution Agent v1.0.0 -->", content);
     }
+
+    [Fact]
+    public async Task HandleAsync_CreatesDeployWorkflow()
+    {
+        // Arrange
+        var handler = new InitHandler(_logger, _testDir);
+
+        // Act
+        var exitCode = await handler.HandleAsync(force: false);
+
+        // Assert
+        Assert.Equal(ExitCodes.Success, exitCode);
+
+        var workflowPath = Path.Combine(_testDir, ".github", "workflows", "deploy-dashboard.yml");
+        Assert.True(File.Exists(workflowPath), "Deploy workflow should exist");
+
+        var content = await File.ReadAllTextAsync(workflowPath);
+        Assert.Contains("Deploy SPECTRA Dashboard", content);
+        Assert.Contains("cloudflare/wrangler-action", content);
+        // Verify no actual secrets embedded
+        Assert.DoesNotContain("sk-", content);
+        Assert.DoesNotContain("ghp_", content);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ExistingDeployWorkflow_DoesNotOverwrite()
+    {
+        // Arrange
+        var handler = new InitHandler(_logger, _testDir);
+        var workflowDir = Path.Combine(_testDir, ".github", "workflows");
+        Directory.CreateDirectory(workflowDir);
+        var workflowPath = Path.Combine(workflowDir, "deploy-dashboard.yml");
+        await File.WriteAllTextAsync(workflowPath, "# Custom workflow");
+
+        // Act
+        var exitCode = await handler.HandleAsync(force: false);
+
+        // Assert
+        Assert.Equal(ExitCodes.Success, exitCode);
+        var content = await File.ReadAllTextAsync(workflowPath);
+        Assert.Equal("# Custom workflow", content);
+    }
 }

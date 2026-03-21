@@ -14,7 +14,7 @@ namespace Spectra.CLI.Tests.Integration;
 /// <summary>
 /// Tests the complete quickstart workflow as documented.
 /// </summary>
-[Collection("Sequential Command Tests")]
+[Collection("WorkingDirectory")]
 public class QuickstartWorkflowTests : IDisposable
 {
     private readonly string _testDir;
@@ -180,6 +180,7 @@ Result";
         var testContent = @"---
 id: TC-001
 priority: high
+tags: []
 ---
 # Test checkout
 
@@ -190,7 +191,19 @@ priority: high
 Result";
 
         await File.WriteAllTextAsync(Path.Combine(suiteDir, "TC-001.md"), testContent);
-        await command.InvokeAsync(["index"]);
+
+        // Build index with correct relative file path (suite/filename)
+        var indexContent = JsonSerializer.Serialize(new
+        {
+            suite = "checkout",
+            generated_at = DateTime.UtcNow,
+            test_count = 1,
+            tests = new[]
+            {
+                new { id = "TC-001", title = "Test checkout", priority = "high", file = "checkout/TC-001.md", tags = Array.Empty<string>() }
+            }
+        }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
+        await File.WriteAllTextAsync(Path.Combine(suiteDir, "_index.json"), indexContent);
 
         // Show test
         var showResult = await command.InvokeAsync(["show", "TC-001"]);

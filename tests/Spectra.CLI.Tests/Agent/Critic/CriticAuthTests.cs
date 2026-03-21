@@ -4,137 +4,27 @@ using Spectra.Core.Models.Config;
 
 namespace Spectra.CLI.Tests.Agent.Critic;
 
+/// <summary>
+/// Tests for CriticFactory and CriticCreateResult after Copilot SDK consolidation.
+/// Auth is handled by the Copilot SDK at runtime, not at factory level.
+/// </summary>
 public class CriticAuthTests
 {
-    [Theory]
-    [InlineData("google", "GOOGLE_API_KEY")]
-    [InlineData("openai", "OPENAI_API_KEY")]
-    [InlineData("anthropic", "ANTHROPIC_API_KEY")]
-    [InlineData("github", "GITHUB_TOKEN")]
-    public void TryCreate_MissingApiKey_ReturnsAuthError(string provider, string envVar)
-    {
-        // Ensure the env var is not set
-        var originalValue = Environment.GetEnvironmentVariable(envVar);
-        Environment.SetEnvironmentVariable(envVar, null);
-
-        try
-        {
-            var config = new CriticConfig
-            {
-                Enabled = true,
-                Provider = provider
-            };
-
-            var result = CriticFactory.TryCreate(config);
-
-            Assert.False(result.Success);
-            Assert.Contains("key not found", result.ErrorMessage?.ToLowerInvariant() ?? "");
-            Assert.NotEmpty(result.HelpInstructions);
-        }
-        finally
-        {
-            // Restore the env var
-            Environment.SetEnvironmentVariable(envVar, originalValue);
-        }
-    }
-
     [Fact]
-    public void TryCreate_MissingApiKey_IncludesHelpInstructions()
+    public void TryCreate_EnabledConfig_Succeeds_RegardlessOfEnvVars()
     {
-        var originalValue = Environment.GetEnvironmentVariable("GOOGLE_API_KEY");
-        Environment.SetEnvironmentVariable("GOOGLE_API_KEY", null);
-
-        try
-        {
-            var config = new CriticConfig
-            {
-                Enabled = true,
-                Provider = "google"
-            };
-
-            var result = CriticFactory.TryCreate(config);
-
-            Assert.False(result.Success);
-            Assert.Contains(result.HelpInstructions, h => h.Contains("GOOGLE_API_KEY"));
-            Assert.Contains(result.HelpInstructions, h => h.Contains("https://"));
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable("GOOGLE_API_KEY", originalValue);
-        }
-    }
-
-    [Fact]
-    public void TryCreate_CustomApiKeyEnv_ChecksCustomEnvVar()
-    {
-        var customEnvVar = "MY_CUSTOM_CRITIC_KEY";
-        var originalValue = Environment.GetEnvironmentVariable(customEnvVar);
-        Environment.SetEnvironmentVariable(customEnvVar, null);
-
-        try
-        {
-            var config = new CriticConfig
-            {
-                Enabled = true,
-                Provider = "openai",
-                ApiKeyEnv = customEnvVar
-            };
-
-            var result = CriticFactory.TryCreate(config);
-
-            Assert.False(result.Success);
-            Assert.Contains(customEnvVar, result.HelpInstructions.FirstOrDefault() ?? "");
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable(customEnvVar, originalValue);
-        }
-    }
-
-    [Fact]
-    public void TryCreate_UnsupportedProvider_ReturnsProviderError()
-    {
+        // After Copilot SDK consolidation, factory doesn't check API keys.
+        // The Copilot SDK handles authentication at runtime.
         var config = new CriticConfig
         {
             Enabled = true,
-            Provider = "unsupported-provider"
+            Provider = "openai"
         };
 
         var result = CriticFactory.TryCreate(config);
 
-        Assert.False(result.Success);
-        Assert.Contains("Unknown", result.ErrorMessage ?? "");
-        Assert.Contains(result.HelpInstructions, h => h.Contains("google") || h.Contains("Supported"));
-    }
-
-    [Fact]
-    public void TryCreate_EmptyProvider_ReturnsProviderError()
-    {
-        var config = new CriticConfig
-        {
-            Enabled = true,
-            Provider = ""
-        };
-
-        var result = CriticFactory.TryCreate(config);
-
-        Assert.False(result.Success);
-        Assert.Contains("provider", result.ErrorMessage?.ToLowerInvariant() ?? "");
-    }
-
-    [Fact]
-    public void TryCreate_NullProvider_ReturnsProviderError()
-    {
-        var config = new CriticConfig
-        {
-            Enabled = true,
-            Provider = null
-        };
-
-        var result = CriticFactory.TryCreate(config);
-
-        Assert.False(result.Success);
-        Assert.Contains("provider", result.ErrorMessage?.ToLowerInvariant() ?? "");
+        Assert.True(result.Success);
+        Assert.NotNull(result.Critic);
     }
 
     [Fact]
@@ -162,33 +52,23 @@ public class CriticAuthTests
     }
 
     [Theory]
-    [InlineData("google", "GOOGLE_API_KEY")]
-    [InlineData("openai", "OPENAI_API_KEY")]
-    [InlineData("anthropic", "ANTHROPIC_API_KEY")]
-    [InlineData("github", "GITHUB_TOKEN")]
-    public void TryCreate_WithApiKey_ReturnsSuccess(string provider, string envVar)
+    [InlineData("github-models")]
+    [InlineData("openai")]
+    [InlineData("anthropic")]
+    [InlineData("google")]
+    public void TryCreate_WithProvider_ReturnsSuccess(string provider)
     {
-        var originalValue = Environment.GetEnvironmentVariable(envVar);
-        Environment.SetEnvironmentVariable(envVar, "test-api-key-12345");
-
-        try
+        var config = new CriticConfig
         {
-            var config = new CriticConfig
-            {
-                Enabled = true,
-                Provider = provider
-            };
+            Enabled = true,
+            Provider = provider
+        };
 
-            var result = CriticFactory.TryCreate(config);
+        var result = CriticFactory.TryCreate(config);
 
-            Assert.True(result.Success);
-            Assert.NotNull(result.Critic);
-            Assert.Equal(provider, result.ProviderName);
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable(envVar, originalValue);
-        }
+        Assert.True(result.Success);
+        Assert.NotNull(result.Critic);
+        Assert.Equal(provider, result.ProviderName);
     }
 
     [Fact]
@@ -213,6 +93,29 @@ public class CriticAuthTests
         Assert.Equal("test-provider", result.ProviderName);
         Assert.Equal("Test error", result.ErrorMessage);
         Assert.Equal(2, result.HelpInstructions.Count);
+    }
+
+    [Fact]
+    public void CriticCreateResult_Failed_EmptyHelp_HasEmptyList()
+    {
+        var result = CriticCreateResult.Failed("provider", "Error");
+
+        Assert.False(result.Success);
+        Assert.Empty(result.HelpInstructions);
+    }
+
+    [Fact]
+    public async Task MockCritic_IsAvailable_ReturnsTrue()
+    {
+        var critic = new MockCritic();
+        Assert.True(await critic.IsAvailableAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public void MockCritic_ModelName_ReturnsExpected()
+    {
+        var critic = new MockCritic();
+        Assert.Equal("mock-model", critic.ModelName);
     }
 
     private sealed class MockCritic : ICriticRuntime

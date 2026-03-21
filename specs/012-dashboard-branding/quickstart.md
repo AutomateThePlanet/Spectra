@@ -1,90 +1,127 @@
-# Quickstart: SPECTRA Branding & Design System
+# Quickstart: Dashboard Branding & Theming
 
-**Feature**: 012-dashboard-branding
-**Date**: 2026-03-21
+**Feature**: 012-dashboard-branding | **Date**: 2026-03-21
+
+## What This Feature Adds
+
+Dashboard branding and theming customization:
+1. **Company branding** — logo, company name, favicon replace default Spectra identity
+2. **Light/dark themes** — two built-in theme presets
+3. **Custom colors** — override individual color values via config
+4. **Custom CSS** — inject your own stylesheet for full control
+5. **Preview mode** — verify branding quickly with sample data
 
 ## Prerequisites
 
-- .NET 8+ SDK installed
-- Brand asset files present in `assets/` directory (already committed)
-- Access to the `dashboard-site/` template directory
+A `spectra.config.json` file must exist in your project root.
 
-## Implementation Order
+## Quick Setup
 
-### Step 1: Copy brand assets into dashboard template
+Add a `branding` section to your dashboard config:
 
-Copy `spectra_dashboard_banner.png` and `spectra_favicon.png` from `assets/` into `dashboard-site/assets/` so they're included in every generated site.
-
-### Step 2: Update dashboard-site/index.html
-
-- Add favicon `<link>` tag in `<head>`
-- Replace the text title in the nav bar with an `<img>` tag for the dashboard banner
-- Update Google Fonts import URL from DM Sans/IBM Plex Sans to Inter
-
-### Step 3: Update dashboard-site/styles/main.css
-
-- Replace `:root` CSS variables with new design tokens
-- Update all component styles to use new variable names
-- Add new component classes (status badges, priority badges, nav tabs)
-- Update typography to Inter font family
-- Add responsive layout rules (max-width 1400px, sidebar 240px)
-
-### Step 4: Update dashboard-site/scripts/app.js
-
-- Update CSS class names in generated HTML to match new design system
-- Add status-colored left borders to test rows
-- Update badge class references for status/priority
-- Add automation percentage color coding and mini progress bar in sidebar
-
-### Step 5: Update dashboard-site/scripts/coverage-map.js
-
-- Update treemap colors to use design token values
-
-### Step 6: Update DashboardGenerator.cs hardcoded defaults
-
-- Update `GetDefaultTemplate()` with favicon link and logo image
-- Update `GetDefaultCss()` with new design tokens and component styles
-- Update `GetDefaultJs()` with new class references
-
-### Step 7: Update README.md
-
-- Add banner image markup at the top of the file
-
-### Step 8: Update tests
-
-- Add test verifying assets are copied to output directory
-- Update any tests that assert on specific CSS content or HTML structure
+```json
+{
+  "dashboard": {
+    "output_dir": "./site",
+    "branding": {
+      "company_name": "Acme Corp",
+      "logo": "assets/logo.svg",
+      "theme": "dark",
+      "colors": {
+        "primary": "#0d47a1"
+      }
+    }
+  }
+}
+```
 
 ## Verification
 
+### 1. Preview Branding (fastest)
+
 ```bash
-# Build
-dotnet build
-
-# Run tests
-dotnet test
-
-# Generate dashboard and inspect visually
-dotnet run --project src/Spectra.CLI -- dashboard --output ./test-site
-
-# Open ./test-site/index.html in a browser
-# Verify: logo in nav, favicon in tab, consistent styling across all tabs
+spectra dashboard --preview
+cd site && python -m http.server 8080
 ```
 
-## Key Files to Modify
+Open http://localhost:8080 — you should see:
+- Your company name in the header and browser tab
+- Your logo in the header
+- Dark theme (dark backgrounds, light text) if configured
+- Custom primary color applied to header gradient
 
-| File | Change Type | Scope |
-|------|-------------|-------|
-| `dashboard-site/index.html` | Modify | Favicon, nav logo, font import |
-| `dashboard-site/styles/main.css` | Major rewrite | Full design system replacement |
-| `dashboard-site/scripts/app.js` | Modify | CSS class references in generated HTML |
-| `dashboard-site/scripts/coverage-map.js` | Minor | Color values |
-| `src/Spectra.CLI/Dashboard/DashboardGenerator.cs` | Modify | Hardcoded defaults |
-| `tests/Spectra.CLI.Tests/Dashboard/DashboardGeneratorTests.cs` | Modify | Asset copy verification |
-| `README.md` | Minor | Add banner image |
+### 2. Full Dashboard with Branding
 
-## Risk Areas
+```bash
+spectra dashboard --output ./site
+```
 
-- **CSS variable renaming**: If any variable name is missed, that component will lose its styling. Systematic search-and-replace required.
-- **JavaScript class references**: `app.js` generates HTML with class names. All class name changes in CSS must be reflected in JS.
-- **Hardcoded defaults**: The fallback CSS/HTML/JS in `DashboardGenerator.cs` must match the template files, or users without the template directory get a different experience.
+Verify branding appears across all views (Suites, Tests, Runs, Coverage).
+
+### 3. Minimal Branding (name only)
+
+```json
+{
+  "dashboard": {
+    "branding": {
+      "company_name": "My Team"
+    }
+  }
+}
+```
+
+Header shows "My Team" instead of "SPECTRA Dashboard". Everything else stays default.
+
+### 4. Dark Theme
+
+```json
+{
+  "dashboard": {
+    "branding": {
+      "theme": "dark"
+    }
+  }
+}
+```
+
+All components use dark backgrounds with light text. Charts and badges adapt.
+
+### 5. Custom CSS Override
+
+Create `assets/custom.css`:
+
+```css
+.header {
+    background: linear-gradient(135deg, #8b0000, #b22222) !important;
+}
+.card {
+    border-left: 3px solid #8b0000;
+}
+```
+
+Reference it in config:
+
+```json
+{
+  "dashboard": {
+    "branding": {
+      "custom_css": "assets/custom.css"
+    }
+  }
+}
+```
+
+## Key Files
+
+| File | Changes |
+|------|---------|
+| `src/Spectra.Core/Models/Config/BrandingConfig.cs` | Branding configuration model |
+| `src/Spectra.Core/Models/Config/ColorPaletteConfig.cs` | Color override model |
+| `src/Spectra.Core/Models/Config/DashboardConfig.cs` | Add branding property |
+| `src/Spectra.CLI/Dashboard/BrandingInjector.cs` | Branding → HTML/CSS injection |
+| `src/Spectra.CLI/Dashboard/SampleDataFactory.cs` | Preview mode sample data |
+| `src/Spectra.CLI/Dashboard/DashboardGenerator.cs` | Integrate branding injection |
+| `dashboard-site/index.html` | Branding placeholders |
+| `dashboard-site/styles/main.css` | Verify CSS variable coverage |
+| `dashboard-site/styles/dark-theme.css` | Dark theme variables |
+| `dashboard-site/scripts/app.js` | Apply branding at render time |

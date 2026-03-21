@@ -1,103 +1,109 @@
-# CLI Command Contracts: CLI UX Improvements
+# Contract: CLI Commands
 
 **Feature**: 013-cli-ux-improvements | **Date**: 2026-03-21
 
 ## New Commands
 
-### `spectra config add-automation-dir <path>`
+### spectra config add-automation-dir
 
-Add an automation directory to coverage configuration.
+```
+spectra config add-automation-dir <path>
+```
 
-| Aspect | Detail |
-|--------|--------|
-| Parent | `spectra config` |
-| Arguments | `path` (required, string) — directory path to add |
-| Options | `--verbosity` (global) |
-| Exit 0 | Path added to `coverage.automation_dirs` in `spectra.config.json` |
-| Exit 0 (idempotent) | Path already exists — prints notice, no modification |
-| Exit 1 | `spectra.config.json` not found |
-| Output | `✓ Added automation directory: <path>` or `ℹ Path already configured: <path>` |
+**Arguments**: `<path>` — directory path to add (required)
+**Exit codes**: 0 = success, 1 = error (no config file)
+**Output (success)**: `✓ Added '<path>' to automation directories`
+**Output (duplicate)**: `'<path>' is already configured as an automation directory`
+**Config effect**: Appends to `coverage.automation_dirs` array
 
-### `spectra config remove-automation-dir <path>`
+### spectra config remove-automation-dir
 
-Remove an automation directory from coverage configuration.
+```
+spectra config remove-automation-dir <path>
+```
 
-| Aspect | Detail |
-|--------|--------|
-| Parent | `spectra config` |
-| Arguments | `path` (required, string) — directory path to remove |
-| Options | `--verbosity` (global) |
-| Exit 0 | Path removed from `coverage.automation_dirs` |
-| Exit 1 | `spectra.config.json` not found |
-| Exit 1 | Path not found in config — prints warning |
-| Output | `✓ Removed automation directory: <path>` or `⚠ Path not found: <path>` |
+**Arguments**: `<path>` — directory path to remove (required)
+**Exit codes**: 0 = success (or not found with warning), 1 = error (no config file)
+**Output (success)**: `✓ Removed '<path>' from automation directories`
+**Output (not found)**: `Warning: '<path>' was not found in automation directories`
+**Config effect**: Removes from `coverage.automation_dirs` array
 
-### `spectra config list-automation-dirs`
+### spectra config list-automation-dirs
 
-List all configured automation directories.
+```
+spectra config list-automation-dirs
+```
 
-| Aspect | Detail |
-|--------|--------|
-| Parent | `spectra config` |
-| Arguments | None |
-| Options | `--verbosity` (global) |
-| Exit 0 | Lists directories or shows "No automation directories configured" |
-| Output (with dirs) | One path per line, prefixed with `  - ` |
-| Output (empty) | `ℹ No automation directories configured.` |
+**Exit codes**: 0 = success
+**Output format**:
+```
+Automation directories:
+  [exists]  tests
+  [exists]  ../test_automation
+  [missing] src/IntegrationTests
+```
 
 ## Modified Commands
 
-### `spectra init` (modified)
+### spectra init (interactive mode additions)
 
-Two new interactive prompts added after existing setup steps.
+**New prompt 1** — After existing setup, before doc index build:
+```
+◆ Where is your automation test code? (for coverage analysis)
+  Enter paths comma-separated, or press Enter for defaults.
+  >
+```
 
-**New prompt 1: Automation directories** (after docs/tests directory setup)
-- Prompt: "Where is your automation test code? (for coverage analysis)"
-- Input: Comma-separated paths or Enter to skip
-- Non-interactive mode: Skipped silently (no automation dirs added)
+**New prompt 2** — After AI provider setup:
+```
+◆ Enable grounding verification? (recommended)
+  (1) Yes — configure a critic model  ← default
+  (2) No — skip verification
+```
 
-**New prompt 2: Critic model** (after AI provider setup)
-- Prompt: "Do you want to enable grounding verification? (recommended)"
-- Selection: Yes → provider list → API key env var; No → skip
-- Non-interactive mode: Skipped silently (critic disabled)
+If Yes:
+```
+◆ Select critic provider:
+  (1) google (Gemini Flash — recommended)
+  (2) anthropic (Claude Haiku)
+  (3) openai (GPT-4o-mini)
+  (4) Same as primary provider
+```
 
-### All commands (modified — hint output)
+Then:
+```
+◆ API key environment variable:
+  > GOOGLE_API_KEY
+```
 
-Every command handler adds a hint rendering call before returning. Hints are suppressed when `verbosity < VerbosityLevel.Normal`.
+**Skipped when**: `--no-interaction` flag or non-interactive mode
 
-**Hint output format:**
+### spectra ai generate (interactive mode)
+
+**New prompt** — After generation completes for a suite:
+```
+◆ What would you like to do next?
+  (1) Generate more for <suite> (fill gaps)
+  (2) Switch to a different suite
+  (3) Create a new suite
+  (4) Done — exit
+```
+
+**Skipped when**: `--no-interaction` flag or direct mode
+
+### spectra dashboard --preview
+
+**Existing** — no changes, but hints are added after output.
+
+## Hint Output Format
+
+All supported commands print hints after primary output:
+
 ```
   Next steps:
-    spectra ai generate           # Generate your first test suite
-    spectra ai analyze --coverage # Check coverage gaps
+    spectra ai analyze --coverage     # Check coverage gaps
+    spectra ai generate               # Interactive mode
 ```
 
-Rendered in dimmed/gray Spectre.Console markup (`[dim]`).
-
-## Config File Contract
-
-### `spectra.config.json` — affected sections
-
-**`coverage.automation_dirs`** (existing field, newly populated by init):
-```json
-{
-  "coverage": {
-    "automation_dirs": ["../test_automation", "src/IntegrationTests"]
-  }
-}
-```
-
-**`ai.critic`** (existing section, newly populated by init):
-```json
-{
-  "ai": {
-    "critic": {
-      "enabled": true,
-      "provider": "google",
-      "model": "gemini-2.0-flash",
-      "api_key_env": "GOOGLE_API_KEY",
-      "timeout_seconds": 30
-    }
-  }
-}
-```
+**Style**: Dimmed/gray text, indented 4 spaces, preceded by "Next steps:" label
+**Suppressed when**: `--quiet` / `-v quiet`, `--no-interaction`, piped output

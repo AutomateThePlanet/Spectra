@@ -6,7 +6,7 @@ using Spectra.Core.Models;
 
 namespace Spectra.CLI.Tests.Commands;
 
-[Collection("Sequential Command Tests")]
+[Collection("WorkingDirectory")]
 public class IndexCommandTests : IDisposable
 {
     private readonly string _testDir;

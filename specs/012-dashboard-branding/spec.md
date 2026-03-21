@@ -1,134 +1,144 @@
-# Feature Specification: SPECTRA Branding & Design System
+# Feature Specification: Dashboard Branding & Theming
 
 **Feature Branch**: `012-dashboard-branding`
 **Created**: 2026-03-21
 **Status**: Draft
-**Input**: Apply SPECTRA branding and design system to the dashboard and GitHub repository to transform the generic, auto-generated appearance into a polished product experience.
+**Input**: User description: "Add dashboard branding and theming customization. Allow users to configure custom logos, color schemes, company name, favicon, and visual themes for generated dashboards via spectra.config.json. Support light/dark themes, custom CSS overrides, and brand asset paths. The dashboard generator should inject branding configuration into the HTML template at build time."
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Dashboard Visual Identity (Priority: P1)
+### User Story 1 - Apply Company Branding to Dashboard (Priority: P1)
 
-A user opens the SPECTRA dashboard in their browser and immediately sees a professional, branded experience: the SPECTRA logo in the navigation bar, the spectral eye favicon in their browser tab, and a cohesive color scheme with navy, beige, and spectral accent colors throughout. The dashboard feels like a polished product rather than an auto-generated report.
+A QA lead generates a dashboard to share with stakeholders. They want the dashboard to display their company logo, company name, and use the company's brand colors so the report looks professional and recognizable rather than carrying generic Spectra branding.
 
-**Why this priority**: First impressions determine whether users trust and adopt the tool. A generic dashboard undermines credibility, especially when shared with stakeholders or team leads.
+**Why this priority**: The most fundamental branding need — replacing generic branding with the organization's identity. Without this, dashboards look like internal tool output rather than professional deliverables.
 
-**Independent Test**: Can be verified by generating a dashboard and visually confirming the logo appears in the nav bar, the favicon shows in the browser tab, and the color scheme matches the brand palette.
+**Independent Test**: Can be fully tested by configuring logo, company name, and primary/accent colors in spectra.config.json, running `spectra dashboard`, and verifying the output HTML displays the custom branding elements instead of Spectra defaults.
 
 **Acceptance Scenarios**:
 
-1. **Given** a generated dashboard, **When** a user opens it in a browser, **Then** the SPECTRA logo banner is displayed in the navigation bar at 40-48px height on a navy background
-2. **Given** a generated dashboard, **When** a user looks at the browser tab, **Then** the spectral eye favicon is displayed
-3. **Given** a generated dashboard, **When** a user views any page, **Then** all colors, typography, and spacing follow the defined design system consistently
-4. **Given** brand asset files in the repository, **When** the dashboard is generated, **Then** all three asset files (dashboard banner, favicon, README banner) are copied into the output directory
+1. **Given** a spectra.config.json with `branding.company_name` set to "Acme Corp", **When** the dashboard is generated, **Then** the header displays "Acme Corp" instead of "SPECTRA Dashboard" and the page title reflects the company name.
+2. **Given** a spectra.config.json with `branding.logo` pointing to a valid image file, **When** the dashboard is generated, **Then** the logo appears in the dashboard header alongside the company name.
+3. **Given** a spectra.config.json with `branding.colors.primary` and `branding.colors.accent` set, **When** the dashboard is generated, **Then** the header background, navigation buttons, and interactive elements use the specified colors.
+4. **Given** no branding configuration exists, **When** the dashboard is generated, **Then** the default Spectra branding is applied (backward compatible).
+5. **Given** a spectra.config.json with `branding.favicon` pointing to a valid icon file, **When** the dashboard is generated, **Then** the favicon is copied to the output directory and linked in the HTML head.
 
 ---
 
-### User Story 2 - Design System Consistency (Priority: P1)
+### User Story 2 - Switch Between Light and Dark Themes (Priority: P2)
 
-A user navigates through the dashboard tabs (Suites, Tests, Run History, Coverage) and encounters a unified visual language: cards with consistent borders and shadows, status badges with color-coded pill styles, properly styled tables with uppercase headers, and navigation tabs with hover/active states. Every component looks intentionally designed and cohesive.
+A user wants to generate a dashboard that matches their organization's preferred visual style — either a light theme for printed reports or a dark theme for on-screen viewing. They select a theme in configuration and the entire dashboard adapts.
 
-**Why this priority**: Visual consistency is what separates a polished product from a prototype. Inconsistent styling across components breaks the illusion of quality.
+**Why this priority**: Theme support is the next most impactful visual customization after basic branding. It transforms the overall look with a single setting.
 
-**Independent Test**: Can be verified by navigating each tab and confirming that cards, badges, tables, navigation tabs, sidebar headings, and priority indicators all follow the defined component styles.
+**Independent Test**: Can be fully tested by setting `branding.theme` to "light" or "dark" in config, generating a dashboard, and verifying the page uses the correct background, text, and component colors for that theme.
 
 **Acceptance Scenarios**:
 
-1. **Given** the Tests tab is active, **When** a user views the test list, **Then** each row shows a subtle left border colored by last execution status (green for passed, red for failed, gray for no data), test IDs in monospace font, and priority/suite/component as pill badges
-2. **Given** any tab with card components, **When** a user hovers over a card, **Then** the card's shadow elevates smoothly with a 0.2s transition
-3. **Given** the summary sidebar, **When** a user views automation percentage, **Then** the percentage is color-coded (green for 80%+, yellow for 50-79%, red for below 50%) and accompanied by a mini progress bar
-4. **Given** any table in the dashboard, **When** a user views it, **Then** column headers are uppercase with small font size and letter spacing, rows have hover highlights, and borders use the defined gray palette
+1. **Given** `branding.theme` is set to "dark", **When** the dashboard is generated, **Then** the page uses a dark background with light text, and all UI components (cards, sidebar, filters) adapt to the dark palette.
+2. **Given** `branding.theme` is set to "light", **When** the dashboard is generated, **Then** the page uses a light background with dark text (current default appearance).
+3. **Given** `branding.theme` is not set, **When** the dashboard is generated, **Then** the "light" theme is applied by default.
+4. **Given** `branding.theme` is "dark" and custom brand colors are also set, **When** the dashboard is generated, **Then** the brand colors are applied on top of the dark theme base palette.
 
 ---
 
-### User Story 3 - GitHub Repository Branding (Priority: P2)
+### User Story 3 - Apply Custom CSS Overrides (Priority: P3)
 
-A developer or stakeholder visits the SPECTRA GitHub repository and sees the wide banner image at the top of the README, giving the project a professional open-source identity. The banner displays the SPECTRA logo, name, and tagline on a beige background.
+A power user needs fine-grained control over dashboard styling beyond what the built-in theme and color options provide. They supply a custom CSS file that is injected after the default styles, allowing them to override any visual aspect.
 
-**Why this priority**: The GitHub README is the project's public face. A branded banner elevates perceived quality and helps the project stand out, but it doesn't affect the core product functionality.
+**Why this priority**: Covers advanced customization needs for organizations with strict brand guidelines that go beyond color and logo changes.
 
-**Independent Test**: Can be verified by viewing the README.md on GitHub and confirming the banner image renders centered at full width.
+**Independent Test**: Can be fully tested by creating a custom CSS file, referencing it in `branding.custom_css`, generating a dashboard, and verifying the custom styles are included after the default stylesheet.
 
 **Acceptance Scenarios**:
 
-1. **Given** the README.md file, **When** a user views it on GitHub, **Then** the SPECTRA banner image is displayed centered at the top at full width
-2. **Given** the banner image file exists at `assets/spectra_github_readme_banner.png`, **When** the README references it, **Then** the image path resolves correctly from the repository root
+1. **Given** `branding.custom_css` points to a valid CSS file, **When** the dashboard is generated, **Then** the custom CSS is included in the output and loaded after the default stylesheet so overrides take effect.
+2. **Given** `branding.custom_css` points to a file that does not exist, **When** the dashboard is generated, **Then** a warning is displayed but dashboard generation completes successfully with default styles.
+3. **Given** the custom CSS file contains rules that override header styles, **When** the dashboard is rendered, **Then** the custom rules take precedence over both theme and brand color defaults.
 
 ---
 
-### User Story 4 - Responsive Layout (Priority: P2)
+### User Story 4 - Preview Branding Before Full Generation (Priority: P3)
 
-A user views the dashboard on different screen sizes. On desktop, the content area is centered with a maximum width of 1400px and a fixed 240px sidebar. On mobile, the layout adapts with 16px padding and appropriately reflowed content.
+A user wants to quickly verify their branding configuration looks correct before generating the full dashboard with data. They run a preview command that produces a sample dashboard with placeholder data and their branding applied.
 
-**Why this priority**: Users may view dashboards on various devices. A polished product must look good across screen sizes, though desktop is the primary use case.
+**Why this priority**: Saves time during branding setup by providing fast feedback without requiring real test data or a full generation cycle.
 
-**Independent Test**: Can be verified by resizing the browser window and confirming the layout adapts correctly at different breakpoints.
+**Independent Test**: Can be fully tested by running `spectra dashboard --preview` and verifying it produces a dashboard with sample data and the configured branding applied.
 
 **Acceptance Scenarios**:
 
-1. **Given** a desktop viewport wider than 1400px, **When** a user views the dashboard, **Then** the content area is centered with max-width 1400px and a 240px fixed sidebar
-2. **Given** a mobile viewport, **When** a user views the dashboard, **Then** the layout uses 16px padding and cards stack vertically with 24px gaps
+1. **Given** branding configuration is set, **When** `spectra dashboard --preview` is run, **Then** a dashboard is generated with placeholder/sample data and the configured branding applied.
+2. **Given** no branding configuration exists, **When** `spectra dashboard --preview` is run, **Then** a dashboard is generated with default Spectra branding and sample data.
 
 ---
 
 ### Edge Cases
 
-- What happens when brand asset files are missing from the repository? The dashboard should still generate successfully with fallback text in place of images.
-- What happens when the dashboard is viewed in a browser that doesn't support CSS custom properties? The dashboard should degrade gracefully since the design system uses CSS variables extensively.
-- What happens when test list rows have very long titles? Titles should truncate with ellipsis rather than breaking the layout.
-- What happens when the dashboard has no execution data? Empty states should render cleanly within the new design system.
+- What happens when the logo file path is invalid or the file is corrupted? The system displays a warning and generates the dashboard without the logo, falling back to text-only header.
+- What happens when custom color values are invalid (e.g., not valid hex or CSS color)? The system ignores invalid color values with a warning and falls back to theme defaults.
+- What happens when the logo file is extremely large (>5 MB)? The system warns the user that large assets may affect dashboard load time but proceeds with generation.
+- What happens when branding is configured but the template_dir is also set to a custom template? Brand colors, logo, and company name are injected into whatever template is used; custom CSS is appended after the template's styles.
+- What happens when the same color property is set in both theme and custom brand colors? Custom brand colors always take precedence over theme defaults.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: The dashboard generator MUST copy brand asset files (dashboard banner, favicon, README banner) into the generated site output directory
-- **FR-002**: The generated dashboard MUST include a favicon link pointing to the spectral eye icon
-- **FR-003**: The dashboard navigation bar MUST display the dashboard banner image instead of plain text, sized to 40-48px height on a navy (#1B2A4A) background
-- **FR-004**: The dashboard MUST use a centralized set of design tokens (color variables) for all colors, typography, shadows, and spacing
-- **FR-005**: The dashboard MUST use Inter as the primary font family with appropriate system font fallbacks
-- **FR-006**: The dashboard MUST use a monospace font for test IDs and code elements
-- **FR-007**: All status badges MUST use pill-style rendering with color-coded backgrounds (green for passed/automated, red for failed/uncovered, yellow for skipped/partial, purple for blocked)
-- **FR-008**: Navigation tabs MUST show hover and active states with semi-transparent white styling on the navy background
-- **FR-009**: Cards MUST have rounded corners, subtle borders, and shadow elevation on hover with smooth transitions
-- **FR-010**: Tables MUST use uppercase headers with small font size and letter spacing, plus row hover highlights
-- **FR-011**: Test list rows MUST show a left border colored by last execution status
-- **FR-012**: Test titles MUST truncate with ellipsis when exceeding available width
-- **FR-013**: The summary sidebar automation percentage MUST be color-coded by threshold (green >= 80%, yellow >= 50%, red < 50%) with a mini progress bar
-- **FR-014**: The page layout MUST center content at a maximum width with a fixed sidebar and consistent card spacing
-- **FR-015**: The README.md MUST include the SPECTRA banner image centered at the top
-- **FR-016**: The dashboard MUST preserve existing tab structure (Suites, Tests, Run History, Coverage), data sources, and functional features (filters, search, sorting) without modification
-- **FR-017**: Priority indicators MUST use distinct colors (red for high, gold for medium, muted for low) with appropriate font weights
+- **FR-001**: System MUST support a `branding` configuration section in spectra.config.json with fields for company_name, logo, favicon, theme, colors, and custom_css.
+- **FR-002**: System MUST replace the default dashboard title and header text with the configured company_name when provided.
+- **FR-003**: System MUST copy the logo file to the output directory and embed it in the dashboard header when a valid logo path is configured.
+- **FR-004**: System MUST copy the favicon file to the output directory and link it in the HTML head when a valid favicon path is configured.
+- **FR-005**: System MUST support "light" and "dark" theme values, with "light" as the default.
+- **FR-006**: System MUST apply theme-appropriate color palettes to all dashboard UI components (header, sidebar, cards, charts, badges, filters).
+- **FR-007**: System MUST support custom color overrides for primary, accent, background, text, and surface colors via the colors configuration object.
+- **FR-008**: System MUST inject custom CSS after default styles when a valid custom_css file path is configured.
+- **FR-009**: System MUST preserve full backward compatibility — dashboards generated without any branding configuration MUST look identical to the current output.
+- **FR-010**: System MUST validate branding configuration at generation time and report warnings for invalid values (bad file paths, invalid colors) without failing the generation.
+- **FR-011**: System MUST support a `--preview` flag on the dashboard command to generate a branded dashboard with sample data for quick visual verification.
+- **FR-012**: System MUST inject branding configuration as a data attribute or embedded JSON block in the HTML so the client-side JavaScript can apply dynamic branding at render time.
+- **FR-013**: System MUST support relative and absolute file paths for logo, favicon, and custom_css assets, resolving relative paths from the spectra.config.json location.
 
 ### Key Entities
 
-- **Brand Assets**: Three image files (GitHub README banner, dashboard banner, favicon) stored in the repository and copied to generated sites
-- **Design Tokens**: A centralized set of color, typography, shadow, and spacing values used consistently across all dashboard components
-- **Dashboard Components**: Cards, badges, tables, navigation tabs, sidebar, and test list rows that each have defined visual styles
+- **BrandingConfig**: The branding configuration object within spectra.config.json. Contains company_name (string), logo (file path), favicon (file path), theme ("light" | "dark"), colors (color overrides object), and custom_css (file path).
+- **ColorPalette**: A set of named color values (primary, accent, background, text, surface, border) that define the visual appearance of a theme. Each theme has a default palette; user-configured colors override individual values.
+- **ThemePreset**: A predefined combination of color palette, typography adjustments, and component styling. Two built-in presets: "light" and "dark".
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: 100% of dashboard UI components use centralized design tokens rather than hard-coded style values
-- **SC-002**: All three brand assets (nav banner, favicon, README banner) are present and correctly displayed in their respective locations
-- **SC-003**: Dashboard passes visual consistency review: every card, badge, table, and navigation element follows the defined component styles with zero inconsistencies
-- **SC-004**: Test list rows display status-colored left borders for 100% of tests that have execution history
-- **SC-005**: The dashboard renders correctly at desktop (1400px+) and mobile (< 768px) viewports without layout breakage
-- **SC-006**: Users perceive the dashboard as a polished product, verified by comparing before/after screenshots showing consistent branding, typography, and component styling
-- **SC-007**: No existing functionality is broken: all tabs, filters, search, sorting, and data visualizations work identically to pre-branding state
-- **SC-008**: Dashboard generation time does not increase by more than 10% due to asset copying and template changes
+- **SC-001**: Users can fully brand a dashboard (logo, company name, colors) with a single configuration change and one command execution.
+- **SC-002**: A branded dashboard is visually indistinguishable from a custom-built report — no residual default branding leaks through when branding is configured.
+- **SC-003**: Switching between light and dark themes updates all dashboard components consistently — no visual artifacts or unreadable text combinations.
+- **SC-004**: Dashboard generation time increases by no more than 500ms when branding is configured (asset copying and CSS injection overhead).
+- **SC-005**: 100% backward compatibility — existing dashboards generated without branding configuration produce identical output before and after this feature is implemented.
+- **SC-006**: Users can preview branding changes in under 5 seconds using the preview flag, without requiring real test data.
 
 ## Assumptions
 
-- Brand asset files already exist in the repository at `assets/spectra_github_readme_banner.png`, `assets/spectra_dashboard_banner.png`, and `assets/spectra_favicon.png`
-- The Inter font will be loaded from a web font CDN; no self-hosting is required
-- Monospace fonts use system fallbacks if not available locally
-- The existing dashboard template structure is maintained
-- Mobile responsiveness follows standard breakpoints (768px for tablet, smaller for mobile)
-- The "polished product" standard is achieved through consistent application of the design system without requiring custom illustrations or animations beyond what is specified
+- Logo and favicon files are user-provided and stored in the project directory or an accessible path. The system copies them to the output — it does not host or transform them.
+- Color values follow standard CSS color syntax (hex, rgb, hsl, named colors). The system does not convert between color formats.
+- The dark theme is a complete palette inversion (dark backgrounds, light text) — not just a color filter on the light theme.
+- Custom CSS is trusted user input. The system does not sanitize or validate CSS content beyond checking file existence.
+- The `--preview` flag generates sample data inline (e.g., 3 mock suites, 10 mock tests, 2 mock runs) — it does not require any existing test files or execution history.
 
-## Dependencies
+## Scope Boundaries
 
-- Brand asset image files must be created and placed in the repository before implementation
-- Web font CDN must be accessible for Inter font loading (with system font fallbacks for offline use)
+**In scope**:
+- Branding configuration in spectra.config.json
+- Logo, favicon, company name injection
+- Light/dark theme presets
+- Custom color overrides
+- Custom CSS file injection
+- Preview mode for branding verification
+- Branding applied to both the dashboard-site template and the embedded default template in DashboardGenerator
+
+**Out of scope**:
+- Custom font loading (beyond what the existing template already loads)
+- Multiple theme presets beyond light/dark
+- Live theme switching in the rendered dashboard (theme is baked in at generation time)
+- Logo resizing or image processing
+- White-labeling of Spectra CLI output or terminal UX
+- Branding for HTML execution reports (only the dashboard)

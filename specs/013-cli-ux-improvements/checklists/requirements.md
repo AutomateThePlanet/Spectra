@@ -31,6 +31,7 @@
 
 ## Notes
 
-- All items pass validation. Spec is ready for `/speckit.plan`.
-- Clarification session 2026-03-21: 3 questions asked and resolved (non-interactive init behavior, duplicate dir handling, hint architecture).
-- The "investigate critic pipeline" aspect from the user's input is captured in US3/AS7 as a verification requirement rather than an investigation task — the spec defines *what* must be true (critic pipeline works) without prescribing how to verify it.
+- All items pass validation. Spec is ready for `/speckit.clarify` or `/speckit.plan`.
+- The user's request to "investigate if critic pipeline is actually working" was resolved during research — the critic does work when configured (enabled + valid provider + API key). It's disabled by default, which is why most users never see it. The init prompt solves this discoverability problem.
+- Scope explicitly excludes critic pipeline debugging since research confirmed it works correctly.
+- Assumptions section references Spectre.Console as a reasonable default for terminal UX — this is descriptive context, not a prescriptive implementation detail.

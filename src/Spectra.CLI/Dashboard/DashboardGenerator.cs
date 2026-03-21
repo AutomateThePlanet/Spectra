@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Dashboard;
 
 namespace Spectra.CLI.Dashboard;
@@ -11,10 +12,14 @@ public sealed class DashboardGenerator
 {
     private readonly string _templatePath;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly BrandingConfig? _brandingConfig;
+    private readonly string _configDir;
 
-    public DashboardGenerator(string? templatePath = null)
+    public DashboardGenerator(string? templatePath = null, BrandingConfig? brandingConfig = null, string? configDir = null)
     {
         _templatePath = templatePath ?? GetDefaultTemplatePath();
+        _brandingConfig = brandingConfig;
+        _configDir = configDir ?? Directory.GetCurrentDirectory();
         _jsonOptions = new JsonSerializerOptions
         {
             WriteIndented = false,
@@ -22,6 +27,11 @@ public sealed class DashboardGenerator
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
     }
+
+    /// <summary>
+    /// Warnings from the most recent generation (e.g., missing branding assets).
+    /// </summary>
+    public IReadOnlyList<string> BrandingWarnings { get; private set; } = [];
 
     /// <summary>
     /// Generates the dashboard to the specified output directory.
@@ -34,25 +44,36 @@ public sealed class DashboardGenerator
         // Ensure output directory exists
         Directory.CreateDirectory(outputPath);
 
-        // Generate HTML with embedded JSON data
+        // Generate HTML with embedded JSON data and branding
         var html = await GenerateHtmlAsync(data);
         var indexPath = Path.Combine(outputPath, "index.html");
         await File.WriteAllTextAsync(indexPath, html);
 
         // Copy static assets
         await CopyStaticAssetsAsync(outputPath);
+
+        // Copy branding assets (logo, favicon, custom CSS)
+        var injector = new BrandingInjector();
+        injector.CopyAssets(_brandingConfig, _configDir, outputPath);
+        BrandingWarnings = injector.Warnings;
     }
 
     /// <summary>
-    /// Generates the main HTML file with embedded dashboard data.
+    /// Generates the main HTML file with embedded dashboard data and branding.
     /// </summary>
     private async Task<string> GenerateHtmlAsync(DashboardData data)
     {
         var template = await LoadTemplateAsync();
         var jsonData = JsonSerializer.Serialize(data, _jsonOptions);
 
-        // Replace placeholder with actual data
-        return template.Replace("{{DASHBOARD_DATA}}", jsonData);
+        // Replace data placeholder
+        var html = template.Replace("{{DASHBOARD_DATA}}", jsonData);
+
+        // Apply branding
+        var injector = new BrandingInjector();
+        html = injector.InjectBranding(html, _brandingConfig, _configDir);
+
+        return html;
     }
 
     /// <summary>
@@ -65,7 +86,14 @@ public sealed class DashboardGenerator
             return await File.ReadAllTextAsync(_templatePath);
         }
 
-        // Return default template if file doesn't exist
+        // Fall back to embedded resource
+        var embedded = ReadEmbeddedResource("Spectra.CLI.Dashboard.Templates.index.html");
+        if (embedded is not null)
+        {
+            return embedded;
+        }
+
+        // Final fallback: hardcoded default template
         return GetDefaultTemplate();
     }
 
@@ -75,42 +103,83 @@ public sealed class DashboardGenerator
     private async Task CopyStaticAssetsAsync(string outputPath)
     {
         var templateDir = Path.GetDirectoryName(_templatePath);
-        if (string.IsNullOrEmpty(templateDir) || !Directory.Exists(templateDir))
+
+        // Try local dashboard-site directory first
+        if (!string.IsNullOrEmpty(templateDir) && Directory.Exists(templateDir))
         {
-            // Create default assets
+            var stylesSource = Path.Combine(templateDir, "styles");
+            var scriptsSource = Path.Combine(templateDir, "scripts");
+
+            if (Directory.Exists(stylesSource) && Directory.Exists(scriptsSource))
+            {
+                CopyDirectory(stylesSource, Path.Combine(outputPath, "styles"));
+                CopyDirectory(scriptsSource, Path.Combine(outputPath, "scripts"));
+
+                // Copy Cloudflare Pages functions if present
+                var functionsSource = Path.Combine(templateDir, "functions");
+                if (Directory.Exists(functionsSource))
+                {
+                    CopyDirectory(functionsSource, Path.Combine(outputPath, "functions"));
+                }
+
+                // Copy access-denied page if present
+                var accessDeniedSource = Path.Combine(templateDir, "access-denied.html");
+                if (File.Exists(accessDeniedSource))
+                {
+                    File.Copy(accessDeniedSource, Path.Combine(outputPath, "access-denied.html"), overwrite: true);
+                }
+
+                return;
+            }
+        }
+
+        // Fall back to embedded resources (used when installed as global tool)
+        await ExtractEmbeddedAssetsAsync(outputPath);
+    }
+
+    /// <summary>
+    /// Extracts embedded dashboard assets to the output directory.
+    /// </summary>
+    private async Task ExtractEmbeddedAssetsAsync(string outputPath)
+    {
+        var assets = new Dictionary<string, string>
+        {
+            ["styles/main.css"] = "Spectra.CLI.Dashboard.Templates.styles.main.css",
+            ["scripts/app.js"] = "Spectra.CLI.Dashboard.Templates.scripts.app.js",
+            ["scripts/coverage-map.js"] = "Spectra.CLI.Dashboard.Templates.scripts.coverage-map.js"
+        };
+
+        foreach (var (relativePath, resourceName) in assets)
+        {
+            var content = ReadEmbeddedResource(resourceName);
+            if (content is null) continue;
+
+            var destPath = Path.Combine(outputPath, relativePath);
+            var destDir = Path.GetDirectoryName(destPath);
+            if (!string.IsNullOrEmpty(destDir))
+            {
+                Directory.CreateDirectory(destDir);
+            }
+            await File.WriteAllTextAsync(destPath, content);
+        }
+
+        // If no embedded resources found, fall back to hardcoded defaults
+        if (!File.Exists(Path.Combine(outputPath, "styles", "main.css")))
+        {
             await CreateDefaultAssetsAsync(outputPath);
-            return;
         }
+    }
 
-        // Copy styles directory
-        var stylesSource = Path.Combine(templateDir, "styles");
-        var stylesDest = Path.Combine(outputPath, "styles");
-        if (Directory.Exists(stylesSource))
-        {
-            CopyDirectory(stylesSource, stylesDest);
-        }
-        else
-        {
-            Directory.CreateDirectory(stylesDest);
-            await File.WriteAllTextAsync(
-                Path.Combine(stylesDest, "main.css"),
-                GetDefaultCss());
-        }
-
-        // Copy scripts directory
-        var scriptsSource = Path.Combine(templateDir, "scripts");
-        var scriptsDest = Path.Combine(outputPath, "scripts");
-        if (Directory.Exists(scriptsSource))
-        {
-            CopyDirectory(scriptsSource, scriptsDest);
-        }
-        else
-        {
-            Directory.CreateDirectory(scriptsDest);
-            await File.WriteAllTextAsync(
-                Path.Combine(scriptsDest, "app.js"),
-                GetDefaultJs());
-        }
+    /// <summary>
+    /// Reads an embedded resource as a string.
+    /// </summary>
+    private static string? ReadEmbeddedResource(string resourceName)
+    {
+        var assembly = typeof(DashboardGenerator).Assembly;
+        using var stream = assembly.GetManifestResourceStream(resourceName);
+        if (stream is null) return null;
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 
     /// <summary>
@@ -182,13 +251,16 @@ public sealed class DashboardGenerator
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>SPECTRA Dashboard</title>
+            <title>{{COMPANY_NAME}}</title>
+            {{FAVICON_LINK}}
             <link rel="stylesheet" href="styles/main.css">
+            {{CUSTOM_CSS_LINK}}
+            {{BRANDING_STYLES}}
         </head>
         <body>
             <div id="app">
                 <header class="header">
-                    <h1>SPECTRA Dashboard</h1>
+                    {{LOGO_IMG}}<h1>{{COMPANY_NAME}}</h1>
                     <nav class="nav">
                         <button class="nav-btn active" data-view="suites">Suites</button>
                         <button class="nav-btn" data-view="tests">Tests</button>
@@ -230,6 +302,8 @@ public sealed class DashboardGenerator
                     </section>
                 </main>
             </div>
+
+            {{BRANDING_CONFIG}}
 
             <script id="dashboard-data" type="application/json">
             {{DASHBOARD_DATA}}
@@ -275,6 +349,12 @@ public sealed class DashboardGenerator
         .header h1 {
             font-size: 1.5rem;
             font-weight: 600;
+        }
+
+        .header-logo {
+            max-height: 40px;
+            margin-right: 12px;
+            vertical-align: middle;
         }
 
         .nav {

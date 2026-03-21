@@ -290,6 +290,47 @@ public class DashboardGeneratorTests : IDisposable
         Assert.Contains("SPECTRA Dashboard", html);
     }
 
+    [Fact]
+    public async Task GenerateAsync_CopiesFunctionsDirectory_WhenPresent()
+    {
+        // Create a template directory with functions/
+        var templateDir = Path.Combine(Path.GetTempPath(), $"spectra-template-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(templateDir);
+        try
+        {
+            // Set up minimal template with styles, scripts, and functions
+            var stylesDir = Path.Combine(templateDir, "styles");
+            var scriptsDir = Path.Combine(templateDir, "scripts");
+            var functionsDir = Path.Combine(templateDir, "functions", "auth");
+            Directory.CreateDirectory(stylesDir);
+            Directory.CreateDirectory(scriptsDir);
+            Directory.CreateDirectory(functionsDir);
+
+            await File.WriteAllTextAsync(Path.Combine(templateDir, "index.html"),
+                "<html><head><title>{{COMPANY_NAME}}</title>{{FAVICON_LINK}}{{CUSTOM_CSS_LINK}}{{BRANDING_STYLES}}</head><body>{{LOGO_IMG}}{{BRANDING_CONFIG}}<script id=\"dashboard-data\" type=\"application/json\">{{DASHBOARD_DATA}}</script></body></html>");
+            await File.WriteAllTextAsync(Path.Combine(stylesDir, "main.css"), "body {}");
+            await File.WriteAllTextAsync(Path.Combine(scriptsDir, "app.js"), "// app");
+            await File.WriteAllTextAsync(Path.Combine(templateDir, "functions", "_middleware.js"), "export async function onRequest() {}");
+            await File.WriteAllTextAsync(Path.Combine(functionsDir, "callback.js"), "export async function onRequest() {}");
+            await File.WriteAllTextAsync(Path.Combine(templateDir, "access-denied.html"), "<html>Access Denied</html>");
+
+            var generator = new DashboardGenerator(Path.Combine(templateDir, "index.html"));
+            var data = CreateMinimalDashboardData();
+
+            await generator.GenerateAsync(data, _outputDir);
+
+            // Verify functions directory was copied
+            Assert.True(Directory.Exists(Path.Combine(_outputDir, "functions")));
+            Assert.True(File.Exists(Path.Combine(_outputDir, "functions", "_middleware.js")));
+            Assert.True(File.Exists(Path.Combine(_outputDir, "functions", "auth", "callback.js")));
+            Assert.True(File.Exists(Path.Combine(_outputDir, "access-denied.html")));
+        }
+        finally
+        {
+            Directory.Delete(templateDir, recursive: true);
+        }
+    }
+
     private static DashboardData CreateMinimalDashboardData()
     {
         return new DashboardData

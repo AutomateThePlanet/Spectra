@@ -1,4 +1,4 @@
-# Specification Quality Checklist: SPECTRA Branding & Design System
+# Specification Quality Checklist: Dashboard Branding & Theming
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-03-21
@@ -31,5 +31,6 @@
 
 ## Notes
 
-- All items pass validation. The feature description was exceptionally detailed, eliminating the need for any clarification markers.
-- Spec is ready for `/speckit.clarify` or `/speckit.plan`.
+- All items pass validation. Spec is ready for `/speckit.clarify` or `/speckit.plan`.
+- Reasonable defaults applied: light theme default, CSS color syntax assumption, relative path resolution from config location.
+- Scope explicitly excludes custom fonts, live theme switching, and report branding to keep the feature focused.

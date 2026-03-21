@@ -1,57 +1,69 @@
 # Research: CLI UX Improvements
 
-**Feature**: 013-cli-ux-improvements | **Date**: 2026-03-21
+**Date**: 2026-03-21 | **Feature**: 013-cli-ux-improvements
 
-## R1: Existing `--quiet` / verbosity mechanism
+## Finding 1: Existing Terminal UX Patterns
 
-**Decision**: Reuse existing `--verbosity quiet` (VerbosityLevel.Quiet) rather than adding a new `--quiet` flag.
+**Decision**: Use Spectre.Console for all new prompts and styled output, matching existing init flow patterns.
 
-**Rationale**: `GlobalOptions.cs` already defines `--verbosity` as a global option with `VerbosityLevel.Quiet` as the lowest level. All command handlers already receive `VerbosityLevel`. Adding a separate `--quiet` flag would duplicate existing functionality.
-
-**Alternatives considered**:
-- New `--quiet` boolean flag: Redundant; would require documenting two ways to suppress output.
-- `-q` alias for `--verbosity quiet`: Possible but adds complexity to option parsing. Could be a future enhancement.
-
-## R2: Existing `spectra config` command capabilities
-
-**Decision**: Extend the existing `ConfigCommand` with subcommands rather than creating a new top-level command.
-
-**Rationale**: `ConfigCommand` already exists at `src/Spectra.CLI/Commands/Config/ConfigCommand.cs` with `config <key> [value]` get/set behavior. System.CommandLine supports parent commands with both a default handler and subcommands. Adding `add-automation-dir`, `remove-automation-dir`, and `list-automation-dirs` as child commands is the idiomatic approach.
+**Rationale**: `InitHandler.cs` already uses `AnsiConsole.Prompt(new SelectionPrompt<string>())` for provider selection and `TextPrompt<string>()` for text input. The critic and automation dir prompts should follow the same patterns exactly.
 
 **Alternatives considered**:
-- New `spectra automation` top-level command: Fragments config management across commands.
-- Using `spectra config coverage.automation_dirs` with JSON array syntax: Poor UX for array manipulation.
+- Raw Console.Write — rejected (inconsistent with existing init UX)
+- Custom prompt library — rejected (adds dependency, violates YAGNI)
 
-## R3: CoverageConfig `AutomationDirs` field
+## Finding 2: Hint Suppression Strategy
 
-**Decision**: The `CoverageConfig` model already has an `AutomationDirs` property (`IReadOnlyList<string>` defaulting to `["tests", "test", "spec", "specs", "e2e"]`). The init prompt and config subcommands will write to this existing field.
+**Decision**: Suppress hints when `VerbosityLevel < Normal`, when `Console.IsOutputRedirected` is true, or when `--no-interaction` is set.
 
-**Rationale**: No model changes needed. The field maps to `coverage.automation_dirs` in JSON (via `JsonPropertyName`).
-
-**Alternatives considered**: None — the field already exists.
-
-## R4: CriticConfig structure and init integration
-
-**Decision**: The `CriticConfig` model already has all needed fields: `Enabled`, `Provider`, `Model`, `ApiKeyEnv`, `BaseUrl`, `TimeoutSeconds`. The init wizard writes these fields directly. `CriticConfig.GetEffectiveModel()` and `GetDefaultApiKeyEnv()` provide sensible defaults per provider.
-
-**Rationale**: No model changes needed. The `CriticFactory.TryCreate()` method reads `CriticConfig` to create a `CopilotCritic`. The init wizard just needs to populate the config JSON.
-
-**Alternatives considered**: None — existing model is complete.
-
-## R5: Interactive session continuation architecture
-
-**Decision**: Wrap the existing `ExecuteInteractiveModeAsync` flow in an outer `do-while` loop controlled by a new `ContinuationSelector`. After the session completes (all gaps handled or user done), the continuation selector offers 4 options. "Generate more" and "switch suite" reset the session and re-enter the loop. "Create new suite" creates the directory and re-enters. "Done" exits.
-
-**Rationale**: Minimal changes to the existing state machine. `InteractiveSession` doesn't need new states — it already handles its own generation loop. The continuation is a handler-level concern.
+**Rationale**: `VerbosityLevel.Quiet` already suppresses verbose output throughout the codebase (handlers check `_verbosity >= VerbosityLevel.Normal`). The hint helper follows the same pattern. `Console.IsOutputRedirected` catches piped output scenarios. The `--no-interaction` flag (exists on generate/update) covers CI environments.
 
 **Alternatives considered**:
-- Adding `Continuation` state to `InteractiveSession`: Mixes session-level and generation-level concerns. The session is designed for one suite per lifecycle.
-- Creating a new `MultiSuiteSession` wrapper: Over-engineering for this use case.
+- Separate `--no-hints` flag — rejected (too granular, `--quiet` or `-v quiet` covers this)
+- Check `Environment.GetEnvironmentVariable("CI")` — rejected (fragile, not all CI systems set this)
 
-## R6: Critic pipeline verification
+## Finding 3: Config File Modification Strategy
 
-**Decision**: The critic pipeline code exists and appears structurally complete in `GenerateHandler.VerifyTestsAsync()` (lines 832-902) and `CopilotCritic.VerifyTestAsync()`. The `ShouldVerify()` method checks `config.Ai.Critic.Enabled`. During implementation, we will verify this works end-to-end by confirming grounding verdicts appear in console output when a critic is configured.
+**Decision**: Use `System.Text.Json.Nodes.JsonNode` to modify spectra.config.json in-place, preserving structure and comments.
 
-**Rationale**: The code path is: `GenerateHandler.ExecuteDirectModeAsync()` → `ShouldVerify()` → `VerifyTestsAsync()` → `CriticFactory.TryCreate()` → `CopilotCritic.VerifyTestAsync()`. This chain is complete. If issues exist, they would be runtime configuration problems (missing API key, Copilot SDK unavailability), not code gaps.
+**Rationale**: The existing `ConfigHandler` already reads and modifies config via `JsonSerializer.Deserialize<SpectraConfig>()` then serializes back. However, for array operations (add/remove automation dirs), using `JsonNode` allows surgical edits without round-tripping through the full model, which would lose unknown fields or formatting.
 
-**Alternatives considered**: N/A — this is an investigation item, not a design decision.
+**Alternatives considered**:
+- Full deserialize → modify → serialize — viable but may lose unknown fields
+- String manipulation (regex) — rejected (fragile)
+- `JsonDocument` (read-only) — can't modify in place
+
+## Finding 4: Critic Pipeline Verification
+
+**Decision**: The critic pipeline works correctly when configured. No fix needed.
+
+**Rationale**: Research confirmed the full flow:
+1. `ShouldVerify()` checks `CriticConfig.Enabled` and `--skip-critic` flag
+2. `CriticFactory.TryCreate()` creates a `CopilotCritic`
+3. `VerifyTestsAsync()` calls `critic.VerifyTestAsync()` for each test
+4. Results filter out hallucinated tests, keep grounded/partial
+5. Metadata stored in frontmatter
+
+The reason most users never see it: `CriticConfig.Enabled` defaults to `false`. The init prompt (US3) solves this.
+
+**Alternatives considered**: Adding debug logging to critic pipeline — deferred, not needed for this feature.
+
+## Finding 5: Interactive Mode Loop Architecture
+
+**Decision**: Wrap the existing `ExecuteInteractiveModeAsync` inner loop in an outer suite-switching loop.
+
+**Rationale**: The current flow has a `while (!session.IsComplete)` loop for gap-filling within a single suite. The outer loop adds suite switching after session completion. The `InteractiveSession` can be reset or a new one created for each suite.
+
+**Alternatives considered**:
+- Refactor into a separate `MultiSuiteSession` class — rejected (YAGNI, simple loop is sufficient)
+- Make a recursive call to `ExecuteInteractiveModeAsync` — rejected (stack depth concerns, harder to track session stats)
+
+## Finding 6: Config Subcommand Architecture
+
+**Decision**: Add `add-automation-dir`, `remove-automation-dir`, `list-automation-dirs` as subcommands of the existing `config` command.
+
+**Rationale**: `spectra config` already exists with `key`/`value`/`--show-all` parameters. Adding subcommands follows System.CommandLine patterns. The config command already has the infrastructure to read/write config files.
+
+**Alternatives considered**:
+- Standalone `spectra automation-dirs` command — rejected (fragments the CLI surface)
+- Generic `spectra config add-to-array coverage.automation_dirs <value>` — rejected (too low-level for a common operation)

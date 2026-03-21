@@ -1,77 +1,132 @@
-# Data Model: SPECTRA Branding & Design System
+# Data Model: Dashboard Branding & Theming
 
-**Feature**: 012-dashboard-branding
-**Date**: 2026-03-21
+**Feature**: 012-dashboard-branding | **Date**: 2026-03-21
 
-## Overview
+## Entities
 
-This feature introduces no new data entities, database changes, or C# model modifications. The "data model" for this feature is the design token system and brand asset inventory — both are static configuration expressed in CSS and file assets.
+### BrandingConfig (new)
 
-## Design Tokens
+Branding configuration nested within DashboardConfig.
 
-The design token system is a set of CSS custom properties that define the visual language. These are not stored in a database or C# model — they live in the CSS `:root` block and are consumed by all dashboard component styles.
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| company_name | string? | null | Display name replacing "SPECTRA Dashboard" in header and page title |
+| logo | string? | null | Path to logo image file (PNG, SVG, JPG). Relative to config file location. |
+| favicon | string? | null | Path to favicon file (ICO, PNG). Relative to config file location. |
+| theme | string? | "light" | Theme preset: "light" or "dark" |
+| colors | ColorPaletteConfig? | null | Custom color overrides applied on top of the theme |
+| custom_css | string? | null | Path to custom CSS file. Relative to config file location. |
 
-### Token Categories
+### ColorPaletteConfig (new)
 
-| Category | Token Pattern | Example | Count |
-|----------|--------------|---------|-------|
-| Primary colors | `--color-{name}` | `--color-navy: #1B2A4A` | 4 |
-| Spectral palette | `--color-{name}` | `--color-green: #16A34A` | 5 |
-| Neutral grays | `--color-gray-{weight}` | `--color-gray-500: #6B7280` | 7 |
-| Backgrounds | `--bg-{surface}` | `--bg-page: #F9FAFB` | 4 |
-| Shadows | `--shadow-{size}` | `--shadow-md: 0 4px 6px ...` | 3 |
+Custom color overrides. Any null field inherits from the selected theme's defaults.
 
-### Token-to-Component Mapping
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| primary | string? | null | Primary brand color (header background, active nav) |
+| accent | string? | null | Accent color (links, interactive elements) |
+| background | string? | null | Page background color |
+| text | string? | null | Primary text color |
+| surface | string? | null | Card/panel background color |
+| border | string? | null | Border color for cards, dividers, inputs |
 
-| Component | Tokens Used |
-|-----------|-------------|
-| Navigation bar | `--bg-nav`, `--color-navy` |
-| Cards | `--bg-card`, `--color-gray-200`, `--shadow-sm`, `--shadow-md` |
-| Status badges | `--color-green`, `--color-red`, `--color-gold` (via hardcoded badge colors) |
-| Priority indicators | `--color-red`, `--color-gold`, `--color-gray-500` |
-| Tables | `--color-gray-50`, `--color-gray-100`, `--color-gray-200`, `--color-gray-500` |
-| Sidebar | `--bg-sidebar`, `--color-gray-200`, `--color-gray-500` |
-| Page background | `--bg-page` |
-| Body text | `--color-gray-900` |
+### DashboardConfig (existing — modify)
 
-## Brand Assets
+Add branding property.
 
-| Asset | File | Location in Template | Usage |
-|-------|------|---------------------|-------|
-| Dashboard banner | `spectra_dashboard_banner.png` | `dashboard-site/assets/` | Nav bar logo image |
-| Favicon | `spectra_favicon.png` | `dashboard-site/assets/` | Browser tab icon |
-| README banner | `spectra_github_readme_banner.png` | `assets/` (repo root) | GitHub README header |
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| output_dir | string | "./site" | Output directory (existing) |
+| title | string? | null | Dashboard title — superseded by branding.company_name when set (existing) |
+| template_dir | string? | null | Custom template directory (existing) |
+| include_coverage | bool | true | Include coverage visualization (existing) |
+| include_runs | bool | true | Include run history (existing) |
+| max_trend_points | int | 30 | Maximum trend data points (existing) |
+| **branding** | **BrandingConfig?** | **null** | **Branding and theming configuration (new)** |
 
-## CSS Class Inventory
+## Theme Presets
 
-### New Classes (to add)
+### Light Theme (default)
 
-| Class | Purpose |
-|-------|---------|
-| `.badge-passed` / `.badge-automated` | Green pill badge |
-| `.badge-failed` / `.badge-uncovered` | Red pill badge |
-| `.badge-skipped` / `.badge-partial` | Yellow pill badge |
-| `.badge-blocked` | Purple pill badge |
-| `.priority-high` | Red priority text |
-| `.priority-medium` | Gold priority text |
-| `.priority-low` | Gray priority text |
-| `.nav-tab` / `.nav-tab.active` | Tab button styling (replaces `.nav-btn`) |
+Maps to existing `:root` CSS variables:
 
-### Modified Classes (existing, restyled)
+| CSS Variable | Value | Purpose |
+|-------------|-------|---------|
+| --primary-color | #1e40af | Header gradient start |
+| --primary-light | #3b82f6 | Header gradient end |
+| --accent-color | #2563eb | Interactive elements |
+| --text-color | #1e293b | Primary text |
+| --text-muted | #64748b | Secondary text |
+| --bg-color | #f1f5f9 | Page background |
+| --card-bg | #ffffff | Card/panel background |
+| --border-color | #e2e8f0 | Borders |
 
-| Class | Change |
-|-------|--------|
-| `.card` | New border-radius (12px), updated shadow, hover transition |
-| `.badge` | Pill style (9999px radius), uppercase, letter-spacing |
-| `.sidebar` | Updated headings to uppercase small caps |
-| `.test-row` | Add status-colored left border |
-| `table th` | Uppercase, small font, letter-spacing |
-| `table td` | Updated padding, bottom border color |
+### Dark Theme
 
-## No C# Model Changes
+| CSS Variable | Value | Purpose |
+|-------------|-------|---------|
+| --primary-color | #1e3a5f | Header gradient start (muted) |
+| --primary-light | #2563eb | Header gradient end |
+| --accent-color | #3b82f6 | Interactive elements |
+| --text-color | #e2e8f0 | Primary text (light on dark) |
+| --text-muted | #94a3b8 | Secondary text |
+| --bg-color | #0f172a | Page background (dark) |
+| --card-bg | #1e293b | Card background (dark surface) |
+| --border-color | #334155 | Borders (subtle on dark) |
+| --color-success | #22c55e | Green (brighter for dark bg) |
+| --color-warning | #f59e0b | Yellow (brighter for dark bg) |
+| --color-danger | #ef4444 | Red (brighter for dark bg) |
+| --shadow-sm | 0 1px 2px rgba(0,0,0,0.2) | Slightly stronger shadows |
+| --shadow-md | 0 4px 6px rgba(0,0,0,0.3) | Slightly stronger shadows |
 
-No changes to:
-- `DashboardData`, `SuiteStats`, `TestEntry`, `RunSummary` models
-- `DataCollector` data collection logic
-- JSON serialization format
-- MCP tool responses
+## Config JSON Structure
+
+```json
+{
+  "dashboard": {
+    "output_dir": "./site",
+    "branding": {
+      "company_name": "Acme Corp",
+      "logo": "assets/logo.svg",
+      "favicon": "assets/favicon.ico",
+      "theme": "dark",
+      "colors": {
+        "primary": "#0d47a1",
+        "accent": "#1565c0"
+      },
+      "custom_css": "assets/custom-dashboard.css"
+    }
+  }
+}
+```
+
+## Relationships
+
+```
+spectra.config.json
+└── dashboard (DashboardConfig)
+    ├── output_dir, title, template_dir, etc. (existing)
+    └── branding (BrandingConfig)
+        └── colors (ColorPaletteConfig)
+```
+
+## Validation Rules
+
+- `theme` must be "light" or "dark" (case-insensitive). Invalid values default to "light" with warning.
+- `colors` values must be valid CSS color strings (hex: `#RGB`/`#RRGGBB`, `rgb()`, `hsl()`, or named colors). Invalid values are skipped with warning.
+- `logo`, `favicon`, `custom_css` paths are resolved relative to the directory containing `spectra.config.json`. Absolute paths are also accepted.
+- Missing asset files produce a warning but do not fail generation.
+- `company_name` takes precedence over the existing `title` field when both are set.
+- All branding fields are optional — null/omitted means "use default".
+
+## Sample Data (Preview Mode)
+
+The `SampleDataFactory` generates a fixed `DashboardData` for `--preview`:
+
+| Section | Sample Content |
+|---------|---------------|
+| Suites | 3 suites: "Checkout" (15 tests), "Authentication" (10 tests), "Search" (8 tests) |
+| Tests | 10 tests with varied priorities (high/medium/low), components, tags, automation status |
+| Runs | 2 runs: one with 80% pass rate, one with 60% pass rate |
+| Coverage | Documentation: 75%, Requirements: 50%, Automation: 40% |
+| Trends | 5 data points showing improving pass rate |

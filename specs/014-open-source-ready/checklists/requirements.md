@@ -1,4 +1,4 @@
-# Specification Quality Checklist: Open-Source Readiness
+# Specification Quality Checklist: Open Source Ready
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-03-21
@@ -32,5 +32,6 @@
 ## Notes
 
 - All items pass validation. Spec is ready for `/speckit.clarify` or `/speckit.plan`.
-- SC-001 mentions "Release configuration" which is borderline implementation detail but acceptable as it's a standard build mode reference.
-- The spec intentionally references specific file paths (`.github/workflows/ci.yml`) as these are GitHub conventions, not implementation choices.
+- The spec references Testimize (https://github.com/AutomateThePlanet/Testimize) as a style guide for README design, not a dependency.
+- Banner image creation is out of scope — the spec assumes it will be provided or uses a placeholder.
+- NuGet publishing requires a secret (`NUGET_API_KEY`) that must be configured by a repo maintainer.

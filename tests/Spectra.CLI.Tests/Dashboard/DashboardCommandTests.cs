@@ -9,7 +9,7 @@ namespace Spectra.CLI.Tests.Dashboard;
 /// <summary>
 /// Integration tests for DashboardCommand.
 /// </summary>
-[Collection("Sequential Command Tests")]
+[Collection("WorkingDirectory")]
 public class DashboardCommandTests : IDisposable
 {
     private readonly string _testDir;

@@ -13,6 +13,7 @@ using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Grounding;
 using Spectra.Core.Models.Profile;
+using Spectre.Console;
 using Spectra.Core.Parsing;
 using Spectra.Core.Profile;
 using ProfilePriority = Spectra.Core.Models.Profile.Priority;
@@ -348,6 +349,7 @@ public sealed class GenerateHandler
             _progress.Info($"Token usage: {result.TokenUsage.InputTokens} in / {result.TokenUsage.OutputTokens} out");
         }
 
+        NextStepHints.Print("generate", true, _verbosity, new HintContext { SuiteName = suite });
         return ExitCodes.Success;
     }
 
@@ -389,7 +391,7 @@ public sealed class GenerateHandler
             // Prompt for new suite name
             var prompt = new Spectre.Console.TextPrompt<string>("│  Suite name: ");
             prompt.PromptStyle = new Spectre.Console.Style(foreground: Spectre.Console.Color.Cyan);
-            var newSuiteName = Spectre.Console.AnsiConsole.Prompt(prompt);
+            var newSuiteName = AnsiConsole.Prompt(prompt);
 
             suiteName = newSuiteName.Trim().ToLowerInvariant().Replace(' ', '-');
             suitePath = Path.Combine(testsPath, suiteName);
@@ -443,13 +445,13 @@ public sealed class GenerateHandler
                 _ => 20
             };
 
-            Spectre.Console.AnsiConsole.MarkupLine($"◆ How many test cases to generate?");
+            AnsiConsole.MarkupLine($"◆ How many test cases to generate?");
             var countPrompt = new Spectre.Console.TextPrompt<int>($"│  Number of tests [grey](default: {suggestedCount})[/]: ");
             countPrompt.PromptStyle = new Spectre.Console.Style(foreground: Spectre.Console.Color.Cyan);
             countPrompt.AllowEmpty = true;
-            var countInput = Spectre.Console.AnsiConsole.Prompt(countPrompt);
+            var countInput = AnsiConsole.Prompt(countPrompt);
             effectiveCount = countInput > 0 ? countInput : suggestedCount;
-            Spectre.Console.AnsiConsole.MarkupLine("└");
+            AnsiConsole.MarkupLine("└");
         }
 
 
@@ -706,6 +708,89 @@ public sealed class GenerateHandler
             await indexWriter.WriteAsync(Path.Combine(suitePath, "_index.json"), index, ct);
         }
 
+        // Track session stats
+        var sessionSuites = new List<string> { suiteName };
+        var sessionTotalTests = allGeneratedTests.Count;
+
+        // Continuation loop — offer to continue with other suites
+        if (!_noInteraction && !_dryRun)
+        {
+            while (true)
+            {
+                AnsiConsole.WriteLine();
+
+                var continueChoice = AnsiConsole.Prompt(
+                    new SelectionPrompt<string>()
+                        .Title("What would you like to do next?")
+                        .HighlightStyle(Style.Parse("cyan"))
+                        .AddChoices(
+                            $"Generate more for {suiteName}",
+                            "Switch to a different suite",
+                            "Create a new suite",
+                            "Done — exit"));
+
+                if (continueChoice == "Done — exit")
+                    break;
+
+                if (continueChoice == $"Generate more for {suiteName}")
+                {
+                    _progress.Info("Re-run 'spectra ai generate' to continue generating for this suite.");
+                    break;
+                }
+
+                if (continueChoice == "Switch to a different suite")
+                {
+                    // Re-scan suites and let user pick
+                    var freshSuites = await scanner.ScanSuitesAsync(testsPath, ct);
+                    if (freshSuites.Count == 0)
+                    {
+                        _progress.Warning("No suites found.");
+                        continue;
+                    }
+
+                    var suiteNames = freshSuites.Select(s => $"{s.Name} ({s.TestCount} tests)").ToList();
+                    var selected = AnsiConsole.Prompt(
+                        new SelectionPrompt<string>()
+                            .Title("Select a suite:")
+                            .HighlightStyle(Style.Parse("cyan"))
+                            .AddChoices(suiteNames));
+
+                    var selectedSuite = freshSuites[suiteNames.IndexOf(selected)];
+                    sessionSuites.Add(selectedSuite.Name);
+                    _progress.Info($"Switched to suite: {selectedSuite.Name}");
+                    _progress.Info($"Run 'spectra ai generate {selectedSuite.Name}' to generate tests.");
+                    break;
+                }
+
+                if (continueChoice == "Create a new suite")
+                {
+                    var newName = AnsiConsole.Prompt(
+                        new TextPrompt<string>("Suite name:")
+                            .PromptStyle(new Style(foreground: Color.Cyan)));
+
+                    var sanitized = newName.Trim().ToLowerInvariant().Replace(' ', '-');
+                    var newPath = Path.Combine(testsPath, sanitized);
+                    Directory.CreateDirectory(newPath);
+                    sessionSuites.Add(sanitized);
+                    _progress.Success($"Created new suite: {sanitized}");
+                    _progress.Info($"Run 'spectra ai generate {sanitized}' to generate tests for it.");
+                    break;
+                }
+            }
+
+            // Session summary if multiple suites were touched
+            if (sessionSuites.Count > 1)
+            {
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine($"[bold]Session summary:[/] {sessionSuites.Count} suites, {sessionTotalTests} tests generated");
+                foreach (var s in sessionSuites)
+                {
+                    AnsiConsole.MarkupLine($"  [grey]• {s}[/]");
+                }
+            }
+        }
+
+        NextStepHints.Print("generate", true, _verbosity, new HintContext { SuiteName = suiteName });
         return ExitCodes.Success;
     }
 
@@ -855,7 +940,7 @@ public sealed class GenerateHandler
             }
 
             // In interactive mode, ask user
-            var proceed = Spectre.Console.AnsiConsole.Confirm("Proceed without verification?", defaultValue: true);
+            var proceed = AnsiConsole.Confirm("Proceed without verification?", defaultValue: true);
             if (!proceed)
             {
                 return results; // Return empty - will be handled by caller

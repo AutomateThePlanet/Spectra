@@ -189,7 +189,9 @@ public class VerificationIntegrationTests
         Assert.True(CriticFactory.IsSupported("google"));
         Assert.True(CriticFactory.IsSupported("openai"));
         Assert.True(CriticFactory.IsSupported("anthropic"));
-        Assert.True(CriticFactory.IsSupported("github"));
+        Assert.True(CriticFactory.IsSupported("github-models"));
+        Assert.True(CriticFactory.IsSupported("azure-openai"));
+        Assert.True(CriticFactory.IsSupported("azure-anthropic"));
         Assert.False(CriticFactory.IsSupported("unknown"));
     }
 

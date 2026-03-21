@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Spectra.CLI.Infrastructure;
 using Spectra.Core.Models.Config;
 
@@ -230,5 +231,141 @@ public sealed class ConfigHandler
             Console.Error.WriteLine($"Error parsing config: {ex.Message}");
             return ExitCodes.Error;
         }
+    }
+
+    /// <summary>
+    /// Adds an automation directory to coverage.automation_dirs.
+    /// </summary>
+    public async Task<int> AddAutomationDirAsync(string path, CancellationToken ct = default)
+    {
+        var configPath = Path.Combine(Directory.GetCurrentDirectory(), "spectra.config.json");
+        if (!File.Exists(configPath))
+        {
+            Console.Error.WriteLine("No spectra.config.json found. Run 'spectra init' first.");
+            return ExitCodes.Error;
+        }
+
+        var json = await File.ReadAllTextAsync(configPath, ct);
+        var root = JsonNode.Parse(json, documentOptions: new JsonDocumentOptions { AllowTrailingCommas = true });
+        if (root is null)
+        {
+            Console.Error.WriteLine("Invalid spectra.config.json");
+            return ExitCodes.Error;
+        }
+
+        // Ensure coverage.automation_dirs exists
+        root["coverage"] ??= new JsonObject();
+        var coverage = root["coverage"]!.AsObject();
+        coverage["automation_dirs"] ??= new JsonArray("tests", "test", "spec", "specs", "e2e");
+        var dirs = coverage["automation_dirs"]!.AsArray();
+
+        // Check for duplicate
+        var existing = dirs.Select(d => d?.GetValue<string>()).Where(d => d is not null).ToList();
+        if (existing.Contains(path))
+        {
+            Console.WriteLine($"'{path}' is already configured as an automation directory");
+            return ExitCodes.Success;
+        }
+
+        dirs.Add(path);
+
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        await File.WriteAllTextAsync(configPath, root.ToJsonString(options), ct);
+
+        Console.WriteLine($"Added '{path}' to automation directories");
+        return ExitCodes.Success;
+    }
+
+    /// <summary>
+    /// Removes an automation directory from coverage.automation_dirs.
+    /// </summary>
+    public async Task<int> RemoveAutomationDirAsync(string path, CancellationToken ct = default)
+    {
+        var configPath = Path.Combine(Directory.GetCurrentDirectory(), "spectra.config.json");
+        if (!File.Exists(configPath))
+        {
+            Console.Error.WriteLine("No spectra.config.json found. Run 'spectra init' first.");
+            return ExitCodes.Error;
+        }
+
+        var json = await File.ReadAllTextAsync(configPath, ct);
+        var root = JsonNode.Parse(json, documentOptions: new JsonDocumentOptions { AllowTrailingCommas = true });
+        if (root is null)
+        {
+            Console.Error.WriteLine("Invalid spectra.config.json");
+            return ExitCodes.Error;
+        }
+
+        var dirs = root["coverage"]?["automation_dirs"]?.AsArray();
+        if (dirs is null)
+        {
+            Console.WriteLine($"Warning: '{path}' was not found in automation directories");
+            return ExitCodes.Success;
+        }
+
+        var index = -1;
+        for (var i = 0; i < dirs.Count; i++)
+        {
+            if (dirs[i]?.GetValue<string>() == path)
+            {
+                index = i;
+                break;
+            }
+        }
+
+        if (index < 0)
+        {
+            Console.WriteLine($"Warning: '{path}' was not found in automation directories");
+            return ExitCodes.Success;
+        }
+
+        dirs.RemoveAt(index);
+
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        await File.WriteAllTextAsync(configPath, root.ToJsonString(options), ct);
+
+        Console.WriteLine($"Removed '{path}' from automation directories");
+        return ExitCodes.Success;
+    }
+
+    /// <summary>
+    /// Lists all configured automation directories with existence status.
+    /// </summary>
+    public async Task<int> ListAutomationDirsAsync(CancellationToken ct = default)
+    {
+        var basePath = Directory.GetCurrentDirectory();
+        var configPath = Path.Combine(basePath, "spectra.config.json");
+        if (!File.Exists(configPath))
+        {
+            Console.Error.WriteLine("No spectra.config.json found. Run 'spectra init' first.");
+            return ExitCodes.Error;
+        }
+
+        var json = await File.ReadAllTextAsync(configPath, ct);
+        var config = JsonSerializer.Deserialize<SpectraConfig>(json, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        var dirs = config?.Coverage.AutomationDirs ?? [];
+
+        if (dirs.Count == 0)
+        {
+            Console.WriteLine("No automation directories configured.");
+            return ExitCodes.Success;
+        }
+
+        Console.WriteLine("Automation directories:");
+        foreach (var dir in dirs)
+        {
+            var fullPath = Path.IsPathRooted(dir)
+                ? dir
+                : Path.GetFullPath(Path.Combine(basePath, dir));
+            var exists = Directory.Exists(fullPath);
+            var status = exists ? "[exists] " : "[missing]";
+            Console.WriteLine($"  {status} {dir}");
+        }
+
+        return ExitCodes.Success;
     }
 }

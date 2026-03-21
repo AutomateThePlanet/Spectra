@@ -11,21 +11,27 @@ function renderTreemap(coverageSummary) {
     const suites = window.dashboardData?.suites;
     if (!suites || suites.length === 0) return '';
 
-    // Build automation % lookup from coverage summary
+    // Build automation % lookup from coverage summary (normalize keys)
     const autoDetails = coverageSummary?.automation?.details || [];
     const autoPctMap = {};
     for (const d of autoDetails) {
-        autoPctMap[d.suite.toLowerCase()] = d.percentage;
+        autoPctMap[d.suite.trim().toLowerCase()] = d.percentage;
     }
 
     // Build treemap data
     const children = suites
         .filter(s => s.test_count > 0)
-        .map(s => ({
-            name: s.name,
-            value: s.test_count,
-            autoPct: autoPctMap[s.name.toLowerCase()] ?? 0
-        }));
+        .map(s => {
+            const key = s.name.trim().toLowerCase();
+            if (!(key in autoPctMap)) {
+                console.warn(`[treemap] No automation match for suite "${s.name}"`);
+            }
+            return {
+                name: s.name,
+                value: s.test_count,
+                autoPct: autoPctMap[key] ?? 0
+            };
+        });
 
     if (children.length === 0) return '';
 
@@ -57,7 +63,7 @@ function initTreemap() {
     const autoDetails = coverageSummary?.automation?.details || [];
     const autoPctMap = {};
     for (const d of autoDetails) {
-        autoPctMap[d.suite.toLowerCase()] = d.percentage;
+        autoPctMap[d.suite.trim().toLowerCase()] = d.percentage;
     }
 
     const children = suites
@@ -65,7 +71,7 @@ function initTreemap() {
         .map(s => ({
             name: s.name,
             value: s.test_count,
-            autoPct: autoPctMap[s.name.toLowerCase()] ?? 0
+            autoPct: autoPctMap[s.name.trim().toLowerCase()] ?? 0
         }));
 
     if (children.length === 0) return;

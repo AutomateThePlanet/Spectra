@@ -1,193 +1,202 @@
-# Feature Specification: Open-Source Readiness
+# Feature Specification: Open Source Ready
 
 **Feature Branch**: `014-open-source-ready`
 **Created**: 2026-03-21
 **Status**: Draft
-**Input**: User description: "Make SPECTRA open-source ready. This covers README redesign, CI/CD pipelines, NuGet publishing, test health, documentation structure, and licensing."
+**Input**: User description: "Make SPECTRA open-source ready — README redesign, CI/CD pipelines, NuGet publishing, test health, documentation structure, licensing, and community templates."
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Discover and Evaluate SPECTRA (Priority: P1)
+### User Story 1 - README Redesign (Priority: P1)
 
-A potential user finds the SPECTRA GitHub repository and needs to quickly understand what SPECTRA does, why it matters, and whether it fits their needs. The README must communicate the value proposition clearly with visual appeal — banner image, status badges, emoji-driven feature showcase, and copy-paste quick start instructions — following the Testimize repo style.
+A developer discovers SPECTRA on GitHub. They land on the repository page and immediately understand what the tool does, why it's valuable, and how to get started — all from the README. The page looks professional with a banner, badges, feature icons, and copy-paste quickstart instructions.
 
-**Why this priority**: First impressions determine whether a visitor clones the repo or moves on. The README is the single most important asset for open-source adoption.
+**Why this priority**: The README is the first thing every visitor sees. A professional, visually appealing README is the single most impactful change for open-source adoption. It determines whether developers stay or bounce.
 
-**Independent Test**: Can be tested by viewing the README on GitHub and confirming it renders correctly with banner, badges, value proposition, feature details, quick start, architecture diagram, and ecosystem context.
+**Independent Test**: Visit the repository page on GitHub. Verify the banner image renders, all badges show live data (NuGet version, CI status, license), the value proposition is immediately clear, and the quickstart instructions work when followed exactly.
 
 **Acceptance Scenarios**:
 
-1. **Given** a visitor lands on the GitHub repository, **When** they view the README, **Then** they see a centered banner image, status badges (NuGet versions, CI status, license, .NET version), and a one-line value proposition.
-2. **Given** a visitor is evaluating SPECTRA, **When** they scroll through the README, **Then** they find a "Why SPECTRA?" section with 6 key differentiators using emoji icons and concise descriptions.
-3. **Given** a visitor wants to try SPECTRA, **When** they reach the Quick Start section, **Then** they find copy-paste-ready commands to install and run SPECTRA in under 5 minutes.
-4. **Given** a visitor wants to understand SPECTRA's ecosystem, **When** they view the README, **Then** they find an ecosystem table showing BELLATRIX, Testimize, and SPECTRA with their roles and links.
-5. **Given** a visitor wants detailed documentation, **When** they find the documentation links table, **Then** every link resolves to an existing file in the `docs/` folder.
+1. **Given** a user visits the SPECTRA GitHub repository, **When** the page loads, **Then** a professional banner image is displayed at the top, followed by a row of status badges (NuGet CLI, NuGet MCP, CI, License, .NET version).
+2. **Given** a user reads the README, **When** they reach the "Why SPECTRA?" section, **Then** they see 6 value propositions with emoji icons explaining what makes SPECTRA unique.
+3. **Given** a user reads the "Key Features" section, **When** they scan the features, **Then** each feature has a heading with icon, a brief description, and enough context to understand the capability without reading docs.
+4. **Given** a user follows the "Quick Start" section, **When** they run the commands listed, **Then** they can install SPECTRA and generate their first test suite within 5 minutes.
+5. **Given** the README has links to documentation pages, **When** a user clicks any link, **Then** it resolves to a real, non-empty page (no broken links).
+6. **Given** the README includes an ecosystem section, **When** a user reads it, **Then** they understand how SPECTRA relates to BELLATRIX and Testimize.
 
 ---
 
-### User Story 2 - CI Pipeline Validates Every Change (Priority: P1)
+### User Story 2 - CI Pipeline (Priority: P1)
 
-A contributor pushes code or opens a pull request. An automated CI pipeline builds the project, runs all tests, and reports results. The contributor and maintainers see immediately whether the change is safe to merge.
+A contributor opens a pull request. The CI pipeline automatically builds the project and runs all tests. The PR shows a green or red status check, and test results are available as downloadable artifacts.
 
-**Why this priority**: CI is foundational for open-source trust. Contributors need fast feedback and maintainers need confidence that PRs don't break the build.
+**Why this priority**: CI is a prerequisite for accepting external contributions safely. Without it, there's no automated quality gate.
 
-**Independent Test**: Can be tested by pushing a commit to a branch and verifying the GitHub Actions workflow triggers, builds successfully, runs tests, and uploads test result artifacts.
+**Independent Test**: Open a PR against main. Verify the CI workflow triggers, builds in Release mode, runs all tests, and reports pass/fail status on the PR.
 
 **Acceptance Scenarios**:
 
-1. **Given** a contributor pushes to main or opens a PR targeting main, **When** the push/PR event fires, **Then** a CI workflow triggers that restores, builds (Release configuration), and runs all tests.
-2. **Given** the CI workflow completes, **When** any test fails, **Then** the workflow fails and test result artifacts (TRX format) are uploaded for inspection.
-3. **Given** the CI workflow completes successfully, **When** all tests pass, **Then** the workflow shows a green check and test results are available as downloadable artifacts.
+1. **Given** a developer pushes to main or opens a PR against main, **When** the push/PR is created, **Then** the CI pipeline triggers automatically.
+2. **Given** the CI pipeline runs, **When** the build step executes, **Then** all projects compile successfully in Release configuration.
+3. **Given** the CI pipeline runs, **When** the test step executes, **Then** all test projects run and results are reported.
+4. **Given** any test fails, **When** the pipeline completes, **Then** the pipeline status is "failed" and the PR cannot be merged (when branch protection is enabled).
+5. **Given** the pipeline completes (pass or fail), **When** a user checks artifacts, **Then** test result files are available for download.
 
 ---
 
-### User Story 3 - Publish NuGet Packages on Release (Priority: P1)
+### User Story 3 - NuGet Publishing (Priority: P2)
 
-A maintainer tags a release (e.g., `v1.11.0`). The publish workflow automatically builds, tests, packs, and publishes two NuGet packages — `Spectra.CLI` as a dotnet global tool and `Spectra.MCP` as a standalone execution server — to nuget.org.
+A maintainer pushes a version tag (e.g., `v1.0.0`). The publishing pipeline automatically builds, tests, packs, and pushes two NuGet packages: `Spectra.CLI` (global tool) and `Spectra.MCP` (server library).
 
-**Why this priority**: NuGet publishing is the primary distribution mechanism. Users install SPECTRA via `dotnet tool install`, so packages must be published reliably on every release.
+**Why this priority**: NuGet publishing is how users install SPECTRA (`dotnet tool install -g Spectra.CLI`). Without it, users must build from source.
 
-**Independent Test**: Can be tested by creating a version tag and verifying the workflow packs both projects and pushes to NuGet (or a test feed).
+**Independent Test**: Push a version tag `v0.1.0-test`. Verify the pipeline runs, creates two .nupkg files, and (in a dry-run or test feed) would push them to NuGet.org.
 
 **Acceptance Scenarios**:
 
-1. **Given** a maintainer pushes a tag matching `v*`, **When** the publish workflow triggers, **Then** it builds, tests, packs both `Spectra.CLI` and `Spectra.MCP`, and pushes `.nupkg` files to nuget.org.
-2. **Given** the version tag is `v1.11.0`, **When** the packages are packed, **Then** the package version matches `1.11.0` (tag without the `v` prefix).
-3. **Given** a package version already exists on nuget.org, **When** the push is attempted, **Then** it skips the duplicate without failing the workflow.
+1. **Given** a maintainer pushes a tag matching `v*`, **When** the tag push is detected, **Then** the NuGet publishing pipeline triggers.
+2. **Given** the pipeline runs, **When** the pack step executes, **Then** two NuGet packages are produced: `Spectra.CLI` and `Spectra.MCP`.
+3. **Given** the `Spectra.CLI` package is packed, **When** inspected, **Then** it is configured as a .NET global tool with the command name `spectra`.
+4. **Given** both packages are packed, **When** the push step executes, **Then** packages are pushed to NuGet.org (requires `NUGET_API_KEY` secret).
+5. **Given** a package version already exists on NuGet, **When** the push step executes, **Then** it skips the duplicate without failing.
+6. **Given** the version tag is `v1.2.3`, **When** the packages are built, **Then** both packages have version `1.2.3`.
 
 ---
 
-### User Story 4 - All Tests Pass (Priority: P1)
+### User Story 4 - Fix All Failing Tests (Priority: P1)
 
-A contributor clones the repo and runs `dotnet test`. All tests pass with zero failures. No tests are skipped without a documented reason.
+A developer clones the repository and runs `dotnet test`. All tests pass on the first run without any external configuration or dependencies. This is the baseline quality bar for an open-source project.
 
-**Why this priority**: 100% green tests are a basic credibility signal. Failing tests in an open-source repo signal abandonment or poor quality.
+**Why this priority**: Same level as CI — failing tests on clone erode trust and block contributions. A 100% green test suite is non-negotiable for open-source credibility.
 
-**Independent Test**: Can be tested by running `dotnet test` on a fresh clone and verifying all tests pass.
+**Independent Test**: Clone the repository on a clean machine with only .NET 8 SDK installed. Run `dotnet test`. Verify 100% pass rate with zero skipped tests.
 
 **Acceptance Scenarios**:
 
-1. **Given** a contributor clones the repo, **When** they run `dotnet test`, **Then** all tests pass with zero failures across all three test projects.
-2. **Given** a test was previously failing due to path issues, missing fixtures, or external dependencies, **When** the fix is applied, **Then** the test passes reliably across multiple runs.
-3. **Given** a test cannot be stabilized, **When** it is skipped, **Then** it has a skip attribute with a clear explanation of why.
+1. **Given** a developer clones the repository, **When** they run `dotnet test`, **Then** all tests pass (exit code 0).
+2. **Given** tests were previously failing due to missing configuration, **When** tests are fixed, **Then** they use self-contained test fixtures with embedded default configuration.
+3. **Given** tests were previously failing due to external dependencies, **When** tests are fixed, **Then** external dependencies are mocked or stubbed.
+4. **Given** any test is marked as skipped, **When** the test suite is reviewed, **Then** each skipped test has a documented reason in a code comment explaining why and when it can be re-enabled.
 
 ---
 
-### User Story 5 - Contributor Onboarding (Priority: P2)
+### User Story 5 - License and Legal (Priority: P2)
 
-A new contributor wants to contribute to SPECTRA. They find clear instructions for building locally, running tests, code style conventions, and the PR process. Issue templates and PR templates guide them through the workflow.
+The repository has a clear MIT license file at the root. Contributors and users know they can use, modify, and distribute SPECTRA freely.
 
-**Why this priority**: Contributor friction is the biggest barrier to open-source participation. Clear templates and docs reduce the barrier to entry.
+**Why this priority**: No license = no open-source. MIT is the most permissive and widely adopted choice for .NET tools.
 
-**Independent Test**: Can be tested by following the CONTRIBUTING.md instructions on a fresh machine and successfully building and testing the project.
+**Independent Test**: Verify LICENSE file exists at repo root, contains valid MIT license text with the correct copyright holder, and the README links to it.
 
 **Acceptance Scenarios**:
 
-1. **Given** a new contributor reads CONTRIBUTING.md, **When** they follow the build instructions, **Then** they can build and run all tests successfully.
-2. **Given** a contributor opens a new issue, **When** they see the issue template chooser, **Then** they can select between "Bug Report" and "Feature Request" with guided fields.
-3. **Given** a contributor opens a PR, **When** the PR form loads, **Then** they see a checklist template covering tests, documentation, and breaking changes.
-4. **Given** contributors use different editors, **When** they open any source file, **Then** the `.editorconfig` enforces consistent indentation, encoding, and line endings.
+1. **Given** a user visits the repository, **When** they look for license information, **Then** a LICENSE file exists at the repo root with MIT license text.
+2. **Given** the LICENSE file exists, **When** a user reads it, **Then** it contains the correct copyright year and organization name.
+3. **Given** the README has a license badge, **When** a user clicks it, **Then** it links to the LICENSE file.
 
 ---
 
-### User Story 6 - Documentation is Complete and Navigable (Priority: P2)
+### User Story 6 - Documentation Structure (Priority: P2)
 
-A user or contributor needs to understand a specific SPECTRA feature. They find documentation in a well-organized `docs/` folder with proper cross-linking from the README. Every link resolves to a real file with meaningful content.
+All documentation is organized in a `docs/` folder with a clear hierarchy. Every link in the README and docs resolves to a real file. A developer can find information about any SPECTRA feature through the documentation.
 
-**Why this priority**: Broken links and missing docs erode trust. Complete documentation demonstrates project maturity.
+**Why this priority**: Documentation is the second most important factor (after README) for open-source adoption. Organized docs reduce support burden and enable self-service.
 
-**Independent Test**: Can be tested by clicking every documentation link in the README and verifying each resolves to an existing file with meaningful content.
+**Independent Test**: Click every link in README.md and every cross-link in docs/ files. Verify all resolve to real, non-empty pages.
 
 **Acceptance Scenarios**:
 
-1. **Given** the README contains documentation links, **When** a user clicks any link, **Then** it resolves to an existing markdown file in the `docs/` folder.
-2. **Given** a user navigates the docs folder, **When** they browse the directory, **Then** they find a logical structure covering getting started, CLI reference, configuration, test format, coverage, profiles, grounding, document index, deployment, execution agent, and architecture.
+1. **Given** the docs/ folder exists, **When** a developer browses it, **Then** files are organized by topic: getting started, CLI reference, configuration, test format, coverage, profiles, verification, deployment, architecture, and development guide.
+2. **Given** the README links to documentation pages, **When** each link is followed, **Then** it resolves to a real file with substantive content (not stubs).
+3. **Given** a new contributor wants to build locally, **When** they read CONTRIBUTING.md or docs/DEVELOPMENT.md, **Then** they find step-by-step build and test instructions.
 
 ---
 
-### User Story 7 - License and Legal Clarity (Priority: P2)
+### User Story 7 - Community Templates and Tooling (Priority: P3)
 
-A potential adopter needs to verify the licensing terms before using SPECTRA. They find a clear MIT license file at the repository root, and the README badge links to it.
+The repository has GitHub issue templates, PR template, contributing guide, editor configuration, and dependency management. These reduce friction for external contributors.
 
-**Why this priority**: License clarity is a prerequisite for enterprise adoption and open-source contribution.
+**Why this priority**: Nice-to-have polish that makes the project feel well-maintained. Lower priority than core quality (tests, CI, README) but important for contributor experience.
 
-**Independent Test**: Can be tested by verifying the LICENSE file exists at the repo root with MIT license text and the README badge links to it.
-
-**Acceptance Scenarios**:
-
-1. **Given** a user checks the repository, **When** they look for licensing information, **Then** they find a LICENSE file at the repository root with MIT license text.
-2. **Given** the README has a license badge, **When** a user clicks the badge, **Then** it links to the LICENSE file.
-
----
-
-### User Story 8 - Automated Dependency Updates (Priority: P3)
-
-Dependencies stay current through automated Dependabot PRs for NuGet packages on a weekly schedule.
-
-**Why this priority**: Keeping dependencies updated prevents security vulnerabilities and reduces upgrade debt over time.
-
-**Independent Test**: Can be tested by verifying the Dependabot configuration file exists and is correctly formatted.
+**Independent Test**: Create a new issue on GitHub. Verify issue templates appear (bug report, feature request). Open a PR and verify the PR template appears with a checklist.
 
 **Acceptance Scenarios**:
 
-1. **Given** the repository has a Dependabot configuration, **When** a new NuGet package version is available, **Then** Dependabot creates a PR with the update on a weekly schedule.
+1. **Given** a user creates a new issue, **When** the issue form loads, **Then** they can choose between "Bug Report" and "Feature Request" templates with guided fields.
+2. **Given** a contributor opens a PR, **When** the PR form loads, **Then** a checklist template appears with items: tests pass, documentation updated, no breaking changes.
+3. **Given** a contributor opens the project in any editor, **When** they edit code, **Then** the editor configuration file enforces consistent formatting (indentation, line endings, charset).
+4. **Given** Dependabot is configured, **When** a NuGet dependency has an update, **Then** Dependabot automatically creates a PR with the update.
+5. **Given** a potential contributor reads CONTRIBUTING.md, **When** they follow the guide, **Then** they can build, test, and submit a PR without asking for help.
 
 ---
 
 ### Edge Cases
 
-- What happens when the banner image file is missing? The README should still be readable (alt text fallback).
-- What happens when NuGet push fails due to network issues? The workflow should fail clearly with actionable error messages.
-- What happens when a contributor runs tests on a different OS (Windows vs Linux vs macOS)? Tests should pass cross-platform, or platform-specific tests should be clearly marked.
-- What happens when the version tag format is wrong (e.g., `release-1.0` instead of `v1.0`)? The publish workflow should only trigger on `v*` tags and ignore other tags.
-- What happens when a contributor opens an issue without using a template? GitHub's template chooser should guide them, but not block free-form issues entirely.
+- What happens when the NuGet API key secret is not configured? The publish pipeline fails with a clear error message indicating the missing secret, without exposing any sensitive information.
+- What happens when a CI build fails on a PR from a fork? The CI pipeline runs but secrets are not available to fork PRs (standard GitHub security). Build and test steps still work since they don't need secrets.
+- What happens when a contributor clones on Windows vs Linux vs macOS? All tests must pass cross-platform. Path handling uses forward slashes or platform-agnostic APIs.
+- What happens when the banner image file is missing from assets/? The README degrades gracefully — the text content is still readable without the image.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: Repository MUST have a README.md with centered banner image, status badges row (NuGet CLI, NuGet MCP, CI status, license, .NET version), one-line value proposition, "Why SPECTRA?" section with 6 emoji-driven differentiators, Key Features section with detailed descriptions, Quick Start section with copy-paste commands, architecture diagram, ecosystem table, documentation links table, project status section, and contributing/license sections.
-- **FR-002**: Repository MUST have a GitHub Actions CI workflow (`.github/workflows/ci.yml`) that triggers on push to main and on all PRs targeting main, restoring dependencies, building in Release configuration, running all tests with TRX logging, and uploading test results as artifacts.
-- **FR-003**: Repository MUST have a GitHub Actions publish workflow (`.github/workflows/publish.yml`) that triggers on `v*` tags, builds, tests, packs both `Spectra.CLI` and `Spectra.MCP` as NuGet packages, and pushes them to nuget.org with skip-duplicate enabled.
-- **FR-004**: All tests across Spectra.Core.Tests, Spectra.CLI.Tests, and Spectra.MCP.Tests MUST pass with zero failures when running `dotnet test`.
-- **FR-005**: Repository MUST have a LICENSE file at the root containing MIT license text with correct copyright holder and year.
-- **FR-006**: Repository MUST have issue templates in `.github/ISSUE_TEMPLATE/` for bug reports (`bug_report.md`) and feature requests (`feature_request.md`) with guided fields.
-- **FR-007**: Repository MUST have a PR template (`.github/PULL_REQUEST_TEMPLATE.md`) with a checklist covering tests passing, documentation updated, and breaking changes documented.
-- **FR-008**: CONTRIBUTING.md MUST include sections for building locally, running tests, code style guidelines (referencing .editorconfig), and the PR process.
-- **FR-009**: Repository MUST have an `.editorconfig` enforcing consistent code style (indentation, encoding, line endings, trailing whitespace).
-- **FR-010**: Repository MUST have a Dependabot configuration (`.github/dependabot.yml`) for weekly NuGet package updates.
-- **FR-011**: All documentation files referenced in README.md MUST exist in the `docs/` folder with meaningful content (not stubs).
-- **FR-012**: NuGet package version MUST be derived from the git tag in the publish workflow, with `PackAsTool=true` and correct `ToolCommandName` values (`spectra` for CLI, `spectra-mcp` for MCP).
-- **FR-013**: CI workflow MUST upload test results (TRX format) as downloadable artifacts regardless of test outcome.
-- **FR-014**: The README MUST include a documentation links table with entries for all docs in the `docs/` folder.
-
-### Key Entities
-
-- **README.md**: Primary landing page for the repository containing all marketing, onboarding, and navigation content.
-- **CI Workflow**: GitHub Actions workflow for continuous integration — build and test on every push/PR.
-- **Publish Workflow**: GitHub Actions workflow for NuGet package publishing triggered by version tags.
-- **NuGet Packages**: Two distributable packages — `Spectra.CLI` (global tool) and `Spectra.MCP` (execution server).
-- **Documentation Set**: Collection of markdown files in `docs/` covering all SPECTRA features and workflows.
-- **Contributor Templates**: Issue templates, PR template, CONTRIBUTING.md, and .editorconfig for contributor onboarding.
+- **FR-001**: Repository MUST have a professionally designed README.md with banner image, badge row, value proposition, feature showcase, quickstart guide, architecture diagram, ecosystem table, documentation links, and license information.
+- **FR-002**: Repository MUST have a CI pipeline that triggers on push to main and all PRs, building all projects and running all tests in Release configuration.
+- **FR-003**: CI pipeline MUST upload test results as downloadable artifacts.
+- **FR-004**: Repository MUST have a NuGet publishing pipeline that triggers on version tags (`v*`), producing and pushing `Spectra.CLI` and `Spectra.MCP` packages.
+- **FR-005**: `Spectra.CLI` MUST be packaged as a .NET global tool with command name `spectra`.
+- **FR-006**: Package version MUST be derived from the git tag (e.g., tag `v1.2.3` produces version `1.2.3`).
+- **FR-007**: All tests MUST pass on a clean clone with only .NET 8 SDK installed — no external configuration or services required.
+- **FR-008**: Repository MUST have an MIT LICENSE file at the root with correct copyright information.
+- **FR-009**: Documentation MUST be organized in a `docs/` folder with files covering: getting started, CLI reference, configuration, test format, coverage, profiles, verification, deployment, architecture, and development.
+- **FR-010**: Every link in README.md and docs/ files MUST resolve to a real, non-empty target.
+- **FR-011**: Repository MUST have GitHub issue templates (bug report, feature request) and a PR template with a review checklist.
+- **FR-012**: Repository MUST have a CONTRIBUTING.md with build instructions, test instructions, code style guidelines, and PR process.
+- **FR-013**: Repository MUST have an .editorconfig file for consistent code formatting.
+- **FR-014**: Repository MUST have Dependabot configuration for NuGet dependency updates.
+- **FR-015**: All CI/CD pipelines MUST not expose secrets in logs or artifact outputs.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: `dotnet build --configuration Release` completes with zero errors across all projects.
-- **SC-002**: `dotnet test` passes all tests (984+) with zero failures across all three test projects.
-- **SC-003**: Every hyperlink in README.md resolves to an existing file or valid external URL.
-- **SC-004**: `dotnet pack` successfully produces `.nupkg` files for both Spectra.CLI and Spectra.MCP.
-- **SC-005**: README renders correctly on GitHub with visible banner placeholder, clickable badges, formatted tables, and proper markdown rendering.
-- **SC-006**: A new contributor can clone, build, and run tests within 5 minutes by following CONTRIBUTING.md instructions.
-- **SC-007**: CI workflow definition is syntactically valid and references correct paths and .NET version.
+- **SC-001**: `dotnet test` achieves 100% pass rate on a clean clone (zero failures, zero unexplained skips).
+- **SC-002**: CI pipeline completes in under 10 minutes for build + test.
+- **SC-003**: A new developer can install SPECTRA and generate their first test suite within 5 minutes by following the README quickstart.
+- **SC-004**: 100% of links in README.md and docs/ files resolve to valid targets (no 404s, no dead links).
+- **SC-005**: NuGet packages can be installed via `dotnet tool install -g Spectra.CLI` after publishing.
+- **SC-006**: The repository passes the "30-second test" — a developer visiting for the first time understands what SPECTRA does within 30 seconds of reading the README.
 
 ## Assumptions
 
-- The banner image (`assets/spectra_github_readme_banner.png`) will be provided or created separately — the README references it but image asset creation is outside this spec's scope.
-- The repository is hosted on GitHub under the `AutomateThePlanet` organization.
-- NuGet API key will be stored as a GitHub secret named `NUGET_API_KEY`.
-- The existing `.editorconfig`, `CONTRIBUTING.md`, and `LICENSE` files may need updates but the files already exist.
-- Version management uses `Directory.Build.props` or individual `.csproj` files — the publish workflow extracts version from the git tag.
-- No license headers are added to individual source files — MIT license at repo root is sufficient for open-source compliance.
-- The Testimize repo (github.com/AutomateThePlanet/Testimize) serves as the visual style reference for README design.
+- The banner image will be provided or created as `assets/spectra_github_readme_banner.png` — the implementation creates the assets/ directory and references it, but the actual image design is handled separately.
+- NuGet.org publishing requires a `NUGET_API_KEY` GitHub secret configured by a maintainer. The pipeline assumes this secret exists.
+- The Testimize repository (https://github.com/AutomateThePlanet/Testimize) is used as a style reference for README layout, not as a functional dependency.
+- Cross-platform test compatibility targets Windows, Linux, and macOS. CI runs on ubuntu-latest; developers may work on any OS.
+- Documentation content (docs/) will be created as substantive guides, not stubs. Exact content depth is determined during implementation based on existing knowledge in the codebase.
+- Branch protection rules are recommended in documentation but not enforced by this feature (that's a repo settings change, not a code change).
+
+## Scope Boundaries
+
+**In scope**:
+- README.md full redesign with banner, badges, features, quickstart, ecosystem, docs links
+- CI pipeline (.github/workflows/ci.yml) — build + test on push/PR
+- NuGet publish pipeline (.github/workflows/publish.yml) — pack + push on tag
+- Project file updates for NuGet packaging (PackAsTool, PackageId, etc.)
+- Fix all failing tests to achieve 100% green
+- MIT LICENSE file
+- Documentation structure in docs/ with core guides
+- CONTRIBUTING.md with build/test/style/PR instructions
+- GitHub issue templates and PR template
+- .editorconfig for code formatting
+- Dependabot configuration
+
+**Out of scope**:
+- GitHub Pages or docs site (future enhancement)
+- Banner image design (placeholder or existing image used)
+- Branch protection rule configuration (documented as recommendation only)
+- Code signing for NuGet packages
+- Release notes automation (future enhancement)
+- Changelog generation
+- Security policy (SECURITY.md — future enhancement)

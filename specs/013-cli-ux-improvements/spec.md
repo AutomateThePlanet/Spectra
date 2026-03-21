@@ -3,151 +3,155 @@
 **Feature Branch**: `013-cli-ux-improvements`
 **Created**: 2026-03-21
 **Status**: Draft
-**Input**: User description: "Several UX improvements for the SPECTRA CLI that make the tool more intuitive and reduce friction: init automation dirs, init critic model, interactive suite continuation, next-step hints"
-
-## Clarifications
-
-### Session 2026-03-21
-
-- Q: What happens to the new init prompts (automation dirs, critic model) when `spectra init` runs in non-interactive mode (`--no-interaction`)? → A: Both prompts are skipped silently, using defaults (no automation dirs, critic disabled). Users can configure them afterward via `spectra config` subcommands or manual config editing.
-- Q: What happens when `spectra config add-automation-dir` is called with a path already in the list? → A: Idempotent no-op with a notice ("path already configured").
-- Q: Should next-step hints dynamically inspect repo state or use static per-command mappings? → A: Static predefined hints per command + outcome (success/failure). No file I/O at hint time.
+**Input**: User description: "Several UX improvements for the SPECTRA CLI that make the tool more intuitive and reduce friction: init automation dirs, init critic config, interactive suite continuation, next-step hints."
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Next-Step Hints After Commands (Priority: P1)
 
-After running any Spectra command, the CLI displays 2-3 contextual suggestions for what to do next, printed in dimmed/gray text below the primary output. Hints are statically mapped per command and outcome (success/failure) — they do not perform file I/O or inspect repo state at hint time. Users running Spectra in CI or automated pipelines can suppress hints with a `--quiet` flag.
+After running a CLI command, the user sees 2-3 contextual suggestions of what to do next, printed in dimmed/gray text below the primary output. This reduces the learning curve and guides new users through the natural workflow without requiring documentation.
 
-**Why this priority**: This is the highest-impact, lowest-risk improvement. Every user benefits on every command invocation. It reduces the learning curve for new users and reminds experienced users of capabilities they may forget. It is purely additive output that does not modify any existing interactive flows.
+**Why this priority**: Affects every command in the CLI and has the broadest user impact. Most users don't know the full command set or the recommended workflow order. Hints are low-friction to implement and immediately improve discoverability.
 
-**Independent Test**: Can be fully tested by running any Spectra command (e.g., `spectra init`, `spectra ai generate`, `spectra dashboard`) and verifying that contextual suggestions appear in dimmed text after the primary output. Running with `--quiet` should suppress them.
+**Independent Test**: Run any supported command (init, generate, analyze, dashboard, validate) and verify that relevant, context-aware next-step suggestions appear after the primary output in dimmed text. Verify `--quiet` suppresses hints.
 
 **Acceptance Scenarios**:
 
-1. **Given** a user runs `spectra init` successfully, **When** the command completes, **Then** the CLI prints 2-3 relevant next-step suggestions in dimmed text (e.g., "spectra init-profile", "spectra ai generate")
-2. **Given** a user runs `spectra ai generate` and tests are written, **When** generation completes, **Then** hints suggest coverage analysis, generating more tests, or switching to interactive mode
-3. **Given** a user runs `spectra ai analyze --coverage`, **When** analysis completes, **Then** hints suggest auto-linking, dashboard generation, or generating tests for uncovered areas
-4. **Given** a user runs `spectra dashboard --output ./site`, **When** the dashboard is generated, **Then** hints suggest opening the HTML file and reference deployment documentation
-5. **Given** a user runs any command with the `--quiet` flag, **When** the command completes, **Then** no next-step hints are displayed
-6. **Given** a user runs `spectra validate` and errors are found, **When** validation fails, **Then** hints suggest fixing errors and re-running validation (different from success hints)
-7. **Given** a user runs `spectra ai analyze --coverage --auto-link`, **When** auto-linking completes, **Then** hints suggest regenerating the dashboard to reflect updated coverage
+1. **Given** a user runs `spectra init` successfully, **When** the output completes, **Then** 2-3 next-step suggestions are printed in dimmed text, including `spectra ai generate` and `spectra init-profile`.
+2. **Given** a user runs `spectra ai generate --suite authentication`, **When** generation completes, **Then** hints include `spectra ai analyze --coverage` and `spectra ai generate` (interactive mode).
+3. **Given** a user runs `spectra ai analyze --coverage`, **When** analysis completes, **Then** hints include `spectra dashboard --output ./site` and `spectra ai analyze --coverage --auto-link` (if auto-link not already used).
+4. **Given** a user runs `spectra dashboard --output ./site`, **When** generation completes, **Then** hints include opening the HTML file and a link to the deployment guide.
+5. **Given** a user runs `spectra validate` with errors, **When** validation fails, **Then** hints suggest fixing errors and re-running `spectra validate`.
+6. **Given** a user runs `spectra validate` with no errors, **When** validation passes, **Then** hints suggest `spectra ai generate` or `spectra index`.
+7. **Given** the `--quiet` flag is used with any command, **When** the command completes, **Then** no hints are displayed.
+8. **Given** a CI environment (non-interactive terminal or `--no-interaction` flag), **When** any command completes, **Then** no hints are displayed.
 
 ---
 
 ### User Story 2 - Init: Configure Automation Directories (Priority: P2)
 
-During the `spectra init` interactive setup, after configuring documentation and test directories, the CLI asks the user to specify automation test code directories for coverage analysis. Users can enter one or more comma-separated paths or press Enter to skip. The configured paths are written to the `coverage.automation_dirs` array in `spectra.config.json`. A standalone `spectra config` subcommand allows users to add, remove, and list automation directories after initialization.
+During `spectra init`, after the existing setup steps, the user is prompted to configure automation code directories for coverage analysis. This tells the scanner where to find automated test code that references manual test IDs. Users can also manage these directories after init with dedicated config subcommands.
 
-**Why this priority**: Automation directory configuration is critical for accurate coverage analysis, which is a core Spectra value proposition. Currently users must manually edit the config file — most never discover this setting, leading to incomplete coverage reports.
+**Why this priority**: Coverage analysis accuracy depends on knowing where automation code lives. Currently users must manually edit config, and most don't discover the `automation_dirs` setting. Prompting during init ensures correct setup from day one.
 
-**Independent Test**: Can be tested by running `spectra init` in a new directory and verifying the automation directory prompt appears, or by running `spectra config add-automation-dir ../tests` and confirming the config file is updated.
+**Independent Test**: Run `spectra init` in an empty directory, respond to the automation directories prompt, and verify the paths appear in `spectra.config.json` under `coverage.automation_dirs`. Then run `spectra config add-automation-dir` and verify the config updates.
 
 **Acceptance Scenarios**:
 
-1. **Given** a user runs `spectra init` in a new repository, **When** the init wizard reaches the automation directory step, **Then** the CLI prompts for automation code directories with examples and a skip option
-2. **Given** a user enters `../test_automation, src/IntegrationTests` at the prompt, **When** the input is confirmed, **Then** `spectra.config.json` contains `coverage.automation_dirs` with both paths
-3. **Given** a user presses Enter without typing anything, **When** the prompt is skipped, **Then** no `automation_dirs` are added and init continues normally
-4. **Given** a user runs `spectra config add-automation-dir ../new-tests`, **When** the command succeeds, **Then** the path is appended to `coverage.automation_dirs` in `spectra.config.json`
-5. **Given** a user runs `spectra config remove-automation-dir ../old-tests`, **When** the path exists in the config, **Then** it is removed from the array
-6. **Given** a user runs `spectra config remove-automation-dir ../nonexistent`, **When** the path does not exist in the config, **Then** the CLI shows a warning that the path was not found
-7. **Given** a user runs `spectra config list-automation-dirs`, **When** dirs are configured, **Then** the CLI lists all configured automation directories
-8. **Given** a user runs `spectra config list-automation-dirs`, **When** no dirs are configured, **Then** the CLI shows a message indicating no automation directories are configured
+1. **Given** a user runs `spectra init` interactively, **When** the init flow reaches the automation config step, **Then** a prompt asks for automation code directories with examples and a skip option.
+2. **Given** the user enters `../test_automation, src/IntegrationTests` at the prompt, **When** init completes, **Then** `coverage.automation_dirs` in spectra.config.json contains `["../test_automation", "src/IntegrationTests"]`.
+3. **Given** the user presses Enter without typing anything, **When** init continues, **Then** the default automation directories are used (existing defaults from CoverageConfig).
+4. **Given** a user runs `spectra config add-automation-dir ../new-tests`, **When** the command completes, **Then** `../new-tests` is appended to `coverage.automation_dirs` in spectra.config.json without duplicating existing entries.
+5. **Given** a user runs `spectra config remove-automation-dir ../old-tests`, **When** the command completes, **Then** `../old-tests` is removed from `coverage.automation_dirs`. If it wasn't present, a warning is shown.
+6. **Given** a user runs `spectra config list-automation-dirs`, **When** the command completes, **Then** all configured automation directories are listed, one per line, with an indication of which ones exist on disk.
+7. **Given** `spectra init` is run with `--no-interaction`, **When** the init flow runs, **Then** the automation directories prompt is skipped and defaults are used.
 
 ---
 
-### User Story 3 - Init: Configure Critic Model (Priority: P3)
+### User Story 3 - Init: Configure Critic Model (Priority: P2)
 
-During `spectra init`, after the user selects their primary AI provider and model, the CLI asks whether they want to enable grounding verification. If yes, the user selects a critic provider from a curated list and provides the API key environment variable name. The configuration is written to the `ai.critic` section of `spectra.config.json`. This story also includes verifying that the existing critic pipeline is actually invoked during test generation and fixing it if not.
+During `spectra init`, after the primary AI provider is configured, the user is asked whether to enable grounding verification (the critic). If yes, they select a critic provider and configure the API key. This makes the critic discoverable — currently users must manually edit the `ai.critic` config section to enable it.
 
-**Why this priority**: The critic model is a differentiating feature (dual-model verification) but is currently invisible to users who don't read the config documentation. Surfacing it during init dramatically increases adoption. However, it depends on the generation flow working correctly, making it slightly lower priority than the purely additive features.
+**Why this priority**: Same level as automation dirs — improves init flow completeness. Grounding verification is a key differentiator for SPECTRA but most users never enable it because they don't know it exists.
 
-**Independent Test**: Can be tested by running `spectra init`, selecting "Yes" for grounding verification, choosing a provider, and verifying that `spectra.config.json` contains a properly populated `ai.critic` section.
+**Independent Test**: Run `spectra init` interactively, select "Yes" for grounding verification, pick a provider, and verify `ai.critic` is properly populated in spectra.config.json with `enabled: true`.
 
 **Acceptance Scenarios**:
 
-1. **Given** a user runs `spectra init` and completes primary AI provider setup, **When** the wizard proceeds, **Then** it asks whether the user wants to enable grounding verification with a description of what it does
-2. **Given** a user selects "Yes" for grounding verification, **When** the critic setup begins, **Then** the CLI presents a list of recommended critic providers with brief descriptions
-3. **Given** a user selects a critic provider (e.g., Google Gemini Flash), **When** the provider is chosen, **Then** the CLI asks for the API key environment variable name with a sensible default for that provider
-4. **Given** a user completes critic configuration, **When** the config is saved, **Then** `spectra.config.json` contains `ai.critic` with enabled, provider, model, and API key variable
-5. **Given** a user selects "No" for grounding verification, **When** the choice is confirmed, **Then** critic configuration is skipped and the critic section is either omitted or set to disabled
-6. **Given** a user selects "Same as primary provider", **When** the config is saved, **Then** the critic provider and model match the primary AI provider settings
-7. **Given** the critic is enabled in config and a user runs `spectra ai generate`, **When** generation completes, **Then** grounding verdicts appear in the console output confirming the critic pipeline is active
+1. **Given** a user runs `spectra init` interactively and has configured a primary AI provider, **When** the provider step completes, **Then** a prompt asks whether to enable grounding verification with a brief explanation of what it does.
+2. **Given** the user selects "Yes", **When** the critic setup begins, **Then** a list of critic providers is shown (google, anthropic, openai, same as primary) with recommendations.
+3. **Given** the user selects "google" as critic provider, **When** the critic setup continues, **Then** the user is prompted for the API key environment variable name (defaulting to `GOOGLE_API_KEY`).
+4. **Given** the user completes critic setup, **When** init finishes, **Then** `ai.critic` in spectra.config.json has `enabled: true`, the selected provider, default model for that provider, and the API key env var.
+5. **Given** the user selects "No" for grounding verification, **When** init continues, **Then** `ai.critic` is either absent or has `enabled: false`.
+6. **Given** the user selects "Same as primary provider", **When** the critic setup continues, **Then** the critic is configured with the same provider and model as the primary, and no additional API key is requested.
+7. **Given** `spectra init` is run with `--no-interaction`, **When** the init flow runs, **Then** the critic prompt is skipped and critic remains disabled (default).
 
 ---
 
-### User Story 4 - Interactive Mode: Continue to Other Suites (Priority: P4)
+### User Story 4 - Interactive Mode: Continue to Other Suites (Priority: P3)
 
-After completing test generation for a suite in interactive mode, instead of exiting, the CLI presents a menu offering to: (1) generate more tests for the same suite to fill remaining coverage gaps, (2) switch to a different existing suite, (3) create a new suite and continue generating, or (4) exit. The session remains active until the user explicitly chooses to exit. When switching suites, the interactive flow restarts from the test type selection step for the new suite.
+After completing test generation for a suite in interactive mode, instead of exiting, the user is offered options to continue working: generate more tests for the same suite, switch to a different suite, create a new suite, or exit. This eliminates the need to restart the CLI for each suite.
 
-**Why this priority**: While this is a significant convenience improvement, it primarily benefits power users who generate tests across multiple suites in a single sitting. Most users generate for one suite at a time. The implementation also touches the interactive session state machine, which is more complex to modify safely.
+**Why this priority**: Improves power user workflow efficiency but is lower impact than the other improvements since most users generate for one suite at a time. Still valuable for comprehensive test generation sessions.
 
-**Independent Test**: Can be tested by running `spectra ai generate` in interactive mode, completing generation for one suite, and verifying the continuation menu appears with all four options functional.
+**Independent Test**: Run `spectra ai generate` in interactive mode, complete generation for one suite, verify the continuation prompt appears with all four options, select "Switch to a different suite", and verify the flow continues without restarting.
 
 **Acceptance Scenarios**:
 
-1. **Given** a user completes test generation for a suite in interactive mode, **When** tests are written and the index is updated, **Then** the CLI displays a continuation menu with four options (generate more, switch suite, create suite, exit)
-2. **Given** the user selects "Generate more tests for [current suite]", **When** the option is chosen, **Then** the session restarts the generation flow for the same suite, showing remaining coverage gaps as context
-3. **Given** the user selects "Switch to a different suite", **When** the option is chosen, **Then** the CLI displays a suite selector listing all available suites with their test counts
-4. **Given** the user selects a suite from the switch list, **When** the suite is selected, **Then** the interactive flow restarts from the test type selection step for that suite
-5. **Given** the user selects "Create a new suite", **When** the option is chosen, **Then** the CLI prompts for a suite name, creates the directory, and continues with the normal interactive generation flow
-6. **Given** the user selects "Done — exit", **When** the option is chosen, **Then** the session ends cleanly
-7. **Given** the user enters an invalid suite name when creating a new suite, **When** validation fails, **Then** the CLI shows an error and re-prompts
+1. **Given** interactive generation completes for a suite, **When** tests are written, **Then** a menu appears with options: (1) Generate more for this suite, (2) Switch to a different suite, (3) Create a new suite, (4) Done — exit.
+2. **Given** gaps were identified during generation, **When** the continuation menu appears, **Then** uncovered gaps are listed as context before the menu (e.g., "Gaps still uncovered: MFA recovery flows, SSO edge cases").
+3. **Given** the user selects "Generate more for this suite", **When** the flow continues, **Then** the interactive generation loop restarts for the same suite, focusing on the remaining gaps.
+4. **Given** the user selects "Switch to a different suite", **When** the suite list appears, **Then** existing suites are shown with test counts, and the user can pick one to generate tests for.
+5. **Given** the user selects "Create a new suite", **When** the prompt appears, **Then** the user enters a suite name, the directory is created, and the interactive generation flow begins for the new suite.
+6. **Given** the user selects "Done — exit", **When** the command exits, **Then** the exit code is 0 and a summary of all suites worked on in the session is printed.
+7. **Given** the `--no-interaction` flag is used, **When** generation completes, **Then** the continuation menu is not shown and the command exits after the first suite.
 
 ---
 
 ### Edge Cases
 
-- What happens if `spectra init` runs with `--no-interaction`? The new automation directory and critic model prompts are skipped silently, using defaults (no automation dirs, critic disabled).
-- What happens if `--quiet` is combined with interactive mode? Hints are suppressed; interactive prompts remain unaffected.
-- What happens if `spectra config add-automation-dir` is run before `spectra init`? The command fails with a clear message that `spectra.config.json` does not exist.
-- What happens if the user configures a critic provider during init but the API key environment variable is not set at runtime? The init wizard warns that the variable is not currently set but still saves the configuration (the key may be set later).
-- What happens if all suites have been fully covered when the continuation menu appears? The "switch to a different suite" option remains available (users may want to regenerate or add tests).
-- What happens if the user creates a new suite with a name that already exists? The CLI warns and offers to generate tests for the existing suite instead.
-- What happens if `spectra.config.json` has no `coverage` section when running `spectra config list-automation-dirs`? The CLI displays "No automation directories configured" rather than erroring.
-- What happens if `spectra config add-automation-dir` is called with a path already in the list? The command is idempotent: it does nothing and prints a notice that the path is already configured.
-- What happens if the terminal does not support ANSI color codes for dimmed text? Hints are printed as plain text without styling.
+- What happens when the user enters invalid directory paths during automation dir setup? The system accepts the paths as-is (they are configuration, not validated at init time) but `list-automation-dirs` shows which paths don't exist on disk.
+- What happens when the user tries to add a duplicate automation directory? The command detects duplicates and prints a message that the directory is already configured, without adding it again.
+- What happens when the user removes the last automation directory? The command allows it, resulting in an empty array. Coverage analysis will warn that no automation directories are configured.
+- What happens when the critic API key environment variable doesn't exist at init time? Init accepts the variable name without validation — the key is only needed at generation time. A note is printed reminding the user to set the variable before running generation.
+- What happens when hints would suggest a command that doesn't apply (e.g., `--auto-link` when already used)? The hint system checks recent command context and omits irrelevant suggestions.
+- What happens when all suites have full coverage during the continue-to-other-suites flow? The "gaps" section is omitted and the menu still offers to switch suites or exit.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: System MUST display 2-3 contextual next-step suggestions after each command completes, using dimmed/gray text styling
-- **FR-002**: System MUST vary hint content based on the command executed and its outcome (success/failure), using static predefined mappings with no file I/O at hint time
-- **FR-003**: System MUST support a `--quiet` flag on all commands to suppress next-step hints for CI/automation use
-- **FR-004**: During `spectra init`, system MUST prompt users to configure automation code directories for coverage analysis, with examples and a skip option
-- **FR-005**: System MUST provide `spectra config add-automation-dir`, `spectra config remove-automation-dir`, and `spectra config list-automation-dirs` subcommands
-- **FR-006**: The `config` subcommands MUST read from and write to `spectra.config.json` in the current directory
-- **FR-007**: During `spectra init`, after primary AI provider configuration, system MUST ask whether to enable grounding verification with an explanation of its purpose
-- **FR-008**: System MUST present a curated list of critic providers with brief descriptions when the user opts to enable grounding verification
-- **FR-009**: System MUST write critic configuration to the `ai.critic` section of `spectra.config.json`
-- **FR-010**: After completing test generation in interactive mode, system MUST display a continuation menu with options to: generate more for the same suite, switch suite, create new suite, or exit
-- **FR-011**: System MUST keep the interactive session alive across suite switches until the user explicitly selects exit
-- **FR-012**: System MUST support creating a new suite directory from the continuation menu and seamlessly continuing the generation flow
-
-### Key Entities
-
-- **NextStepHint**: A suggestion displayed after command completion, consisting of a command string and a brief description. Associated with a command context (which command ran, success/failure state).
-- **AutomationDirectory**: A file system path pointing to automation test code, stored in the project configuration's coverage section.
-- **CriticProviderOption**: A selectable provider for grounding verification during init, consisting of a provider name, default model, and default API key environment variable name.
+- **FR-001**: System MUST display 2-3 contextual next-step hints after command completion, formatted in dimmed/gray text, separated from primary output by a blank line.
+- **FR-002**: System MUST suppress hints when `--quiet` flag is used, when `--no-interaction` flag is set, or when the terminal is non-interactive.
+- **FR-003**: Hints MUST be context-aware — different suggestions based on the command that ran, its success/failure status, and the current repository state.
+- **FR-004**: System MUST prompt for automation code directories during `spectra init` interactive mode, after the existing setup steps.
+- **FR-005**: System MUST support `spectra config add-automation-dir <path>` to append a directory to `coverage.automation_dirs`.
+- **FR-006**: System MUST support `spectra config remove-automation-dir <path>` to remove a directory from `coverage.automation_dirs`.
+- **FR-007**: System MUST support `spectra config list-automation-dirs` to list all configured automation directories with existence status.
+- **FR-008**: System MUST prompt for grounding verification (critic) configuration during `spectra init` interactive mode, after the primary AI provider is configured.
+- **FR-009**: The critic prompt MUST offer at least three provider options (google, anthropic, openai) plus "same as primary" and "skip/disable".
+- **FR-010**: System MUST write a valid `ai.critic` section to spectra.config.json when the user enables the critic during init.
+- **FR-011**: After interactive generation completes for a suite, system MUST offer a continuation menu with options to: generate more for the same suite, switch suites, create a new suite, or exit.
+- **FR-012**: The continuation menu MUST display any remaining coverage gaps identified during generation, if available.
+- **FR-013**: The interactive session MUST support working on multiple suites in sequence without restarting the CLI.
+- **FR-014**: System MUST print a session summary when the user exits after working on multiple suites (total tests generated, suites worked on).
+- **FR-015**: All new prompts and menus MUST be skipped when `--no-interaction` is set, falling back to defaults or exiting as appropriate.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: 100% of supported commands display contextually appropriate next-step hints when `--quiet` is not specified
-- **SC-002**: Users can complete automation directory configuration during init in under 30 seconds
-- **SC-003**: Users can configure the critic model during init without referring to external documentation
-- **SC-004**: Users generating tests interactively can switch between suites without restarting the CLI
-- **SC-005**: All next-step hints are suppressed when `--quiet` flag is provided, producing clean output suitable for CI pipelines
-- **SC-006**: The `spectra config` subcommands correctly modify the configuration file without corrupting existing settings
-- **SC-007**: Grounding verification is confirmed functional during test generation when the critic is enabled
+- **SC-001**: Users complete initial setup (init through first generation) with 50% fewer documentation lookups — hints guide them through the natural workflow.
+- **SC-002**: 100% of supported commands display relevant next-step hints in interactive mode (init, generate, analyze, dashboard, validate, docs index).
+- **SC-003**: Users can configure automation directories and critic model entirely through the init flow without manually editing spectra.config.json.
+- **SC-004**: Interactive generation sessions last 3x longer on average — users work across multiple suites without restarting the CLI.
+- **SC-005**: All new interactive prompts are suppressed in CI mode (`--no-interaction` or `--quiet`), maintaining backward compatibility with automated workflows.
+- **SC-006**: Hint display adds less than 50ms to command execution time.
 
 ## Assumptions
 
-- The `--quiet` flag follows existing Spectra CLI flag conventions and can be applied globally to any command.
-- Dimmed/gray text is rendered using the existing Spectre.Console terminal UX library.
-- The continuation menu in interactive mode uses the same selection prompt pattern as existing interactive components (suite selector, test type selector).
-- Default critic provider suggestions: Google (Gemini Flash, fast and economical), Anthropic (Claude Haiku), OpenAI (GPT-4o-mini), plus a "same as primary" option.
-- The `spectra config` command is a new top-level command group with no existing conflicts.
-- Automation directory paths are stored as provided (not normalized to absolute paths) to support portable configurations.
+- Hints are printed to stderr or after the primary stdout output, so they don't interfere with piped/scripted usage.
+- The "dimmed/gray text" styling uses the existing terminal UX library (Spectre.Console) or ANSI escape codes for muted text.
+- The continuation menu in interactive mode reuses the existing Spectre.Console selection prompts used elsewhere in the CLI.
+- The critic provider list is hardcoded at build time (google, anthropic, openai, same-as-primary). New providers can be added in future versions.
+- The hint content is hardcoded per command, not dynamically generated by AI. This keeps hints fast and deterministic.
+- `--quiet` and `--no-interaction` are existing global options that already suppress verbose output. Hints respect these flags.
+
+## Scope Boundaries
+
+**In scope**:
+- Next-step hints for: init, generate (direct + interactive), analyze, dashboard, validate, docs index
+- Automation directory init prompt and config subcommands (add/remove/list)
+- Critic model init prompt
+- Interactive mode continuation (suite switching, new suite creation)
+- Session summary on exit
+- CI/quiet mode suppression
+
+**Out of scope**:
+- Customizable hint content (user-defined hints)
+- Hint localization/internationalization
+- Persistent session state across CLI invocations
+- Critic pipeline debugging or fixing (the critic is confirmed to work when configured)
+- Changes to non-interactive (direct) generation mode beyond adding hints
+- Tab completion for CLI commands
+- Command history or recall

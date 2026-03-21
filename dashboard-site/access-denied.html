@@ -146,18 +146,22 @@
             const message = document.getElementById('message');
 
             const errorMessages = {
-                'no_code': 'Authentication was cancelled or failed.',
-                'access_denied': 'You denied the authorization request.',
-                'user_fetch_failed': 'Could not retrieve your GitHub profile.',
-                'no_repo_access': 'You do not have access to the required repository.',
-                'invalid_state': 'The authentication request was invalid.',
-                'token_error': 'Failed to exchange authorization code.'
+                'no_code': 'Authentication was cancelled or failed. Please try again.',
+                'access_denied': 'You denied the authorization request. To access the dashboard, you must approve the GitHub OAuth authorization.',
+                'user_fetch_failed': 'Could not retrieve your GitHub profile. Please try again or check that the OAuth app is properly configured.',
+                'no_repo_access': 'You do not have read access to any of the allowed repositories. Contact your repository admin to request access.',
+                'invalid_state': 'The authentication request was invalid or expired. Please try again.',
+                'token_error': 'Failed to exchange authorization code. This may indicate a misconfigured OAuth app — verify the callback URL matches your deployment.'
             };
 
             const friendlyMessage = errorMessages[error] || `An error occurred: ${error}`;
             message.textContent = friendlyMessage;
 
-            errorDisplay.innerHTML = `<span class="error-code">Error: ${error}</span>`;
+            errorDisplay.innerHTML = `<span class="error-code">Error: ${error}</span>
+                <p style="margin-top:1rem;font-size:0.9rem;color:var(--text-muted)">
+                    To access this dashboard, you need read access to one of the allowed repositories.
+                    If you believe you should have access, contact your repository administrator.
+                </p>`;
         }
     </script>
 </body>
