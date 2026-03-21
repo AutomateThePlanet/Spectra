@@ -60,12 +60,6 @@ jobs:
       - name: Generate dashboard
         run: spectra dashboard --output ./site
 
-      - name: Copy Cloudflare Pages functions (OAuth middleware)
-        run: |
-          if [ -d "dashboard-site/functions" ]; then
-            cp -r dashboard-site/functions ./site/functions
-          fi
-
       - name: Read project name from config
         id: config
         run: |

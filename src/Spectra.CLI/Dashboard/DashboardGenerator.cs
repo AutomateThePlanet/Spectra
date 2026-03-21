@@ -114,6 +114,21 @@ public sealed class DashboardGenerator
             {
                 CopyDirectory(stylesSource, Path.Combine(outputPath, "styles"));
                 CopyDirectory(scriptsSource, Path.Combine(outputPath, "scripts"));
+
+                // Copy Cloudflare Pages functions if present
+                var functionsSource = Path.Combine(templateDir, "functions");
+                if (Directory.Exists(functionsSource))
+                {
+                    CopyDirectory(functionsSource, Path.Combine(outputPath, "functions"));
+                }
+
+                // Copy access-denied page if present
+                var accessDeniedSource = Path.Combine(templateDir, "access-denied.html");
+                if (File.Exists(accessDeniedSource))
+                {
+                    File.Copy(accessDeniedSource, Path.Combine(outputPath, "access-denied.html"), overwrite: true);
+                }
+
                 return;
             }
         }
