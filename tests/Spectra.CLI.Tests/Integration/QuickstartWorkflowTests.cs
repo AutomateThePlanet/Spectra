@@ -14,7 +14,7 @@ namespace Spectra.CLI.Tests.Integration;
 /// <summary>
 /// Tests the complete quickstart workflow as documented.
 /// </summary>
-[Collection("Sequential Command Tests")]
+[Collection("WorkingDirectory")]
 public class QuickstartWorkflowTests : IDisposable
 {
     private readonly string _testDir;

@@ -4,7 +4,7 @@ using Spectra.Core.Models.Profile;
 
 namespace Spectra.CLI.Tests.Profile;
 
-[Collection("ConsoleOutput")]
+[Collection("WorkingDirectory")]
 public sealed class ProfileShowTests : IDisposable
 {
     private readonly string _testDir;

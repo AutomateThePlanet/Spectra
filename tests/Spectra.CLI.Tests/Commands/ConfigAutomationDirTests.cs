@@ -3,6 +3,7 @@ using Spectra.CLI.Commands.Config;
 
 namespace Spectra.CLI.Tests.Commands;
 
+[Collection("WorkingDirectory")]
 public class ConfigAutomationDirTests : IDisposable
 {
     private readonly string _tempDir;

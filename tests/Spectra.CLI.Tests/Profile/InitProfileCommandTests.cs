@@ -5,6 +5,7 @@ using Spectra.Core.Profile;
 
 namespace Spectra.CLI.Tests.Profile;
 
+[Collection("WorkingDirectory")]
 public sealed class InitProfileCommandTests : IDisposable
 {
     private readonly string _testDir;
