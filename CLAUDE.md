@@ -32,12 +32,12 @@ src/
 │   ├── Validation/           # Test validation, dedup
 │   ├── Review/               # Interactive terminal UI
 │   ├── Interactive/          # Interactive mode components (selectors, session)
-│   ├── Output/               # Progress reporters, result presenters
+│   ├── Output/               # Progress reporters, result presenters, NextStepHints
 │   ├── Classification/       # Test classification (update flow)
 │   ├── Coverage/             # Gap analysis and coverage reporting
 │   ├── Profile/              # Generation profile loading
-│   ├── Config/               # Configuration loader
-│   ├── Dashboard/            # Dashboard data collection and generation
+│   ├── Config/               # Configuration loader, automation dir subcommands
+│   ├── Dashboard/            # Dashboard data collection, generation, BrandingInjector, SampleDataFactory
 │   └── IO/                   # File writers
 ├── Spectra.Core/             # Shared library
 │   ├── Models/               # TestCase, Suite, Config models
@@ -119,10 +119,11 @@ spectra ai update checkout                       # Direct mode (specific suite)
 spectra ai update checkout --no-interaction      # CI mode (no prompts, exit codes)
 spectra ai update --diff                         # Show changes before applying
 
-# Dashboard Generation (003)
+# Dashboard Generation (003 + 012-dashboard-branding)
 spectra dashboard --output ./site
 spectra dashboard --output ./site --title "My Dashboard"
-spectra dashboard --dry-run  # Preview without generating
+spectra dashboard --dry-run                        # Preview without generating
+spectra dashboard --preview                        # Sample data + branding verification
 
 # Documentation Index (010-document-index)
 spectra docs index                               # Incremental update (only changed files)
