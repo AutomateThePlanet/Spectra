@@ -83,7 +83,12 @@
       "Bash(export PATH=\"$HOME/.dotnet/tools:$PATH\" && cd /c/SourceCode/Spectra/test_app_documentation && spectra auth 2>&1)",
       "Bash(export PATH=\"$HOME/.dotnet/tools:$PATH\" && spectra ai generate spectra-test-docs --no-interaction --count 3 2>&1)",
       "Bash(cd /c/SourceCode/Spectra && sed -i 's/1.10.6/1.10.7/' src/Spectra.CLI/Spectra.CLI.csproj && dotnet build src/Spectra.CLI -c Release --no-incremental -p:NoWarn=CA1062 2>&1 | tail -3)",
-      "Bash(export PATH=\"$HOME/.dotnet/tools:$PATH\" && cd /c/SourceCode/Spectra/test_app_documentation && spectra ai generate spectra-test-docs --no-interaction --count 5 2>&1)"
+      "Bash(export PATH=\"$HOME/.dotnet/tools:$PATH\" && cd /c/SourceCode/Spectra/test_app_documentation && spectra ai generate spectra-test-docs --no-interaction --count 5 2>&1)",
+      "Bash(wc -l \"C:\\\\SourceCode\\\\Spectra\\\\tests\\\\Spectra.Core.Tests\\\\Coverage\"/*.cs)",
+      "Bash(echo \"=== MCP.Tests Breakdown ===\" && \\\\\necho \"Execution tests:\" && \\\\\ngrep -r \"public.*Task\" /c/SourceCode/Spectra/tests/Spectra.MCP.Tests/Execution --include=\"*.cs\" | grep -v obj | wc -l && \\\\\necho \"Helpers tests:\" && \\\\\ngrep -r \"public.*Task\" /c/SourceCode/Spectra/tests/Spectra.MCP.Tests/Helpers --include=\"*.cs\" | grep -v obj | wc -l && \\\\\necho \"Models tests:\" && \\\\\ngrep -r \"public.*Task\" /c/SourceCode/Spectra/tests/Spectra.MCP.Tests/Models --include=\"*.cs\" | grep -v obj | wc -l && \\\\\necho \"Reports tests:\" && \\\\\ngrep -r \"public.*Task\\\\|public.*void\" /c/SourceCode/Spectra/tests/Spectra.MCP.Tests/Reports --include=\"*.cs\" | grep -v obj | wc -l)",
+      "Bash(echo \"=== All test methods in MCP.Tests ===\" && \\\\\nfind /c/SourceCode/Spectra/tests/Spectra.MCP.Tests -type f -name \"*Tests.cs\" ! -path \"*/obj/*\" -exec grep -H \"public.*Task\\\\|public.*void\" {} \\\\; | grep -v \"IAsyncDisposable\\\\|DisposeAsync\\\\|Dispose\\\\|ValueTask\" | wc -l)",
+      "Bash(.specify/scripts/bash/update-agent-context.sh claude:*)",
+      "Bash(find /c/SourceCode/Spectra -type f \\\\\\( -name \"*agent*\" -o -name \"*skill*\" \\\\\\) -iname \"*.md\" 2>/dev/null | grep -v node_modules | sort)"
     ]
   }
 }
