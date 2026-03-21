@@ -60,6 +60,7 @@ public sealed class DocsIndexHandler
                           $"{index.TotalWordCount:N0} words, ~{index.TotalEstimatedTokens:N0} tokens");
         _progress.Info($"Index written to: {Path.GetRelativePath(currentDir, indexPath)}");
 
+        NextStepHints.Print("docs-index", true, _verbosity);
         return ExitCodes.Success;
     }
 

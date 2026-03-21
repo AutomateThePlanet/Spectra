@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Spectra.CLI.Infrastructure;
+using Spectra.CLI.Output;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Profile;
@@ -197,9 +198,11 @@ public sealed class ValidateHandler
             {
                 Console.WriteLine("Validation passed.");
             }
+            NextStepHints.Print("validate", true, _verbosity, new HintContext { ErrorCount = 0 });
             return ExitCodes.Success;
         }
 
+        NextStepHints.Print("validate", false, _verbosity, new HintContext { ErrorCount = totalErrors });
         return ExitCodes.Error;
     }
 

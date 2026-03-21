@@ -2,6 +2,7 @@ using System.Text.Json;
 using Spectra.CLI.Agent.Tools;
 using Spectra.CLI.Coverage;
 using Spectra.CLI.Infrastructure;
+using Spectra.CLI.Output;
 using Spectra.CLI.IO;
 using Spectra.CLI.Source;
 using Spectra.Core.Coverage;
@@ -185,6 +186,8 @@ public sealed class AnalyzeHandler
             Console.WriteLine($"Requirements Coverage:  {reqCoverage.Percentage:F1}% ({reqCoverage.CoveredRequirements}/{reqCoverage.TotalRequirements} requirements)");
             Console.WriteLine($"Automation Coverage:    {autoCoverage.Percentage:F1}% ({autoCoverage.Automated}/{autoCoverage.TotalTests} tests)");
 
+            var hasGaps = docCoverage.Percentage < 100 || reqCoverage.Percentage < 100 || autoCoverage.Percentage < 100;
+            NextStepHints.Print("analyze", true, _verbosity, new HintContext { HasAutoLink = autoLink, HasGaps = hasGaps });
             return ExitCodes.Success;
         }
         catch (OperationCanceledException)

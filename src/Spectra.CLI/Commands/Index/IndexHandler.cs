@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Spectra.CLI.Infrastructure;
+using Spectra.CLI.Output;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
@@ -162,7 +163,9 @@ public sealed class IndexHandler
             }
         }
 
-        return errors > 0 ? ExitCodes.Error : ExitCodes.Success;
+        var success = errors == 0;
+        NextStepHints.Print("index", success, _verbosity);
+        return success ? ExitCodes.Success : ExitCodes.Error;
     }
 
     private static List<string> GetSuitesToIndex(string testsPath, string? suite)

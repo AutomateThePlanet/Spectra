@@ -134,6 +134,11 @@ spectra ai analyze --coverage --format json --output coverage.json
 spectra ai analyze --coverage --format markdown --output coverage.md
 spectra ai analyze --coverage --auto-link                        # Write automated_by back into test files
 spectra ai analyze --coverage --verbosity detailed
+
+# Automation Directory Management (013-cli-ux-improvements)
+spectra config add-automation-dir ../new-tests     # Add automation dir for coverage
+spectra config remove-automation-dir ../old-tests   # Remove automation dir
+spectra config list-automation-dirs                 # List dirs with existence status
 ```
 
 ## Code Style
@@ -145,6 +150,7 @@ spectra ai analyze --coverage --verbosity detailed
 - **Tests:** xUnit with structured results (never throw on validation errors)
 
 ## Recent Changes
+- 013-cli-ux-improvements: ✅ COMPLETE - CLI UX improvements for discoverability and workflow. New `NextStepHints` helper prints context-aware next-step suggestions after every command (init, generate, analyze, dashboard, validate, docs index, index) in dimmed text, suppressed by `--quiet` or piped output. Init flow: new interactive prompts for automation directory setup (`coverage.automation_dirs`) and critic model configuration (`ai.critic`). New config subcommands: `spectra config add-automation-dir`, `remove-automation-dir`, `list-automation-dirs`. Interactive generation mode: continuation menu after suite completion (generate more, switch suite, create suite, exit) with session summary. 18 new tests.
 - 012-dashboard-branding: ✅ COMPLETE - Dashboard branding and theming customization. New models: `BrandingConfig`, `ColorPaletteConfig` in `DashboardConfig`. New service: `BrandingInjector` handles company name, logo, favicon, CSS variable overrides, dark theme, and custom CSS injection via template placeholders. `SampleDataFactory` provides mock data for `--preview` mode. Light/dark theme presets via CSS custom properties. Config: `dashboard.branding` section in spectra.config.json with `company_name`, `logo`, `favicon`, `theme`, `colors`, `custom_css`. CLI: `spectra dashboard --preview` for branding verification. 51 new tests (8 config + 21 injector + 9 sample data + 13 existing generator).
 - 010-smart-test-selection: ✅ COMPLETE - Cross-suite test search and filtering via `find_test_cases` MCP tool (free-text query, priority/tag/component/automation filters, AND between types, OR within arrays). Extended `start_execution_run` with `test_ids` (custom test ID list) and `selection` (saved selection by name) modes alongside existing `suite` mode. New `get_test_execution_history` tool for per-test execution statistics (pass rate, last status, total runs). New `list_saved_selections` tool reads named selections from `spectra.config.json`. Added `description` field to TestCaseFrontmatter/TestCase/TestIndexEntry. Index writer now populates description, estimated_duration, automated_by, requirements fields. Default config includes "smoke" saved selection. Agent prompt updated with smart selection workflow and risk-based recommendations.
 - 009-coverage-dashboard-viz: ✅ COMPLETE - Enhanced dashboard coverage visualizations. Typed detail models replacing `IReadOnlyList<object>` (`DocumentationSectionData`, `RequirementsSectionData`, `AutomationSectionData` with per-item detail classes). `DataCollector` populates detail lists for all three sections. Dashboard: expandable progress bar drill-down with per-item breakdown, donut chart (SVG, automated/manual/unlinked distribution), D3.js treemap (suites sized by test count, colored by automation %), empty state guidance with setup instructions. CSS transitions for expand/collapse animations.

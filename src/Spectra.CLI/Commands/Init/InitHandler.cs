@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Spectra.CLI.Agent;
 using System.Text.Json;
 using Spectra.CLI.Infrastructure;
+using Spectra.CLI.Output;
 using Spectra.CLI.Source;
 using Spectra.Core.Config;
 using Spectra.Core.Models.Config;
@@ -96,8 +97,16 @@ public sealed class InitHandler
             {
                 Console.WriteLine();
                 await InteractiveAuthSetupAsync(ct);
+
+                // Automation directory setup
+                await InteractiveAutomationDirsAsync(ct);
+
+                // Critic model setup
+                await InteractiveCriticSetupAsync(ct);
             }
 
+            NextStepHints.Print("init", true,
+                _interactive ? VerbosityLevel.Normal : VerbosityLevel.Quiet);
             return ExitCodes.Success;
         }
         catch (Exception ex)
@@ -640,5 +649,165 @@ public sealed class InitHandler
         var content = contentProvider();
         await File.WriteAllTextAsync(targetPath, content, ct);
         _logger.LogDebug("Installed agent file: {Path}", targetPath);
+    }
+
+    private async Task InteractiveAutomationDirsAsync(CancellationToken ct)
+    {
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[bold]Automation Directory Setup[/]");
+        AnsiConsole.MarkupLine("[grey]Tell SPECTRA where your automated test code lives (for coverage analysis).[/]");
+        AnsiConsole.MarkupLine("[grey]Examples: ../tests, src/Tests, e2e/[/]");
+        AnsiConsole.WriteLine();
+
+        var input = AnsiConsole.Prompt(
+            new TextPrompt<string>("Enter paths [grey](comma-separated, or press Enter for defaults)[/]:")
+                .AllowEmpty()
+                .PromptStyle("green"));
+
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            AnsiConsole.MarkupLine("[grey]Using defaults (tests, test, spec, specs, e2e)[/]");
+            return;
+        }
+
+        var dirs = input.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(d => !string.IsNullOrWhiteSpace(d))
+            .Distinct()
+            .ToList();
+
+        if (dirs.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[grey]Using defaults (tests, test, spec, specs, e2e)[/]");
+            return;
+        }
+
+        // Update config file with the automation dirs
+        var configPath = Path.Combine(_workingDirectory, ConfigFileName);
+        if (File.Exists(configPath))
+        {
+            var json = await File.ReadAllTextAsync(configPath, ct);
+            var root = System.Text.Json.Nodes.JsonNode.Parse(json);
+            if (root is not null)
+            {
+                root["coverage"] ??= new System.Text.Json.Nodes.JsonObject();
+                var dirsArray = new System.Text.Json.Nodes.JsonArray();
+                foreach (var d in dirs) dirsArray.Add(d);
+                root["coverage"]!["automation_dirs"] = dirsArray;
+
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                await File.WriteAllTextAsync(configPath, root.ToJsonString(options), ct);
+            }
+        }
+
+        AnsiConsole.MarkupLine($"[green]Added {dirs.Count} automation director{(dirs.Count == 1 ? "y" : "ies")} to spectra.config.json[/]");
+    }
+
+    private async Task InteractiveCriticSetupAsync(CancellationToken ct)
+    {
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[bold]Grounding Verification Setup[/]");
+        AnsiConsole.MarkupLine("[grey]A second AI model reviews generated tests against your documentation[/]");
+        AnsiConsole.MarkupLine("[grey]to catch hallucinated steps and unverified claims.[/]");
+        AnsiConsole.WriteLine();
+
+        var enableChoice = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("Enable [cyan]grounding verification[/]? (recommended)")
+                .HighlightStyle(Style.Parse("cyan"))
+                .AddChoices("Yes — configure a critic model", "No — skip verification"));
+
+        if (enableChoice.StartsWith("No"))
+        {
+            AnsiConsole.MarkupLine("[grey]Skipped. You can enable it later in spectra.config.json under ai.critic.[/]");
+            return;
+        }
+
+        AnsiConsole.WriteLine();
+
+        var providerChoices = new Dictionary<string, (string Provider, string Model, string DefaultKeyEnv)>
+        {
+            ["google (Gemini Flash — fast and cheap, recommended)"] = ("google", "gemini-2.0-flash", "GOOGLE_API_KEY"),
+            ["anthropic (Claude Haiku)"] = ("anthropic", "claude-haiku-4-5-20251001", "ANTHROPIC_API_KEY"),
+            ["openai (GPT-4o-mini)"] = ("openai", "gpt-4o-mini", "OPENAI_API_KEY"),
+            ["Same as primary provider"] = ("same", "", "")
+        };
+
+        var providerChoice = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("Select [cyan]critic provider[/]:")
+                .HighlightStyle(Style.Parse("cyan"))
+                .AddChoices(providerChoices.Keys));
+
+        var (provider, model, defaultKeyEnv) = providerChoices[providerChoice];
+
+        string apiKeyEnv;
+
+        if (provider == "same")
+        {
+            // Read primary provider from config
+            var configPath = Path.Combine(_workingDirectory, ConfigFileName);
+            if (File.Exists(configPath))
+            {
+                var json = await File.ReadAllTextAsync(configPath, ct);
+                var config = JsonSerializer.Deserialize<SpectraConfig>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                var primary = config?.Ai.Providers.FirstOrDefault(p => p.Enabled);
+                if (primary is not null)
+                {
+                    provider = primary.Name;
+                    model = primary.Model ?? "gpt-4o";
+                    apiKeyEnv = primary.ApiKeyEnv ?? "";
+                }
+                else
+                {
+                    provider = "github-models";
+                    model = "gpt-4o";
+                    apiKeyEnv = "";
+                }
+            }
+            else
+            {
+                provider = "github-models";
+                model = "gpt-4o";
+                apiKeyEnv = "";
+            }
+        }
+        else
+        {
+            AnsiConsole.WriteLine();
+            apiKeyEnv = AnsiConsole.Prompt(
+                new TextPrompt<string>($"API key environment variable [grey](default: {defaultKeyEnv})[/]:")
+                    .DefaultValue(defaultKeyEnv)
+                    .PromptStyle("green"));
+        }
+
+        // Write critic config
+        var cfgPath = Path.Combine(_workingDirectory, ConfigFileName);
+        if (File.Exists(cfgPath))
+        {
+            var json = await File.ReadAllTextAsync(cfgPath, ct);
+            var root = System.Text.Json.Nodes.JsonNode.Parse(json);
+            if (root is not null)
+            {
+                root["ai"] ??= new System.Text.Json.Nodes.JsonObject();
+                root["ai"]!["critic"] = new System.Text.Json.Nodes.JsonObject
+                {
+                    ["enabled"] = true,
+                    ["provider"] = provider,
+                    ["model"] = model,
+                    ["api_key_env"] = apiKeyEnv
+                };
+
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                await File.WriteAllTextAsync(cfgPath, root.ToJsonString(options), ct);
+            }
+        }
+
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine($"[green]Critic configured:[/] [cyan]{provider}[/] / [cyan]{model}[/]");
+        AnsiConsole.MarkupLine("[grey]Grounding verification will run after every generation.[/]");
+        AnsiConsole.MarkupLine("[grey]Use --skip-critic to bypass when needed.[/]");
     }
 }

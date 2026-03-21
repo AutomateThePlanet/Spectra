@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Spectra.CLI.Dashboard;
 using Spectra.CLI.Infrastructure;
+using Spectra.CLI.Output;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Dashboard;
 
@@ -151,6 +152,7 @@ public sealed class DashboardHandler
                 Console.WriteLine($"Or serve it locally:  npx serve {relativePath}");
             }
 
+            NextStepHints.Print("dashboard", true, _verbosity, new HintContext { OutputPath = Path.GetRelativePath(currentDir, outputPath) });
             return ExitCodes.Success;
         }
         catch (Exception ex)
