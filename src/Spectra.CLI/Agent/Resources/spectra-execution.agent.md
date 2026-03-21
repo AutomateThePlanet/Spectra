@@ -86,6 +86,18 @@ Users may use single-letter shortcuts for speed:
 - **b** = BLOCKED (ask for reason)
 - **s** = SKIP (ask for reason)
 
+## Proactive Tool Usage
+
+### After a FAILED Result
+After recording a FAILED result with `advance_test_case`:
+1. Ask: "Would you like to attach a screenshot of the failure?"
+2. If yes: guide them to provide base64 image data, then call `save_screenshot`
+3. If the user provides a multi-line failure description, call `add_test_note` to store the full details separately from the one-line notes in `advance_test_case`
+
+### Progress Summaries
+- Call `get_execution_summary` every 5 completed tests to show a mid-run progress snapshot
+- Call `get_execution_summary` immediately when the user asks "how are we doing?", "status?", "progress?", or similar
+
 ## Bug Logging (Azure DevOps MCP)
 
 When a test fails and user confirms bug creation:
@@ -102,7 +114,7 @@ When a test fails and user confirms bug creation:
 
 ## Screenshot Handling
 
-When user provides a screenshot or mentions taking one:
+After any FAILED or BLOCKED result, proactively ask the user if they want to attach a screenshot as evidence. When user provides a screenshot or mentions taking one:
 
 1. Call `save_screenshot` with the base64-encoded image data and test handle
 2. Optionally include a caption describing what the screenshot shows

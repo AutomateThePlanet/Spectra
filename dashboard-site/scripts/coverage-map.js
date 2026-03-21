@@ -89,12 +89,12 @@ function initCoverageMap() {
         status: l.status
     }));
 
-    // Create force simulation
+    // Create force simulation with better spacing
     const simulation = d3.forceSimulation(nodes)
-        .force('link', d3.forceLink(links).id(d => d.id).distance(80))
-        .force('charge', d3.forceManyBody().strength(-200))
+        .force('link', d3.forceLink(links).id(d => d.id).distance(120))
+        .force('charge', d3.forceManyBody().strength(-400))
         .force('center', d3.forceCenter(width / 2, height / 2))
-        .force('collision', d3.forceCollide().radius(30));
+        .force('collision', d3.forceCollide().radius(45));
 
     coverageMapState.simulation = simulation;
     coverageMapState.data = { nodes, links };
@@ -130,12 +130,16 @@ function initCoverageMap() {
         .attr('dominant-baseline', 'central')
         .text(d => getNodeIcon(d.type));
 
-    // Node labels
+    // Node labels (show full name, with tooltip for long labels)
     node.append('text')
         .attr('class', 'node-label')
-        .attr('dy', d => getNodeRadius(d.type) + 12)
+        .attr('dy', d => getNodeRadius(d.type) + 14)
         .attr('text-anchor', 'middle')
-        .text(d => truncateLabel(d.name, 15));
+        .text(d => truncateLabel(d.name, 25));
+
+    // Full-name tooltips on nodes
+    node.append('title')
+        .text(d => `${d.type}: ${d.name}\nStatus: ${d.status}${d.path ? '\nPath: ' + d.path : ''}`);
 
     // Update positions on tick
     simulation.on('tick', () => {

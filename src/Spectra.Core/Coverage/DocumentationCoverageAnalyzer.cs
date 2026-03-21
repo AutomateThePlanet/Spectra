@@ -20,7 +20,7 @@ public sealed class DocumentationCoverageAnalyzer
         foreach (var doc in documentMap.Documents)
         {
             var testsForDoc = allTests
-                .Where(t => t.SourceRefs.Contains(doc.Path))
+                .Where(t => t.SourceRefs.Any(r => StripFragment(r) == doc.Path))
                 .ToList();
 
             details.Add(new DocumentCoverageDetail
@@ -45,5 +45,15 @@ public sealed class DocumentationCoverageAnalyzer
             Percentage = percentage,
             Details = details
         };
+    }
+
+    /// <summary>
+    /// Strips the fragment anchor (#section) from a source_ref path.
+    /// e.g. "docs/auth.md#Login-Flow" → "docs/auth.md"
+    /// </summary>
+    private static string StripFragment(string sourceRef)
+    {
+        var hashIndex = sourceRef.IndexOf('#');
+        return hashIndex >= 0 ? sourceRef[..hashIndex] : sourceRef;
     }
 }

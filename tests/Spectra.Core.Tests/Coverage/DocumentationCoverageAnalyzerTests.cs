@@ -116,6 +116,41 @@ public class DocumentationCoverageAnalyzerTests
         Assert.Equal(3, result.Details[0].TestIds.Count);
     }
 
+    [Fact]
+    public void Analyze_SourceRefsWithFragmentAnchors_MatchesDocPath()
+    {
+        var docMap = new DocumentMap
+        {
+            TotalSizeKb = 10,
+            Documents =
+            [
+                new DocumentEntry { Path = "docs/auth.md", Title = "Auth", SizeKb = 5, Headings = ["Auth"], Preview = "" },
+                new DocumentEntry { Path = "docs/billing.md", Title = "Billing", SizeKb = 5, Headings = ["Billing"], Preview = "" }
+            ]
+        };
+
+        var tests = new List<TestCase>
+        {
+            CreateTestCase("TC-001", ["docs/auth.md#Login-Flow"]),
+            CreateTestCase("TC-002", ["docs/auth.md#Session-Management", "docs/billing.md#Refunds"])
+        };
+
+        var result = _analyzer.Analyze(docMap, tests);
+
+        Assert.Equal(2, result.TotalDocs);
+        Assert.Equal(2, result.CoveredDocs);
+        Assert.Equal(100m, result.Percentage);
+
+        var authDetail = result.Details.First(d => d.Doc == "docs/auth.md");
+        Assert.Equal(2, authDetail.TestCount);
+        Assert.Contains("TC-001", authDetail.TestIds);
+        Assert.Contains("TC-002", authDetail.TestIds);
+
+        var billingDetail = result.Details.First(d => d.Doc == "docs/billing.md");
+        Assert.Equal(1, billingDetail.TestCount);
+        Assert.Contains("TC-002", billingDetail.TestIds);
+    }
+
     private static TestCase CreateTestCase(string id, IReadOnlyList<string> sourceRefs) => new()
     {
         Id = id,

@@ -1,0 +1,12 @@
+# Requirements definition file for Spectra coverage analysis
+# Uncomment and customize the examples below
+#
+# requirements:
+#   - id: REQ-001
+#     title: "User can log in with valid credentials"
+#     source: docs/authentication.md
+#     priority: high
+#   - id: REQ-002
+#     title: "System rejects invalid passwords"
+#     source: docs/authentication.md
+#     priority: high

@@ -27,8 +27,13 @@ public sealed class LinkReconciler
             suiteIndexes.Values.SelectMany(idx => idx.Tests.Select(t => t.Id)),
             StringComparer.OrdinalIgnoreCase);
 
+        // All test IDs discovered by the scanner
+        var scannerLinkedTestIds = new HashSet<string>(
+            automationToTests.Values.SelectMany(ids => ids),
+            StringComparer.OrdinalIgnoreCase);
+
         // Detect issues
-        var unlinkedTests = FindUnlinkedTests(suiteIndexes, testToAutomation);
+        var unlinkedTests = FindUnlinkedTests(suiteIndexes, testToAutomation, scannerLinkedTestIds);
         var orphanedAutomation = FindOrphanedAutomation(automationFiles, allTestIds);
         var brokenLinks = FindBrokenLinks(suiteIndexes, automationFiles);
         var mismatches = FindMismatches(testToAutomation, automationToTests, allTestIds);
@@ -93,11 +98,12 @@ public sealed class LinkReconciler
     }
 
     /// <summary>
-    /// Finds tests without any automation link.
+    /// Finds tests without any automation link (neither automated_by nor scanner-discovered).
     /// </summary>
     private static List<CoverageModels.UnlinkedTest> FindUnlinkedTests(
         IReadOnlyDictionary<string, MetadataIndex> suiteIndexes,
-        Dictionary<string, string> testToAutomation)
+        Dictionary<string, string> testToAutomation,
+        HashSet<string> scannerLinkedTestIds)
     {
         var unlinked = new List<CoverageModels.UnlinkedTest>();
 
@@ -105,7 +111,8 @@ public sealed class LinkReconciler
         {
             foreach (var test in index.Tests)
             {
-                if (!testToAutomation.ContainsKey(test.Id))
+                if (!testToAutomation.ContainsKey(test.Id) &&
+                    !scannerLinkedTestIds.Contains(test.Id))
                 {
                     unlinked.Add(new CoverageModels.UnlinkedTest
                     {
@@ -265,7 +272,10 @@ public sealed class LinkReconciler
     }
 
     /// <summary>
-    /// Builds list of valid bidirectional links.
+    /// Builds list of valid links from both directions:
+    /// 1. Test→automation (from automated_by field)
+    /// 2. Automation→test (from scanner, for tests without automated_by)
+    /// Scanner-discovered links are valid when the automation file references a known test.
     /// </summary>
     private static List<CoverageModels.CoverageLink> BuildValidLinks(
         Dictionary<string, string> testToAutomation,
@@ -278,9 +288,12 @@ public sealed class LinkReconciler
             .ToDictionary(kvp => NormalizePath(kvp.Key), kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
 
         var links = new List<CoverageModels.CoverageLink>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        // 1. Links from test→automation (automated_by field)
         foreach (var (testId, automationFile) in testToAutomation)
         {
+            seen.Add(testId);
             var status = CoverageModels.LinkStatus.Valid;
 
             // Check if automation file exists
@@ -302,6 +315,27 @@ public sealed class LinkReconciler
                 Type = CoverageModels.LinkType.TestToAutomation,
                 Status = status
             });
+        }
+
+        // 2. Links from automation→test (scanner-discovered, for tests not already covered)
+        foreach (var (automationFile, referencedTests) in automationToTests)
+        {
+            foreach (var testId in referencedTests)
+            {
+                if (seen.Contains(testId) || !allTestIds.Contains(testId))
+                {
+                    continue;
+                }
+
+                seen.Add(testId);
+                links.Add(new CoverageModels.CoverageLink
+                {
+                    Source = testId,
+                    Target = automationFile,
+                    Type = CoverageModels.LinkType.AutomationToTest,
+                    Status = CoverageModels.LinkStatus.Valid
+                });
+            }
         }
 
         return links;

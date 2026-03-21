@@ -116,6 +116,14 @@ public sealed class AnalyzeHandler
                     Console.WriteLine($"  Scanned {automationFiles.Count} automation files");
                 }
 
+                // Auto-link before coverage calculation so the report
+                // and file state are consistent
+                if (autoLink)
+                {
+                    await RunAutoLinkAsync(
+                        basePath, testsDir, suiteIndexes, automationFiles, ct);
+                }
+
                 var reconciler = new LinkReconciler();
                 var reconciliation = reconciler.Reconcile(suiteIndexes, automationFiles);
 
@@ -123,13 +131,6 @@ public sealed class AnalyzeHandler
                 var calcReport = calculator.Calculate(suiteIndexes, reconciliation);
 
                 autoCoverage = UnifiedCoverageBuilder.FromCalculatorReport(calcReport);
-
-                // Auto-link if requested
-                if (autoLink)
-                {
-                    await RunAutoLinkAsync(
-                        basePath, testsDir, suiteIndexes, automationFiles, ct);
-                }
             }
             else
             {

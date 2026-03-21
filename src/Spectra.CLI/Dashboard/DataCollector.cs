@@ -41,8 +41,9 @@ public sealed class DataCollector
     {
         var suiteIndexes = await LoadSuiteIndexesAsync();
         var runSummaries = await CollectRunHistoryAsync();
-        var testEntries = BuildTestEntries(suiteIndexes);
-        var suiteStats = BuildSuiteStats(suiteIndexes, runSummaries);
+        var automatedTestIds = await ScanAutomatedTestIdsAsync();
+        var testEntries = BuildTestEntries(suiteIndexes, automatedTestIds);
+        var suiteStats = BuildSuiteStats(suiteIndexes, runSummaries, automatedTestIds);
         var trends = CalculateTrends(runSummaries);
         var coverage = BuildCoverageData(testEntries);
         var coverageSummary = await BuildCoverageSummaryAsync(suiteIndexes, testEntries);
@@ -96,6 +97,47 @@ public sealed class DataCollector
         }
 
         return indexes;
+    }
+
+    /// <summary>
+    /// Scans automation directories and returns a map of test ID → automation file path.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, string>> ScanAutomatedTestIdsAsync()
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            var configPath = Path.Combine(_basePath, "spectra.config.json");
+            if (!File.Exists(configPath))
+            {
+                return result;
+            }
+
+            var configJson = await File.ReadAllTextAsync(configPath);
+            var config = JsonSerializer.Deserialize<SpectraConfig>(configJson, s_jsonOptions);
+            if (config?.Coverage is null)
+            {
+                return result;
+            }
+
+            var scanner = AutomationScanner.FromConfig(_basePath, config.Coverage);
+            var automationFiles = await scanner.ScanAsync();
+
+            foreach (var (filePath, info) in automationFiles)
+            {
+                foreach (var testId in info.ReferencedTestIds)
+                {
+                    result.TryAdd(testId, filePath);
+                }
+            }
+        }
+        catch
+        {
+            // Non-fatal — dashboard still works without automation data
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -178,8 +220,11 @@ public sealed class DataCollector
 
     /// <summary>
     /// Builds test entries from suite indexes, including parsed content.
+    /// Uses scanner results to populate automation status.
     /// </summary>
-    private IReadOnlyList<TestEntry> BuildTestEntries(Dictionary<string, MetadataIndex> indexes)
+    private IReadOnlyList<TestEntry> BuildTestEntries(
+        Dictionary<string, MetadataIndex> indexes,
+        IReadOnlyDictionary<string, string> automatedTestIds)
     {
         var entries = new List<TestEntry>();
         var parser = new TestCaseParser();
@@ -226,8 +271,8 @@ public sealed class DataCollector
                     Tags = test.Tags,
                     Component = test.Component,
                     SourceRefs = test.SourceRefs,
-                    AutomatedBy = null, // Will be populated by coverage analysis
-                    HasAutomation = false, // Will be populated by coverage analysis
+                    AutomatedBy = automatedTestIds.TryGetValue(test.Id, out var autoFile) ? autoFile : null,
+                    HasAutomation = automatedTestIds.ContainsKey(test.Id),
                     Steps = steps,
                     ExpectedResult = expectedResult,
                     Preconditions = preconditions,
@@ -244,7 +289,8 @@ public sealed class DataCollector
     /// </summary>
     private IReadOnlyList<SuiteStats> BuildSuiteStats(
         Dictionary<string, MetadataIndex> indexes,
-        IReadOnlyList<RunSummary> runs)
+        IReadOnlyList<RunSummary> runs,
+        IReadOnlyDictionary<string, string> automatedTestIds)
     {
         var stats = new List<SuiteStats>();
 
@@ -268,6 +314,10 @@ public sealed class DataCollector
             var lastRun = runs.FirstOrDefault(r =>
                 r.Suite.Equals(suite, StringComparison.OrdinalIgnoreCase));
 
+            var suiteAutomated = index.Tests.Count(t => automatedTestIds.ContainsKey(t.Id));
+            var autoPct = index.TestCount > 0
+                ? Math.Round((suiteAutomated * 100m) / index.TestCount, 2) : 0m;
+
             stats.Add(new SuiteStats
             {
                 Name = suite,
@@ -276,7 +326,7 @@ public sealed class DataCollector
                 ByComponent = byComponent,
                 Tags = allTags,
                 LastRun = lastRun,
-                AutomationCoverage = 0 // Will be populated by coverage analysis
+                AutomationCoverage = autoPct
             });
         }
 
@@ -551,9 +601,12 @@ public sealed class DataCollector
         try
         {
             // Build a lookup from test ID → index entry for requirements/automated_by
-            var indexEntryLookup = suiteIndexes.Values
-                .SelectMany(idx => idx.Tests)
-                .ToDictionary(ti => ti.Id, ti => ti, StringComparer.OrdinalIgnoreCase);
+            // Use first-wins for duplicate IDs across suites
+            var indexEntryLookup = new Dictionary<string, TestIndexEntry>(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in suiteIndexes.Values.SelectMany(idx => idx.Tests))
+            {
+                indexEntryLookup.TryAdd(entry.Id, entry);
+            }
 
             // ── Documentation coverage ──
             // Map each doc path → test IDs that reference it

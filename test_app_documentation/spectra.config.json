@@ -71,11 +71,7 @@
   },
   "coverage": {
     "automation_dirs": [
-      "tests",
-      "test",
-      "spec",
-      "specs",
-      "e2e"
+       "../test_app_automation"
     ],
     "file_patterns": [
       "*.cs",
@@ -93,11 +89,25 @@
     "test_id_pattern": "TC-\\d{3,}",
     "report_orphans": true,
     "report_broken_links": true,
-    "report_mismatches": true
+    "report_mismatches": true,
+    "scan_patterns": [
+      "[TestCase(\u0022{id}\u0022)]",
+      "[ManualTestCase(\u0022{id}\u0022)]",
+      "@pytest.mark.manual_test(\u0022{id}\u0022)",
+      "groups = {\u0022{id}\u0022}"
+    ],
+    "file_extensions": [
+      ".cs",
+      ".java",
+      ".py",
+      ".ts"
+    ],
+    "requirements_file": "docs/requirements/_requirements.yaml"
   },
   "profile": {
     "auto_load": true,
     "validate_on_load": true,
     "include_in_validation": true
-  }
+  },
+  "selections": {}
 }

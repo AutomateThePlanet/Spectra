@@ -88,7 +88,9 @@
       "Bash(echo \"=== MCP.Tests Breakdown ===\" && \\\\\necho \"Execution tests:\" && \\\\\ngrep -r \"public.*Task\" /c/SourceCode/Spectra/tests/Spectra.MCP.Tests/Execution --include=\"*.cs\" | grep -v obj | wc -l && \\\\\necho \"Helpers tests:\" && \\\\\ngrep -r \"public.*Task\" /c/SourceCode/Spectra/tests/Spectra.MCP.Tests/Helpers --include=\"*.cs\" | grep -v obj | wc -l && \\\\\necho \"Models tests:\" && \\\\\ngrep -r \"public.*Task\" /c/SourceCode/Spectra/tests/Spectra.MCP.Tests/Models --include=\"*.cs\" | grep -v obj | wc -l && \\\\\necho \"Reports tests:\" && \\\\\ngrep -r \"public.*Task\\\\|public.*void\" /c/SourceCode/Spectra/tests/Spectra.MCP.Tests/Reports --include=\"*.cs\" | grep -v obj | wc -l)",
       "Bash(echo \"=== All test methods in MCP.Tests ===\" && \\\\\nfind /c/SourceCode/Spectra/tests/Spectra.MCP.Tests -type f -name \"*Tests.cs\" ! -path \"*/obj/*\" -exec grep -H \"public.*Task\\\\|public.*void\" {} \\\\; | grep -v \"IAsyncDisposable\\\\|DisposeAsync\\\\|Dispose\\\\|ValueTask\" | wc -l)",
       "Bash(.specify/scripts/bash/update-agent-context.sh claude:*)",
-      "Bash(find /c/SourceCode/Spectra -type f \\\\\\( -name \"*agent*\" -o -name \"*skill*\" \\\\\\) -iname \"*.md\" 2>/dev/null | grep -v node_modules | sort)"
+      "Bash(find /c/SourceCode/Spectra -type f \\\\\\( -name \"*agent*\" -o -name \"*skill*\" \\\\\\) -iname \"*.md\" 2>/dev/null | grep -v node_modules | sort)",
+      "Bash(cd C:/SourceCode/Spectra && mkdir -p test_app_documentation/Diag)",
+      "Bash(cd C:/SourceCode/Spectra && rm -rf test_app_documentation/Diag test_app_documentation/diag.csx)"
     ]
   }
 }

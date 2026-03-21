@@ -27,7 +27,9 @@ public sealed class AutomationScanner
             foreach (var template in config.ScanPatterns)
             {
                 var escaped = Regex.Escape(template);
-                var regex = escaped.Replace(@"\{id\}", $"({config.TestIdPattern})");
+                // Regex.Escape escapes '{' to '\{' but leaves '}' unescaped,
+                // so the placeholder becomes "\{id}" not "\{id\}"
+                var regex = escaped.Replace(@"\{id}", $"({config.TestIdPattern})");
                 patterns.Add(regex);
             }
         }

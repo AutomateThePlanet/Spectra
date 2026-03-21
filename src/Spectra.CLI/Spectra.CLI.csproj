@@ -22,7 +22,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>spectra</ToolCommandName>
     <PackageId>Spectra.CLI</PackageId>
-    <Version>1.10.10</Version>
+    <Version>1.10.15</Version>
     <Authors>Spectra</Authors>
     <Description>AI-native test generation and management CLI</Description>
     <PackageOutputPath>./nupkg</PackageOutputPath>
