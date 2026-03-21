@@ -53,5 +53,19 @@
     "branch_prefix": "spectra/",
     "auto_commit": true,
     "auto_pr": false
+  },
+  "dashboard": {
+    "output_dir": "./site",
+    "branding": {
+      "company_name": null,
+      "logo": null,
+      "favicon": null,
+      "theme": "light",
+      "colors": {
+        "primary": null,
+        "accent": null
+      },
+      "custom_css": null
+    }
   }
 }

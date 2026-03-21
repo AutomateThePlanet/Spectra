@@ -1,0 +1,21 @@
+/* SPECTRA Dashboard Dark Theme */
+/* Applied via BrandingInjector when theme is "dark" */
+
+:root {
+    --primary-color: #1e3a5f;
+    --primary-light: #2563eb;
+    --accent-color: #3b82f6;
+    --text-color: #e2e8f0;
+    --text-muted: #94a3b8;
+    --bg-color: #0f172a;
+    --card-bg: #1e293b;
+    --border-color: #334155;
+    --color-success: #22c55e;
+    --color-warning: #f59e0b;
+    --color-danger: #ef4444;
+    --color-blocked: #f59e0b;
+    --color-skipped: #94a3b8;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4);
+}

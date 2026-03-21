@@ -47,4 +47,11 @@ public sealed class DashboardConfig
     /// </summary>
     [JsonPropertyName("max_trend_points")]
     public int MaxTrendPoints { get; init; } = 30;
+
+    /// <summary>
+    /// Branding and theming configuration.
+    /// Default: null (uses default Spectra branding)
+    /// </summary>
+    [JsonPropertyName("branding")]
+    public BrandingConfig? Branding { get; init; }
 }

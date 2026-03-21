@@ -23,6 +23,7 @@ const allTests = [...data.tests];
  * Initialize the dashboard
  */
 document.addEventListener('DOMContentLoaded', () => {
+    applyBranding();
     setupNavigation();
     setupFilters();
     populateComponentFilter();
@@ -31,6 +32,22 @@ document.addEventListener('DOMContentLoaded', () => {
     updateGeneratedAt();
     render();
 });
+
+/**
+ * Apply branding configuration from embedded JSON
+ */
+function applyBranding() {
+    const el = document.getElementById('branding-config');
+    if (!el) return;
+    try {
+        const branding = JSON.parse(el.textContent);
+        if (branding.theme && branding.theme.toLowerCase() === 'dark') {
+            document.body.classList.add('dark');
+        }
+    } catch {
+        // Branding config is optional
+    }
+}
 
 /**
  * Set up navigation button handlers
