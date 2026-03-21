@@ -135,6 +135,8 @@ spectra ai analyze --coverage --format json --output coverage.json
 spectra ai analyze --coverage --format markdown --output coverage.md
 spectra ai analyze --coverage --auto-link                        # Write automated_by back into test files
 spectra ai analyze --coverage --verbosity detailed
+spectra ai analyze --extract-requirements            # Extract requirements from docs
+spectra ai analyze --extract-requirements --dry-run  # Preview without writing
 
 # Automation Directory Management (013-cli-ux-improvements)
 spectra config add-automation-dir ../new-tests     # Add automation dir for coverage
@@ -151,6 +153,7 @@ spectra config list-automation-dirs                 # List dirs with existence s
 - **Tests:** xUnit with structured results (never throw on validation errors)
 
 ## Recent Changes
+- 015-auto-requirements-extraction: ✅ COMPLETE - AI-powered extraction of testable requirements from documentation. New models: `ExtractionResult`, `DuplicateMatch`. New service: `RequirementsWriter` handles YAML merge, duplicate detection (normalized title + substring matching), sequential ID allocation (REQ-NNN, never reuse gaps), atomic writes. New `RequirementsExtractor` uses Copilot SDK to extract requirements with RFC 2119 priority inference. CLI: `spectra ai analyze --extract-requirements [--dry-run]`. 11 new RequirementsWriter tests.
 - 014-open-source-ready: ✅ COMPLETE - Open source readiness. README redesign with banner placeholder, shields.io badges, value props, feature showcase, quickstart. CI pipeline (`.github/workflows/ci.yml`) — build+test on push/PR. NuGet publish pipeline (`.github/workflows/publish.yml`) — tag-triggered pack+push for Spectra.CLI and Spectra.MCP. All 1071 tests passing (fixed parallel test isolation with `[Collection("WorkingDirectory")]`). GitHub issue templates (bug report, feature request), PR template, Dependabot config. All README doc links verified.
 - 013-cli-ux-improvements: ✅ COMPLETE - CLI UX improvements for discoverability and workflow. New `NextStepHints` helper prints context-aware next-step suggestions after every command (init, generate, analyze, dashboard, validate, docs index, index) in dimmed text, suppressed by `--quiet` or piped output. Init flow: new interactive prompts for automation directory setup (`coverage.automation_dirs`) and critic model configuration (`ai.critic`). New config subcommands: `spectra config add-automation-dir`, `remove-automation-dir`, `list-automation-dirs`. Interactive generation mode: continuation menu after suite completion (generate more, switch suite, create suite, exit) with session summary. 18 new tests.
 - 012-dashboard-branding: ✅ COMPLETE - Dashboard branding and theming customization. New models: `BrandingConfig`, `ColorPaletteConfig` in `DashboardConfig`. New service: `BrandingInjector` handles company name, logo, favicon, CSS variable overrides, dark theme, and custom CSS injection via template placeholders. `SampleDataFactory` provides mock data for `--preview` mode. Light/dark theme presets via CSS custom properties. Config: `dashboard.branding` section in spectra.config.json with `company_name`, `logo`, `favicon`, `theme`, `colors`, `custom_css`. CLI: `spectra dashboard --preview` for branding verification. 51 new tests (8 config + 21 injector + 9 sample data + 13 existing generator).

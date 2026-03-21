@@ -29,10 +29,15 @@ public sealed class AnalyzeCommand : Command
             ["--auto-link"],
             "Scan automation code and update test automated_by fields");
 
+        var extractRequirementsOption = new Option<bool>(
+            ["--extract-requirements"],
+            "Extract testable requirements from documentation");
+
         AddOption(outputOption);
         AddOption(formatOption);
         AddOption(coverageOption);
         AddOption(autoLinkOption);
+        AddOption(extractRequirementsOption);
 
         this.SetHandler(async (context) =>
         {
@@ -40,15 +45,27 @@ public sealed class AnalyzeCommand : Command
             var format = context.ParseResult.GetValueForOption(formatOption);
             var coverage = context.ParseResult.GetValueForOption(coverageOption);
             var autoLink = context.ParseResult.GetValueForOption(autoLinkOption);
+            var extractReqs = context.ParseResult.GetValueForOption(extractRequirementsOption);
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
+            var dryRun = context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption);
 
             var handler = new AnalyzeHandler(verbosity);
-            context.ExitCode = await handler.ExecuteAsync(
-                output,
-                format,
-                coverage,
-                autoLink,
-                context.GetCancellationToken());
+
+            if (extractReqs)
+            {
+                context.ExitCode = await handler.RunExtractRequirementsAsync(
+                    dryRun,
+                    context.GetCancellationToken());
+            }
+            else
+            {
+                context.ExitCode = await handler.ExecuteAsync(
+                    output,
+                    format,
+                    coverage,
+                    autoLink,
+                    context.GetCancellationToken());
+            }
         });
     }
 }

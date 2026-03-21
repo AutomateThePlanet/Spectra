@@ -203,6 +203,144 @@ public sealed class AnalyzeHandler
     }
 
     /// <summary>
+    /// Extracts testable requirements from documentation using AI.
+    /// </summary>
+    public async Task<int> RunExtractRequirementsAsync(
+        bool dryRun,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var currentDir = Directory.GetCurrentDirectory();
+            var configPath = Path.Combine(currentDir, "spectra.config.json");
+
+            // Load config
+            SpectraConfig? config = null;
+            if (File.Exists(configPath))
+            {
+                var configJson = await File.ReadAllTextAsync(configPath, ct);
+                config = JsonSerializer.Deserialize<SpectraConfig>(configJson, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            }
+
+            if (config is null)
+            {
+                Console.Error.WriteLine("No spectra.config.json found. Run 'spectra init' first.");
+                return ExitCodes.Error;
+            }
+
+            // Auto-refresh document index
+            var indexService = new DocumentIndexService();
+            await indexService.EnsureIndexAsync(currentDir, config.Source, forceRebuild: false, ct);
+
+            // Load source documents
+            var docBuilder = new DocumentMapBuilder();
+            var documentMap = await docBuilder.BuildAsync(currentDir, ct);
+
+            if (documentMap.Documents.Count == 0)
+            {
+                Console.WriteLine("No documentation files found. Add docs to your source directory.");
+                return ExitCodes.Success;
+            }
+
+            // Load existing requirements
+            var reqsPath = Path.Combine(currentDir, config.Coverage.RequirementsFile);
+            var parser = new Spectra.Core.Parsing.RequirementsParser();
+            var existing = await parser.ParseAsync(reqsPath, ct);
+
+            // Get primary provider
+            var provider = config.Ai.Providers.FirstOrDefault(p => p.Enabled);
+            if (provider is null)
+            {
+                Console.Error.WriteLine("No AI provider configured. Run 'spectra init' to configure.");
+                return ExitCodes.Error;
+            }
+
+            // Extract requirements
+            if (_verbosity >= VerbosityLevel.Normal)
+            {
+                Console.WriteLine($"Extracting requirements from {documentMap.Documents.Count} document(s)...");
+            }
+
+            var extractor = new Agent.Copilot.RequirementsExtractor(
+                provider,
+                currentDir,
+                _verbosity >= VerbosityLevel.Normal ? Console.WriteLine : null);
+
+            var extracted = await extractor.ExtractAsync(documentMap.Documents, existing, ct);
+
+            if (extracted.Count == 0)
+            {
+                Console.WriteLine("No requirements found in documentation.");
+                return ExitCodes.Success;
+            }
+
+            // Merge and write
+            var writer = new Spectra.Core.Parsing.RequirementsWriter();
+            var result = writer.DetectDuplicates(existing, extracted);
+
+            if (dryRun)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"Extracted {extracted.Count} requirement(s) (dry run — no files written):");
+                Console.WriteLine();
+
+                var withIds = writer.AllocateIds(existing, result.Merged);
+                foreach (var req in withIds)
+                {
+                    Console.WriteLine($"  {req.Id}  [{req.Priority}]  {req.Title}");
+                    Console.WriteLine($"          Source: {req.Source}");
+                }
+
+                if (result.Duplicates.Count > 0)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine($"  {result.Duplicates.Count} duplicate(s) would be skipped");
+                }
+
+                return ExitCodes.Success;
+            }
+
+            var writeResult = await writer.MergeAndWriteAsync(reqsPath, extracted, ct);
+
+            // Report results
+            Console.WriteLine();
+            Console.WriteLine($"Requirements extraction complete:");
+            Console.WriteLine($"  New:        {writeResult.Merged.Count}");
+            Console.WriteLine($"  Duplicates: {writeResult.SkippedCount} (skipped)");
+            Console.WriteLine($"  Total:      {writeResult.TotalInFile}");
+            Console.WriteLine($"  File:       {Path.GetRelativePath(currentDir, reqsPath)}");
+
+            if (writeResult.Merged.Count > 0 && _verbosity >= VerbosityLevel.Normal)
+            {
+                Console.WriteLine();
+                foreach (var req in writeResult.Merged)
+                {
+                    Console.WriteLine($"  + {req.Id}  [{req.Priority}]  {req.Title}");
+                }
+            }
+
+            return ExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine("\nOperation cancelled.");
+            return ExitCodes.Cancelled;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            if (_verbosity >= VerbosityLevel.Detailed)
+            {
+                Console.Error.WriteLine(ex.StackTrace);
+            }
+            return ExitCodes.Error;
+        }
+    }
+
+    /// <summary>
     /// Legacy doc-only coverage mode (when --coverage is not specified).
     /// </summary>
     private async Task<int> RunLegacyCoverageAsync(
