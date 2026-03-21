@@ -55,15 +55,18 @@
     "max_trend_points": 30,
     "cloudflare_project_name": "spectra-dashboard",
     "branding": {
-      "company_name": null,
-      "logo": null,
-      "favicon": null,
+      "company_name": "SPECTRA",
+      "logo": "assets/spectra-logo.svg",
+      "favicon": "assets/favicon.ico",
       "theme": "light",
+      "_comment_theme": "Options: 'light' or 'dark'",
       "colors": {
         "primary": null,
-        "accent": null
+        "accent": null,
+        "_comment_colors": "Override theme colors: primary, accent, background, text, surface, border. Use CSS color values (#hex, rgb(), hsl(), named)."
       },
-      "custom_css": null
+      "custom_css": null,
+      "_comment_custom_css": "Path to a custom CSS file loaded after default styles for full override control."
     }
   },
   "git": {

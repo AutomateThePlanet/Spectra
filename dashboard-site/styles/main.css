@@ -725,7 +725,7 @@ body.panel-open {
 
 /* Run Detail */
 .run-detail {
-    max-width: 1000px;
+    max-width: 100%;
 }
 
 .run-detail h2 {
