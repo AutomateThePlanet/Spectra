@@ -269,7 +269,7 @@ public sealed class DataCollector
 
                 try
                 {
-                    var testFilePath = Path.Combine(_testsPath, test.File);
+                    var testFilePath = Path.Combine(_testsPath, suite, test.File);
                     if (File.Exists(testFilePath))
                     {
                         content = File.ReadAllText(testFilePath);
