@@ -104,7 +104,12 @@
       "Bash(git status:*)",
       "Bash(for branch:*)",
       "Bash(git ls-tree:*)",
-      "Bash(git tag:*)"
+      "Bash(git tag:*)",
+      "Bash(gh pr:*)",
+      "Bash(git mv:*)",
+      "Bash(gh run:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(xargs -I {} gh run view {} --repo AutomateThePlanet/Spectra --log-failed)"
     ]
   }
 }
