@@ -51,7 +51,13 @@ jobs:
           dotnet-version: '8.0'
 
       - name: Install SPECTRA CLI
-        run: dotnet tool install -g spectra-cli
+        run: |
+          dotnet nuget add source "https://nuget.pkg.github.com/AutomateThePlanet/index.json" \
+            --name github-packages \
+            --username AutomateThePlanet \
+            --password ${{ secrets.GITHUB_TOKEN }} \
+            --store-password-in-clear-text
+          dotnet tool install -g Spectra.CLI
 
       - name: Run coverage analysis with auto-linking
         run: spectra ai analyze --coverage --auto-link
