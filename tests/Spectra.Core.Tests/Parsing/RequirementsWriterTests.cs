@@ -61,7 +61,7 @@ public class RequirementsWriterTests : IDisposable
         };
         var result = await _writer.MergeAndWriteAsync(path, newReqs);
 
-        Assert.Equal(1, result.Merged.Count);
+        Assert.Single(result.Merged);
         Assert.Equal(2, result.TotalInFile);
 
         var parser = new RequirementsParser();

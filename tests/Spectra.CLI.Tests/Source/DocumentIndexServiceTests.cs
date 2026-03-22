@@ -149,7 +149,7 @@ public class DocumentIndexServiceTests : IDisposable
 
         var map = DocumentIndexService.ToDocumentMap(index);
 
-        Assert.Equal(1, map.Documents.Count);
+        Assert.Single(map.Documents);
         Assert.Equal("docs/test.md", map.Documents[0].Path);
         Assert.Equal("Test", map.Documents[0].Title);
         Assert.Equal(5, map.Documents[0].SizeKb);

@@ -143,7 +143,7 @@ Use the modern approach for better results.
         var results = classifier.ClassifyBatch(tests, sourceContents);
 
         Assert.Equal(3, results.Count);
-        Assert.True(results.Any(r => r.Test.Id == "TC-003" && r.Classification == UpdateClassification.Orphaned));
+        Assert.Contains(results, r => r.Test.Id == "TC-003" && r.Classification == UpdateClassification.Orphaned);
     }
 
     [Fact]
