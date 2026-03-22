@@ -26,7 +26,13 @@
         "base_url": "https://angel-mdnhzlaw-swedencentral.services.ai.azure.com/"
       }
     ],
-    "fallback_strategy": "auto"
+    "fallback_strategy": "auto",
+    "critic": {
+      "enabled": true,
+      "provider": "azure-anthropic",
+      "model": "claude-sonnet-4-5",
+      "api_key_env": "AZURE_ANTHROPIC_API_KEY"
+    }
   },
   "generation": {
     "default_count": 15,
@@ -67,11 +73,12 @@
     "output_dir": "./site",
     "include_coverage": true,
     "include_runs": true,
-    "max_trend_points": 30
+    "max_trend_points": 30,
+    "cloudflare_project_name": "spectra-dashboard"
   },
   "coverage": {
     "automation_dirs": [
-       "../test_app_automation"
+      "C:\\SourceCode\\Spectra\\test_app_automation"
     ],
     "file_patterns": [
       "*.cs",

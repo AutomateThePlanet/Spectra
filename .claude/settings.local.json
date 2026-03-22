@@ -103,7 +103,8 @@
       "Bash(cp dashboard-site/access-denied.html \"C:/SourceCode/Spectra_Demo/dashboard-site/\")",
       "Bash(git status:*)",
       "Bash(for branch:*)",
-      "Bash(git ls-tree:*)"
+      "Bash(git ls-tree:*)",
+      "Bash(git tag:*)"
     ]
   }
 }
