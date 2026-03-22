@@ -27,6 +27,8 @@ public sealed class InitHandler
     private const string DeployWorkflowPath = ".github/workflows/deploy-dashboard.yml";
     private const string DocsDir = "docs";
     private const string TestsDir = "tests";
+    private const string TemplatesDir = "templates";
+    private const string BugReportTemplatePath = "templates/bug-report.md";
 
     public InitHandler(ILogger<InitHandler> logger, string? workingDirectory = null, bool interactive = false)
     {
@@ -75,6 +77,9 @@ public sealed class InitHandler
             // Update .gitignore
             await UpdateGitIgnoreAsync(ct);
 
+            // Create bug report template
+            await CreateBugReportTemplateAsync(ct);
+
             // Build initial document index if docs exist
             await BuildInitialIndexAsync(configPath, ct);
 
@@ -87,6 +92,11 @@ public sealed class InitHandler
             _logger.LogInformation("  - {AgentPath}", ExecutionAgentPath);
             _logger.LogInformation("  - {SkillPath}", ExecutionSkillPath);
             _logger.LogInformation("  - {WorkflowPath}", DeployWorkflowPath);
+            _logger.LogInformation("");
+            _logger.LogInformation("  - {TemplatePath}", BugReportTemplatePath);
+            _logger.LogInformation("");
+            _logger.LogInformation("Bug report template created at {Path}", BugReportTemplatePath);
+            _logger.LogInformation("  Customize it or delete it — the execution agent adapts automatically.");
             _logger.LogInformation("");
             _logger.LogInformation("Dashboard auto-deployment workflow created.");
             _logger.LogInformation("See docs/deployment/cloudflare-pages-setup.md for setup instructions.");
@@ -400,7 +410,8 @@ public sealed class InitHandler
             Path.Combine(_workingDirectory, DocsDir),
             Path.Combine(_workingDirectory, TestsDir),
             Path.Combine(_workingDirectory, ".github", "skills", "test-generation"),
-            Path.Combine(_workingDirectory, DocsDir, "requirements")
+            Path.Combine(_workingDirectory, DocsDir, "requirements"),
+            Path.Combine(_workingDirectory, TemplatesDir)
         };
 
         foreach (var dir in directories)
@@ -441,6 +452,19 @@ public sealed class InitHandler
 
         await File.WriteAllTextAsync(reqPath, template, ct);
         _logger.LogDebug("Created requirements template: {Path}", reqPath);
+    }
+
+    private async Task CreateBugReportTemplateAsync(CancellationToken ct)
+    {
+        var templatePath = Path.Combine(_workingDirectory, BugReportTemplatePath);
+        if (File.Exists(templatePath))
+        {
+            return;
+        }
+
+        var content = GetEmbeddedTemplate("bug-report.md");
+        await File.WriteAllTextAsync(templatePath, content, ct);
+        _logger.LogDebug("Created bug report template: {Path}", templatePath);
     }
 
     private async Task CreateConfigFileAsync(string configPath, CancellationToken ct)
@@ -581,6 +605,7 @@ public sealed class InitHandler
         {
             "spectra.config.json" => ConfigLoader.GenerateDefaultConfig(),
             "test-generation-skill.md" => GetDefaultSkillContent(),
+            "bug-report.md" => GetDefaultBugReportTemplate(),
             _ => throw new FileNotFoundException($"Template not found: {templateName}")
         };
     }
@@ -599,6 +624,42 @@ public sealed class InitHandler
         - `get_next_test_ids`: Allocate sequential test IDs
         - `check_duplicates_batch`: Verify tests are unique
         - `batch_write_tests`: Submit generated tests
+        """;
+
+    private static string GetDefaultBugReportTemplate() => """
+        ## {{title}}
+
+        **Test Case:** {{test_id}} - {{test_title}}
+        **Suite:** {{suite_name}}
+        **Environment:** {{environment}}
+        **Severity:** {{severity}}
+        **Execution Run:** {{run_id}}
+
+        ### Steps to Reproduce
+
+        {{failed_steps}}
+
+        ### Expected Result
+
+        {{expected_result}}
+
+        ### Actual Result
+
+        [Describe what actually happened]
+
+        ### Screenshots
+
+        {{attachments}}
+
+        ### Additional Context
+
+        [Any relevant details — browser, OS, test data used, error messages]
+
+        ### Traceability
+
+        - **Source Documentation:** {{source_refs}}
+        - **Requirements:** {{requirements}}
+        - **Component:** {{component}}
         """;
 
     private async Task CreateDeployWorkflowAsync(CancellationToken ct)

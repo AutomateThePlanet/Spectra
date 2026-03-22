@@ -1,0 +1,14 @@
+{
+  "$schema": "Spectra bug_tracking config section contract",
+  "bug_tracking": {
+    "provider": "auto",
+    "template": "templates/bug-report.md",
+    "default_severity": "medium",
+    "auto_attach_screenshots": true,
+    "auto_prompt_on_failure": true
+  },
+  "_enums": {
+    "provider": ["auto", "azure-devops", "jira", "github", "local"],
+    "default_severity": ["critical", "major", "medium", "minor"]
+  }
+}

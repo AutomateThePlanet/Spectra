@@ -18,6 +18,12 @@ public sealed partial class FrontmatterUpdater
     [GeneratedRegex(@"^automated_by:\s*\n(?:^\s+-\s+.*\n)*", RegexOptions.Multiline)]
     private static partial Regex AutomatedByBlockRegex();
 
+    [GeneratedRegex(@"^bugs:\s*.*$", RegexOptions.Multiline)]
+    private static partial Regex BugsLineRegex();
+
+    [GeneratedRegex(@"^bugs:\s*\n(?:^\s+-\s+.*\n)*", RegexOptions.Multiline)]
+    private static partial Regex BugsBlockRegex();
+
     /// <summary>
     /// Updates the automated_by field in a test file's YAML frontmatter.
     /// Returns the updated file content, or null if the file has no valid frontmatter.
@@ -82,6 +88,79 @@ public sealed partial class FrontmatterUpdater
 
         var content = await File.ReadAllTextAsync(filePath, ct);
         var updated = UpdateAutomatedBy(content, automationPaths);
+
+        if (updated is null || updated == content)
+        {
+            return false;
+        }
+
+        await File.WriteAllTextAsync(filePath, updated, ct);
+        return true;
+    }
+
+    /// <summary>
+    /// Updates the bugs field in a test file's YAML frontmatter.
+    /// Returns the updated file content, or null if the file has no valid frontmatter.
+    /// </summary>
+    public string? UpdateBugs(string fileContent, IReadOnlyList<string> bugIds)
+    {
+        var fmMatch = FrontmatterRegex().Match(fileContent);
+        if (!fmMatch.Success)
+        {
+            return null;
+        }
+
+        var frontmatter = fmMatch.Groups[1].Value;
+        var yamlValue = FormatYamlList("bugs", bugIds);
+
+        string newFrontmatter;
+
+        // Check if bugs already exists as a block (list)
+        var blockMatch = BugsBlockRegex().Match(frontmatter);
+        if (blockMatch.Success)
+        {
+            newFrontmatter = frontmatter[..blockMatch.Index]
+                + yamlValue
+                + frontmatter[(blockMatch.Index + blockMatch.Length)..];
+        }
+        else
+        {
+            // Check for inline bugs
+            var lineMatch = BugsLineRegex().Match(frontmatter);
+            if (lineMatch.Success)
+            {
+                newFrontmatter = frontmatter[..lineMatch.Index]
+                    + yamlValue.TrimEnd('\n')
+                    + frontmatter[(lineMatch.Index + lineMatch.Length)..];
+            }
+            else
+            {
+                // Insert before end of frontmatter
+                newFrontmatter = frontmatter.TrimEnd() + "\n" + yamlValue.TrimEnd('\n');
+            }
+        }
+
+        return fileContent[..fmMatch.Groups[1].Index]
+            + newFrontmatter
+            + fileContent[(fmMatch.Groups[1].Index + fmMatch.Groups[1].Length)..];
+    }
+
+    /// <summary>
+    /// Updates the bugs field in a file on disk.
+    /// Returns true if the file was updated.
+    /// </summary>
+    public async Task<bool> UpdateBugsFileAsync(
+        string filePath,
+        IReadOnlyList<string> bugIds,
+        CancellationToken ct = default)
+    {
+        if (!File.Exists(filePath))
+        {
+            return false;
+        }
+
+        var content = await File.ReadAllTextAsync(filePath, ct);
+        var updated = UpdateBugs(content, bugIds);
 
         if (updated is null || updated == content)
         {

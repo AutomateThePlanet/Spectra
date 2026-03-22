@@ -69,6 +69,13 @@
       "_comment_custom_css": "Path to a custom CSS file loaded after default styles for full override control."
     }
   },
+  "bug_tracking": {
+    "provider": "auto",
+    "template": "templates/bug-report.md",
+    "default_severity": "medium",
+    "auto_attach_screenshots": true,
+    "auto_prompt_on_failure": true
+  },
   "git": {
     "auto_branch": true,
     "branch_prefix": "spectra/",

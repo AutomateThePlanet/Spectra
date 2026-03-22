@@ -91,6 +91,11 @@ public sealed class TestCase
     public IReadOnlyList<string> Requirements { get; init; } = [];
 
     /// <summary>
+    /// Bug IDs or URLs linked to this test case.
+    /// </summary>
+    public IReadOnlyList<string> Bugs { get; init; } = [];
+
+    /// <summary>
     /// Test status (e.g., "orphaned" when documentation is removed).
     /// </summary>
     public string? Status { get; init; }
