@@ -98,19 +98,97 @@ After recording a FAILED result with `advance_test_case`:
 - Call `get_execution_summary` every 5 completed tests to show a mid-run progress snapshot
 - Call `get_execution_summary` immediately when the user asks "how are we doing?", "status?", "progress?", or similar
 
-## Bug Logging (Azure DevOps MCP)
+## Bug Logging
 
-When a test fails and user confirms bug creation:
+When a test case is marked as FAILED, offer to log a bug. Check `bug_tracking.auto_prompt_on_failure` in `spectra.config.json` first — if `false`, only log bugs when the user explicitly asks.
 
-1. Create work item with:
-   - **Title**: `[SPECTRA] {test_title} — {first 50 chars of comment}`
-   - **Description**: Include test ID, steps performed, expected result, actual result, user comment
-   - **Priority**: Map test priority (high→P1, medium→P2, low→P3)
-   - **Tags**: Include test tags plus "spectra-execution"
+### Bug Logging Flow
 
-2. If no bug tracker MCP connected:
-   - Show copyable bug details for manual logging
-   - Include all fields that would be in automated bug
+1. **After recording a FAILED result** with `advance_test_case`:
+   - If `auto_prompt_on_failure` is `true` (default): Ask "Would you like to log a bug for this failure?"
+   - If `auto_prompt_on_failure` is `false`: Do not ask. Only log bugs when the user says "log a bug", "file a bug", etc.
+
+2. **Check for duplicates**:
+   - Call `get_test_case_details` and check the `bugs` field in frontmatter
+   - If existing bugs are listed, show them: "This test has existing bugs: [BUG-42, #99]. Would you like to link to an existing one or create a new bug?"
+   - If no existing bugs, proceed to step 3
+
+3. **Gather context** from the current execution:
+   - Test case details (ID, title, steps, expected result, component, source_refs, requirements)
+   - Failed step number and failure notes
+   - Screenshots attached during execution
+   - Execution run metadata (environment, run ID, suite name)
+
+4. **Check for bug report template**:
+   - Read `bug_tracking.template` from config (default: `templates/bug-report.md`)
+   - If the file exists, read it and populate `{{variable}}` placeholders (see table below)
+   - If the file does not exist or template is set to `null`, compose the report directly
+
+5. **Show the populated bug report** for review
+   - Ask: "Submit this to [detected tracker]? Or edit first?"
+
+6. **Submit the bug** via the configured tracker:
+   - Check `bug_tracking.provider` in config:
+     - `"auto"` (default): Detect available MCP tools in priority order:
+       1. Azure DevOps MCP tools → Create Work Item (type: Bug)
+       2. Jira MCP tools → Create Issue (type: Bug)
+       3. GitHub MCP tools → Create Issue (label: bug)
+     - `"azure-devops"`, `"jira"`, `"github"`: Use that specific tracker
+     - `"local"`: Save as local Markdown file
+   - If no bug tracker MCP is available → save as `reports/{run_id}/bugs/BUG-{test_id}.md`
+   - If the tracker API call fails, notify the user and offer to save locally as fallback
+
+7. **Record the bug reference**:
+   - Call `add_test_note` with the bug ID or URL
+   - The `bugs` field in test case frontmatter will be updated for future duplicate detection
+
+8. **Continue** to the next test
+
+### Template Variables
+
+When populating `templates/bug-report.md`, replace these `{{variable}}` placeholders:
+
+| Variable | Source | Example |
+|----------|--------|---------|
+| `{{title}}` | Auto-generated | "Bug: Login timeout - Step 3 fails" |
+| `{{test_id}}` | Test case frontmatter `id` | "TC-101" |
+| `{{test_title}}` | First heading of test case | "Login with valid credentials" |
+| `{{suite_name}}` | Suite folder from run | "authentication" |
+| `{{environment}}` | Run environment parameter | "staging" |
+| `{{severity}}` | Derived from priority (high→critical, medium→major, low→minor) | "major" |
+| `{{run_id}}` | Current run UUID | "a1b2c3d4-..." |
+| `{{failed_steps}}` | Steps up to and including failing step | Numbered list |
+| `{{expected_result}}` | Expected Results from test case | Free text |
+| `{{attachments}}` | Screenshots from execution | Markdown image links |
+| `{{source_refs}}` | Frontmatter `source_refs` | Comma-separated |
+| `{{requirements}}` | Frontmatter `requirements` | Comma-separated |
+| `{{component}}` | Frontmatter `component` | "auth-module" |
+
+If a variable has no data, leave the placeholder text for the user to fill in.
+Custom `{{variables}}` not in this table are left as-is.
+
+### Without Template
+
+If `templates/bug-report.md` does not exist, compose the bug report with these sections:
+Title, Test Case reference, Steps to Reproduce, Expected vs Actual, Screenshots, Environment, and Traceability links.
+
+### Bulk Failure Bug Logging
+
+When using `bulk_record_results` to record multiple failures at once:
+- Do NOT prompt for each failure individually during the bulk operation
+- After the bulk operation completes, present a consolidated prompt:
+  - List all failed tests with IDs and titles
+  - Ask: "Which failures would you like to log bugs for? (all / none / specific IDs)"
+- Create one individual bug per selected failure (not one consolidated bug)
+
+### Severity Mapping
+
+| Test Priority | Bug Severity |
+|---------------|-------------|
+| high | critical |
+| medium | major |
+| low | minor |
+| (not set) | Use `bug_tracking.default_severity` from config |
 
 ## Screenshot Handling
 

@@ -101,6 +101,7 @@ public sealed partial class TestCaseParser
             Custom = frontmatter.Custom,
             AutomatedBy = frontmatter.AutomatedBy,
             Requirements = frontmatter.Requirements,
+            Bugs = frontmatter.Bugs,
             Grounding = frontmatter.Grounding?.ToMetadata(),
             Title = title,
             Steps = steps,

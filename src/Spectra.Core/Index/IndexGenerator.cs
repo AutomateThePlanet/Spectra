@@ -53,7 +53,8 @@ public sealed class IndexGenerator
             DependsOn = testCase.DependsOn,
             SourceRefs = testCase.SourceRefs.ToList(),
             AutomatedBy = testCase.AutomatedBy,
-            Requirements = testCase.Requirements
+            Requirements = testCase.Requirements,
+            Bugs = testCase.Bugs
         };
     }
 

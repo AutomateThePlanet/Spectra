@@ -56,4 +56,7 @@ public sealed class TestCaseFrontmatter
 
     [YamlMember(Alias = "requirements")]
     public List<string> Requirements { get; set; } = [];
+
+    [YamlMember(Alias = "bugs")]
+    public List<string> Bugs { get; set; } = [];
 }
