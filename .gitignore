@@ -1,8 +1,8 @@
 # Execution state (local, transient)
 .execution/
 
-# Reports (local by default)
-reports/
+# Reports (local execution reports, not source code)
+/reports/
 
 # .NET build artifacts
 bin/
