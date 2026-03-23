@@ -21,9 +21,9 @@ interactively using SPECTRA MCP tools.
    b. Present: title, preconditions, steps, expected result, test data
    c. Ask user for result: PASS, FAIL, BLOCKED, or SKIP
    d. If PASS: call `advance_test_case` immediately
-   e. If FAIL: ask user "What went wrong?" — wait for their answer — then call `advance_test_case` with their exact words as notes. Then ask if they want to attach a screenshot.
-   f. If BLOCKED: ask user "What's blocking this?" — wait for their answer — then call `advance_test_case` with status=BLOCKED and their exact words as notes
-   g. If SKIP: ask user "Why skip?" — wait for their answer — then call `skip_test_case` with their exact words as reason
+   e. If FAIL: reply in chat "What went wrong? You can describe the failure and/or paste a screenshot." — wait for their reply — then call `advance_test_case` with their exact words as notes. If they pasted a screenshot, also call `save_screenshot`.
+   f. If BLOCKED: reply in chat "What's blocking this?" — wait for their reply — then call `advance_test_case` with status=BLOCKED and their exact words as notes
+   g. If SKIP: reply in chat "Why skip?" — wait for their reply — then call `skip_test_case` with their exact words as reason
    h. Show progress: "Test 5/15 — 4 passed, 1 failed"
 5. Call `finalize_execution_run` when all tests complete
 6. Present summary with pass/fail counts
@@ -73,11 +73,13 @@ Interpret natural language into test statuses:
 | User Says | Status | Action |
 |-----------|--------|--------|
 | "passed", "it worked", "success", "yes", "p" | PASS | Call **advance_test_case** with status=PASSED immediately |
-| "failed", "broken", "bug", "doesn't work", "f", "fail" | FAIL | **STOP — do NOT call advance_test_case yet.** First ask: "What went wrong? Please describe the failure." Wait for the user's response, then call **advance_test_case** with status=FAILED and notes set to exactly what the user said. **Never invent or generate notes yourself.** |
-| "blocked", "can't test", "environment down", "b" | BLOCKED | **STOP — do NOT call advance_test_case yet.** First ask: "What's blocking this test?" Wait for the user's response, then call **advance_test_case** with status=BLOCKED and notes set to exactly what the user said. **Never invent or generate notes yourself.** |
-| "skip", "not applicable", "N/A", "s" | SKIP | **STOP — do NOT call skip_test_case yet.** First ask: "Why are we skipping this?" Wait for the user's response, then call **skip_test_case** with reason set to exactly what the user said. |
+| "failed", "broken", "bug", "doesn't work", "f", "fail" | FAIL | **STOP — do NOT call advance_test_case yet.** Reply with a normal chat message: "What went wrong? You can describe the failure and/or paste a screenshot." Wait for the user's next message, then call **advance_test_case** with status=FAILED and notes set to exactly what the user said. **Never invent or generate notes yourself.** |
+| "blocked", "can't test", "environment down", "b" | BLOCKED | **STOP — do NOT call advance_test_case yet.** Reply with a normal chat message: "What's blocking this test? You can describe the issue and/or paste a screenshot." Wait for the user's next message, then call **advance_test_case** with status=BLOCKED and notes set to exactly what the user said. **Never invent or generate notes yourself.** |
+| "skip", "not applicable", "N/A", "s" | SKIP | **STOP — do NOT call skip_test_case yet.** Reply with a normal chat message: "Why are we skipping this?" Wait for the user's next message, then call **skip_test_case** with reason set to exactly what the user said. |
 
 > **CRITICAL**: For FAIL, BLOCKED, and SKIP — you MUST ask the user for their comment/reason BEFORE calling the tool. Do NOT fabricate, infer, or generate notes on behalf of the user. The notes must come from the user's own words.
+
+> **CRITICAL**: When asking for failure details, always reply with a **normal chat message** — do NOT use any "ask user" tool, input prompt, or dialog. The user needs the regular chat input so they can paste screenshots alongside their text description.
 
 > **IMPORTANT**: BLOCKED tests MUST use `advance_test_case` with `status=BLOCKED`.
 > Do NOT use `skip_test_case` for blocked tests. `skip_test_case` is ONLY for SKIP.
@@ -86,16 +88,16 @@ Interpret natural language into test statuses:
 
 Users may use single-letter shortcuts for speed:
 - **p** = PASS (record immediately)
-- **f** = FAIL (ask for failure comment first, then record)
-- **b** = BLOCKED (ask for blocking reason first, then record)
-- **s** = SKIP (ask for skip reason first, then record)
+- **f** = FAIL (reply asking for comment + optional screenshot, then record)
+- **b** = BLOCKED (reply asking for reason + optional screenshot, then record)
+- **s** = SKIP (reply asking for reason, then record)
 
 ## Proactive Tool Usage
 
 ### After a FAILED Result
 After recording a FAILED result with `advance_test_case`:
-1. Ask: "Would you like to attach a screenshot of the failure?"
-2. If yes: guide them to provide base64 image data, then call `save_screenshot`
+1. Reply in chat: "Would you like to attach a screenshot of the failure? You can paste it here."
+2. If the user pastes a screenshot, call `save_screenshot` with the image data
 3. If the user provides a multi-line failure description, call `add_test_note` to store the full details separately from the one-line notes in `advance_test_case`
 
 ### Progress Summaries
