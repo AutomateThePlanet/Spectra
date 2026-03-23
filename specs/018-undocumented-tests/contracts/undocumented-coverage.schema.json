@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Documentation Coverage with Undocumented Tests",
+  "description": "Extended documentation coverage section including undocumented test metrics",
+  "type": "object",
+  "properties": {
+    "total_docs": {
+      "type": "integer",
+      "description": "Total documentation files analyzed"
+    },
+    "covered_docs": {
+      "type": "integer",
+      "description": "Documentation files with at least one linked test"
+    },
+    "percentage": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Documentation coverage percentage"
+    },
+    "undocumented_test_count": {
+      "type": "integer",
+      "description": "Number of tests with empty source_refs (no documentation source)"
+    },
+    "undocumented_test_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "IDs of tests with no documentation source"
+    },
+    "details": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "doc": { "type": "string" },
+          "test_count": { "type": "integer" },
+          "covered": { "type": "boolean" },
+          "test_ids": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["doc", "test_count", "covered"]
+      }
+    }
+  },
+  "required": ["total_docs", "covered_docs", "percentage", "undocumented_test_count"]
+}

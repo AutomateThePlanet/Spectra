@@ -10,6 +10,7 @@ public class GroundingModelsTests
         Assert.Equal(0, (int)VerificationVerdict.Grounded);
         Assert.Equal(1, (int)VerificationVerdict.Partial);
         Assert.Equal(2, (int)VerificationVerdict.Hallucinated);
+        Assert.Equal(3, (int)VerificationVerdict.Manual);
     }
 
     [Fact]
@@ -226,5 +227,100 @@ public class GroundingModelsTests
         Assert.Single(result.Errors);
         Assert.Contains("Connection timeout", result.Errors);
         Assert.False(result.IsSuccess);
+    }
+
+    [Fact]
+    public void GroundingMetadata_ManualVerdictIsValid()
+    {
+        var metadata = new GroundingMetadata
+        {
+            Verdict = VerificationVerdict.Manual,
+            Score = 1.0,
+            Generator = "user",
+            Critic = "none",
+            VerifiedAt = DateTimeOffset.UtcNow
+        };
+
+        Assert.True(metadata.IsValid());
+    }
+
+    [Fact]
+    public void GroundingFrontmatter_ManualVerdict_ToMetadata_ReturnsPlaceholderValues()
+    {
+        var frontmatter = new GroundingFrontmatter
+        {
+            Verdict = "manual",
+            Source = "user-described",
+            CreatedBy = "testuser",
+            Note = "Undocumented IBAN validation"
+        };
+
+        var metadata = frontmatter.ToMetadata();
+
+        Assert.NotNull(metadata);
+        Assert.Equal(VerificationVerdict.Manual, metadata!.Verdict);
+        Assert.Equal(1.0, metadata.Score);
+        Assert.Equal("user", metadata.Generator);
+        Assert.Equal("none", metadata.Critic);
+        Assert.Empty(metadata.UnverifiedClaims);
+    }
+
+    [Fact]
+    public void GroundingFrontmatter_ManualVerdict_DoesNotRequireGeneratorOrCritic()
+    {
+        var frontmatter = new GroundingFrontmatter
+        {
+            Verdict = "manual",
+            // No Generator, Critic, Score, or VerifiedAt set
+            Source = "user-described",
+            CreatedBy = "testuser"
+        };
+
+        var metadata = frontmatter.ToMetadata();
+
+        Assert.NotNull(metadata);
+        Assert.Equal(VerificationVerdict.Manual, metadata!.Verdict);
+    }
+
+    [Fact]
+    public void GroundingFrontmatter_NewFields_CanBeSet()
+    {
+        var frontmatter = new GroundingFrontmatter
+        {
+            Verdict = "manual",
+            Source = "user-described",
+            CreatedBy = "angelovstanton",
+            Note = "IBAN validation behavior — not yet documented"
+        };
+
+        Assert.Equal("user-described", frontmatter.Source);
+        Assert.Equal("angelovstanton", frontmatter.CreatedBy);
+        Assert.Equal("IBAN validation behavior — not yet documented", frontmatter.Note);
+    }
+
+    [Fact]
+    public void GroundingFrontmatter_NewFields_DefaultToNull()
+    {
+        var frontmatter = new GroundingFrontmatter
+        {
+            Verdict = "grounded"
+        };
+
+        Assert.Null(frontmatter.Source);
+        Assert.Null(frontmatter.CreatedBy);
+        Assert.Null(frontmatter.Note);
+    }
+
+    [Fact]
+    public void GroundingFrontmatter_NonManualVerdict_StillRequiresGeneratorAndCritic()
+    {
+        var frontmatter = new GroundingFrontmatter
+        {
+            Verdict = "grounded"
+            // No Generator or Critic
+        };
+
+        var metadata = frontmatter.ToMetadata();
+        Assert.Null(metadata);
     }
 }

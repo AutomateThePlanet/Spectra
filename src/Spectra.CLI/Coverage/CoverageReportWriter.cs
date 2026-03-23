@@ -73,6 +73,18 @@ public sealed class CoverageReportWriter
         sb.AppendLine($"**{doc.Percentage:F1}%** — {doc.CoveredDocs} of {doc.TotalDocs} documents covered");
         sb.AppendLine();
 
+        if (doc.UndocumentedTestCount > 0)
+        {
+            var totalTests = doc.Details.Sum(d => d.TestCount) + doc.UndocumentedTestCount;
+            var undocPct = totalTests > 0
+                ? (doc.UndocumentedTestCount * 100.0m) / totalTests
+                : 0m;
+            sb.AppendLine($"Undocumented tests: {doc.UndocumentedTestCount} ({undocPct:F1}%)");
+            sb.AppendLine();
+            sb.AppendLine($"> :warning: {doc.UndocumentedTestCount} test cases have no documentation source. These may indicate documentation gaps.");
+            sb.AppendLine();
+        }
+
         if (doc.Details.Count > 0)
         {
             sb.AppendLine("| Document | Tests | Covered |");

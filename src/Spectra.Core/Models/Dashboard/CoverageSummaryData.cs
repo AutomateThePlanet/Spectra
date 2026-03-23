@@ -35,6 +35,13 @@ public sealed class DocumentationSectionData
     [JsonPropertyName("details")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<DocumentationCoverageDetail>? Details { get; init; }
+
+    [JsonPropertyName("undocumented_test_count")]
+    public int UndocumentedTestCount { get; init; }
+
+    [JsonPropertyName("undocumented_test_ids")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? UndocumentedTestIds { get; init; }
 }
 
 /// <summary>

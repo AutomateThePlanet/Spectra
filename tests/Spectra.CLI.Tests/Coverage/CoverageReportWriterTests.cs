@@ -276,6 +276,46 @@ public class CoverageReportWriterTests : IDisposable
 
     #endregion
 
+    #region Undocumented Tests
+
+    [Fact]
+    public void FormatAsJson_IncludesUndocumentedTestFields()
+    {
+        var report = CreateReportWithUndocumentedTests();
+
+        var json = _writer.FormatAsJson(report);
+
+        Assert.Contains("\"undocumented_test_count\"", json);
+        Assert.Contains("\"undocumented_test_ids\"", json);
+        Assert.Contains("TC-010", json);
+        Assert.Contains("TC-011", json);
+    }
+
+    [Fact]
+    public void FormatAsMarkdown_IncludesUndocumentedSection()
+    {
+        var report = CreateReportWithUndocumentedTests();
+
+        var markdown = _writer.FormatAsMarkdown(report);
+
+        Assert.Contains("Undocumented tests: 2", markdown);
+        Assert.Contains("2 test cases have no documentation source", markdown);
+        Assert.Contains("documentation gaps", markdown);
+    }
+
+    [Fact]
+    public void FormatAsMarkdown_NoUndocumentedTests_OmitsSection()
+    {
+        var report = CreateMinimalReport();
+
+        var markdown = _writer.FormatAsMarkdown(report);
+
+        Assert.DoesNotContain("Undocumented tests:", markdown);
+        Assert.DoesNotContain("documentation gaps", markdown);
+    }
+
+    #endregion
+
     #region FormatAsText Tests
 
     [Fact]
@@ -495,6 +535,51 @@ public class CoverageReportWriterTests : IDisposable
                         ReferencedIds = ["TC-999"]
                     }
                 ]
+            }
+        };
+    }
+
+    private static UnifiedCoverageReport CreateReportWithUndocumentedTests()
+    {
+        return new UnifiedCoverageReport
+        {
+            GeneratedAt = DateTime.UtcNow,
+            DocumentationCoverage = new DocumentationCoverage
+            {
+                TotalDocs = 2,
+                CoveredDocs = 1,
+                Percentage = 50m,
+                UndocumentedTestCount = 2,
+                UndocumentedTestIds = ["TC-010", "TC-011"],
+                Details =
+                [
+                    new DocumentCoverageDetail
+                    {
+                        Doc = "docs/auth.md",
+                        TestCount = 3,
+                        Covered = true,
+                        TestIds = ["TC-001", "TC-002", "TC-003"]
+                    },
+                    new DocumentCoverageDetail
+                    {
+                        Doc = "docs/admin.md",
+                        TestCount = 0,
+                        Covered = false
+                    }
+                ]
+            },
+            RequirementsCoverage = new RequirementsCoverage
+            {
+                TotalRequirements = 0,
+                CoveredRequirements = 0,
+                Percentage = 0m,
+                HasRequirementsFile = false
+            },
+            AutomationCoverage = new AutomationCoverage
+            {
+                TotalTests = 5,
+                Automated = 3,
+                Percentage = 60m
             }
         };
     }

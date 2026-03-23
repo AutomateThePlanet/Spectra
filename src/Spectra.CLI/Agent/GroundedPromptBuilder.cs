@@ -80,6 +80,66 @@ public static class GroundedPromptBuilder
               timeouts, validation rules, etc.
             - Steps should be clear and actionable
             - When asked for "full coverage", extract EVERY testable scenario from the docs
+
+            ## Creating Test Cases from Undocumented Behavior
+
+            When a user explicitly describes behavior that is NOT in the documentation and asks you
+            to create a test for it, follow these steps:
+
+            ### Step 1: Understand the Behavior
+            Ask clarifying questions, but ONLY ask what is missing from the user's description.
+            The questions you may need to ask cover:
+            - Screen or module where the behavior occurs
+            - Steps to trigger the behavior
+            - Expected result
+            - Preconditions or setup required
+            - Priority (high/medium/low)
+            - Which test suite this belongs to
+            If the user's description is detailed enough to cover these aspects, do NOT ask questions.
+            Skip straight to duplicate detection.
+
+            ### Step 2: Check for Duplicates
+            Before generating the test, search existing tests using the find_test_cases tool with
+            keywords extracted from the user's behavior description.
+
+            - If an EXACT duplicate is found (same behavior, same steps, same expected result):
+              Offer three options:
+              1. Update the existing test with any new details
+              2. Create a new, separate test anyway
+              3. Cancel and take no action
+              Wait for the user to choose before proceeding.
+
+            - If a SIMILAR (but not exact) test is found:
+              Show the existing test to the user with an explanation of how it differs, then
+              proceed with generating the new test unless the user says otherwise.
+
+            - If NO matches are found:
+              Proceed silently to test generation without mentioning the search.
+
+            ### Step 3: Generate the Test Case
+            Generate the test case in standard SPECTRA format, but with these specific field values:
+            - source_refs: [] (empty array — there is no documentation source)
+            - grounding.verdict: "manual"
+            - grounding.source: "user-described"
+            - grounding.created_by: the current user identity
+            - grounding.note: a brief sentence of context about why this test was created from
+              a user description rather than documentation
+
+            ### Step 4: Show Draft for Review
+            Present the complete draft test case to the user for review and confirmation.
+            Do NOT write the test file until the user explicitly confirms the draft is acceptable.
+            Wait for the user to approve, request changes, or cancel.
+
+            ### Step 5: Save and Show Documentation Reminder
+            After saving the test file, always display this reminder:
+            "This test has no documentation source. Consider updating docs to include this behavior."
+
+            ## When NOT to Use the Undocumented Behavior Flow
+
+            - If the user says "generate tests from docs" → use normal document-grounded generation
+            - If the user provides a document path or URL → use document-based generation
+            - Only use the undocumented behavior flow when the user explicitly describes a behavior
+              that is NOT covered in existing documentation and asks you to create a test for it
             """;
     }
 

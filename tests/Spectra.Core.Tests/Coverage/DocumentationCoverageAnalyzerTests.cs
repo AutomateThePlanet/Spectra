@@ -151,6 +151,83 @@ public class DocumentationCoverageAnalyzerTests
         Assert.Contains("TC-002", billingDetail.TestIds);
     }
 
+    [Fact]
+    public void Analyze_MixedDocumentedAndUndocumented_ShowsCorrectCounts()
+    {
+        var docMap = new DocumentMap
+        {
+            TotalSizeKb = 5,
+            Documents =
+            [
+                new DocumentEntry { Path = "docs/auth.md", Title = "Auth", SizeKb = 5, Headings = ["Auth"], Preview = "" }
+            ]
+        };
+
+        var tests = new List<TestCase>
+        {
+            CreateTestCase("TC-001", ["docs/auth.md"]),
+            CreateTestCase("TC-002", []),
+            CreateTestCase("TC-003", ["docs/auth.md"]),
+            CreateTestCase("TC-004", [])
+        };
+
+        var result = _analyzer.Analyze(docMap, tests);
+
+        Assert.Equal(2, result.UndocumentedTestCount);
+        Assert.Equal(2, result.UndocumentedTestIds.Count);
+        Assert.Contains("TC-002", result.UndocumentedTestIds);
+        Assert.Contains("TC-004", result.UndocumentedTestIds);
+    }
+
+    [Fact]
+    public void Analyze_NoUndocumentedTests_ShowsZero()
+    {
+        var docMap = new DocumentMap
+        {
+            TotalSizeKb = 10,
+            Documents =
+            [
+                new DocumentEntry { Path = "docs/auth.md", Title = "Auth", SizeKb = 5, Headings = ["Auth"], Preview = "" },
+                new DocumentEntry { Path = "docs/billing.md", Title = "Billing", SizeKb = 5, Headings = ["Billing"], Preview = "" }
+            ]
+        };
+
+        var tests = new List<TestCase>
+        {
+            CreateTestCase("TC-001", ["docs/auth.md"]),
+            CreateTestCase("TC-002", ["docs/billing.md"])
+        };
+
+        var result = _analyzer.Analyze(docMap, tests);
+
+        Assert.Equal(0, result.UndocumentedTestCount);
+        Assert.Empty(result.UndocumentedTestIds);
+    }
+
+    [Fact]
+    public void Analyze_EmptySourceRefs_IdentifiedAsUndocumented()
+    {
+        var docMap = new DocumentMap
+        {
+            TotalSizeKb = 5,
+            Documents =
+            [
+                new DocumentEntry { Path = "docs/auth.md", Title = "Auth", SizeKb = 5, Headings = ["Auth"], Preview = "" }
+            ]
+        };
+
+        var tests = new List<TestCase>
+        {
+            CreateTestCase("TC-001", [])
+        };
+
+        var result = _analyzer.Analyze(docMap, tests);
+
+        Assert.Equal(1, result.UndocumentedTestCount);
+        Assert.Single(result.UndocumentedTestIds);
+        Assert.Equal("TC-001", result.UndocumentedTestIds[0]);
+    }
+
     private static TestCase CreateTestCase(string id, IReadOnlyList<string> sourceRefs) => new()
     {
         Id = id,

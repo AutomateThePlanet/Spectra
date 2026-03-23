@@ -38,11 +38,18 @@ public sealed class DocumentationCoverageAnalyzer
             ? Math.Round((coveredDocs * 100m) / totalDocs, 2)
             : 0m;
 
+        var undocumentedTests = allTests
+            .Where(t => t.SourceRefs.Count == 0)
+            .Select(t => t.Id)
+            .ToList();
+
         return new DocumentationCoverage
         {
             TotalDocs = totalDocs,
             CoveredDocs = coveredDocs,
             Percentage = percentage,
+            UndocumentedTestCount = undocumentedTests.Count,
+            UndocumentedTestIds = undocumentedTests,
             Details = details
         };
     }

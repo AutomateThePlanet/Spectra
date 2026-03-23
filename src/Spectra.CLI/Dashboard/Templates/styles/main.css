@@ -1487,6 +1487,7 @@ details.result-row[open] summary::before {
 
 .donut-legend-dot.automated { background: var(--color-success); }
 .donut-legend-dot.manual { background: var(--color-warning); }
+.donut-legend-dot.undocumented { background: var(--cov-orange); }
 .donut-legend-dot.unlinked { background: var(--color-danger); }
 
 .donut-segment {
@@ -1713,6 +1714,8 @@ details.result-row[open] summary::before {
     --cov-blue: #3B82F6;
     --cov-blue-bg: #eff6ff;
     --cov-slate: #64748b;
+    --cov-orange: #F97316;
+    --cov-orange-bg: #fff7ed;
     --font-display: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-body: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'JetBrains Mono', 'SF Mono', Monaco, Consolas, monospace;

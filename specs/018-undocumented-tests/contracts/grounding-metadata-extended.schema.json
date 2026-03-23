@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Extended Grounding Metadata Schema",
+  "description": "YAML frontmatter schema for grounding section, extended with manual verdict support",
+  "type": "object",
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["grounded", "partial", "hallucinated", "manual"],
+      "description": "Verification verdict. 'manual' indicates user-described behavior with no documentation source."
+    },
+    "score": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Confidence score. Not required for manual verdict."
+    },
+    "generator": {
+      "type": "string",
+      "description": "Model that generated the test. Not required for manual verdict."
+    },
+    "critic": {
+      "type": "string",
+      "description": "Model that verified the test. Not required for manual verdict."
+    },
+    "verified_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Verification timestamp. Not required for manual verdict."
+    },
+    "unverified_claims": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Claims that couldn't be verified. Only for partial verdict."
+    },
+    "source": {
+      "type": "string",
+      "enum": ["doc-generated", "user-described", "imported"],
+      "description": "Origin of the test case. 'user-described' for undocumented behaviors."
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Username of the person who described the behavior. Used with manual verdict."
+    },
+    "note": {
+      "type": "string",
+      "description": "Optional context about why this behavior isn't documented."
+    }
+  },
+  "required": ["verdict"],
+  "allOf": [
+    {
+      "if": {
+        "properties": { "verdict": { "const": "manual" } }
+      },
+      "then": {
+        "properties": {
+          "source": { "const": "user-described" }
+        },
+        "required": ["source", "created_by"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "verdict": { "enum": ["grounded", "partial", "hallucinated"] } }
+      },
+      "then": {
+        "required": ["verdict", "score", "generator", "critic", "verified_at"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "verdict": { "const": "partial" } }
+      },
+      "then": {
+        "properties": {
+          "unverified_claims": { "minItems": 1 }
+        },
+        "required": ["unverified_claims"]
+      }
+    }
+  ]
+}

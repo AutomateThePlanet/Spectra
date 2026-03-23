@@ -705,6 +705,14 @@ public sealed class DataCollector
             var docPercentage = totalDocs > 0
                 ? Math.Round((coveredDocs * 100m) / totalDocs, 2) : 0m;
 
+            // ── Undocumented tests (empty source_refs) ──
+            var undocumentedTestIds = testEntries
+                .Where(t => t.SourceRefs.Count == 0)
+                .Select(t => t.Id)
+                .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var undocumentedTestCount = undocumentedTestIds.Count;
+
             // ── Requirements coverage ──
             var configPath = Path.Combine(_basePath, "spectra.config.json");
             var reqDetails = new List<Core.Models.Coverage.RequirementCoverageDetail>();
@@ -818,7 +826,9 @@ public sealed class DataCollector
                     Covered = coveredDocs,
                     Total = totalDocs,
                     Percentage = docPercentage,
-                    Details = docDetails
+                    Details = docDetails,
+                    UndocumentedTestCount = undocumentedTestCount,
+                    UndocumentedTestIds = undocumentedTestCount > 0 ? undocumentedTestIds : null
                 },
                 Requirements = new RequirementsSectionData
                 {

@@ -579,6 +579,80 @@ public class DataCollectorTests : IDisposable
         Assert.Equal(0m, data.CoverageSummary.Documentation.Percentage);
     }
 
+    [Fact]
+    public async Task CollectAsync_WithUndocumentedTests_PopulatesUndocumentedMetric()
+    {
+        // Create suite with mix of documented and undocumented tests
+        var index = new MetadataIndex
+        {
+            Suite = "checkout",
+            GeneratedAt = DateTime.UtcNow,
+            Tests =
+            [
+                new TestIndexEntry
+                {
+                    Id = "TC-001", Title = "Documented test", File = "TC-001.md",
+                    Priority = "high", Tags = [],
+                    SourceRefs = ["docs/checkout.md#Flow"]
+                },
+                new TestIndexEntry
+                {
+                    Id = "TC-002", Title = "Undocumented test 1", File = "TC-002.md",
+                    Priority = "medium", Tags = [],
+                    SourceRefs = []
+                },
+                new TestIndexEntry
+                {
+                    Id = "TC-003", Title = "Undocumented test 2", File = "TC-003.md",
+                    Priority = "low", Tags = [],
+                    SourceRefs = []
+                }
+            ]
+        };
+
+        await WriteIndexAsync("checkout", index);
+        var collector = new DataCollector(_testDir);
+        var data = await collector.CollectAsync();
+
+        Assert.NotNull(data.CoverageSummary);
+        Assert.Equal(2, data.CoverageSummary.Documentation.UndocumentedTestCount);
+        Assert.NotNull(data.CoverageSummary.Documentation.UndocumentedTestIds);
+        Assert.Contains("TC-002", data.CoverageSummary.Documentation.UndocumentedTestIds);
+        Assert.Contains("TC-003", data.CoverageSummary.Documentation.UndocumentedTestIds);
+    }
+
+    [Fact]
+    public async Task CollectAsync_NoUndocumentedTests_ZeroUndocumentedCount()
+    {
+        // Create docs directory so there's something to measure
+        var docsDir = Path.Combine(_testDir, "docs");
+        Directory.CreateDirectory(docsDir);
+        await File.WriteAllTextAsync(Path.Combine(docsDir, "checkout.md"), "# Checkout\nFlow docs.");
+
+        var index = new MetadataIndex
+        {
+            Suite = "checkout",
+            GeneratedAt = DateTime.UtcNow,
+            Tests =
+            [
+                new TestIndexEntry
+                {
+                    Id = "TC-001", Title = "Documented test", File = "TC-001.md",
+                    Priority = "high", Tags = [],
+                    SourceRefs = ["docs/checkout.md"]
+                }
+            ]
+        };
+
+        await WriteIndexAsync("checkout", index);
+        var collector = new DataCollector(_testDir);
+        var data = await collector.CollectAsync();
+
+        Assert.NotNull(data.CoverageSummary);
+        Assert.Equal(0, data.CoverageSummary.Documentation.UndocumentedTestCount);
+        Assert.Null(data.CoverageSummary.Documentation.UndocumentedTestIds);
+    }
+
     #endregion
 
     private async Task CreateSuiteIndexAsync(string suiteName, string[] testIds)

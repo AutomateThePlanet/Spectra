@@ -21,5 +21,11 @@ public enum VerificationVerdict
     /// Test contains invented behaviors or undocumented claims.
     /// Test is rejected and NOT written to disk.
     /// </summary>
-    Hallucinated
+    Hallucinated,
+
+    /// <summary>
+    /// Test was created from a user-described behavior, not from documentation.
+    /// Skips critic verification entirely. Written to disk with manual grounding metadata.
+    /// </summary>
+    Manual
 }

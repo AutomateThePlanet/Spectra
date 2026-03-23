@@ -1,6 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Spectra.CLI.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Spectra.Core\Spectra.Core.csproj" />
   </ItemGroup>
 
@@ -18,11 +22,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
+
     <!-- NuGet Tool Configuration -->
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>spectra</ToolCommandName>
     <PackageId>Spectra.CLI</PackageId>
-    <Version>1.16.0</Version>
+    <Version>1.17.0</Version>
     <Authors>Spectra</Authors>
     <Description>AI-native test generation and management CLI</Description>
     <PackageOutputPath>./nupkg</PackageOutputPath>

@@ -969,6 +969,19 @@ public sealed class GenerateHandler
         // Verify each test
         foreach (var test in tests)
         {
+            // T013: Skip verification for tests with Manual verdict — pass through as-is
+            if (test.Grounding is not null && test.Grounding.Verdict == VerificationVerdict.Manual)
+            {
+                results.Add((test, new VerificationResult
+                {
+                    Verdict = VerificationVerdict.Manual,
+                    Score = 1.0,
+                    Findings = [],
+                    CriticModel = critic.ModelName
+                }));
+                continue;
+            }
+
             await _progress.StatusAsync($"Verifying {test.Id} ({critic.ModelName})...", async () =>
             {
                 try
@@ -989,13 +1002,38 @@ public sealed class GenerateHandler
     /// <summary>
     /// Creates a test with grounding metadata if verified.
     /// </summary>
-    private static TestCase CreateTestWithGrounding(
+    internal static TestCase CreateTestWithGrounding(
         TestCase test,
         VerificationResult? result,
         string generatorModel,
         string filePath,
         string testsPath)
     {
+        // T010: Preserve existing Manual grounding metadata — do not overwrite with critic results
+        if (test.Grounding is not null && test.Grounding.Verdict == VerificationVerdict.Manual)
+        {
+            return new TestCase
+            {
+                Id = test.Id,
+                Title = test.Title,
+                Priority = test.Priority,
+                Tags = test.Tags,
+                Component = test.Component,
+                Preconditions = test.Preconditions,
+                Environment = test.Environment,
+                EstimatedDuration = test.EstimatedDuration,
+                DependsOn = test.DependsOn,
+                SourceRefs = test.SourceRefs,
+                RelatedWorkItems = test.RelatedWorkItems,
+                Custom = test.Custom,
+                Steps = test.Steps,
+                ExpectedResult = test.ExpectedResult,
+                TestData = test.TestData,
+                FilePath = Path.GetRelativePath(testsPath, filePath),
+                Grounding = test.Grounding
+            };
+        }
+
         GroundingMetadata? grounding = null;
 
         if (result is not null && result.IsSuccess)

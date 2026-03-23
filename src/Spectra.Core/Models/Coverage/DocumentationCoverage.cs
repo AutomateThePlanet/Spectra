@@ -16,6 +16,12 @@ public sealed class DocumentationCoverage
     [JsonPropertyName("percentage")]
     public required decimal Percentage { get; init; }
 
+    [JsonPropertyName("undocumented_test_count")]
+    public int UndocumentedTestCount { get; init; }
+
+    [JsonPropertyName("undocumented_test_ids")]
+    public IReadOnlyList<string> UndocumentedTestIds { get; init; } = [];
+
     [JsonPropertyName("details")]
     public IReadOnlyList<DocumentCoverageDetail> Details { get; init; } = [];
 }

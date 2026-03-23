@@ -909,6 +909,7 @@ function renderThreeSectionCoverage(summary) {
     html += renderCoverageSection('Documentation Coverage', summary.documentation, 'documents', renderDocDetails);
     html += renderCoverageSection('Requirements Coverage', summary.requirements, 'requirements', renderReqDetails);
     html += renderCoverageSection('Automation Coverage', summary.automation, 'tests', renderAutoDetails);
+    html += renderUndocumentedTestsSection(summary.documentation);
     html += '</div>';
 
     // Coverage tree (hierarchical collapsible)
@@ -1466,19 +1467,63 @@ function renderAutoDetails(section) {
 }
 
 /**
+ * Render undocumented tests section (tests with no documentation source).
+ */
+function renderUndocumentedTestsSection(docSection) {
+    const count = docSection?.undocumented_test_count || 0;
+    if (count === 0) return '';
+
+    const ids = docSection.undocumented_test_ids || [];
+    const preview = ids.slice(0, 8).join(', ');
+    const more = ids.length > 8 ? `, +${ids.length - 8} more` : '';
+
+    return `
+        <div class="coverage-section" id="undocumented-tests-section" style="border-left: 3px solid var(--cov-orange);">
+            <div class="coverage-section-header">
+                <span class="coverage-section-label" style="color: var(--cov-orange);">
+                    Undocumented Tests
+                </span>
+                <span class="coverage-section-pct" style="color: var(--cov-orange);">${count}</span>
+            </div>
+            <span class="coverage-section-detail" title="Test created from user description \u2014 no documentation source">
+                ${count} test${count !== 1 ? 's' : ''} with no documentation source
+            </span>
+            <div style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
+                ${preview}${more}
+            </div>
+            <div style="margin-top: 0.5rem; padding: 0.5rem; background: var(--cov-orange-bg); border-radius: 6px; font-size: 0.85rem; color: #9a3412;">
+                \u26a0 These test cases have no documentation source. They may indicate documentation gaps.
+            </div>
+            <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" checked onchange="toggleUndocumentedTests(this.checked)" />
+                Show undocumented tests in coverage
+            </label>
+        </div>
+    `;
+}
+
+/** Toggle undocumented tests visibility in the coverage view. */
+function toggleUndocumentedTests(show) {
+    const section = document.getElementById('undocumented-tests-section');
+    if (section) {
+        section.style.display = show ? '' : 'none';
+    }
+}
+
+/**
  * Render donut chart showing test health distribution.
  */
 function renderDonutChart() {
     if (!allTests || allTests.length === 0) return '';
 
-    let automated = 0, manualOnly = 0, unlinked = 0;
+    let automated = 0, manualOnly = 0, undocumented = 0, unlinked = 0;
     for (const t of allTests) {
         if (t.has_automation || (t.automated_by && t.automated_by.length > 0)) {
             automated++;
-        } else if (t.source_refs && t.source_refs.length > 0) {
-            manualOnly++;
+        } else if (!t.source_refs || t.source_refs.length === 0) {
+            undocumented++;
         } else {
-            unlinked++;
+            manualOnly++;
         }
     }
 
@@ -1496,6 +1541,7 @@ function renderDonutChart() {
     const segments = [
         { count: automated, pct: (automated / total) * 100, color: 'var(--color-success)', label: 'Automated' },
         { count: manualOnly, pct: (manualOnly / total) * 100, color: 'var(--color-warning)', label: 'Manual Only' },
+        { count: undocumented, pct: (undocumented / total) * 100, color: 'var(--cov-orange)', label: 'Undocumented' },
         { count: unlinked, pct: (unlinked / total) * 100, color: 'var(--color-danger)', label: 'Unlinked' }
     ].filter(s => s.count > 0);
 
@@ -1515,7 +1561,7 @@ function renderDonutChart() {
     }
 
     const legendItems = segments.map(s => {
-        const dotClass = s.label === 'Automated' ? 'automated' : s.label === 'Manual Only' ? 'manual' : 'unlinked';
+        const dotClass = s.label === 'Automated' ? 'automated' : s.label === 'Manual Only' ? 'manual' : s.label === 'Undocumented' ? 'undocumented' : 'unlinked';
         return `<span class="donut-legend-item"><span class="donut-legend-dot ${dotClass}"></span>${s.label}: ${s.count} (${s.pct.toFixed(1)}%)</span>`;
     }).join('');
 

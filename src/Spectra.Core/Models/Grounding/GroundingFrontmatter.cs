@@ -26,20 +26,47 @@ public sealed class GroundingFrontmatter
     [YamlMember(Alias = "unverified_claims")]
     public List<string> UnverifiedClaims { get; set; } = [];
 
+    [YamlMember(Alias = "source")]
+    public string? Source { get; set; }
+
+    [YamlMember(Alias = "created_by")]
+    public string? CreatedBy { get; set; }
+
+    [YamlMember(Alias = "note")]
+    public string? Note { get; set; }
+
     /// <summary>
     /// Converts the frontmatter DTO to a GroundingMetadata record.
     /// Returns null if required fields are missing.
     /// </summary>
     public GroundingMetadata? ToMetadata()
     {
-        if (string.IsNullOrWhiteSpace(Verdict) ||
-            string.IsNullOrWhiteSpace(Generator) ||
-            string.IsNullOrWhiteSpace(Critic))
+        if (string.IsNullOrWhiteSpace(Verdict))
         {
             return null;
         }
 
         if (!TryParseVerdict(Verdict, out var verdict))
+        {
+            return null;
+        }
+
+        // Manual verdict uses placeholder values — no critic verification was performed
+        if (verdict == VerificationVerdict.Manual)
+        {
+            return new GroundingMetadata
+            {
+                Verdict = VerificationVerdict.Manual,
+                Score = 1.0,
+                Generator = "user",
+                Critic = "none",
+                VerifiedAt = DateTimeOffset.UtcNow,
+                UnverifiedClaims = []
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(Generator) ||
+            string.IsNullOrWhiteSpace(Critic))
         {
             return null;
         }
@@ -69,6 +96,7 @@ public sealed class GroundingFrontmatter
             "grounded" => SetAndReturn(VerificationVerdict.Grounded, ref verdict),
             "partial" => SetAndReturn(VerificationVerdict.Partial, ref verdict),
             "hallucinated" => SetAndReturn(VerificationVerdict.Hallucinated, ref verdict),
+            "manual" => SetAndReturn(VerificationVerdict.Manual, ref verdict),
             _ => false
         };
 
