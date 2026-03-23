@@ -34,11 +34,11 @@ public sealed class SaveScreenshotTool : IMcpTool
         properties = new
         {
             test_handle = new { type = "string", description = "Test handle to attach screenshot to (auto-detected from active run if omitted)" },
-            image_data = new { type = "string", description = "Base64-encoded image data (PNG, JPG, or WebP)" },
+            image_data = new { type = "string", description = "Base64-encoded image data (PNG, JPG, or WebP). Use this OR file_path." },
+            file_path = new { type = "string", description = "Absolute path to a screenshot file on disk. Use this when base64 is not available (e.g. user drags file into chat). The tool reads and processes the file." },
             caption = new { type = "string", description = "Optional caption describing what the screenshot shows" },
             filename = new { type = "string", description = "Optional filename override" }
-        },
-        required = new[] { "image_data" }
+        }
     };
 
     public SaveScreenshotTool(ExecutionEngine engine, string reportsPath, RunRepository runRepo, ResultRepository? resultRepo = null)
@@ -90,11 +90,14 @@ public sealed class SaveScreenshotTool : IMcpTool
             }
         }
 
-        if (string.IsNullOrEmpty(request?.ImageData))
+        var hasImageData = !string.IsNullOrEmpty(request?.ImageData);
+        var hasFilePath = !string.IsNullOrEmpty(request?.FilePath);
+
+        if (!hasImageData && !hasFilePath)
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "INVALID_PARAMS",
-                "image_data is required (base64-encoded)"));
+                "Either image_data (base64) or file_path is required. If you cannot extract base64 from a pasted image, ask the user to save the file and provide the path, or drag the file into the chat."));
         }
 
         var result = await _engine.GetTestResultAsync(resolvedTestHandle!);
@@ -115,23 +118,36 @@ public sealed class SaveScreenshotTool : IMcpTool
 
         try
         {
-            // Decode base64 image data
+            // Get image bytes from either base64 or file path
             byte[] imageBytes;
-            try
+            if (hasFilePath)
             {
-                // Handle data URI format (data:image/png;base64,...)
-                var base64Data = request.ImageData;
-                if (base64Data.Contains(','))
+                if (!File.Exists(request!.FilePath))
                 {
-                    base64Data = base64Data.Split(',')[1];
+                    return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
+                        "FILE_NOT_FOUND",
+                        $"Screenshot file not found: {request.FilePath}"));
                 }
-                imageBytes = Convert.FromBase64String(base64Data);
+                imageBytes = await File.ReadAllBytesAsync(request.FilePath!);
             }
-            catch (FormatException)
+            else
             {
-                return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
-                    "INVALID_IMAGE_DATA",
-                    "image_data must be valid base64-encoded image data"));
+                try
+                {
+                    // Handle data URI format (data:image/png;base64,...)
+                    var base64Data = request!.ImageData!;
+                    if (base64Data.Contains(','))
+                    {
+                        base64Data = base64Data.Split(',')[1];
+                    }
+                    imageBytes = Convert.FromBase64String(base64Data);
+                }
+                catch (FormatException)
+                {
+                    return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
+                        "INVALID_IMAGE_DATA",
+                        "image_data must be valid base64-encoded image data. If you cannot extract base64 from the pasted image, ask the user to save the screenshot to a file and call this tool with file_path instead."));
+                }
             }
 
             // Count existing screenshots for this test to generate index
@@ -258,6 +274,9 @@ internal sealed class SaveScreenshotRequest
 
     [JsonPropertyName("image_data")]
     public string? ImageData { get; set; }
+
+    [JsonPropertyName("file_path")]
+    public string? FilePath { get; set; }
 
     [JsonPropertyName("caption")]
     public string? Caption { get; set; }

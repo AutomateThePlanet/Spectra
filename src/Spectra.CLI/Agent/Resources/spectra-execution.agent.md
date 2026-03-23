@@ -34,7 +34,7 @@ interactively using SPECTRA MCP tools.
    b. Present: title, preconditions, steps, expected result, test data
    c. Ask user for result: PASS, FAIL, BLOCKED, or SKIP
    d. If PASS: call `advance_test_case` immediately
-   e. If FAIL: reply in chat "What went wrong? You can describe the failure and/or paste a screenshot." — wait for their reply — then call `advance_test_case` with their exact words as notes. If they pasted a screenshot, also call `save_screenshot`.
+   e. If FAIL: reply in chat "What went wrong? You can describe the failure and/or paste a screenshot." — wait for their reply — then call `advance_test_case` with their exact words as notes. If they pasted a screenshot, immediately call `save_clipboard_screenshot` with the same test_handle.
    f. If BLOCKED: reply in chat "What's blocking this?" — wait for their reply — then call `advance_test_case` with status=BLOCKED and their exact words as notes
    g. If SKIP: reply in chat "Why skip?" — wait for their reply — then call `skip_test_case` with their exact words as reason
    h. Show progress: "Test 5/15 — 4 passed, 1 failed"
@@ -86,7 +86,7 @@ Interpret natural language into test statuses:
 | User Says | Status | Action |
 |-----------|--------|--------|
 | "passed", "it worked", "success", "yes", "p" | PASS | Call **advance_test_case** with status=PASSED immediately |
-| "failed", "broken", "bug", "doesn't work", "f", "fail" | FAIL | **STOP — do NOT call advance_test_case yet.** Reply: "What went wrong? You can describe the failure and/or paste a screenshot." Wait for the user's next message. Then: (1) call **advance_test_case** with status=FAILED and notes from their text, (2) if they also pasted a screenshot, call **save_screenshot** with the image data. **Never invent the user's failure comment.** |
+| "failed", "broken", "bug", "doesn't work", "f", "fail" | FAIL | **STOP — do NOT call advance_test_case yet.** Reply: "What went wrong? You can describe the failure and/or paste a screenshot." Wait for the user's next message. Then: (1) call **advance_test_case** with status=FAILED and notes from their text, (2) if they also pasted a screenshot, call **save_clipboard_screenshot** with the same test_handle to capture it from the clipboard. **Never invent the user's failure comment.** |
 | "blocked", "can't test", "environment down", "b" | BLOCKED | **STOP — do NOT call advance_test_case yet.** Reply: "What's blocking this test? You can describe the issue and/or paste a screenshot." Wait for the user's next message. Same as FAIL: record notes, then save screenshot if provided. |
 | "skip", "not applicable", "N/A", "s" | SKIP | **STOP — do NOT call skip_test_case yet.** Reply with a normal chat message: "Why are we skipping this?" Wait for the user's next message, then call **skip_test_case** with reason set to exactly what the user said. |
 
@@ -109,7 +109,7 @@ Users may use single-letter shortcuts for speed:
 
 ### After a FAILED Result
 After recording a FAILED result with `advance_test_case`:
-1. If the user included a screenshot with their failure comment, attempt `save_screenshot` immediately. If it fails (INVALID_IMAGE_DATA), describe the screenshot and call `add_test_note` instead. Do not ask again either way.
+1. If the user included a screenshot with their failure comment, immediately call `save_clipboard_screenshot` with the `test_handle` to capture it from the clipboard. Do not ask again.
 2. If the user did NOT include a screenshot, reply: "Would you like to paste a screenshot of the failure?"
 3. If the user provides a multi-line failure description, call `add_test_note` to store the full details separately from the one-line notes in `advance_test_case`
 
@@ -133,17 +133,31 @@ When a test fails and user confirms bug creation:
 
 ## Screenshot Handling
 
-When the user pastes a screenshot (at any point during test execution):
+When the user pastes or mentions a screenshot during test execution, use **`save_clipboard_screenshot`** as the primary method. This tool reads the image directly from the system clipboard — no base64 extraction needed.
 
-1. Try to call `save_screenshot` with the base64-encoded image data and the `test_handle` from the previous `advance_test_case` or `get_test_case_details` call. Always pass `test_handle` explicitly — after recording a result, auto-detection will NOT find the completed test.
-2. **If `save_screenshot` fails with INVALID_IMAGE_DATA** (some models cannot extract base64 from pasted images): fall back by describing what you see in the screenshot and calling `add_test_note` with the test_handle and a note like "Screenshot: [your description of what the image shows — UI state, error messages, visual issues, etc.]". Tell the user the screenshot description was saved as a note.
-3. **When the user sends BOTH text and a pasted image**: first call `advance_test_case` with the text as notes, then attempt `save_screenshot`. If save_screenshot fails, fall back to `add_test_note` with a description as above.
-4. Screenshots that save successfully are automatically compressed to WebP format and linked to the test.
+### Recommended flow (works with ALL models):
+
+1. User pastes a screenshot in chat (image is now on their clipboard)
+2. Call **`save_clipboard_screenshot`** — pass `test_handle` from the previous `advance_test_case` or `get_test_case_details` call. Optionally add a `caption`.
+3. The tool reads the clipboard image, compresses it to WebP, and attaches it to the test. Done.
+
+### When user sends BOTH text and a pasted image:
+1. Call `advance_test_case` with the text as notes
+2. Immediately call `save_clipboard_screenshot` with the same `test_handle` — the image is still on the clipboard
+
+### Fallback options (if clipboard read fails):
+- **`save_screenshot` with `file_path`**: Ask the user to save the file and provide the path, or drag the file into the chat. The tool reads the file from disk.
+- **`save_screenshot` with `image_data`**: If you can extract base64 from the pasted image, pass it directly.
+
+### Important:
+- Always pass `test_handle` explicitly to screenshot tools — after recording a result, auto-detection may not find the completed test
+- Call the screenshot tool **immediately** after the user pastes — before they copy anything else to the clipboard
+- Screenshots are automatically compressed to WebP format and linked to the test
 
 ## Error Handling
 
 - If MCP tool returns error, explain to user and suggest next action
-- If `save_screenshot` returns INVALID_IMAGE_DATA, use the `add_test_note` fallback described above — do not ask the user for base64
+- If `save_clipboard_screenshot` returns NO_CLIPBOARD_IMAGE, ask the user to paste the screenshot again or save the file and provide the path, then use `save_screenshot` with `file_path`
 - If run is paused, offer to resume or cancel
 - If test is blocked, mark dependent tests as blocked automatically
 - If connection lost mid-run, explain state is preserved and can resume

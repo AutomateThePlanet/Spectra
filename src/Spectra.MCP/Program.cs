@@ -149,7 +149,9 @@ public static class Program
         registry.Register("bulk_record_results", new BulkRecordResultsTool(engine));
         registry.Register("add_test_note", new AddTestNoteTool(engine, runRepo, resultRepo));
         registry.Register("retest_test_case", new RetestTestCaseTool(engine, runRepo));
-        registry.Register("save_screenshot", new SaveScreenshotTool(engine, config.ReportsPath, runRepo, resultRepo));
+        var saveScreenshotTool = new SaveScreenshotTool(engine, config.ReportsPath, runRepo, resultRepo);
+        registry.Register("save_screenshot", saveScreenshotTool);
+        registry.Register("save_clipboard_screenshot", new SaveClipboardScreenshotTool(engine, config.ReportsPath, runRepo, resultRepo, saveScreenshotTool));
 
         // Reporting tools
         registry.Register("get_run_history", new GetRunHistoryTool(runRepo, resultRepo));

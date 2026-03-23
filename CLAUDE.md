@@ -190,7 +190,8 @@ The MCP server (`Spectra.MCP`) provides test execution tools for AI agents.
 - `bulk_record_results` - Bulk record results for multiple tests at once
 - `add_test_note` - Add notes to a test
 - `retest_test_case` - Requeue a test for another attempt
-- `save_screenshot` - Save screenshot attachment
+- `save_screenshot` - Save screenshot attachment (base64 or file_path)
+- `save_clipboard_screenshot` - Read image from system clipboard and save as attachment (cross-platform)
 
 **Run Discovery & Cleanup:**
 - `list_active_runs` - List all non-terminal runs with progress summaries
