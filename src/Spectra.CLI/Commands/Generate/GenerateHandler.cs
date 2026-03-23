@@ -1,5 +1,7 @@
 using System.Text.Json;
 using Spectra.CLI.Agent;
+using Spectra.CLI.Agent.Analysis;
+using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Agent.Critic;
 using Spectra.CLI.Commands.Auth;
 using Spectra.CLI.Coverage;
@@ -79,7 +81,7 @@ public sealed class GenerateHandler
 
         if (isDirectMode)
         {
-            return await ExecuteDirectModeAsync(suite!, count ?? 20, focus, ct);
+            return await ExecuteDirectModeAsync(suite!, count, focus, ct);
         }
         else
         {
@@ -89,7 +91,7 @@ public sealed class GenerateHandler
 
     private async Task<int> ExecuteDirectModeAsync(
         string suite,
-        int count,
+        int? count,
         string? focus,
         CancellationToken ct)
     {
@@ -162,6 +164,47 @@ public sealed class GenerateHandler
         var profileLoader = new ProfileLoader();
         var effectiveProfile = await profileLoader.LoadAsync(currentDir, suitePath, ct);
 
+        // Smart test count: analyze documentation when --count is not specified
+        BehaviorAnalysisResult? analysisResult = null;
+        int effectiveCount;
+
+        if (count.HasValue)
+        {
+            // --count explicitly provided: skip analysis, use as-is
+            effectiveCount = count.Value;
+        }
+        else
+        {
+            // No --count: perform AI-powered behavior analysis
+            analysisResult = await _progress.StatusAsync(
+                $"Analyzing {suite} documentation...",
+                async () =>
+                {
+                    var provider = config.Ai.Providers?.FirstOrDefault(p => p.Enabled);
+                    var analyzer = new BehaviorAnalyzer(provider);
+                    return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct);
+                });
+
+            if (analysisResult is not null)
+            {
+                AnalysisPresenter.DisplayBreakdown(analysisResult);
+
+                if (analysisResult.RecommendedCount == 0)
+                {
+                    AnalysisPresenter.DisplayAllCovered(analysisResult.TotalBehaviors);
+                    return ExitCodes.Success;
+                }
+
+                effectiveCount = analysisResult.RecommendedCount;
+            }
+            else
+            {
+                // Analysis failed — fall back to default
+                _progress.Warning("Behavior analysis unavailable, using default count of 20");
+                effectiveCount = 20;
+            }
+        }
+
         // Analyze coverage gaps (filtered by suite)
         var gapAnalyzer = new GapAnalyzer();
         var gaps = gapAnalyzer.AnalyzeGaps(documentMap, existingTests, focus, suite);
@@ -213,11 +256,11 @@ public sealed class GenerateHandler
         }
 
         // Generate tests
-        var prompt = BuildPrompt(suite, count, allExistingIds, effectiveProfile, focus);
+        var prompt = BuildPrompt(suite, effectiveCount, allExistingIds, effectiveProfile, focus);
         GenerationResult result = null!;
         await _progress.StatusAsync("Generating tests...", async () =>
         {
-            result = await agent.GenerateTestsAsync(prompt, documents, existingTests, count, ct);
+            result = await agent.GenerateTestsAsync(prompt, documents, existingTests, effectiveCount, ct);
         });
 
         if (!result.IsSuccess)
@@ -241,9 +284,9 @@ public sealed class GenerateHandler
 
         if (result.Tests.Count == 0)
         {
-            _progress.Warning($"No tests generated (requested: {count})");
+            _progress.Warning($"No tests generated (requested: {effectiveCount})");
             _progress.BlankLine();
-            ShowCountMismatchReason(0, count, documentMap.Documents.Count, existingTests.Count, focus);
+            ShowCountMismatchReason(0, effectiveCount, documentMap.Documents.Count, existingTests.Count, focus);
             return ExitCodes.Success;
         }
 
@@ -253,11 +296,11 @@ public sealed class GenerateHandler
         _results.ShowGeneratedTests(result.Tests);
 
         // Warn if fewer tests than requested
-        if (result.Tests.Count < count)
+        if (result.Tests.Count < effectiveCount)
         {
             _progress.BlankLine();
-            _progress.Warning($"Generated {result.Tests.Count} of {count} requested tests");
-            ShowCountMismatchReason(result.Tests.Count, count, documentMap.Documents.Count, existingTests.Count, focus);
+            _progress.Warning($"Generated {result.Tests.Count} of {effectiveCount} requested tests");
+            ShowCountMismatchReason(result.Tests.Count, effectiveCount, documentMap.Documents.Count, existingTests.Count, focus);
         }
 
         // Preview or write tests
@@ -341,6 +384,13 @@ public sealed class GenerateHandler
         // Show remaining gaps
         var remainingGaps = gapAnalyzer.GetRemainingGaps(gaps, testsToWrite);
         _gapPresenter.ShowRemainingGaps(remainingGaps);
+
+        // Smart count: show behavior gap notification if analysis was performed
+        if (analysisResult is not null)
+        {
+            AnalysisPresenter.DisplayGapNotification(
+                analysisResult, testsToWrite.Count, suite);
+        }
 
         // Token usage if verbose
         if (_verbosity >= VerbosityLevel.Detailed && result.TokenUsage is not null)
@@ -429,32 +479,6 @@ public sealed class GenerateHandler
 
         session.SetFocus(focus);
 
-        // Prompt for count if not provided via --count flag
-        int effectiveCount;
-        if (count.HasValue)
-        {
-            effectiveCount = count.Value;
-        }
-        else
-        {
-            // Suggest count based on test type
-            var suggestedCount = testType switch
-            {
-                TestTypeSelection.FullCoverage => 30,
-                TestTypeSelection.NegativeOnly => 15,
-                _ => 20
-            };
-
-            AnsiConsole.MarkupLine($"◆ How many test cases to generate?");
-            var countPrompt = new Spectre.Console.TextPrompt<int>($"│  Number of tests [grey](default: {suggestedCount})[/]: ");
-            countPrompt.PromptStyle = new Spectre.Console.Style(foreground: Spectre.Console.Color.Cyan);
-            countPrompt.AllowEmpty = true;
-            var countInput = AnsiConsole.Prompt(countPrompt);
-            effectiveCount = countInput > 0 ? countInput : suggestedCount;
-            AnsiConsole.MarkupLine("└");
-        }
-
-
         // Load source documents with full content for grounded generation
         var documents = await _progress.StatusAsync(
             $"Scanning documentation...",
@@ -522,6 +546,83 @@ public sealed class GenerateHandler
             }
 
             _gapPresenter.ShowUncoveredAreas(gaps);
+        }
+
+        // Smart test count: analyze documentation when --count is not specified
+        BehaviorAnalysisResult? analysisResult = null;
+        int effectiveCount;
+        string? analysisAppendFocus = null;
+
+        if (count.HasValue)
+        {
+            effectiveCount = count.Value;
+        }
+        else
+        {
+            // Perform AI-powered behavior analysis
+            analysisResult = await _progress.StatusAsync(
+                $"Analyzing {suiteName} documentation...",
+                async () =>
+                {
+                    var provider = config.Ai.Providers?.FirstOrDefault(p => p.Enabled);
+                    var analyzer = new BehaviorAnalyzer(provider);
+                    return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct);
+                });
+
+            if (analysisResult is not null)
+            {
+                AnalysisPresenter.DisplayBreakdown(analysisResult);
+
+                if (analysisResult.RecommendedCount == 0)
+                {
+                    AnalysisPresenter.DisplayAllCovered(analysisResult.TotalBehaviors);
+                    session.Complete();
+                    return ExitCodes.Success;
+                }
+
+                // Show interactive count selection menu
+                var countSelector = new CountSelector();
+                var selection = countSelector.Select(analysisResult);
+                effectiveCount = selection.Count;
+
+                // If user selected specific categories, build focus from them
+                if (selection.SelectedCategories is not null)
+                {
+                    var categoryNames = selection.SelectedCategories
+                        .Select(c => c.ToString().ToLowerInvariant())
+                        .ToList();
+                    analysisAppendFocus = string.Join(", ", categoryNames);
+                }
+
+                if (selection.FreeTextDescription is not null)
+                {
+                    analysisAppendFocus = selection.FreeTextDescription;
+                }
+            }
+            else
+            {
+                // Analysis failed — fall back to existing test type suggestion
+                var suggestedCount = testType switch
+                {
+                    TestTypeSelection.FullCoverage => 30,
+                    TestTypeSelection.NegativeOnly => 15,
+                    _ => 20
+                };
+
+                AnsiConsole.MarkupLine("◆ How many test cases to generate?");
+                var countPrompt = new Spectre.Console.TextPrompt<int>($"│  Number of tests [grey](default: {suggestedCount})[/]: ");
+                countPrompt.PromptStyle = new Spectre.Console.Style(foreground: Spectre.Console.Color.Cyan);
+                countPrompt.AllowEmpty = true;
+                var countInput = AnsiConsole.Prompt(countPrompt);
+                effectiveCount = countInput > 0 ? countInput : suggestedCount;
+                AnsiConsole.MarkupLine("└");
+            }
+        }
+
+        // Combine focus with analysis category selection if applicable
+        if (analysisAppendFocus is not null)
+        {
+            focus = string.IsNullOrEmpty(focus) ? analysisAppendFocus : $"{focus}, {analysisAppendFocus}";
         }
 
         // Interactive generation loop
@@ -788,6 +889,13 @@ public sealed class GenerateHandler
                     AnsiConsole.MarkupLine($"  [grey]• {s}[/]");
                 }
             }
+        }
+
+        // Smart count: show behavior gap notification if analysis was performed
+        if (analysisResult is not null)
+        {
+            AnalysisPresenter.DisplayGapNotification(
+                analysisResult, allGeneratedTests.Count, suiteName);
         }
 
         NextStepHints.Print("generate", true, _verbosity, new HintContext { SuiteName = suiteName });
