@@ -12,6 +12,8 @@ public sealed class ReportWriter
 {
     private readonly string _reportsPath;
 
+    public string ReportsPath => _reportsPath;
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,

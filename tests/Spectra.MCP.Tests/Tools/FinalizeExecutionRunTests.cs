@@ -95,7 +95,11 @@ public class FinalizeExecutionRunTests : IAsyncDisposable
 
         var data = response.GetProperty("data");
         Assert.True(data.TryGetProperty("reports", out var reports));
-        Assert.True(File.Exists(reports.GetProperty("json").GetString()));
+        var jsonFile = reports.GetProperty("json").GetString()!;
+        Assert.EndsWith(".json", jsonFile);
+        // Verify the actual file exists in the reports directory
+        var reportsDir = Path.Combine(_testDir, "reports");
+        Assert.True(Directory.GetFiles(reportsDir, "*.json").Length > 0, "JSON report file should exist");
     }
 
     [Fact]

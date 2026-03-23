@@ -104,15 +104,22 @@ public sealed class FinalizeExecutionRunTool : IMcpTool
             var report = _reportGenerator.Generate(finalizedRun, results, testTitles, testCases);
             var (jsonPath, mdPath, htmlPath) = await _reportWriter.WriteAsync(report);
 
+            // Return just filenames — the reports directory is always .execution/reports/
+            var jsonFile = Path.GetFileName(jsonPath);
+            var mdFile = Path.GetFileName(mdPath);
+            var htmlFile = Path.GetFileName(htmlPath);
+
             var data = new
             {
                 run_id = finalizedRun.RunId,
                 completed_at = finalizedRun.CompletedAt?.ToString("O"),
                 reports = new
                 {
-                    json = jsonPath,
-                    markdown = mdPath,
-                    html = htmlPath
+                    directory = ".execution/reports/",
+                    json = jsonFile,
+                    markdown = mdFile,
+                    html = htmlFile,
+                    note = "These are LOCAL FILE PATHS, not URLs. Present them in backticks as code, e.g. `.execution/reports/filename.html`. NEVER wrap in markdown links or add http://."
                 },
                 summary = new
                 {
