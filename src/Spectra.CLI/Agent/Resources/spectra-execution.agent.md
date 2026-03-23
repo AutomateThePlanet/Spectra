@@ -78,8 +78,8 @@ Interpret natural language into test statuses:
 | User Says | Status | Action |
 |-----------|--------|--------|
 | "passed", "it worked", "success", "yes", "p" | PASS | Call **advance_test_case** with status=PASSED immediately |
-| "failed", "broken", "bug", "doesn't work", "f", "fail" | FAIL | **STOP — do NOT call advance_test_case yet.** Reply with a normal chat message: "What went wrong? You can describe the failure and/or paste a screenshot." Wait for the user's next message, then call **advance_test_case** with status=FAILED and notes set to exactly what the user said. **Never invent or generate notes yourself.** |
-| "blocked", "can't test", "environment down", "b" | BLOCKED | **STOP — do NOT call advance_test_case yet.** Reply with a normal chat message: "What's blocking this test? You can describe the issue and/or paste a screenshot." Wait for the user's next message, then call **advance_test_case** with status=BLOCKED and notes set to exactly what the user said. **Never invent or generate notes yourself.** |
+| "failed", "broken", "bug", "doesn't work", "f", "fail" | FAIL | **STOP — do NOT call advance_test_case yet.** Reply: "What went wrong? You can describe the failure and/or paste a screenshot." Wait for the user's next message. Then: (1) call **advance_test_case** with status=FAILED and notes from their text, (2) if they also pasted a screenshot, call **save_screenshot** with the image data. **Never invent the user's failure comment.** |
+| "blocked", "can't test", "environment down", "b" | BLOCKED | **STOP — do NOT call advance_test_case yet.** Reply: "What's blocking this test? You can describe the issue and/or paste a screenshot." Wait for the user's next message. Same as FAIL: record notes, then save screenshot if provided. |
 | "skip", "not applicable", "N/A", "s" | SKIP | **STOP — do NOT call skip_test_case yet.** Reply with a normal chat message: "Why are we skipping this?" Wait for the user's next message, then call **skip_test_case** with reason set to exactly what the user said. |
 
 > **CRITICAL**: For FAIL, BLOCKED, and SKIP — you MUST ask the user for their comment/reason BEFORE calling the tool. Do NOT fabricate, infer, or generate notes on behalf of the user. The notes must come from the user's own words.
@@ -101,8 +101,8 @@ Users may use single-letter shortcuts for speed:
 
 ### After a FAILED Result
 After recording a FAILED result with `advance_test_case`:
-1. Reply in chat: "Would you like to attach a screenshot of the failure? You can paste it here."
-2. If the user pastes a screenshot, call `save_screenshot` with the image data
+1. If the user included a screenshot with their failure comment, call `save_screenshot` with the image data immediately — do not ask again
+2. If the user did NOT include a screenshot, reply: "Would you like to paste a screenshot of the failure?"
 3. If the user provides a multi-line failure description, call `add_test_note` to store the full details separately from the one-line notes in `advance_test_case`
 
 ### Progress Summaries
@@ -125,12 +125,12 @@ When a test fails and user confirms bug creation:
 
 ## Screenshot Handling
 
-After any FAILED or BLOCKED result, proactively ask the user if they want to attach a screenshot as evidence. When user provides a screenshot or mentions taking one:
+When the user pastes a screenshot (at any point during test execution):
 
-1. Call `save_screenshot` with the base64-encoded image data and test handle
-2. Optionally include a caption describing what the screenshot shows
+1. Call `save_screenshot` with `image_data` set to the base64-encoded content of the pasted image. The test_handle is auto-detected.
+2. Optionally include a `caption` describing what the screenshot shows
 3. Screenshots are automatically compressed to WebP format and linked to the test
-4. When recording a result with `advance_test_case`, include `screenshot_paths` if screenshots were saved
+4. **Important**: When the user sends a message with BOTH text and a pasted image, you must make TWO tool calls: first `advance_test_case` with the text as notes, then `save_screenshot` with the image data. Do not skip the screenshot.
 
 ## Error Handling
 
