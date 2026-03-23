@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Spectra.Core.Models.Execution;
 using Spectra.MCP.Execution;
 using Spectra.MCP.Server;
+using Spectra.MCP.Storage;
 
 namespace Spectra.MCP.Tools.TestExecution;
 
@@ -13,48 +14,59 @@ namespace Spectra.MCP.Tools.TestExecution;
 public sealed class AddTestNoteTool : IMcpTool
 {
     private readonly ExecutionEngine _engine;
+    private readonly RunRepository _runRepo;
+    private readonly ResultRepository _resultRepo;
 
-    public string Description => "Adds a note to a test without changing its status";
+    public string Description => "Adds a note to a test without changing its status. Auto-detects test_handle from the active run if omitted.";
 
     public object? ParameterSchema => new
     {
         type = "object",
         properties = new
         {
-            test_handle = new { type = "string", description = "Test handle to add note to" },
+            test_handle = new { type = "string", description = "Test handle to add note to. Auto-detected from active run if omitted." },
             note = new { type = "string", description = "Note text" }
         },
-        required = new[] { "test_handle", "note" }
+        required = new[] { "note" }
     };
 
-    public AddTestNoteTool(ExecutionEngine engine)
+    public AddTestNoteTool(ExecutionEngine engine, RunRepository runRepo, ResultRepository resultRepo)
     {
         _engine = engine;
+        _runRepo = runRepo;
+        _resultRepo = resultRepo;
     }
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
         var request = McpProtocol.DeserializeParams<AddTestNoteRequest>(parameters);
-        if (request is null || string.IsNullOrEmpty(request.TestHandle))
+
+        // Resolve test_handle
+        var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(null, _runRepo);
+        string? resolvedTestHandle = request?.TestHandle;
+        if (string.IsNullOrEmpty(resolvedTestHandle))
         {
-            return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
-                "INVALID_PARAMS",
-                "test_handle is required"));
+            if (runError is not null)
+                return runError;
+            var (autoHandle, handleError) = await ActiveRunResolver.ResolveTestHandleAsync(null, resolvedRunId!, _resultRepo);
+            if (handleError is not null)
+                return handleError;
+            resolvedTestHandle = autoHandle;
         }
 
-        if (string.IsNullOrEmpty(request.Note))
+        if (string.IsNullOrEmpty(request?.Note))
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "INVALID_PARAMS",
                 "note is required"));
         }
 
-        var result = await _engine.GetTestResultAsync(request.TestHandle);
+        var result = await _engine.GetTestResultAsync(resolvedTestHandle!);
         if (result is null)
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "INVALID_HANDLE",
-                $"Test handle '{request.TestHandle}' not found"));
+                $"Test handle '{resolvedTestHandle}' not found"));
         }
 
         var run = await _engine.GetRunAsync(result.RunId);
@@ -65,10 +77,10 @@ public sealed class AddTestNoteTool : IMcpTool
                 "Run not found"));
         }
 
-        await _engine.AddNoteAsync(request.TestHandle, request.Note);
+        await _engine.AddNoteAsync(resolvedTestHandle!, request!.Note!);
 
         // Get updated result to count notes
-        var updated = await _engine.GetTestResultAsync(request.TestHandle);
+        var updated = await _engine.GetTestResultAsync(resolvedTestHandle!);
         var noteCount = updated?.Notes?.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length ?? 1;
 
         var queue = await _engine.GetQueueAsync(result.RunId);

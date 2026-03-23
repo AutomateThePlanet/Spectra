@@ -54,9 +54,9 @@ public class RetestTestCaseTests : IAsyncDisposable
             });
 
         _startTool = new StartExecutionRunTool(_engine, _ => testEntries);
-        _detailsTool = new GetTestCaseDetailsTool(_engine, (_, id) => testCases.GetValueOrDefault(id));
-        _advanceTool = new AdvanceTestCaseTool(_engine);
-        _retestTool = new RetestTestCaseTool(_engine);
+        _detailsTool = new GetTestCaseDetailsTool(_engine, (_, id) => testCases.GetValueOrDefault(id), runRepo, resultRepo);
+        _advanceTool = new AdvanceTestCaseTool(_engine, resultRepo, runRepo);
+        _retestTool = new RetestTestCaseTool(_engine, runRepo);
     }
 
     public async ValueTask DisposeAsync()

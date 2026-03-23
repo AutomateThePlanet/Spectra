@@ -50,7 +50,7 @@ public class GetTestCaseDetailsTests : IAsyncDisposable
             TestData = "Card: 4111111111111111"
         };
 
-        _tool = new GetTestCaseDetailsTool(_engine, (suite, testId) => testId == "TC-001" ? testCase : null);
+        _tool = new GetTestCaseDetailsTool(_engine, (suite, testId) => testId == "TC-001" ? testCase : null, runRepo, resultRepo);
     }
 
     public async ValueTask DisposeAsync()
@@ -121,7 +121,7 @@ public class GetTestCaseDetailsTests : IAsyncDisposable
         var response = JsonDocument.Parse(result).RootElement;
 
         Assert.True(response.TryGetProperty("error", out var error));
-        Assert.Equal("INVALID_PARAMS", error.GetProperty("code").GetString());
+        Assert.Equal("NO_ACTIVE_RUNS", error.GetProperty("code").GetString());
     }
 
     [Fact]

@@ -29,7 +29,7 @@ public class ResumeExecutionRunTests : IAsyncDisposable
         var config = new McpConfig { BasePath = _testDir };
 
         _engine = new ExecutionEngine(runRepo, resultRepo, identity, config);
-        _tool = new ResumeExecutionRunTool(_engine);
+        _tool = new ResumeExecutionRunTool(_engine, runRepo);
 
         _testEntries =
         [
@@ -94,7 +94,7 @@ public class ResumeExecutionRunTests : IAsyncDisposable
         var result = await _tool.ExecuteAsync(parameters);
         var response = JsonDocument.Parse(result).RootElement;
 
-        Assert.Equal("INVALID_PARAMS", response.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal("NO_ACTIVE_RUNS", response.GetProperty("error").GetProperty("code").GetString());
     }
 
     [Fact]

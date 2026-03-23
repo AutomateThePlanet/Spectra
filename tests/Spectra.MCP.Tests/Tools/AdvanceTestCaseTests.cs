@@ -37,7 +37,7 @@ public class AdvanceTestCaseTests : IAsyncDisposable
             new TestIndexEntry { Id = "TC-003", File = "tc-003.md", Title = "Test Three", Priority = "low", Tags = [] }
         ];
 
-        _tool = new AdvanceTestCaseTool(_engine);
+        _tool = new AdvanceTestCaseTool(_engine, resultRepo, runRepo);
     }
 
     public async ValueTask DisposeAsync()

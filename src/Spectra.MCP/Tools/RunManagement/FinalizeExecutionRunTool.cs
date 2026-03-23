@@ -6,6 +6,7 @@ using Spectra.Core.Models.Execution;
 using Spectra.MCP.Execution;
 using Spectra.MCP.Reports;
 using Spectra.MCP.Server;
+using Spectra.MCP.Storage;
 
 namespace Spectra.MCP.Tools.RunManagement;
 
@@ -20,18 +21,18 @@ public sealed class FinalizeExecutionRunTool : IMcpTool
     private readonly ReportWriter _reportWriter;
     private readonly Func<string, IEnumerable<TestIndexEntry>> _indexLoader;
     private readonly Func<string, string, TestCase?>? _testCaseLoader;
+    private readonly RunRepository _runRepo;
 
-    public string Description => "Completes the run and generates reports";
+    public string Description => "Completes the run and generates reports. If run_id is omitted, auto-detects when exactly one active run exists.";
 
     public object? ParameterSchema => new
     {
         type = "object",
         properties = new
         {
-            run_id = new { type = "string", description = "Run identifier" },
+            run_id = new { type = "string", description = "Run identifier. If omitted, auto-detects when exactly one active run exists." },
             force = new { type = "boolean", description = "Allow finalize with pending tests" }
-        },
-        required = new[] { "run_id" }
+        }
     };
 
     public FinalizeExecutionRunTool(
@@ -39,36 +40,36 @@ public sealed class FinalizeExecutionRunTool : IMcpTool
         ReportGenerator reportGenerator,
         ReportWriter reportWriter,
         Func<string, IEnumerable<TestIndexEntry>> indexLoader,
-        Func<string, string, TestCase?>? testCaseLoader = null)
+        Func<string, string, TestCase?>? testCaseLoader = null,
+        RunRepository? runRepo = null)
     {
         _engine = engine;
         _reportGenerator = reportGenerator;
         _reportWriter = reportWriter;
         _indexLoader = indexLoader;
         _testCaseLoader = testCaseLoader;
+        _runRepo = runRepo!;
     }
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
         var request = McpProtocol.DeserializeParams<FinalizeExecutionRunRequest>(parameters);
-        if (request is null || string.IsNullOrEmpty(request.RunId))
-        {
-            return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
-                "INVALID_PARAMS",
-                "run_id is required"));
-        }
 
-        var run = await _engine.GetRunAsync(request.RunId);
+        var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(request?.RunId, _runRepo);
+        if (runError is not null)
+            return runError;
+
+        var run = await _engine.GetRunAsync(resolvedRunId!);
         if (run is null)
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "RUN_NOT_FOUND",
-                $"Run '{request.RunId}' not found"));
+                $"Run '{resolvedRunId!}' not found"));
         }
 
         try
         {
-            var finalizedRun = await _engine.FinalizeRunAsync(request.RunId, request.Force);
+            var finalizedRun = await _engine.FinalizeRunAsync(resolvedRunId!, request?.Force ?? false);
             if (finalizedRun is null)
             {
                 return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
@@ -79,7 +80,7 @@ public sealed class FinalizeExecutionRunTool : IMcpTool
             }
 
             // Generate and write report
-            var results = await _engine.GetResultsAsync(request.RunId);
+            var results = await _engine.GetResultsAsync(resolvedRunId!);
 
             // Load test titles from index
             var testTitles = _indexLoader(finalizedRun.Suite)

@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Spectra.Core.Models.Execution;
 using Spectra.MCP.Execution;
 using Spectra.MCP.Server;
+using Spectra.MCP.Storage;
 
 namespace Spectra.MCP.Tools.RunManagement;
 
@@ -13,45 +14,44 @@ namespace Spectra.MCP.Tools.RunManagement;
 public sealed class GetExecutionStatusTool : IMcpTool
 {
     private readonly ExecutionEngine _engine;
+    private readonly RunRepository _runRepo;
 
-    public string Description => "Returns current run state and progress";
+    public string Description => "Returns current run state and progress. If run_id is omitted, auto-detects when exactly one active run exists.";
 
     public object? ParameterSchema => new
     {
         type = "object",
         properties = new
         {
-            run_id = new { type = "string", description = "Run identifier" }
-        },
-        required = new[] { "run_id" }
+            run_id = new { type = "string", description = "Run identifier. If omitted, auto-detects when exactly one active run exists." }
+        }
     };
 
-    public GetExecutionStatusTool(ExecutionEngine engine)
+    public GetExecutionStatusTool(ExecutionEngine engine, RunRepository runRepo)
     {
         _engine = engine;
+        _runRepo = runRepo;
     }
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
         var request = McpProtocol.DeserializeParams<GetExecutionStatusRequest>(parameters);
-        if (request is null || string.IsNullOrEmpty(request.RunId))
-        {
-            return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
-                "INVALID_PARAMS",
-                "run_id is required"));
-        }
 
-        var run = await _engine.GetRunAsync(request.RunId);
+        var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(request?.RunId, _runRepo);
+        if (runError is not null)
+            return runError;
+
+        var run = await _engine.GetRunAsync(resolvedRunId!);
         if (run is null)
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "RUN_NOT_FOUND",
-                $"Run '{request.RunId}' not found"));
+                $"Run '{resolvedRunId}' not found"));
         }
 
-        var statusCounts = await _engine.GetStatusCountsAsync(request.RunId);
+        var statusCounts = await _engine.GetStatusCountsAsync(resolvedRunId!);
         var summary = ReportSummary.FromCounts(statusCounts);
-        var queue = await _engine.GetQueueAsync(request.RunId);
+        var queue = await _engine.GetQueueAsync(resolvedRunId!);
 
         var currentTest = queue?.GetNext();
         var progress = queue?.GetProgress() ?? $"{summary.Total - summary.Pending}/{summary.Total}";

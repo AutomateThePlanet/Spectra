@@ -29,7 +29,7 @@ public class AddTestNoteTests : IAsyncDisposable
         var config = new McpConfig { BasePath = _testDir };
 
         _engine = new ExecutionEngine(runRepo, resultRepo, identity, config);
-        _tool = new AddTestNoteTool(_engine);
+        _tool = new AddTestNoteTool(_engine, runRepo, resultRepo);
 
         _testEntries =
         [

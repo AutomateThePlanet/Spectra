@@ -286,6 +286,27 @@ public sealed class ResultRepository
     }
 
     /// <summary>
+    /// Gets all in-progress test results for a run.
+    /// </summary>
+    public async Task<IReadOnlyList<TestResult>> GetInProgressTestsAsync(string runId)
+    {
+        var connection = await _db.GetConnectionAsync();
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT * FROM test_results WHERE run_id = @run_id AND status = 'InProgress'";
+        command.Parameters.AddWithValue("@run_id", runId);
+
+        var results = new List<TestResult>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            results.Add(MapResult(reader));
+        }
+
+        return results;
+    }
+
+    /// <summary>
     /// Gets execution history statistics per test.
     /// </summary>
     public async Task<Dictionary<string, TestExecutionHistoryEntry>> GetTestExecutionHistoryAsync(

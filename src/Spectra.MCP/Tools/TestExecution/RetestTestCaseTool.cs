@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Spectra.Core.Models.Execution;
 using Spectra.MCP.Execution;
 using Spectra.MCP.Server;
+using Spectra.MCP.Storage;
 
 namespace Spectra.MCP.Tools.TestExecution;
 
@@ -13,50 +14,57 @@ namespace Spectra.MCP.Tools.TestExecution;
 public sealed class RetestTestCaseTool : IMcpTool
 {
     private readonly ExecutionEngine _engine;
+    private readonly RunRepository _runRepo;
 
-    public string Description => "Requeues a completed test for another attempt";
+    public string Description => "Requeues a completed test for another attempt. If run_id is omitted, auto-detects when exactly one active run exists.";
 
     public object? ParameterSchema => new
     {
         type = "object",
         properties = new
         {
-            run_id = new { type = "string", description = "Run ID" },
+            run_id = new { type = "string", description = "Run ID (auto-detected if omitted and exactly one active run exists)" },
             test_id = new { type = "string", description = "Test ID to retest" }
         },
-        required = new[] { "run_id", "test_id" }
+        required = new[] { "test_id" }
     };
 
-    public RetestTestCaseTool(ExecutionEngine engine)
+    public RetestTestCaseTool(ExecutionEngine engine, RunRepository runRepo)
     {
         _engine = engine;
+        _runRepo = runRepo;
     }
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
         var request = McpProtocol.DeserializeParams<RetestRequest>(parameters);
-        if (request is null || string.IsNullOrEmpty(request.RunId) || string.IsNullOrEmpty(request.TestId))
+
+        var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(request?.RunId, _runRepo);
+        if (runError is not null)
+            return runError;
+
+        if (request is null || string.IsNullOrEmpty(request.TestId))
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "INVALID_PARAMS",
-                "Run ID and test ID are required"));
+                "test_id is required"));
         }
 
-        var run = await _engine.GetRunAsync(request.RunId);
+        var run = await _engine.GetRunAsync(resolvedRunId!);
         if (run is null)
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "RUN_NOT_FOUND",
-                $"Run '{request.RunId}' not found"));
+                $"Run '{resolvedRunId!}' not found"));
         }
 
         // Check if test exists and is completed
-        var status = await _engine.GetStatusAsync(request.RunId);
+        var status = await _engine.GetStatusAsync(resolvedRunId!);
         if (status is null)
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "RUN_NOT_FOUND",
-                $"Run '{request.RunId}' not found or not active"));
+                $"Run '{resolvedRunId!}' not found or not active"));
         }
 
         var existingTest = status.Value.Queue.GetById(request.TestId);
@@ -76,7 +84,7 @@ public sealed class RetestTestCaseTool : IMcpTool
         }
 
         // Retest the test
-        var requeued = await _engine.RetestAsync(request.RunId, request.TestId);
+        var requeued = await _engine.RetestAsync(resolvedRunId!, request.TestId);
         if (requeued is null)
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
@@ -84,7 +92,7 @@ public sealed class RetestTestCaseTool : IMcpTool
                 $"Failed to requeue test '{request.TestId}'"));
         }
 
-        var queue = (await _engine.GetStatusAsync(request.RunId))!.Value.Queue;
+        var queue = (await _engine.GetStatusAsync(resolvedRunId!))!.Value.Queue;
 
         var data = new
         {

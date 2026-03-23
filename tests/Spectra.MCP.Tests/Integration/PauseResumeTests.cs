@@ -56,10 +56,10 @@ public class PauseResumeTests : IAsyncDisposable
 
         Func<string, IEnumerable<TestIndexEntry>> indexLoader = _ => _testEntries;
         _startTool = new StartExecutionRunTool(_engine, indexLoader);
-        _pauseTool = new PauseExecutionRunTool(_engine);
-        _resumeTool = new ResumeExecutionRunTool(_engine);
-        _detailsTool = new GetTestCaseDetailsTool(_engine, (_, id) => testCases.GetValueOrDefault(id));
-        _advanceTool = new AdvanceTestCaseTool(_engine);
+        _pauseTool = new PauseExecutionRunTool(_engine, runRepo);
+        _resumeTool = new ResumeExecutionRunTool(_engine, runRepo);
+        _detailsTool = new GetTestCaseDetailsTool(_engine, (_, id) => testCases.GetValueOrDefault(id), runRepo, resultRepo);
+        _advanceTool = new AdvanceTestCaseTool(_engine, resultRepo, runRepo);
         _finalizeTool = new FinalizeExecutionRunTool(_engine, reportGenerator, reportWriter, indexLoader);
     }
 

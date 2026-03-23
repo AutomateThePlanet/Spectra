@@ -71,7 +71,7 @@ public class SmartSelectionFlowTests : IAsyncDisposable
 
         _findTool = new FindTestCasesTool(suiteListLoader, indexLoader);
         _startTool = new StartExecutionRunTool(_engine, indexLoader, suiteListLoader, selectionsLoader);
-        _advanceTool = new AdvanceTestCaseTool(_engine);
+        _advanceTool = new AdvanceTestCaseTool(_engine, resultRepo, runRepo);
         _finalizeTool = new FinalizeExecutionRunTool(_engine, reportGenerator, reportWriter, indexLoader);
         _listSelectionsTool = new ListSavedSelectionsTool(selectionsLoader, suiteListLoader, indexLoader);
         _historyTool = new GetTestExecutionHistoryTool(resultRepo);

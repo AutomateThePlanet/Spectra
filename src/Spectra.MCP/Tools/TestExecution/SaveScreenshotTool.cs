@@ -7,6 +7,7 @@ using Spectra.Core.Models.Execution;
 using Spectra.MCP.Execution;
 using Spectra.MCP.Server;
 using Spectra.MCP.Storage;
+using Spectra.MCP.Tools;
 
 namespace Spectra.MCP.Tools.TestExecution;
 
@@ -17,6 +18,7 @@ namespace Spectra.MCP.Tools.TestExecution;
 public sealed class SaveScreenshotTool : IMcpTool
 {
     private readonly ExecutionEngine _engine;
+    private readonly RunRepository _runRepo;
     private readonly ResultRepository _resultRepo;
     private readonly string _reportsPath;
 
@@ -24,51 +26,59 @@ public sealed class SaveScreenshotTool : IMcpTool
     private const int MaxHeight = 1080;
     private const int WebPQuality = 80;
 
-    public string Description => "Saves a screenshot as an attachment for the current test";
+    public string Description => "Saves a screenshot as an attachment for the current test. Auto-detects the active test if test_handle is omitted.";
 
     public object? ParameterSchema => new
     {
         type = "object",
         properties = new
         {
-            test_handle = new { type = "string", description = "Test handle to attach screenshot to" },
+            test_handle = new { type = "string", description = "Test handle to attach screenshot to (auto-detected from active run if omitted)" },
             image_data = new { type = "string", description = "Base64-encoded image data (PNG, JPG, or WebP)" },
             caption = new { type = "string", description = "Optional caption describing what the screenshot shows" },
             filename = new { type = "string", description = "Optional filename override" }
         },
-        required = new[] { "test_handle", "image_data" }
+        required = new[] { "image_data" }
     };
 
-    public SaveScreenshotTool(ExecutionEngine engine, string reportsPath, ResultRepository? resultRepo = null)
+    public SaveScreenshotTool(ExecutionEngine engine, string reportsPath, RunRepository runRepo, ResultRepository? resultRepo = null)
     {
         _engine = engine;
         _reportsPath = reportsPath;
+        _runRepo = runRepo;
         _resultRepo = resultRepo!;
     }
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
         var request = McpProtocol.DeserializeParams<SaveScreenshotRequest>(parameters);
-        if (request is null || string.IsNullOrEmpty(request.TestHandle))
+
+        // Resolve test_handle
+        var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(null, _runRepo);
+        string? resolvedTestHandle = request?.TestHandle;
+        if (string.IsNullOrEmpty(resolvedTestHandle))
         {
-            return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
-                "INVALID_PARAMS",
-                "test_handle is required"));
+            if (runError is not null)
+                return runError;
+            var (autoHandle, handleError) = await ActiveRunResolver.ResolveTestHandleAsync(null, resolvedRunId!, _resultRepo!);
+            if (handleError is not null)
+                return handleError;
+            resolvedTestHandle = autoHandle;
         }
 
-        if (string.IsNullOrEmpty(request.ImageData))
+        if (string.IsNullOrEmpty(request?.ImageData))
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "INVALID_PARAMS",
                 "image_data is required (base64-encoded)"));
         }
 
-        var result = await _engine.GetTestResultAsync(request.TestHandle);
+        var result = await _engine.GetTestResultAsync(resolvedTestHandle!);
         if (result is null)
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "INVALID_HANDLE",
-                $"Test handle '{request.TestHandle}' not found"));
+                $"Test handle '{resolvedTestHandle}' not found"));
         }
 
         var run = await _engine.GetRunAsync(result.RunId);
@@ -154,12 +164,12 @@ public sealed class SaveScreenshotTool : IMcpTool
             var noteText = string.IsNullOrEmpty(request.Caption)
                 ? $"[Screenshot: {relativePath}]"
                 : $"[Screenshot: {relativePath}] {request.Caption}";
-            await _engine.AddNoteAsync(request.TestHandle, noteText);
+            await _engine.AddNoteAsync(resolvedTestHandle!, noteText);
 
             // Store screenshot path in DB
             if (_resultRepo is not null)
             {
-                await _resultRepo.AppendScreenshotPathAsync(request.TestHandle, relativePath);
+                await _resultRepo.AppendScreenshotPathAsync(resolvedTestHandle!, relativePath);
             }
 
             var queue = await _engine.GetQueueAsync(result.RunId);
