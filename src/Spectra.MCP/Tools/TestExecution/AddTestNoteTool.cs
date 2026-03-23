@@ -61,7 +61,7 @@ public sealed class AddTestNoteTool : IMcpTool
                 "note is required"));
         }
 
-        var result = await _engine.GetTestResultAsync(resolvedTestHandle);
+        var result = await _engine.GetTestResultAsync(resolvedTestHandle!);
         if (result is null)
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
@@ -77,10 +77,10 @@ public sealed class AddTestNoteTool : IMcpTool
                 "Run not found"));
         }
 
-        await _engine.AddNoteAsync(resolvedTestHandle, request!.Note!);
+        await _engine.AddNoteAsync(resolvedTestHandle!, request!.Note!);
 
         // Get updated result to count notes
-        var updated = await _engine.GetTestResultAsync(resolvedTestHandle);
+        var updated = await _engine.GetTestResultAsync(resolvedTestHandle!);
         var noteCount = updated?.Notes?.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length ?? 1;
 
         var queue = await _engine.GetQueueAsync(result.RunId);

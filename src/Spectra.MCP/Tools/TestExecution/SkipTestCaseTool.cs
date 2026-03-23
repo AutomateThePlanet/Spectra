@@ -61,7 +61,7 @@ public sealed class SkipTestCaseTool : IMcpTool
                 "reason is required"));
         }
 
-        var result = await _engine.GetTestResultAsync(resolvedTestHandle);
+        var result = await _engine.GetTestResultAsync(resolvedTestHandle!);
         if (result is null)
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
@@ -88,8 +88,8 @@ public sealed class SkipTestCaseTool : IMcpTool
         {
             var (skipped, blocked, next) = await _engine.SkipTestAsync(
                 result.RunId,
-                resolvedTestHandle,
-                request?.Reason);
+                resolvedTestHandle!,
+                request!.Reason!);
 
             var queue = await _engine.GetQueueAsync(result.RunId);
             var progress = queue?.GetProgress() ?? "?/?";

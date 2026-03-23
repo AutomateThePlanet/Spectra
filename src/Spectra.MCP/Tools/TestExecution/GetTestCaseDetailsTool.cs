@@ -79,7 +79,7 @@ public sealed class GetTestCaseDetailsTool : IMcpTool
         }
 
         // Mark test as in progress
-        await _engine.StartTestAsync(result.RunId, resolvedTestHandle);
+        await _engine.StartTestAsync(result.RunId, resolvedTestHandle!);
 
         // Load full test case content
         var testCase = _testLoader(run.Suite, result.TestId);

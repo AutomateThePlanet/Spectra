@@ -79,7 +79,7 @@ public sealed class AdvanceTestCaseTool : IMcpTool
                 $"Notes are required for {status.ToString().ToUpperInvariant()} tests - explain why the test {(status == TestStatus.Failed ? "failed" : "is blocked")}"));
         }
 
-        var result = await _engine.GetTestResultAsync(resolvedTestHandle);
+        var result = await _engine.GetTestResultAsync(resolvedTestHandle!);
         if (result is null)
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
@@ -106,7 +106,7 @@ public sealed class AdvanceTestCaseTool : IMcpTool
         {
             var (recorded, blocked, next) = await _engine.AdvanceTestAsync(
                 result.RunId,
-                resolvedTestHandle,
+                resolvedTestHandle!,
                 status,
                 request?.Notes);
 
@@ -115,7 +115,7 @@ public sealed class AdvanceTestCaseTool : IMcpTool
             {
                 foreach (var ssPath in request.ScreenshotPaths)
                 {
-                    await _resultRepo.AppendScreenshotPathAsync(resolvedTestHandle, ssPath);
+                    await _resultRepo.AppendScreenshotPathAsync(resolvedTestHandle!, ssPath);
                 }
             }
 

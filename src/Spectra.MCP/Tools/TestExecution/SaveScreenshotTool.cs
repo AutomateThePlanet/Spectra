@@ -73,7 +73,7 @@ public sealed class SaveScreenshotTool : IMcpTool
                 "image_data is required (base64-encoded)"));
         }
 
-        var result = await _engine.GetTestResultAsync(resolvedTestHandle);
+        var result = await _engine.GetTestResultAsync(resolvedTestHandle!);
         if (result is null)
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
@@ -164,12 +164,12 @@ public sealed class SaveScreenshotTool : IMcpTool
             var noteText = string.IsNullOrEmpty(request.Caption)
                 ? $"[Screenshot: {relativePath}]"
                 : $"[Screenshot: {relativePath}] {request.Caption}";
-            await _engine.AddNoteAsync(resolvedTestHandle, noteText);
+            await _engine.AddNoteAsync(resolvedTestHandle!, noteText);
 
             // Store screenshot path in DB
             if (_resultRepo is not null)
             {
-                await _resultRepo.AppendScreenshotPathAsync(resolvedTestHandle, relativePath);
+                await _resultRepo.AppendScreenshotPathAsync(resolvedTestHandle!, relativePath);
             }
 
             var queue = await _engine.GetQueueAsync(result.RunId);
