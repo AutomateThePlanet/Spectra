@@ -212,15 +212,39 @@ public sealed class DataCollector
             }
         }
 
-        // Enrich with report paths
+        // Enrich with report paths — find matching HTML report by run_id in filename or content
         for (var i = 0; i < runs.Count; i++)
         {
             var run = runs[i];
-            if (run.ReportPath is null)
+            if (run.ReportPath is null && Directory.Exists(_reportsPath))
             {
+                // Try legacy format first: {runId}.html
                 var htmlPath = Path.Combine(_reportsPath, $"{run.RunId}.html");
+                if (!File.Exists(htmlPath))
+                {
+                    // Try new format: find any HTML file whose matching JSON contains this run_id
+                    foreach (var htmlFile in Directory.GetFiles(_reportsPath, "*.html"))
+                    {
+                        var jsonFile = Path.ChangeExtension(htmlFile, ".json");
+                        if (File.Exists(jsonFile))
+                        {
+                            try
+                            {
+                                var jsonContent = File.ReadAllText(jsonFile);
+                                if (jsonContent.Contains(run.RunId))
+                                {
+                                    htmlPath = htmlFile;
+                                    break;
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                }
+
                 if (File.Exists(htmlPath))
                 {
+                    var relativePath = $".execution/reports/{Path.GetFileName(htmlPath)}";
                     runs[i] = new RunSummary
                     {
                         RunId = run.RunId,
@@ -236,7 +260,7 @@ public sealed class DataCollector
                         Skipped = run.Skipped,
                         Blocked = run.Blocked,
                         Results = run.Results,
-                        ReportPath = $".execution/reports/{run.RunId}.html"
+                        ReportPath = relativePath
                     };
                 }
             }
