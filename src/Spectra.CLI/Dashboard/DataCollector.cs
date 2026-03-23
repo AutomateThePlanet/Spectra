@@ -194,7 +194,7 @@ public sealed class DataCollector
                                     Failed = existing.Failed,
                                     Skipped = existing.Skipped,
                                     Blocked = existing.Blocked,
-                                    Results = enriched.Results,
+                                    Results = EmbedScreenshotsAsBase64(enriched.Results),
                                     ReportPath = existing.ReportPath
                                 };
                             }
@@ -416,7 +416,7 @@ public sealed class DataCollector
             Failed = failed,
             Skipped = skipped,
             Blocked = blocked,
-            Results = report.Results,
+            Results = EmbedScreenshotsAsBase64(report.Results),
             ReportPath = File.Exists(Path.Combine(_reportsPath, $"{report.GetRunId()}.html"))
                 ? $".execution/reports/{report.GetRunId()}.html"
                 : null
@@ -842,6 +842,60 @@ public sealed class DataCollector
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Converts screenshot file paths in test results to base64 data URIs so the
+    /// dashboard works when served from any location.
+    /// </summary>
+    private IReadOnlyList<TestResultEntry>? EmbedScreenshotsAsBase64(IReadOnlyList<TestResultEntry>? results)
+    {
+        if (results is null) return null;
+
+        var processed = new List<TestResultEntry>();
+        foreach (var r in results)
+        {
+            if (r.ScreenshotPaths is { Count: > 0 })
+            {
+                var base64Paths = new List<string>();
+                foreach (var path in r.ScreenshotPaths)
+                {
+                    var fullPath = Path.Combine(_reportsPath, path);
+                    if (File.Exists(fullPath))
+                    {
+                        try
+                        {
+                            var bytes = File.ReadAllBytes(fullPath);
+                            var base64 = Convert.ToBase64String(bytes);
+                            var ext = Path.GetExtension(fullPath).ToLowerInvariant();
+                            var mime = ext switch
+                            {
+                                ".webp" => "image/webp",
+                                ".png" => "image/png",
+                                ".jpg" or ".jpeg" => "image/jpeg",
+                                ".gif" => "image/gif",
+                                _ => "image/png"
+                            };
+                            base64Paths.Add($"data:{mime};base64,{base64}");
+                        }
+                        catch
+                        {
+                            base64Paths.Add(path); // Keep original if conversion fails
+                        }
+                    }
+                    else
+                    {
+                        base64Paths.Add(path); // Keep original if file not found
+                    }
+                }
+                processed.Add(r with { ScreenshotPaths = base64Paths });
+            }
+            else
+            {
+                processed.Add(r);
+            }
+        }
+        return processed;
     }
 
     /// <summary>

@@ -10,6 +10,7 @@ window.dashboardData = data;
 // Application state
 let currentView = 'suites';
 let filters = {
+    suite: '',
     priority: '',
     component: '',
     search: '',
@@ -27,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupNavigation();
     setupFilters();
     populateComponentFilter();
+    populateSuiteFilter();
     populateTagFilter();
     updateSummary();
     updateGeneratedAt();
@@ -67,6 +69,11 @@ function setupNavigation() {
  * Set up filter change handlers
  */
 function setupFilters() {
+    document.getElementById('filter-suite').addEventListener('change', (e) => {
+        filters.suite = e.target.value;
+        render();
+    });
+
     document.getElementById('filter-priority').addEventListener('change', (e) => {
         filters.priority = e.target.value;
         render();
@@ -99,6 +106,23 @@ function populateComponentFilter() {
         const option = document.createElement('option');
         option.value = c;
         option.textContent = c;
+        select.appendChild(option);
+    });
+}
+
+/**
+ * Populate suite filter dropdown
+ */
+function populateSuiteFilter() {
+    const suites = new Set();
+    allTests.forEach(t => {
+        if (t.suite) suites.add(t.suite);
+    });
+    const select = document.getElementById('filter-suite');
+    [...suites].sort().forEach(s => {
+        const option = document.createElement('option');
+        option.value = s;
+        option.textContent = s;
         select.appendChild(option);
     });
 }
@@ -230,6 +254,7 @@ function getTestsForSuite(suiteName) {
  * Check if a suite matches current filters
  */
 function suiteMatchesFilters(suite) {
+    if (filters.suite && suite.name !== filters.suite) return false;
     const suiteTests = getTestsForSuite(suite.name);
     if (filters.priority && !suiteTests.some(t => t.priority === filters.priority)) return false;
     if (filters.component && !suiteTests.some(t => t.component === filters.component)) return false;
@@ -302,6 +327,7 @@ function renderSuites() {
  */
 function renderTests() {
     let tests = allTests.filter(t => {
+        if (filters.suite && t.suite !== filters.suite) return false;
         if (filters.priority && t.priority !== filters.priority) return false;
         if (filters.component && t.component !== filters.component) return false;
         if (filters.search) {
@@ -354,6 +380,7 @@ function renderTests() {
  * Check if a run matches current filters (by cross-referencing suite metadata)
  */
 function runMatchesFilters(run) {
+    if (filters.suite && run.suite !== filters.suite) return false;
     const suite = data.suites.find(s => s.name.toLowerCase() === (run.suite || '').toLowerCase());
     const suiteTests = getTestsForSuite(run.suite);
 
@@ -656,13 +683,16 @@ function showRunDetail(runId) {
     const run = data.runs.find(r => r.run_id === runId);
     if (!run) return;
 
+    document.querySelector('.sidebar').style.display = 'none';
+    document.querySelector('.content').style.flex = '1';
+
     const passRate = run.total > 0 ? ((run.passed / run.total) * 100).toFixed(1) : 0;
     const duration = run.duration_seconds ? formatDuration(run.duration_seconds) : 'N/A';
 
     const content = document.getElementById('content');
     content.innerHTML = `
         <div class="card run-detail">
-            <button class="back-btn" onclick="render()">← Back to Runs</button>
+            <button class="back-btn" onclick="closeSingleRunDetail()">← Back to Runs</button>
             <h2>Run: ${escapeHtml(run.run_id)}</h2>
             <div class="run-detail-meta">
                 <div class="stat">
@@ -735,6 +765,12 @@ function showRunDetail(runId) {
             `}
         </div>
     `;
+}
+
+function closeSingleRunDetail() {
+    document.querySelector('.sidebar').style.display = '';
+    document.querySelector('.content').style.flex = '';
+    render();
 }
 
 /**
@@ -1528,7 +1564,7 @@ function renderDonutChart() {
  */
 function showSuiteTests(suite) {
     // Reset filters
-    filters = { priority: '', component: '', search: '', tags: [] };
+    filters = { suite: '', priority: '', component: '', search: '', tags: [] };
     document.getElementById('filter-priority').value = '';
     document.getElementById('filter-component').value = '';
     document.getElementById('filter-search').value = '';
@@ -1540,12 +1576,10 @@ function showSuiteTests(suite) {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     document.querySelector('[data-view="tests"]').classList.add('active');
 
-    // Filter tests to show only this suite
-    data.tests = allTests.filter(t => t.suite === suite);
+    // Set suite filter to show only this suite's tests
+    filters.suite = suite;
+    document.getElementById('filter-suite').value = suite;
     render();
-
-    // Reset to all tests after rendering
-    data.tests = allTests;
 }
 
 /**
