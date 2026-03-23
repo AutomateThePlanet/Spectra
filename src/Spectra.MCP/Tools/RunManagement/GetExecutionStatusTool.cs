@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Spectra.Core.Models;
 using Spectra.Core.Models.Execution;
 using Spectra.MCP.Execution;
 using Spectra.MCP.Server;
@@ -9,14 +10,15 @@ namespace Spectra.MCP.Tools.RunManagement;
 
 /// <summary>
 /// MCP tool: get_execution_status
-/// Returns current run state and progress.
+/// Returns current run state, progress, and inline test details for resilience after context compaction.
 /// </summary>
 public sealed class GetExecutionStatusTool : IMcpTool
 {
     private readonly ExecutionEngine _engine;
     private readonly RunRepository _runRepo;
+    private readonly Func<string, string, TestCase?>? _testLoader;
 
-    public string Description => "Returns current run state and progress. If run_id is omitted, auto-detects when exactly one active run exists.";
+    public string Description => "Returns current run state, progress, and full test details for the current test. If run_id is omitted, auto-detects when exactly one active run exists.";
 
     public object? ParameterSchema => new
     {
@@ -27,10 +29,11 @@ public sealed class GetExecutionStatusTool : IMcpTool
         }
     };
 
-    public GetExecutionStatusTool(ExecutionEngine engine, RunRepository runRepo)
+    public GetExecutionStatusTool(ExecutionEngine engine, RunRepository runRepo, Func<string, string, TestCase?>? testLoader = null)
     {
         _engine = engine;
         _runRepo = runRepo;
+        _testLoader = testLoader;
     }
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
@@ -56,6 +59,23 @@ public sealed class GetExecutionStatusTool : IMcpTool
         var currentTest = queue?.GetNext();
         var progress = queue?.GetProgress() ?? $"{summary.Total - summary.Pending}/{summary.Total}";
 
+        // Load inline test details when a test loader is available and there's a current test
+        object? testDetails = null;
+        if (currentTest is not null && _testLoader is not null)
+        {
+            var testCase = _testLoader(run.Suite, currentTest.TestId);
+            if (testCase is not null)
+            {
+                testDetails = new
+                {
+                    preconditions = testCase.Preconditions,
+                    steps = testCase.Steps?.Select((s, i) => new { number = i + 1, action = s }),
+                    expected_result = testCase.ExpectedResult,
+                    step_count = testCase.Steps?.Count ?? 0
+                };
+            }
+        }
+
         var data = new
         {
             run_id = run.RunId,
@@ -66,7 +86,8 @@ public sealed class GetExecutionStatusTool : IMcpTool
             {
                 test_handle = currentTest.TestHandle,
                 test_id = currentTest.TestId,
-                title = currentTest.Title
+                title = currentTest.Title,
+                details = testDetails
             } : null,
             summary = new
             {
@@ -87,11 +108,26 @@ public sealed class GetExecutionStatusTool : IMcpTool
             _ => "start_execution_run"
         };
 
+        // Build explicit instruction text to guide models after context compaction
+        var instruction = run.Status switch
+        {
+            RunStatus.Running when currentTest is not null =>
+                $"NEXT STEP: Call advance_test_case with status PASSED, FAILED, or BLOCKED for test {currentTest.TestId} (\"{currentTest.Title}\"). " +
+                $"You can also call get_test_case_details first to review the full test steps. " +
+                $"Progress: {progress}.",
+            RunStatus.Running =>
+                "All tests have been executed. Call finalize_execution_run to complete the run and generate reports.",
+            RunStatus.Paused =>
+                "The run is paused. Call resume_execution_run to continue testing.",
+            _ => "No active run. Call start_execution_run to begin a new execution."
+        };
+
         return JsonSerializer.Serialize(McpToolResponse<object>.Success(
             data,
             run.Status,
             progress,
-            nextAction));
+            nextAction,
+            instruction));
     }
 }
 

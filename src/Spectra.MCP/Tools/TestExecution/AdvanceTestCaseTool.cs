@@ -43,17 +43,36 @@ public sealed class AdvanceTestCaseTool : IMcpTool
     {
         var request = McpProtocol.DeserializeParams<AdvanceTestCaseRequest>(parameters);
 
-        // Resolve test_handle: if omitted, auto-detect from active run's in-progress test
+        // Resolve test_handle: if omitted, auto-detect from active run's in-progress test,
+        // or fall back to the next pending test in the queue (resilience after context compaction).
         var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(null, _runRepo);
         string? resolvedTestHandle = request?.TestHandle;
         if (string.IsNullOrEmpty(resolvedTestHandle))
         {
             if (runError is not null)
                 return runError;
+
             var (autoHandle, handleError) = await ActiveRunResolver.ResolveTestHandleAsync(null, resolvedRunId!, _resultRepo!);
             if (handleError is not null)
-                return handleError;
-            resolvedTestHandle = autoHandle;
+            {
+                // No in-progress test found — try the next pending test from the queue.
+                // This handles the case where get_test_case_details was never called
+                // (e.g., after context compaction the model skips it).
+                var queue = await _engine.GetQueueAsync(resolvedRunId!);
+                var nextPending = queue?.GetNext();
+                if (nextPending is not null)
+                {
+                    resolvedTestHandle = nextPending.TestHandle;
+                }
+                else
+                {
+                    return handleError;
+                }
+            }
+            else
+            {
+                resolvedTestHandle = autoHandle;
+            }
         }
 
         if (string.IsNullOrEmpty(request?.Status))
@@ -85,6 +104,21 @@ public sealed class AdvanceTestCaseTool : IMcpTool
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "INVALID_HANDLE",
                 $"Test handle '{resolvedTestHandle}' not found"));
+        }
+
+        // Auto-start pending tests — eliminates the hard requirement to call get_test_case_details first.
+        // This is critical for resilience after context compaction where models skip the details step.
+        if (result.Status == TestStatus.Pending)
+        {
+            await _engine.StartTestAsync(result.RunId, resolvedTestHandle!);
+            // Re-fetch to get the updated status
+            result = await _engine.GetTestResultAsync(resolvedTestHandle!);
+            if (result is null || result.Status != TestStatus.InProgress)
+            {
+                return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
+                    "AUTO_START_FAILED",
+                    $"Failed to auto-start test '{resolvedTestHandle}'. Use get_test_case_details to start the test manually."));
+            }
         }
 
         if (result.Status != TestStatus.InProgress)
@@ -140,11 +174,17 @@ public sealed class AdvanceTestCaseTool : IMcpTool
 
             var nextAction = next is not null ? "get_test_case_details" : "finalize_execution_run";
 
+            var instruction = next is not null
+                ? $"NEXT STEP: Call advance_test_case with status PASSED, FAILED, or BLOCKED for test {next.TestId} (\"{next.Title}\"). " +
+                  $"You can also call get_test_case_details first to review the full test steps. Progress: {progress}."
+                : "All tests have been executed. Call finalize_execution_run to complete the run and generate reports.";
+
             return JsonSerializer.Serialize(McpToolResponse<object>.Success(
                 data,
                 run.Status,
                 progress,
-                nextAction));
+                nextAction,
+                instruction));
         }
         catch (InvalidOperationException ex)
         {

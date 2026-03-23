@@ -29,6 +29,11 @@ public sealed record McpToolResponse<T>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? NextExpectedAction { get; init; }
 
+    /// <summary>Human-readable instruction for the AI model on what to do next. Survives context compaction.</summary>
+    [JsonPropertyName("instruction")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Instruction { get; init; }
+
     /// <summary>Error details if failed.</summary>
     [JsonPropertyName("error")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -47,14 +52,16 @@ public sealed record McpToolResponse<T>
         T data,
         RunStatus? runStatus = null,
         string? progress = null,
-        string? nextExpectedAction = null)
+        string? nextExpectedAction = null,
+        string? instruction = null)
     {
         return new McpToolResponse<T>
         {
             Data = data,
             RunStatus = runStatus,
             Progress = progress,
-            NextExpectedAction = nextExpectedAction
+            NextExpectedAction = nextExpectedAction,
+            Instruction = instruction
         };
     }
 

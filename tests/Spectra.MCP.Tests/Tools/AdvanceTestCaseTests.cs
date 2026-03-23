@@ -145,18 +145,35 @@ public class AdvanceTestCaseTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task Execute_TestNotInProgress_ReturnsError()
+    public async Task Execute_PendingTest_AutoStartsAndAdvances()
     {
         var (_, queue) = await _engine.StartRunAsync("checkout", _testEntries);
         var handle = queue.GetNext()!.TestHandle;
-        // Don't start the test (leave it pending)
+        // Don't start the test (leave it pending) — auto-start should kick in
 
         var parameters = JsonDocument.Parse($$$"""{"test_handle": "{{{handle}}}", "status": "PASSED"}""").RootElement;
         var result = await _tool.ExecuteAsync(parameters);
         var response = JsonDocument.Parse(result).RootElement;
 
-        Assert.True(response.TryGetProperty("error", out var error));
-        Assert.Equal("TEST_NOT_IN_PROGRESS", error.GetProperty("code").GetString());
+        // Should succeed — the test was auto-started from Pending to InProgress, then advanced
+        Assert.True(response.TryGetProperty("data", out var data));
+        Assert.Equal("TC-001", data.GetProperty("recorded").GetProperty("test_id").GetString());
+        Assert.Equal("PASSED", data.GetProperty("recorded").GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Execute_TerminalTest_ReturnsError()
+    {
+        // Advance a test to completion, then try to advance it again
+        var handle = await StartRunAndGetInProgressHandle();
+        var passParams = JsonDocument.Parse($$$"""{"test_handle": "{{{handle}}}", "status": "PASSED"}""").RootElement;
+        await _tool.ExecuteAsync(passParams);
+
+        // Try to advance the already-completed test
+        var result = await _tool.ExecuteAsync(passParams);
+        var response = JsonDocument.Parse(result).RootElement;
+
+        Assert.True(response.TryGetProperty("error", out _));
     }
 
     [Fact]
@@ -169,5 +186,53 @@ public class AdvanceTestCaseTests : IAsyncDisposable
 
         Assert.True(response.TryGetProperty("error", out var error));
         Assert.Equal("INVALID_HANDLE", error.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task Execute_NoHandleNoPendingTest_AutoResolvesFromQueue()
+    {
+        // Start a run but don't start any test — omit test_handle entirely
+        await _engine.StartRunAsync("checkout", _testEntries);
+
+        // Call with no test_handle — should auto-resolve from queue, auto-start, and advance
+        var parameters = JsonDocument.Parse("""{"status": "PASSED"}""").RootElement;
+        var result = await _tool.ExecuteAsync(parameters);
+        var response = JsonDocument.Parse(result).RootElement;
+
+        Assert.True(response.TryGetProperty("data", out var data));
+        Assert.Equal("TC-001", data.GetProperty("recorded").GetProperty("test_id").GetString());
+        Assert.Equal("PASSED", data.GetProperty("recorded").GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Execute_ReturnsInstructionField()
+    {
+        var handle = await StartRunAndGetInProgressHandle();
+        var parameters = JsonDocument.Parse($$$"""{"test_handle": "{{{handle}}}", "status": "PASSED"}""").RootElement;
+
+        var result = await _tool.ExecuteAsync(parameters);
+        var response = JsonDocument.Parse(result).RootElement;
+
+        Assert.True(response.TryGetProperty("instruction", out var instruction));
+        var text = instruction.GetString()!;
+        Assert.Contains("NEXT STEP", text);
+        Assert.Contains("advance_test_case", text);
+    }
+
+    [Fact]
+    public async Task Execute_LastTest_InstructionSaysFinalizeRun()
+    {
+        var (run, queue) = await _engine.StartRunAsync("single", [
+            new TestIndexEntry { Id = "TC-001", File = "tc-001.md", Title = "Only Test", Priority = "high", Tags = [] }
+        ]);
+        var handle = queue.GetNext()!.TestHandle;
+        await _engine.StartTestAsync(run.RunId, handle);
+
+        var parameters = JsonDocument.Parse($$$"""{"test_handle": "{{{handle}}}", "status": "PASSED"}""").RootElement;
+        var result = await _tool.ExecuteAsync(parameters);
+        var response = JsonDocument.Parse(result).RootElement;
+
+        var instruction = response.GetProperty("instruction").GetString()!;
+        Assert.Contains("finalize_execution_run", instruction);
     }
 }

@@ -133,7 +133,7 @@ public static class Program
 
         // Run management tools
         registry.Register("start_execution_run", new StartExecutionRunTool(engine, indexLoader, suiteListLoader, selectionsLoader));
-        registry.Register("get_execution_status", new GetExecutionStatusTool(engine, runRepo));
+        registry.Register("get_execution_status", new GetExecutionStatusTool(engine, runRepo, testCaseLoader));
         registry.Register("pause_execution_run", new PauseExecutionRunTool(engine, runRepo));
         registry.Register("resume_execution_run", new ResumeExecutionRunTool(engine, runRepo));
         registry.Register("cancel_execution_run", new CancelExecutionRunTool(engine, runRepo));
