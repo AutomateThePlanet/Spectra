@@ -53,17 +53,41 @@ public sealed class SaveScreenshotTool : IMcpTool
     {
         var request = McpProtocol.DeserializeParams<SaveScreenshotRequest>(parameters);
 
-        // Resolve test_handle
+        // Resolve test_handle — for screenshots, also check the most recently completed test
+        // since screenshots are typically attached right after recording a FAILED result
         var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(null, _runRepo);
         string? resolvedTestHandle = request?.TestHandle;
         if (string.IsNullOrEmpty(resolvedTestHandle))
         {
             if (runError is not null)
                 return runError;
-            var (autoHandle, handleError) = await ActiveRunResolver.ResolveTestHandleAsync(null, resolvedRunId!, _resultRepo!);
-            if (handleError is not null)
-                return handleError;
-            resolvedTestHandle = autoHandle;
+
+            // First try in-progress tests
+            var (autoHandle, _) = await ActiveRunResolver.ResolveTestHandleAsync(null, resolvedRunId!, _resultRepo!);
+            if (autoHandle is not null)
+            {
+                resolvedTestHandle = autoHandle;
+            }
+            else
+            {
+                // Fall back to the most recently completed test in this run
+                var allResults = await _resultRepo!.GetByRunIdAsync(resolvedRunId!);
+                var lastCompleted = allResults
+                    .Where(r => r.CompletedAt.HasValue)
+                    .OrderByDescending(r => r.CompletedAt)
+                    .FirstOrDefault();
+                if (lastCompleted is not null)
+                {
+                    resolvedTestHandle = lastCompleted.TestHandle;
+                }
+                else
+                {
+                    return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
+                        "NO_TEST_FOUND",
+                        "No test found to attach screenshot to. Pass test_handle explicitly.",
+                        nextExpectedAction: "get_execution_status"));
+                }
+            }
         }
 
         if (string.IsNullOrEmpty(request?.ImageData))

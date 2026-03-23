@@ -127,10 +127,11 @@ When a test fails and user confirms bug creation:
 
 When the user pastes a screenshot (at any point during test execution):
 
-1. Call `save_screenshot` with `image_data` set to the base64-encoded content of the pasted image. The test_handle is auto-detected.
-2. Optionally include a `caption` describing what the screenshot shows
-3. Screenshots are automatically compressed to WebP format and linked to the test
-4. **Important**: When the user sends a message with BOTH text and a pasted image, you must make TWO tool calls: first `advance_test_case` with the text as notes, then `save_screenshot` with the image data. Do not skip the screenshot.
+1. Call `save_screenshot` with `image_data` set to the base64-encoded content of the pasted image
+2. **Always pass `test_handle`** — use the same test_handle from the previous `advance_test_case` or `get_test_case_details` call. After recording a result, the test is no longer in-progress so auto-detection will NOT work. You must pass the handle explicitly.
+3. Optionally include a `caption` describing what the screenshot shows
+4. Screenshots are automatically compressed to WebP format and linked to the test
+5. **Important**: When the user sends a message with BOTH text and a pasted image, you must make TWO tool calls: first `advance_test_case` with the text as notes, then `save_screenshot` with the image data AND the same `test_handle`. Do not skip the screenshot.
 
 ## Error Handling
 
