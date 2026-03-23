@@ -19,6 +19,7 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
   "update": { ... },
   "suites": { ... },
   "coverage": { ... },
+  "execution": { ... },
   "validation": { ... },
   "git": { ... },
   "dashboard": { ... },
@@ -225,6 +226,15 @@ Filters are combined with AND logic between types. Use the `list_saved_selection
 The default configuration includes a `smoke` selection that matches all high-priority tests.
 
 ---
+
+## `execution` — Execution Settings
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `copilot_space` | string | — | Copilot Space name for inline documentation lookup during execution |
+| `copilot_space_owner` | string | — | GitHub user or organization that owns the Copilot Space |
+
+When configured, the execution agent uses the specified Copilot Space to answer tester questions about test steps and expected behavior. See [Copilot Spaces Setup](copilot-spaces-setup.md).
 
 ## `validation` — Test Validation Rules
 

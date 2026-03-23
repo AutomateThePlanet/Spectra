@@ -2,7 +2,7 @@
 
 How SPECTRA's MCP-based execution engine enables AI-driven test execution.
 
-Related: [CLI Reference](../cli-reference.md) | Platform setup: [Copilot Chat](copilot-chat.md) | [Copilot CLI](copilot-cli.md) | [Claude](claude.md) | [Generic MCP](generic-mcp.md)
+Related: [CLI Reference](../cli-reference.md) | [Copilot Spaces](../copilot-spaces-setup.md) | Platform setup: [Copilot Chat](copilot-chat.md) | [Copilot CLI](copilot-cli.md) | [Claude](claude.md) | [Generic MCP](generic-mcp.md)
 
 ---
 
@@ -166,6 +166,12 @@ AI: [calls finalize_execution_run]
 Run complete. 6 passed, 2 failed, 1 skipped, 1 blocked.
 Report saved: .execution/reports/abc123.json
 ```
+
+## Inline Documentation via Copilot Spaces
+
+The execution agent supports inline documentation lookup during test execution via [GitHub Copilot Spaces](../copilot-spaces-setup.md). When a tester asks for clarification about a test step or expected behavior, the agent queries the configured Copilot Space to provide concise answers without leaving the execution flow.
+
+Configure in `spectra.config.json` under `execution.copilot_space`. See [Copilot Spaces Setup](../copilot-spaces-setup.md) for details.
 
 ## Storage
 

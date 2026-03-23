@@ -73,7 +73,11 @@ public static class NextStepHints
     private static List<string> GetInitHints() =>
     [
         "spectra ai generate           # Generate your first test suite",
-        "spectra init-profile           # Configure generation preferences"
+        "spectra init-profile           # Configure generation preferences",
+        "",
+        "ℹ  Optional: Create a Copilot Space with your product documentation",
+        "   for inline help during test execution.",
+        "   See docs/copilot-spaces-setup.md"
     ];
 
     private static List<string> GetGenerateHints(bool success, HintContext context)

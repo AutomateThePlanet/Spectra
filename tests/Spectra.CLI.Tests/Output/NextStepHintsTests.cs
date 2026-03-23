@@ -10,9 +10,9 @@ public class NextStepHintsTests
     {
         var hints = NextStepHints.GetHints("init", true, new HintContext());
 
-        Assert.Equal(2, hints.Count);
         Assert.Contains(hints, h => h.Contains("spectra ai generate"));
         Assert.Contains(hints, h => h.Contains("spectra init-profile"));
+        Assert.Contains(hints, h => h.Contains("Copilot Space"));
     }
 
     [Fact]

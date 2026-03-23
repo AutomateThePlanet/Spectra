@@ -69,6 +69,10 @@
       "_comment_custom_css": "Path to a custom CSS file loaded after default styles for full override control."
     }
   },
+  "execution": {
+    "copilot_space": null,
+    "copilot_space_owner": null
+  },
   "bug_tracking": {
     "provider": "auto",
     "template": "templates/bug-report.md",

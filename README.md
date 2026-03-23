@@ -76,6 +76,7 @@ spectra dashboard --output ./site
 
 Execute tests through Copilot Chat, Claude, or any MCP client.
 State machine with pause/resume, crash recovery, and three report formats (JSON, Markdown, HTML).
+Inline documentation lookup via Copilot Spaces — testers get answers about test steps without leaving the execution flow.
 
 ### Generation Profiles
 

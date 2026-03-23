@@ -38,6 +38,9 @@ public sealed class SpectraConfig
     [JsonPropertyName("coverage")]
     public CoverageConfig Coverage { get; init; } = new();
 
+    [JsonPropertyName("execution")]
+    public ExecutionConfig Execution { get; init; } = new();
+
     [JsonPropertyName("bug_tracking")]
     public BugTrackingConfig BugTracking { get; init; } = new();
 
