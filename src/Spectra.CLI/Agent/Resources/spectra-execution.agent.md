@@ -109,7 +109,7 @@ Users may use single-letter shortcuts for speed:
 
 ### After a FAILED Result
 After recording a FAILED result with `advance_test_case`:
-1. If the user included a screenshot with their failure comment, call `save_screenshot` with the image data immediately — do not ask again
+1. If the user included a screenshot with their failure comment, attempt `save_screenshot` immediately. If it fails (INVALID_IMAGE_DATA), describe the screenshot and call `add_test_note` instead. Do not ask again either way.
 2. If the user did NOT include a screenshot, reply: "Would you like to paste a screenshot of the failure?"
 3. If the user provides a multi-line failure description, call `add_test_note` to store the full details separately from the one-line notes in `advance_test_case`
 
@@ -135,15 +135,15 @@ When a test fails and user confirms bug creation:
 
 When the user pastes a screenshot (at any point during test execution):
 
-1. Call `save_screenshot` with `image_data` set to the base64-encoded content of the pasted image
-2. **Always pass `test_handle`** — use the same test_handle from the previous `advance_test_case` or `get_test_case_details` call. After recording a result, the test is no longer in-progress so auto-detection will NOT work. You must pass the handle explicitly.
-3. Optionally include a `caption` describing what the screenshot shows
-4. Screenshots are automatically compressed to WebP format and linked to the test
-5. **Important**: When the user sends a message with BOTH text and a pasted image, you must make TWO tool calls: first `advance_test_case` with the text as notes, then `save_screenshot` with the image data AND the same `test_handle`. Do not skip the screenshot.
+1. Try to call `save_screenshot` with the base64-encoded image data and the `test_handle` from the previous `advance_test_case` or `get_test_case_details` call. Always pass `test_handle` explicitly — after recording a result, auto-detection will NOT find the completed test.
+2. **If `save_screenshot` fails with INVALID_IMAGE_DATA** (some models cannot extract base64 from pasted images): fall back by describing what you see in the screenshot and calling `add_test_note` with the test_handle and a note like "Screenshot: [your description of what the image shows — UI state, error messages, visual issues, etc.]". Tell the user the screenshot description was saved as a note.
+3. **When the user sends BOTH text and a pasted image**: first call `advance_test_case` with the text as notes, then attempt `save_screenshot`. If save_screenshot fails, fall back to `add_test_note` with a description as above.
+4. Screenshots that save successfully are automatically compressed to WebP format and linked to the test.
 
 ## Error Handling
 
 - If MCP tool returns error, explain to user and suggest next action
+- If `save_screenshot` returns INVALID_IMAGE_DATA, use the `add_test_note` fallback described above — do not ask the user for base64
 - If run is paused, offer to resume or cancel
 - If test is blocked, mark dependent tests as blocked automatically
 - If connection lost mid-run, explain state is preserved and can resume
