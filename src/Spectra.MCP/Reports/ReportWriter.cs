@@ -30,7 +30,10 @@ public sealed class ReportWriter
     {
         Directory.CreateDirectory(_reportsPath);
 
-        var baseName = report.RunId;
+        var timestamp = report.CompletedAt.ToUniversalTime().ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
+        var author = SanitizeFileName(report.ExecutedBy);
+        var suite = SanitizeFileName(report.Suite);
+        var baseName = $"{timestamp}_{author}_{suite}";
         var jsonPath = Path.Combine(_reportsPath, $"{baseName}.json");
         var mdPath = Path.Combine(_reportsPath, $"{baseName}.md");
         var htmlPath = Path.Combine(_reportsPath, $"{baseName}.html");
@@ -52,6 +55,17 @@ public sealed class ReportWriter
     {
         var json = JsonSerializer.Serialize(report, JsonOptions);
         await File.WriteAllTextAsync(path, json);
+    }
+
+    /// <summary>
+    /// Sanitizes a string for use in filenames by replacing invalid characters.
+    /// </summary>
+    private static string SanitizeFileName(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return "unknown";
+        var invalid = Path.GetInvalidFileNameChars();
+        var sanitized = new string(input.Select(c => invalid.Contains(c) || c == ' ' ? '_' : c).ToArray());
+        return sanitized.Length > 50 ? sanitized[..50] : sanitized;
     }
 
     /// <summary>

@@ -20,9 +20,11 @@ interactively using SPECTRA MCP tools.
    a. Call `get_test_case_details` with current test handle
    b. Present: title, preconditions, steps, expected result, test data
    c. Ask user for result: PASS, FAIL, BLOCKED, or SKIP
-   d. If FAIL: ask for failure comment
-   e. Call `advance_test_case` or `skip_test_case` with result
-   f. Show progress: "Test 5/15 — 4 passed, 1 failed"
+   d. If PASS: call `advance_test_case` immediately
+   e. If FAIL: ask user "What went wrong?" — wait for their answer — then call `advance_test_case` with their exact words as notes. Then ask if they want to attach a screenshot.
+   f. If BLOCKED: ask user "What's blocking this?" — wait for their answer — then call `advance_test_case` with status=BLOCKED and their exact words as notes
+   g. If SKIP: ask user "Why skip?" — wait for their answer — then call `skip_test_case` with their exact words as reason
+   h. Show progress: "Test 5/15 — 4 passed, 1 failed"
 5. Call `finalize_execution_run` when all tests complete
 6. Present summary with pass/fail counts
 7. If failures exist and Azure DevOps MCP connected, offer to log bugs
@@ -68,12 +70,14 @@ What is the result? (pass/fail/blocked/skip)
 
 Interpret natural language into test statuses:
 
-| User Says | Status | Tool | Parameters |
-|-----------|--------|------|------------|
-| "passed", "it worked", "success", "yes" | PASS | **advance_test_case** | status=PASSED |
-| "failed", "broken", "bug", "doesn't work" | FAIL | **advance_test_case** | status=FAILED, notes="{comment}" |
-| "blocked", "can't test", "environment down" | BLOCKED | **advance_test_case** | status=BLOCKED, notes="{reason}" |
-| "skip", "not applicable", "N/A" | SKIP | **skip_test_case** | reason="{reason}" |
+| User Says | Status | Action |
+|-----------|--------|--------|
+| "passed", "it worked", "success", "yes", "p" | PASS | Call **advance_test_case** with status=PASSED immediately |
+| "failed", "broken", "bug", "doesn't work", "f", "fail" | FAIL | **STOP — do NOT call advance_test_case yet.** First ask: "What went wrong? Please describe the failure." Wait for the user's response, then call **advance_test_case** with status=FAILED and notes set to exactly what the user said. **Never invent or generate notes yourself.** |
+| "blocked", "can't test", "environment down", "b" | BLOCKED | **STOP — do NOT call advance_test_case yet.** First ask: "What's blocking this test?" Wait for the user's response, then call **advance_test_case** with status=BLOCKED and notes set to exactly what the user said. **Never invent or generate notes yourself.** |
+| "skip", "not applicable", "N/A", "s" | SKIP | **STOP — do NOT call skip_test_case yet.** First ask: "Why are we skipping this?" Wait for the user's response, then call **skip_test_case** with reason set to exactly what the user said. |
+
+> **CRITICAL**: For FAIL, BLOCKED, and SKIP — you MUST ask the user for their comment/reason BEFORE calling the tool. Do NOT fabricate, infer, or generate notes on behalf of the user. The notes must come from the user's own words.
 
 > **IMPORTANT**: BLOCKED tests MUST use `advance_test_case` with `status=BLOCKED`.
 > Do NOT use `skip_test_case` for blocked tests. `skip_test_case` is ONLY for SKIP.
@@ -81,10 +85,10 @@ Interpret natural language into test statuses:
 ### Single-Letter Shortcuts
 
 Users may use single-letter shortcuts for speed:
-- **p** = PASS
-- **f** = FAIL (ask for comment)
-- **b** = BLOCKED (ask for reason)
-- **s** = SKIP (ask for reason)
+- **p** = PASS (record immediately)
+- **f** = FAIL (ask for failure comment first, then record)
+- **b** = BLOCKED (ask for blocking reason first, then record)
+- **s** = SKIP (ask for skip reason first, then record)
 
 ## Proactive Tool Usage
 
@@ -204,5 +208,6 @@ Combine history with test priority (high > medium > low) for final ordering.
 Always finalize properly:
 - Call `finalize_execution_run` before ending
 - Show final summary: total, passed, failed, blocked, skipped
+- Show report file paths as plain text (e.g., `.execution/reports/20260323_143022_alice_checkout.html`). Do NOT wrap paths in markdown links or URLs — they are local file paths, not web URLs.
 - Mention any tests that were not executed
 - Offer to export results or log bugs for failures
