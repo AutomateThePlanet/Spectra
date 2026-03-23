@@ -153,6 +153,7 @@ spectra config list-automation-dirs                 # List dirs with existence s
 - **Tests:** xUnit with structured results (never throw on validation errors)
 
 ## Recent Changes
+- 017-mcp-tool-resilience: ✅ COMPLETE - MCP tool resilience for weaker models (GPT-4.1, GPT-4o). All tools accepting `run_id` (13 tools) and `test_handle` (6 tools) now auto-resolve when parameters are omitted: single active run or single in-progress test is used automatically; 0 or 2+ returns descriptive error with listings. New shared `ActiveRunResolver` helper. New tools: `list_active_runs` (returns all non-terminal runs with progress summaries), `cancel_all_active_runs` (bulk cancel with per-run status reporting). Enhanced `get_run_history` with `status` filter and per-run pass/fail/skip summary counts. New `GetActiveRunsAsync` and `GetInProgressTestsAsync` repository methods. 26 new tests, 1148 total passing.
 - 015-auto-requirements-extraction: ✅ COMPLETE - AI-powered extraction of testable requirements from documentation. New models: `ExtractionResult`, `DuplicateMatch`. New service: `RequirementsWriter` handles YAML merge, duplicate detection (normalized title + substring matching), sequential ID allocation (REQ-NNN, never reuse gaps), atomic writes. New `RequirementsExtractor` uses Copilot SDK to extract requirements with RFC 2119 priority inference. CLI: `spectra ai analyze --extract-requirements [--dry-run]`. 11 new RequirementsWriter tests.
 - 014-open-source-ready: ✅ COMPLETE - Open source readiness. README redesign with banner placeholder, shields.io badges, value props, feature showcase, quickstart. CI pipeline (`.github/workflows/ci.yml`) — build+test on push/PR. NuGet publish pipeline (`.github/workflows/publish.yml`) — tag-triggered pack+push for Spectra.CLI and Spectra.MCP. All 1071 tests passing (fixed parallel test isolation with `[Collection("WorkingDirectory")]`). GitHub issue templates (bug report, feature request), PR template, Dependabot config. All README doc links verified.
 - 013-cli-ux-improvements: ✅ COMPLETE - CLI UX improvements for discoverability and workflow. New `NextStepHints` helper prints context-aware next-step suggestions after every command (init, generate, analyze, dashboard, validate, docs index, index) in dimmed text, suppressed by `--quiet` or piped output. Init flow: new interactive prompts for automation directory setup (`coverage.automation_dirs`) and critic model configuration (`ai.critic`). New config subcommands: `spectra config add-automation-dir`, `remove-automation-dir`, `list-automation-dirs`. Interactive generation mode: continuation menu after suite completion (generate more, switch suite, create suite, exit) with session summary. 18 new tests.
@@ -191,6 +192,10 @@ The MCP server (`Spectra.MCP`) provides test execution tools for AI agents.
 - `retest_test_case` - Requeue a test for another attempt
 - `save_screenshot` - Save screenshot attachment
 
+**Run Discovery & Cleanup:**
+- `list_active_runs` - List all non-terminal runs with progress summaries
+- `cancel_all_active_runs` - Cancel all active runs at once (bulk cleanup)
+
 **Data Tools:**
 - `validate_tests` - Validate test files
 - `rebuild_indexes` - Rebuild _index.json files
@@ -200,7 +205,7 @@ The MCP server (`Spectra.MCP`) provides test execution tools for AI agents.
 - `list_saved_selections` - List named selections from config with estimated test counts
 
 **Reporting:**
-- `get_run_history` - Get execution history
+- `get_run_history` - Get execution history with optional status/suite/limit filters and per-run summary counts
 - `get_execution_summary` - Get summary statistics
 
 ### Bulk Operations

@@ -29,7 +29,7 @@ public class PauseExecutionRunTests : IAsyncDisposable
         var config = new McpConfig { BasePath = _testDir };
 
         _engine = new ExecutionEngine(runRepo, resultRepo, identity, config);
-        _tool = new PauseExecutionRunTool(_engine);
+        _tool = new PauseExecutionRunTool(_engine, runRepo);
 
         _testEntries =
         [
@@ -78,7 +78,7 @@ public class PauseExecutionRunTests : IAsyncDisposable
         var result = await _tool.ExecuteAsync(parameters);
         var response = JsonDocument.Parse(result).RootElement;
 
-        Assert.Equal("INVALID_PARAMS", response.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal("NO_ACTIVE_RUNS", response.GetProperty("error").GetProperty("code").GetString());
     }
 
     [Fact]

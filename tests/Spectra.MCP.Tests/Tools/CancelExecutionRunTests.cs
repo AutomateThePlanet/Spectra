@@ -37,7 +37,7 @@ public class CancelExecutionRunTests : IAsyncDisposable
         };
 
         _startTool = new StartExecutionRunTool(_engine, _ => testEntries);
-        _cancelTool = new CancelExecutionRunTool(_engine);
+        _cancelTool = new CancelExecutionRunTool(_engine, runRepo);
     }
 
     public async ValueTask DisposeAsync()

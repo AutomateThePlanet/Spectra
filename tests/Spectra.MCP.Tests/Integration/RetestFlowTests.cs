@@ -58,9 +58,9 @@ public class RetestFlowTests : IAsyncDisposable
 
         Func<string, IEnumerable<TestIndexEntry>> indexLoader = _ => testEntries;
         _startTool = new StartExecutionRunTool(_engine, indexLoader);
-        _detailsTool = new GetTestCaseDetailsTool(_engine, (_, id) => testCases.GetValueOrDefault(id));
-        _advanceTool = new AdvanceTestCaseTool(_engine);
-        _retestTool = new RetestTestCaseTool(_engine);
+        _detailsTool = new GetTestCaseDetailsTool(_engine, (_, id) => testCases.GetValueOrDefault(id), runRepo, resultRepo);
+        _advanceTool = new AdvanceTestCaseTool(_engine, resultRepo, runRepo);
+        _retestTool = new RetestTestCaseTool(_engine, runRepo);
         _finalizeTool = new FinalizeExecutionRunTool(_engine, reportGenerator, reportWriter, indexLoader);
     }
 

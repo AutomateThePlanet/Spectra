@@ -103,7 +103,7 @@ public class ConcurrentUsersTests : IAsyncDisposable
         var identity = new MockUserIdentityResolver("user-a");
         var engine = new ExecutionEngine(_runRepo, _resultRepo, identity, _config);
         var startTool = new StartExecutionRunTool(engine, _ => _testEntries);
-        var cancelTool = new CancelExecutionRunTool(engine);
+        var cancelTool = new CancelExecutionRunTool(engine, _runRepo);
 
         // Start first run
         var result1 = await startTool.ExecuteAsync(JsonDocument.Parse("""{"suite": "checkout"}""").RootElement);

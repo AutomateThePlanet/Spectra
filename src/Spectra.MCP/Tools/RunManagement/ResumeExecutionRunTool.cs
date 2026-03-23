@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Spectra.Core.Models.Execution;
 using Spectra.MCP.Execution;
 using Spectra.MCP.Server;
+using Spectra.MCP.Storage;
 
 namespace Spectra.MCP.Tools.RunManagement;
 
@@ -13,43 +14,42 @@ namespace Spectra.MCP.Tools.RunManagement;
 public sealed class ResumeExecutionRunTool : IMcpTool
 {
     private readonly ExecutionEngine _engine;
+    private readonly RunRepository _runRepo;
 
-    public string Description => "Resumes a paused execution run";
+    public string Description => "Resumes a paused execution run. If run_id is omitted, auto-detects when exactly one active run exists.";
 
     public object? ParameterSchema => new
     {
         type = "object",
         properties = new
         {
-            run_id = new { type = "string", description = "Run to resume" }
-        },
-        required = new[] { "run_id" }
+            run_id = new { type = "string", description = "Run to resume. If omitted, auto-detects when exactly one active run exists." }
+        }
     };
 
-    public ResumeExecutionRunTool(ExecutionEngine engine)
+    public ResumeExecutionRunTool(ExecutionEngine engine, RunRepository runRepo)
     {
         _engine = engine;
+        _runRepo = runRepo;
     }
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
         var request = McpProtocol.DeserializeParams<ResumeExecutionRunRequest>(parameters);
-        if (request is null || string.IsNullOrEmpty(request.RunId))
-        {
-            return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
-                "INVALID_PARAMS",
-                "run_id is required"));
-        }
 
-        var run = await _engine.GetRunAsync(request.RunId);
+        var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(request?.RunId, _runRepo);
+        if (runError is not null)
+            return runError;
+
+        var run = await _engine.GetRunAsync(resolvedRunId!);
         if (run is null)
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "RUN_NOT_FOUND",
-                $"Run '{request.RunId}' not found"));
+                $"Run '{resolvedRunId!}' not found"));
         }
 
-        if (!await _engine.VerifyOwnerAsync(request.RunId))
+        if (!await _engine.VerifyOwnerAsync(resolvedRunId!))
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "NOT_OWNER",
@@ -67,7 +67,7 @@ public sealed class ResumeExecutionRunTool : IMcpTool
                 GetNextActionForStatus(run.Status)));
         }
 
-        var resumedRun = await _engine.ResumeRunAsync(request.RunId);
+        var resumedRun = await _engine.ResumeRunAsync(resolvedRunId!);
         if (resumedRun is null)
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
@@ -76,7 +76,7 @@ public sealed class ResumeExecutionRunTool : IMcpTool
                 run.Status));
         }
 
-        var queue = await _engine.GetQueueAsync(request.RunId);
+        var queue = await _engine.GetQueueAsync(resolvedRunId!);
         var progress = queue?.GetProgress() ?? "?/?";
         var nextTest = queue?.GetNext();
 

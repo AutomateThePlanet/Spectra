@@ -176,7 +176,7 @@ public sealed class RunRepository
     /// <summary>
     /// Gets all runs with optional filters.
     /// </summary>
-    public async Task<IReadOnlyList<Run>> GetAllAsync(string? suite = null, string? user = null, int limit = 50)
+    public async Task<IReadOnlyList<Run>> GetAllAsync(string? suite = null, string? user = null, int limit = 50, RunStatus? status = null)
     {
         var connection = await _db.GetConnectionAsync();
         await using var command = connection.CreateCommand();
@@ -189,6 +189,10 @@ public sealed class RunRepository
         if (!string.IsNullOrEmpty(user))
         {
             conditions.Add("started_by = @user");
+        }
+        if (status.HasValue)
+        {
+            conditions.Add("status = @status");
         }
 
         var whereClause = conditions.Count > 0 ? $"WHERE {string.Join(" AND ", conditions)}" : "";
@@ -203,6 +207,34 @@ public sealed class RunRepository
         {
             command.Parameters.AddWithValue("@user", user);
         }
+        if (status.HasValue)
+        {
+            command.Parameters.AddWithValue("@status", status.Value.ToString());
+        }
+
+        var runs = new List<Run>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            runs.Add(MapRun(reader));
+        }
+
+        return runs;
+    }
+
+    /// <summary>
+    /// Gets all active (non-terminal) runs.
+    /// </summary>
+    public async Task<IReadOnlyList<Run>> GetActiveRunsAsync()
+    {
+        var connection = await _db.GetConnectionAsync();
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = """
+            SELECT * FROM runs
+            WHERE status IN ('Created', 'Running', 'Paused')
+            ORDER BY started_at DESC
+            """;
 
         var runs = new List<Run>();
         await using var reader = await command.ExecuteReaderAsync();

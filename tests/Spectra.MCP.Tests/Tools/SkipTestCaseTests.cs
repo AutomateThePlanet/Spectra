@@ -29,7 +29,7 @@ public class SkipTestCaseTests : IAsyncDisposable
         var config = new McpConfig { BasePath = _testDir };
 
         _engine = new ExecutionEngine(runRepo, resultRepo, identity, config);
-        _tool = new SkipTestCaseTool(_engine);
+        _tool = new SkipTestCaseTool(_engine, runRepo, resultRepo);
 
         _testEntries =
         [

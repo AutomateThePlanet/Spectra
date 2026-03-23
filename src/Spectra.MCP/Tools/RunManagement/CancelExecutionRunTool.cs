@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Spectra.Core.Models.Execution;
 using Spectra.MCP.Execution;
 using Spectra.MCP.Server;
+using Spectra.MCP.Storage;
 
 namespace Spectra.MCP.Tools.RunManagement;
 
@@ -13,44 +14,43 @@ namespace Spectra.MCP.Tools.RunManagement;
 public sealed class CancelExecutionRunTool : IMcpTool
 {
     private readonly ExecutionEngine _engine;
+    private readonly RunRepository _runRepo;
 
-    public string Description => "Cancels an active execution run";
+    public string Description => "Cancels an execution run. If run_id is omitted, auto-detects when exactly one active run exists.";
 
     public object? ParameterSchema => new
     {
         type = "object",
         properties = new
         {
-            run_id = new { type = "string", description = "Run identifier" },
+            run_id = new { type = "string", description = "Run to cancel. If omitted, auto-detects when exactly one active run exists." },
             reason = new { type = "string", description = "Reason for cancellation" }
-        },
-        required = new[] { "run_id" }
+        }
     };
 
-    public CancelExecutionRunTool(ExecutionEngine engine)
+    public CancelExecutionRunTool(ExecutionEngine engine, RunRepository runRepo)
     {
         _engine = engine;
+        _runRepo = runRepo;
     }
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
         var request = McpProtocol.DeserializeParams<CancelExecutionRunRequest>(parameters);
-        if (request is null || string.IsNullOrEmpty(request.RunId))
-        {
-            return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
-                "INVALID_PARAMS",
-                "run_id is required"));
-        }
 
-        var run = await _engine.GetRunAsync(request.RunId);
+        var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(request?.RunId, _runRepo);
+        if (runError is not null)
+            return runError;
+
+        var run = await _engine.GetRunAsync(resolvedRunId!);
         if (run is null)
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "RUN_NOT_FOUND",
-                $"Run '{request.RunId}' not found"));
+                $"Run '{resolvedRunId!}' not found"));
         }
 
-        var cancelled = await _engine.CancelRunAsync(request.RunId, request.Reason);
+        var cancelled = await _engine.CancelRunAsync(resolvedRunId!, request?.Reason);
         if (cancelled is null)
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
@@ -64,7 +64,7 @@ public sealed class CancelExecutionRunTool : IMcpTool
         {
             run_id = cancelled.RunId,
             cancelled_at = DateTime.UtcNow.ToString("O"),
-            reason = request.Reason
+            reason = request?.Reason
         };
 
         return JsonSerializer.Serialize(McpToolResponse<object>.Success(
