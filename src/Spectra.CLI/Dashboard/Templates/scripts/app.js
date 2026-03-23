@@ -666,9 +666,6 @@ function showRunDetail(runId) {
     const run = data.runs.find(r => r.run_id === runId);
     if (!run) return;
 
-    document.querySelector('.sidebar').style.display = 'none';
-    document.querySelector('.content').style.flex = '1';
-
     const passRate = run.total > 0 ? ((run.passed / run.total) * 100).toFixed(1) : 0;
     const duration = run.duration_seconds ? formatDuration(run.duration_seconds) : 'N/A';
 
@@ -751,8 +748,6 @@ function showRunDetail(runId) {
 }
 
 function closeSingleRunDetail() {
-    document.querySelector('.sidebar').style.display = '';
-    document.querySelector('.content').style.flex = '';
     render();
 }
 
@@ -793,7 +788,7 @@ function renderResultRow(r) {
                     ${testDataStr ? `<div class="result-section"><strong>Test Data:</strong><pre class="result-test-data">${escapeHtml(testDataStr)}</pre></div>` : ''}
                     ${r.notes ? `<div class="result-notes"><strong>Actual Result / Notes:</strong> ${escapeHtml(r.notes)}</div>` : ''}
                     ${r.blocked_by ? `<div class="result-blocked-by"><strong>Blocked by:</strong> ${escapeHtml(r.blocked_by)}</div>` : ''}
-                    ${screenshots && screenshots.length > 0 ? `<div class="result-section"><strong>Screenshots:</strong><div class="result-screenshots">${screenshots.map(s => `<a href="${escapeHtml(s)}" target="_blank" class="screenshot-thumb"><img src="${escapeHtml(s)}" alt="Screenshot" /></a>`).join('')}</div></div>` : ''}
+                    ${screenshots && screenshots.length > 0 ? `<div class="result-section"><strong>Screenshots:</strong><div class="result-screenshots">${screenshots.map(s => `<div class="screenshot-thumb" onclick="openScreenshotLightbox('${escapeHtml(s)}')"><img src="${escapeHtml(s)}" alt="Screenshot" /></div>`).join('')}</div></div>` : ''}
                 </div>
             </details>
         `;
@@ -1686,3 +1681,27 @@ function escapeHtml(str) {
     div.textContent = str;
     return div.innerHTML;
 }
+
+/**
+ * Screenshot lightbox
+ */
+function openScreenshotLightbox(src) {
+    let lightbox = document.getElementById('screenshot-lightbox');
+    if (!lightbox) {
+        lightbox = document.createElement('div');
+        lightbox.id = 'screenshot-lightbox';
+        lightbox.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:10000;cursor:pointer;';
+        lightbox.onclick = () => lightbox.style.display = 'none';
+        document.body.appendChild(lightbox);
+    }
+    lightbox.innerHTML = `<img src="${src}" style="max-width:90vw;max-height:90vh;border-radius:8px;box-shadow:0 4px 24px rgba(0,0,0,0.5);" onclick="event.stopPropagation()" />
+        <button onclick="document.getElementById('screenshot-lightbox').style.display='none'" style="position:absolute;top:20px;right:30px;background:none;border:none;color:white;font-size:2rem;cursor:pointer;">&times;</button>`;
+    lightbox.style.display = 'flex';
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const lb = document.getElementById('screenshot-lightbox');
+        if (lb) lb.style.display = 'none';
+    }
+});
