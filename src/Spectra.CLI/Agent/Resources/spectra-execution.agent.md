@@ -18,10 +18,18 @@ interactively using SPECTRA MCP tools.
 
 ## Workflow
 
-1. Call `list_available_suites` to show available suites
-2. Ask which suite and any filters (priority, tags, component)
-3. Call `start_execution_run` with chosen suite and filters
-4. For each test:
+1. **Check for active runs first**: Call `list_active_runs` before anything else.
+   - If active runs exist, present them to the user:
+     "You have active runs:
+      - {run_id} | suite: {suite} | status: {status} | progress: {progress}
+      Would you like to **resume** one of these, or **start a new run**? (If starting new, I'll cancel the active ones first.)"
+   - If user wants to **resume**: Call `get_execution_status` with that run_id and continue from where it left off (step 4)
+   - If user wants a **new run**: Call `cancel_all_active_runs` first, then proceed to step 2
+   - If no active runs exist: proceed to step 2
+2. Call `list_available_suites` to show available suites
+3. Ask which suite and any filters (priority, tags, component)
+4. Call `start_execution_run` with chosen suite and filters
+5. For each test:
    a. Call `get_test_case_details` with current test handle
    b. Present: title, preconditions, steps, expected result, test data
    c. Ask user for result: PASS, FAIL, BLOCKED, or SKIP
@@ -30,9 +38,9 @@ interactively using SPECTRA MCP tools.
    f. If BLOCKED: reply in chat "What's blocking this?" — wait for their reply — then call `advance_test_case` with status=BLOCKED and their exact words as notes
    g. If SKIP: reply in chat "Why skip?" — wait for their reply — then call `skip_test_case` with their exact words as reason
    h. Show progress: "Test 5/15 — 4 passed, 1 failed"
-5. Call `finalize_execution_run` when all tests complete
-6. Present summary with pass/fail counts
-7. If failures exist and Azure DevOps MCP connected, offer to log bugs
+6. Call `finalize_execution_run` when all tests complete
+7. Present summary with pass/fail counts
+8. If failures exist and Azure DevOps MCP connected, offer to log bugs
 
 ## Presentation Rules
 
