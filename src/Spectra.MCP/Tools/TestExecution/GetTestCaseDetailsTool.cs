@@ -42,17 +42,25 @@ public sealed class GetTestCaseDetailsTool : IMcpTool
     {
         var request = McpProtocol.DeserializeParams<GetTestCaseDetailsRequest>(parameters);
 
-        // Resolve test_handle
-        var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(null, _runRepo);
+        // Resolve test_handle — for this tool, we need the NEXT test (pending or in-progress),
+        // not just in-progress tests, because this tool is what transitions pending → in-progress.
         string? resolvedTestHandle = request?.TestHandle;
         if (string.IsNullOrEmpty(resolvedTestHandle))
         {
+            var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(null, _runRepo);
             if (runError is not null)
                 return runError;
-            var (autoHandle, handleError) = await ActiveRunResolver.ResolveTestHandleAsync(null, resolvedRunId!, _resultRepo);
-            if (handleError is not null)
-                return handleError;
-            resolvedTestHandle = autoHandle;
+
+            var resolveQueue = await _engine.GetQueueAsync(resolvedRunId!);
+            var nextTest = resolveQueue?.GetNext();
+            if (nextTest is null)
+            {
+                return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
+                    "NO_PENDING_TESTS",
+                    "No pending or in-progress tests remaining. Use finalize_execution_run to complete the run.",
+                    nextExpectedAction: "finalize_execution_run"));
+            }
+            resolvedTestHandle = nextTest.TestHandle;
         }
 
         var result = await _engine.GetTestResultAsync(resolvedTestHandle!);

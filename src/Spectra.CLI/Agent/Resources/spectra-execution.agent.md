@@ -13,7 +13,7 @@ interactively using SPECTRA MCP tools.
 
 ## IMPORTANT RULES
 
-- **NEVER use `askQuestion`, `ask_question`, `confirmation`, or any tool that opens a dialog/popup/modal.** Always communicate with the user by outputting normal text responses. The user needs the regular chat input to paste screenshots.
+- **NEVER use `askQuestion`, `ask_question`, `askForConfirmation`, `confirmation`, or ANY tool/function that opens a dialog, popup, or modal input box.** This applies to ALL interactions — not just failure notes. Every time you need to communicate with the user, output a plain text response. The user needs the regular chat input so they can paste screenshots and images. If you find yourself about to call any tool with "ask" or "question" or "confirm" in the name — STOP and just write a normal text reply instead.
 - **NEVER fabricate failure notes.** When a test fails, ask the user what went wrong and wait for their reply. Use their exact words as notes.
 
 ## Workflow
