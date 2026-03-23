@@ -220,6 +220,7 @@ body.panel-open {
 /* Content Area */
 .content {
     flex: 1;
+    min-width: 0;
     padding: 2rem;
     overflow-y: auto;
 }
@@ -725,7 +726,8 @@ body.panel-open {
 
 /* Run Detail */
 .run-detail {
-    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .run-detail h2 {
