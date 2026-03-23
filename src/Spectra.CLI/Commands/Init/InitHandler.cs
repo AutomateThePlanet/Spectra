@@ -525,10 +525,11 @@ public sealed class InitHandler
     {
         var gitIgnorePath = Path.Combine(_workingDirectory, ".gitignore");
         const string spectraSection = "# SPECTRA";
-        const string executionDir = ".execution/";
+        const string executionDb = ".execution/*.db";
+        const string executionDbJournal = ".execution/*.db-*";
         const string lockPattern = ".spectra.lock";
 
-        var patterns = new[] { executionDir, lockPattern };
+        var patterns = new[] { executionDb, executionDbJournal, lockPattern };
         var newEntries = new List<string>();
 
         if (File.Exists(gitIgnorePath))
@@ -570,7 +571,8 @@ public sealed class InitHandler
             // Create new .gitignore
             var sb = new System.Text.StringBuilder();
             sb.AppendLine(spectraSection);
-            sb.AppendLine(executionDir);
+            sb.AppendLine(executionDb);
+            sb.AppendLine(executionDbJournal);
             sb.AppendLine(lockPattern);
 
             await File.WriteAllTextAsync(gitIgnorePath, sb.ToString(), ct);
