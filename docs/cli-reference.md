@@ -13,6 +13,18 @@ Related: [Getting Started](getting-started.md) | [Configuration](configuration.m
 | `--verbosity` | `-v` | Output level: `quiet`, `minimal`, `normal`, `detailed`, `diagnostic` |
 | `--dry-run` | | Preview changes without executing |
 | `--no-review` | | Skip interactive review (CI mode) |
+| `--output-format` | | Output format: `human` (default) or `json` for structured output |
+| `--no-interaction` | | Disable interactive prompts; fail with exit code 3 if required args missing |
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success |
+| 1 | Command failed (runtime error, missing config) |
+| 2 | Validation errors found |
+| 3 | Missing required arguments in non-interactive mode |
+| 130 | Cancelled by user |
 
 ---
 
@@ -26,7 +38,16 @@ Initialize a repository for SPECTRA.
 spectra init
 ```
 
-Creates `spectra.config.json`, `docs/`, `tests/`, `docs/requirements/_requirements.yaml` (commented template), and `.github/skills/` agent definition.
+Creates `spectra.config.json`, `docs/`, `tests/`, `docs/requirements/_requirements.yaml`, `.github/skills/` (6 SKILL files), and `.github/agents/` (2 agent prompts).
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--force` | Overwrite existing configuration |
+| `--interactive` / `-i` | Enable interactive setup |
+| `--no-interactive` | Disable interactive setup |
+| `--skip-skills` | Skip creation of SKILL and agent files |
 
 ### `spectra validate`
 
@@ -56,6 +77,21 @@ spectra auth -p github-models
 spectra auth -p openai
 ```
 
+### `spectra update-skills`
+
+Update bundled SKILL and agent files to the latest version.
+
+```bash
+spectra update-skills
+```
+
+Compares installed files against bundled versions using SHA-256 hashes:
+- **Unmodified files** → updated to latest version
+- **User-modified files** → skipped with warning (preserves customizations)
+- **Missing files** → recreated
+
+Reports a summary of updated, unchanged, and skipped files.
+
 ---
 
 ## Documentation Commands
@@ -81,43 +117,65 @@ See [Document Index](document-index.md) for full details.
 
 ### `spectra ai generate`
 
-Generate test cases from documentation. Supports two modes.
+Generate test cases from documentation. Supports multiple modes.
 
-**Interactive Mode** — guided prompts for exploratory generation:
+**Interactive Session** — four-phase guided session:
 
 ```bash
 spectra ai generate
 ```
 
-Launches a guided session that:
-1. Lists available suites with test counts (or create a new suite)
-2. Asks what kind of tests you want (full coverage, negative only, specific area)
-3. Shows existing tests matching your focus
-4. Identifies coverage gaps in your documentation
-5. Generates tests and writes them directly
-6. Prompts to generate more for remaining gaps
+Launches a generation session that flows through:
+1. **Phase 1 — Analysis**: Counts testable behaviors in documentation, shows breakdown by category
+2. **Phase 2 — Generation**: Creates test cases with AI verification (grounded/partial/hallucinated)
+3. **Phase 3 — Suggestions**: Proposes additional tests for uncovered areas
+4. **Phase 4 — User-Described**: Create tests from your own descriptions (skips critic, marked `verdict: manual`)
+5. Phases 3-4 loop until you choose "Done", then displays session summary
 
 **Direct Mode** — specify suite and options upfront:
 
 ```bash
 spectra ai generate checkout --count 10
 spectra ai generate checkout --focus "error handling"
-spectra ai generate payments --focus "negative validation edge cases"
 spectra ai generate checkout --skip-critic
-spectra ai generate checkout --count 10 --no-interaction --no-review
 spectra ai generate checkout --count 5 --dry-run
+```
+
+**Session Commands** — work with previous session state:
+
+```bash
+spectra ai generate checkout --from-suggestions                     # Generate from last session's suggestions
+spectra ai generate checkout --from-suggestions 1,3                 # Generate specific suggestions by index
+spectra ai generate checkout --from-description "IBAN validation"   # Create test from description
+spectra ai generate checkout --from-description "IBAN validation" --context "checkout page"
+spectra ai generate checkout --auto-complete --output-format json   # CI: all phases, no prompts
+```
+
+**SKILL/CI Mode** — structured JSON output:
+
+```bash
+spectra ai generate checkout --output-format json --verbosity quiet   # JSON for Copilot SKILL parsing
+spectra ai generate checkout --no-interaction --output-format json    # CI pipeline with exit codes
 ```
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--count` | `-n` | Number of tests to generate (default: 5) |
+| `--count` | `-n` | Number of tests to generate (default: AI-recommended count) |
 | `--focus` | `-f` | Focus area description for targeted generation |
 | `--skip-critic` | | Skip grounding verification (faster) |
-| `--no-interaction` | | Disable interactive prompts |
-| `--no-review` | | Skip interactive review of generated tests |
+| `--from-suggestions` | | Generate from previous session's suggestions (optionally pass indices like `1,3`) |
+| `--from-description` | | Create a test from a plain-language behavior description |
+| `--context` | | Additional context for `--from-description` |
+| `--auto-complete` | | Run all phases without prompts (analyze → generate → suggestions → finalize) |
 | `--dry-run` | | Preview without writing files |
 
-**Exit codes:** `0` = success, `1` = error.
+Session state is stored in `.spectra/session.json` and expires after 1 hour.
+
+User-described tests are marked with `grounding.verdict: manual` and `source: user-described`.
+
+Duplicate detection warns when a new test has >80% title similarity to an existing test.
+
+**Exit codes:** `0` = success, `1` = error, `3` = missing required args with `--no-interaction`.
 
 ### `spectra ai update`
 

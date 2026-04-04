@@ -34,14 +34,27 @@ This creates:
 
 ```
 my-project/
-├── spectra.config.json       # Configuration
-├── docs/                     # Put your documentation here
-│   └── _index.md             # Document index (auto-built if docs exist)
-├── tests/                    # Generated tests go here
+├── spectra.config.json                          # Configuration
+├── docs/                                        # Put your documentation here
+│   └── _index.md                                # Document index (auto-built if docs exist)
+├── tests/                                       # Generated tests go here
 ├── docs/requirements/
-│   └── _requirements.yaml    # Requirements definition (commented template)
-└── .github/skills/...        # AI skill definition
+│   └── _requirements.yaml                       # Requirements definition (commented template)
+├── .github/
+│   ├── agents/
+│   │   ├── spectra-execution.agent.md           # Test execution agent (MCP)
+│   │   └── spectra-generation.agent.md          # Test generation agent (CLI)
+│   └── skills/
+│       ├── spectra-generate/SKILL.md            # Generate tests via Copilot Chat
+│       ├── spectra-coverage/SKILL.md            # Check coverage via Copilot Chat
+│       ├── spectra-dashboard/SKILL.md           # Build dashboard via Copilot Chat
+│       ├── spectra-validate/SKILL.md            # Validate tests via Copilot Chat
+│       ├── spectra-list/SKILL.md                # Browse tests via Copilot Chat
+│       └── spectra-init-profile/SKILL.md        # Configure profile via Copilot Chat
+└── templates/bug-report.md                      # Bug report template
 ```
+
+Use `spectra init --skip-skills` if you don't use GitHub Copilot Chat.
 
 ## Add Your Documentation
 
@@ -166,15 +179,42 @@ Override the default environment variable name in config:
 
 ## First Run
 
+### Option 1: Copilot Chat (recommended)
+
+Open VS Code with Copilot Chat and say:
+- "Generate test cases for the checkout suite"
+- "How's our test coverage?"
+- "Validate all test cases"
+
+The bundled SKILLs handle CLI invocation automatically. See [Skills Integration](skills-integration.md).
+
+### Option 2: CLI directly
+
 ```bash
 # Build the documentation index
 spectra docs index
 
-# Generate tests
+# Interactive generation session (analyze → generate → suggest → loop)
+spectra ai generate
+
+# Or direct mode with specific suite
 spectra ai generate checkout --count 10
 
 # Validate
 spectra validate
+```
+
+### Option 3: CI/SKILL automation
+
+```bash
+# Full automated generation with JSON output
+spectra ai generate checkout --auto-complete --output-format json
+
+# Coverage check
+spectra ai analyze --coverage --output-format json
+
+# Validation with structured errors
+spectra validate --output-format json --no-interaction
 ```
 
 See [CLI Reference](cli-reference.md) for all available commands.

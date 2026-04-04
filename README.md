@@ -40,11 +40,13 @@ SPECTRA reads your product documentation, generates comprehensive test suites, a
 
 ### AI Test Generation
 
-Generate test cases from product documentation with a single command.
-The AI reads your docs, identifies testable behaviors, and creates structured test cases with steps, expected results, and metadata.
+Generate test cases from product documentation through an iterative session.
+The AI analyzes your docs, identifies testable behaviors, generates structured test cases, suggests additional tests for uncovered areas, and lets you describe undocumented behaviors — all in one continuous flow.
 
 ```bash
-spectra ai generate checkout --count 15
+spectra ai generate                    # Interactive session
+spectra ai generate checkout           # Direct mode
+spectra ai generate checkout --auto-complete --output-format json  # CI mode
 ```
 
 ### Grounding Verification
@@ -78,6 +80,16 @@ Execute tests through Copilot Chat, Claude, or any MCP client.
 State machine with pause/resume, crash recovery, and three report formats (JSON, Markdown, HTML).
 Inline documentation lookup via Copilot Spaces — testers get answers about test steps without leaving the execution flow.
 
+### Copilot Chat Integration
+
+Bundled SKILL files let you use SPECTRA through natural language in Copilot Chat.
+Say "generate test cases for checkout" and the SKILL handles CLI invocation, JSON parsing, and result presentation.
+
+```bash
+spectra init                  # Creates 6 SKILLs + 2 agent prompts
+spectra update-skills         # Update SKILLs when CLI is upgraded
+```
+
 ### Generation Profiles
 
 Customize AI output with natural language profiles — detail level, negative scenario count, domain rules, formatting preferences.
@@ -90,13 +102,16 @@ Customize AI output with natural language profiles — detail level, negative sc
 # Install
 dotnet tool install -g Spectra.CLI
 
-# Initialize a new project
+# Initialize (creates config, dirs, SKILL files, agent prompts)
 spectra init
 
 # Build the document index
 spectra docs index
 
-# Generate your first test suite
+# Generate tests — interactive session with analysis, suggestions, and more
+spectra ai generate
+
+# Or direct mode for a specific suite
 spectra ai generate checkout --count 10
 
 # Validate generated tests
@@ -107,6 +122,14 @@ spectra ai analyze --coverage
 
 # Generate a visual dashboard
 spectra dashboard --output ./site
+```
+
+**For CI/SKILL workflows** — all commands support `--output-format json` and `--no-interaction`:
+
+```bash
+spectra ai generate checkout --auto-complete --output-format json
+spectra ai analyze --coverage --output-format json
+spectra validate --output-format json --no-interaction
 ```
 
 See [Getting Started](docs/getting-started.md) for auth setup and detailed instructions.
@@ -158,6 +181,7 @@ SPECTRA is part of the [Automate The Planet](https://www.automatetheplanet.com/)
 | [Generation Profiles](docs/generation-profiles.md) | Customize AI output style and quality |
 | [Grounding Verification](docs/grounding-verification.md) | Dual-model critic for hallucination detection |
 | [Document Index](docs/document-index.md) | Pre-built doc index for efficient generation |
+| [Skills Integration](docs/skills-integration.md) | Copilot Chat SKILLs and agent prompts |
 | [Execution Agent](docs/execution-agent/overview.md) | MCP tools and AI-driven test execution |
 | [Architecture](docs/architecture/overview.md) | System design and key decisions |
 | [Development Guide](docs/DEVELOPMENT.md) | Building, testing, and running locally |

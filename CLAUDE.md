@@ -29,10 +29,13 @@ src/
 │   │   └── Critic/           # ICriticRuntime, CriticFactory, prompt builder
 │   ├── Source/               # Document map builder, document index service
 │   ├── Index/                # _index.json operations
-│   ├── Validation/           # Test validation, dedup
+│   ├── Validation/           # Test validation, dedup, DuplicateDetector
 │   ├── Review/               # Interactive terminal UI
-│   ├── Interactive/          # Interactive mode components (selectors, session)
-│   ├── Output/               # Progress reporters, result presenters, NextStepHints
+│   ├── Interactive/          # Interactive mode components (selectors, session, UserDescriptionPrompt)
+│   ├── Session/              # Generation session state, SessionStore, SuggestionBuilder
+│   ├── Skills/               # Bundled SKILL content, AgentContent, SkillsManifest
+│   ├── Results/              # Typed JSON result models per command (CommandResult, GenerateResult, etc.)
+│   ├── Output/               # Progress reporters, result presenters, NextStepHints, JsonResultWriter
 │   ├── Classification/       # Test classification (update flow)
 │   ├── Coverage/             # Gap analysis and coverage reporting
 │   ├── Profile/              # Generation profile loading
@@ -105,13 +108,26 @@ dotnet test
 # Run CLI
 dotnet run --project src/Spectra.CLI -- <command>
 
-# Test Generation (006-conversational-generation)
-spectra ai generate                              # Interactive mode (guided prompts)
+# Global Options (020-cli-non-interactive)
+# --output-format json          Structured JSON on stdout (for SKILL/CI)
+# --output-format human         Default human-readable output
+# --no-interaction              Fail with exit 3 if required args missing
+# --verbosity quiet             Minimal output (only final result)
+
+# Test Generation (006 + 021-generation-session)
+spectra ai generate                              # Interactive session (analyze → generate → suggest → loop)
 spectra ai generate checkout                     # Direct mode (specific suite)
 spectra ai generate checkout --focus "negative"  # Direct mode with focus
 spectra ai generate checkout --no-interaction    # CI mode (no prompts, exit codes)
 spectra ai generate --dry-run                    # Preview without writing
 spectra ai generate checkout --skip-critic       # Skip grounding verification (008)
+
+# Generation Session (021-generation-session)
+spectra ai generate checkout --auto-complete --output-format json   # All phases, no prompts (CI)
+spectra ai generate checkout --from-suggestions --output-format json  # Generate from previous session suggestions
+spectra ai generate checkout --from-suggestions 1,3                 # Specific suggestions by index
+spectra ai generate checkout --from-description "IBAN validation error" --context "checkout page"  # User-described test
+spectra ai generate checkout --output-format json --verbosity quiet   # SKILL-friendly output
 
 # Test Update (006-conversational-generation)
 spectra ai update                                # Interactive mode (guided prompts)
@@ -124,6 +140,7 @@ spectra dashboard --output ./site
 spectra dashboard --output ./site --title "My Dashboard"
 spectra dashboard --dry-run                        # Preview without generating
 spectra dashboard --preview                        # Sample data + branding verification
+spectra dashboard --output ./site --output-format json  # JSON output for SKILL
 
 # Documentation Index (010-document-index)
 spectra docs index                               # Incremental update (only changed files)
@@ -134,9 +151,16 @@ spectra ai analyze --coverage                                    # Unified three
 spectra ai analyze --coverage --format json --output coverage.json
 spectra ai analyze --coverage --format markdown --output coverage.md
 spectra ai analyze --coverage --auto-link                        # Write automated_by back into test files
-spectra ai analyze --coverage --verbosity detailed
+spectra ai analyze --coverage --output-format json               # Structured JSON to stdout (SKILL)
 spectra ai analyze --extract-requirements            # Extract requirements from docs
 spectra ai analyze --extract-requirements --dry-run  # Preview without writing
+
+# Validation with JSON output
+spectra validate --output-format json              # JSON errors for SKILL/CI
+
+# SKILL Management (022-bundled-skills)
+spectra update-skills                             # Update bundled SKILL files to latest version
+spectra init --skip-skills                        # Init without creating SKILL/agent files
 
 # Automation Directory Management (013-cli-ux-improvements)
 spectra config add-automation-dir ../new-tests     # Add automation dir for coverage
@@ -153,6 +177,9 @@ spectra config list-automation-dirs                 # List dirs with existence s
 - **Tests:** xUnit with structured results (never throw on validation errors)
 
 ## Recent Changes
+- 022-bundled-skills: ✅ COMPLETE - Bundled SKILL files and agent prompts for Copilot Chat integration. 6 SKILL files (generate, coverage, dashboard, validate, list, init-profile) and 2 agent prompts (execution, generation) created by `spectra init` in `.github/skills/` and `.github/agents/`. Each SKILL contains CLI commands with `--output-format json --verbosity quiet`, JSON parsing instructions, and example user requests. New `SkillContent`, `AgentContent` static classes with bundled content. New `SkillsManifest` with SHA-256 hash tracking for safe updates. New `spectra update-skills` command (updates unmodified files, skips user-customized). New `--skip-skills` flag on init. New `FileHasher` utility. 10 new tests, 1241 total passing.
+- 021-generation-session: ✅ COMPLETE - Four-phase generation session flow (Analysis → Generation → Suggestions → User-Described). Session state persisted in `.spectra/session.json` (1-hour TTL). New `Session/` directory: `GenerationSessionState`, `SessionStore`, `SuggestionBuilder`, `SessionSummary`. New `UserDescribedGenerator` creates tests from plain-language descriptions with `grounding.verdict: manual`. New `DuplicateDetector` with Levenshtein similarity (80% threshold). New `SuggestionPresenter` for interactive suggestions menu. New CLI flags: `--from-suggestions [indices]`, `--from-description`, `--context`, `--auto-complete`. Interactive mode loops Phases 3-4 until user exits with session summary. 20 new tests, 1231 total passing.
+- 020-cli-non-interactive: ✅ COMPLETE - CLI non-interactive mode and structured JSON output for SKILL/CI workflows. New global options: `--output-format` (human/json) and `--no-interaction` on all commands. New `OutputFormat` enum, `ExitCodes.MissingArguments` (exit code 3). New `Results/` directory with typed result models per command (`GenerateResult`, `AnalyzeCoverageResult`, `ValidateResult`, `DashboardResult`, `ListResult`, `ShowResult`, `InitResult`, `DocsIndexResult`, `ErrorResult`). New `JsonResultWriter` serializes any result to stdout as JSON (camelCase, enums as strings, null omission). All presenters (`ProgressReporter`, `ResultPresenter`, `VerificationPresenter`, `AnalysisPresenter`, `NextStepHints`) suppress output when `OutputFormat.Json`. All 12 command handlers updated. Standardized exit codes: 0 (success), 1 (error), 2 (validation), 3 (missing args). 7 new tests, 1211 total passing.
 - 017-mcp-tool-resilience: ✅ COMPLETE - MCP tool resilience for weaker models (GPT-4.1, GPT-4o). All tools accepting `run_id` (13 tools) and `test_handle` (6 tools) now auto-resolve when parameters are omitted: single active run or single in-progress test is used automatically; 0 or 2+ returns descriptive error with listings. New shared `ActiveRunResolver` helper. New tools: `list_active_runs` (returns all non-terminal runs with progress summaries), `cancel_all_active_runs` (bulk cancel with per-run status reporting). Enhanced `get_run_history` with `status` filter and per-run pass/fail/skip summary counts. New `GetActiveRunsAsync` and `GetInProgressTestsAsync` repository methods. 26 new tests, 1148 total passing.
 - 015-auto-requirements-extraction: ✅ COMPLETE - AI-powered extraction of testable requirements from documentation. New models: `ExtractionResult`, `DuplicateMatch`. New service: `RequirementsWriter` handles YAML merge, duplicate detection (normalized title + substring matching), sequential ID allocation (REQ-NNN, never reuse gaps), atomic writes. New `RequirementsExtractor` uses Copilot SDK to extract requirements with RFC 2119 priority inference. CLI: `spectra ai analyze --extract-requirements [--dry-run]`. 11 new RequirementsWriter tests.
 - 014-open-source-ready: ✅ COMPLETE - Open source readiness. README redesign with banner placeholder, shields.io badges, value props, feature showcase, quickstart. CI pipeline (`.github/workflows/ci.yml`) — build+test on push/PR. NuGet publish pipeline (`.github/workflows/publish.yml`) — tag-triggered pack+push for Spectra.CLI and Spectra.MCP. All 1071 tests passing (fixed parallel test isolation with `[Collection("WorkingDirectory")]`). GitHub issue templates (bug report, feature request), PR template, Dependabot config. All README doc links verified.
