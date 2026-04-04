@@ -44,7 +44,7 @@ public sealed class InitHandler
     /// </summary>
     /// <param name="force">Overwrite existing configuration if true</param>
     /// <returns>Exit code</returns>
-    public async Task<int> HandleAsync(bool force, CancellationToken ct = default)
+    public async Task<int> HandleAsync(bool force, bool skipSkills = false, CancellationToken ct = default)
     {
         try
         {
@@ -64,11 +64,17 @@ public sealed class InitHandler
             // Create configuration file
             await CreateConfigFileAsync(configPath, ct);
 
-            // Create skill file
-            await CreateSkillFileAsync(ct);
+            if (!skipSkills)
+            {
+                // Create skill file
+                await CreateSkillFileAsync(ct);
 
-            // Install execution agent files
-            await InstallAgentFilesAsync(force, ct);
+                // Install execution agent files
+                await InstallAgentFilesAsync(force, ct);
+
+                // Create bundled SKILL files
+                await CreateBundledSkillFilesAsync(force, ct);
+            }
 
             // Create dashboard deployment workflow
             await CreateDeployWorkflowAsync(ct);
@@ -489,6 +495,31 @@ public sealed class InitHandler
         var templateContent = GetEmbeddedTemplate("test-generation-skill.md");
         await File.WriteAllTextAsync(skillPath, templateContent, ct);
         _logger.LogDebug("Created skill file: {Path}", skillPath);
+    }
+
+    private async Task CreateBundledSkillFilesAsync(bool force, CancellationToken ct)
+    {
+        var manifest = new Skills.SkillsManifest();
+        var manifestStore = new Skills.SkillsManifestStore(_workingDirectory);
+
+        // Create bundled SKILL files
+        foreach (var (name, content) in Skills.SkillContent.All)
+        {
+            var skillPath = Path.Combine(_workingDirectory, ".github", "skills", name, "SKILL.md");
+            await InstallAgentFileAsync(skillPath, () => content, force, ct);
+            manifest.Files[skillPath] = Infrastructure.FileHasher.ComputeHash(content);
+        }
+
+        // Create bundled agent files
+        foreach (var (name, content) in Skills.AgentContent.All)
+        {
+            var agentPath = Path.Combine(_workingDirectory, ".github", "agents", name);
+            await InstallAgentFileAsync(agentPath, () => content, force, ct);
+            manifest.Files[agentPath] = Infrastructure.FileHasher.ComputeHash(content);
+        }
+
+        await manifestStore.SaveAsync(manifest, ct);
+        _logger.LogDebug("Created skills manifest with {Count} entries", manifest.Files.Count);
     }
 
     private async Task CreateVsCodeMcpConfigAsync(CancellationToken ct)

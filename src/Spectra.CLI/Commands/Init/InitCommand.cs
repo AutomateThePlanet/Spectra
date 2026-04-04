@@ -30,11 +30,17 @@ public static class InitCommand
             getDefaultValue: () => false,
             description: "Disable interactive setup");
 
+        var skipSkillsOption = new Option<bool>(
+            name: "--skip-skills",
+            getDefaultValue: () => false,
+            description: "Skip creation of SKILL and agent files");
+
         var command = new Command("init", "Initialize SPECTRA in this repository")
         {
             forceOption,
             interactiveOption,
-            noInteractiveOption
+            noInteractiveOption,
+            skipSkillsOption
         };
 
         command.SetHandler(async (InvocationContext context) =>
@@ -61,11 +67,12 @@ public static class InitCommand
             }
 
             var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
+            var skipSkills = context.ParseResult.GetValueForOption(skipSkillsOption);
 
             var logger = LoggingSetup.CreateLogger<InitHandler>(verbosity);
             var handler = new InitHandler(logger, interactive: isInteractive, outputFormat: outputFormat);
 
-            context.ExitCode = await handler.HandleAsync(force, context.GetCancellationToken());
+            context.ExitCode = await handler.HandleAsync(force, skipSkills, context.GetCancellationToken());
         });
 
         return command;
