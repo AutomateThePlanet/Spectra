@@ -14,11 +14,13 @@ public sealed class DashboardHandler
 {
     private readonly VerbosityLevel _verbosity;
     private readonly bool _dryRun;
+    private readonly OutputFormat _outputFormat;
 
-    public DashboardHandler(VerbosityLevel verbosity = VerbosityLevel.Normal, bool dryRun = false)
+    public DashboardHandler(VerbosityLevel verbosity = VerbosityLevel.Normal, bool dryRun = false, OutputFormat outputFormat = OutputFormat.Human)
     {
         _verbosity = verbosity;
         _dryRun = dryRun;
+        _outputFormat = outputFormat;
     }
 
     public async Task<int> ExecuteAsync(
@@ -152,7 +154,7 @@ public sealed class DashboardHandler
                 Console.WriteLine($"Or serve it locally:  npx serve {relativePath}");
             }
 
-            NextStepHints.Print("dashboard", true, _verbosity, new HintContext { OutputPath = Path.GetRelativePath(currentDir, outputPath) });
+            NextStepHints.Print("dashboard", true, _verbosity, new HintContext { OutputPath = Path.GetRelativePath(currentDir, outputPath) }, _outputFormat);
             return ExitCodes.Success;
         }
         catch (Exception ex)

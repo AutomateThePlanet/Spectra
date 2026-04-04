@@ -17,10 +17,12 @@ namespace Spectra.CLI.Commands.Validate;
 public sealed class ValidateHandler
 {
     private readonly VerbosityLevel _verbosity;
+    private readonly OutputFormat _outputFormat;
 
-    public ValidateHandler(VerbosityLevel verbosity = VerbosityLevel.Normal)
+    public ValidateHandler(VerbosityLevel verbosity = VerbosityLevel.Normal, OutputFormat outputFormat = OutputFormat.Human)
     {
         _verbosity = verbosity;
+        _outputFormat = outputFormat;
     }
 
     public async Task<int> ExecuteAsync(string? suite, CancellationToken cancellationToken = default)
@@ -198,11 +200,11 @@ public sealed class ValidateHandler
             {
                 Console.WriteLine("Validation passed.");
             }
-            NextStepHints.Print("validate", true, _verbosity, new HintContext { ErrorCount = 0 });
+            NextStepHints.Print("validate", true, _verbosity, new HintContext { ErrorCount = 0 }, _outputFormat);
             return ExitCodes.Success;
         }
 
-        NextStepHints.Print("validate", false, _verbosity, new HintContext { ErrorCount = totalErrors });
+        NextStepHints.Print("validate", false, _verbosity, new HintContext { ErrorCount = totalErrors }, _outputFormat);
         return ExitCodes.Error;
     }
 

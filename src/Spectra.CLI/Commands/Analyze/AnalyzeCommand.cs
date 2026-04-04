@@ -49,7 +49,9 @@ public sealed class AnalyzeCommand : Command
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
             var dryRun = context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption);
 
-            var handler = new AnalyzeHandler(verbosity);
+            var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
+
+            var handler = new AnalyzeHandler(verbosity, outputFormat);
 
             if (extractReqs)
             {

@@ -36,7 +36,9 @@ public sealed class ConfigCommand : Command
             var showRaw = context.ParseResult.GetValueForOption(rawOption);
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
 
-            var handler = new ConfigHandler(verbosity);
+            var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
+
+            var handler = new ConfigHandler(verbosity, outputFormat);
             context.ExitCode = await handler.ExecuteAsync(
                 key,
                 value,

@@ -35,8 +35,11 @@ public static class NextStepHints
     /// <summary>
     /// Prints next-step hints if conditions allow (normal+ verbosity, interactive terminal).
     /// </summary>
-    public static void Print(string commandName, bool success, VerbosityLevel verbosity, HintContext? context = null)
+    public static void Print(string commandName, bool success, VerbosityLevel verbosity, HintContext? context = null, OutputFormat outputFormat = OutputFormat.Human)
     {
+        if (outputFormat == OutputFormat.Json)
+            return;
+
         if (verbosity < VerbosityLevel.Normal)
             return;
 

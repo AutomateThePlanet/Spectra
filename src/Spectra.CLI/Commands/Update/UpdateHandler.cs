@@ -22,6 +22,7 @@ public sealed class UpdateHandler
     private readonly bool _dryRun;
     private readonly bool _noReview;
     private readonly bool _noInteraction;
+    private readonly OutputFormat _outputFormat;
     private readonly ProgressReporter _progress;
     private readonly ClassificationPresenter _classificationPresenter;
 
@@ -29,13 +30,15 @@ public sealed class UpdateHandler
         VerbosityLevel verbosity = VerbosityLevel.Normal,
         bool dryRun = false,
         bool noReview = false,
-        bool noInteraction = false)
+        bool noInteraction = false,
+        OutputFormat outputFormat = OutputFormat.Human)
     {
         _verbosity = verbosity;
         _dryRun = dryRun;
         _noReview = noReview;
         _noInteraction = noInteraction;
-        _progress = new ProgressReporter();
+        _outputFormat = outputFormat;
+        _progress = new ProgressReporter(outputFormat: outputFormat);
         _classificationPresenter = new ClassificationPresenter();
     }
 

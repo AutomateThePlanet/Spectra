@@ -28,10 +28,6 @@ public sealed class GenerateCommand : Command
             ["--focus", "-f"],
             "Focus area description for test generation");
 
-        var noInteractionOption = new Option<bool>(
-            "--no-interaction",
-            "Disable interactive prompts (for CI/automation)");
-
         var skipCriticOption = new Option<bool>(
             "--skip-critic",
             "Skip grounding verification (faster, but no verification metadata)");
@@ -39,7 +35,6 @@ public sealed class GenerateCommand : Command
         AddArgument(suiteArgument);
         AddOption(countOption);
         AddOption(focusOption);
-        AddOption(noInteractionOption);
         AddOption(skipCriticOption);
 
         this.SetHandler(async (context) =>
@@ -47,13 +42,14 @@ public sealed class GenerateCommand : Command
             var suite = context.ParseResult.GetValueForArgument(suiteArgument);
             var count = context.ParseResult.GetValueForOption(countOption);
             var focus = context.ParseResult.GetValueForOption(focusOption);
-            var noInteraction = context.ParseResult.GetValueForOption(noInteractionOption);
             var skipCritic = context.ParseResult.GetValueForOption(skipCriticOption);
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
             var dryRun = context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption);
             var noReview = context.ParseResult.GetValueForOption(GlobalOptions.NoReviewOption);
+            var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
+            var noInteraction = context.ParseResult.GetValueForOption(GlobalOptions.NoInteractionOption);
 
-            var handler = new GenerateHandler(verbosity, dryRun, noReview, noInteraction, skipCritic);
+            var handler = new GenerateHandler(verbosity, dryRun, noReview, noInteraction, skipCritic, outputFormat);
             context.ExitCode = await handler.ExecuteAsync(suite, count, focus, context.GetCancellationToken());
         });
     }

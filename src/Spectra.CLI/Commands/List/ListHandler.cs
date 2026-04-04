@@ -11,10 +11,12 @@ namespace Spectra.CLI.Commands.List;
 public sealed class ListHandler
 {
     private readonly VerbosityLevel _verbosity;
+    private readonly OutputFormat _outputFormat;
 
-    public ListHandler(VerbosityLevel verbosity = VerbosityLevel.Normal)
+    public ListHandler(VerbosityLevel verbosity = VerbosityLevel.Normal, OutputFormat outputFormat = OutputFormat.Human)
     {
         _verbosity = verbosity;
+        _outputFormat = outputFormat;
     }
 
     /// <summary>

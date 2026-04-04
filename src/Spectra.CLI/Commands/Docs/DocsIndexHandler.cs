@@ -13,13 +13,15 @@ public sealed class DocsIndexHandler
 {
     private readonly VerbosityLevel _verbosity;
     private readonly bool _dryRun;
+    private readonly OutputFormat _outputFormat;
     private readonly ProgressReporter _progress;
 
-    public DocsIndexHandler(VerbosityLevel verbosity = VerbosityLevel.Normal, bool dryRun = false)
+    public DocsIndexHandler(VerbosityLevel verbosity = VerbosityLevel.Normal, bool dryRun = false, OutputFormat outputFormat = OutputFormat.Human)
     {
         _verbosity = verbosity;
         _dryRun = dryRun;
-        _progress = new ProgressReporter();
+        _outputFormat = outputFormat;
+        _progress = new ProgressReporter(outputFormat: outputFormat);
     }
 
     public async Task<int> ExecuteAsync(bool force, CancellationToken ct = default)
@@ -60,7 +62,7 @@ public sealed class DocsIndexHandler
                           $"{index.TotalWordCount:N0} words, ~{index.TotalEstimatedTokens:N0} tokens");
         _progress.Info($"Index written to: {Path.GetRelativePath(currentDir, indexPath)}");
 
-        NextStepHints.Print("docs-index", true, _verbosity);
+        NextStepHints.Print("docs-index", true, _verbosity, outputFormat: _outputFormat);
         return ExitCodes.Success;
     }
 

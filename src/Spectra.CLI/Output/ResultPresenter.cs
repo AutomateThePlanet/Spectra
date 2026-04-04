@@ -1,3 +1,4 @@
+using Spectra.CLI.Infrastructure;
 using Spectre.Console;
 using Spectra.Core.Models;
 
@@ -9,10 +10,12 @@ namespace Spectra.CLI.Output;
 public sealed class ResultPresenter
 {
     private readonly IAnsiConsole _console;
+    private readonly OutputFormat _outputFormat;
 
-    public ResultPresenter(IAnsiConsole? console = null)
+    public ResultPresenter(IAnsiConsole? console = null, OutputFormat outputFormat = OutputFormat.Human)
     {
         _console = console ?? AnsiConsole.Console;
+        _outputFormat = outputFormat;
     }
 
     /// <summary>
@@ -20,6 +23,8 @@ public sealed class ResultPresenter
     /// </summary>
     public void ShowGeneratedTests(IReadOnlyList<TestCase> tests)
     {
+        if (_outputFormat == OutputFormat.Json) return;
+
         if (tests.Count == 0)
         {
             _console.MarkupLine("[dim]No tests generated.[/]");
@@ -50,6 +55,8 @@ public sealed class ResultPresenter
     /// </summary>
     public void ShowExistingTests(IReadOnlyList<TestCase> tests, string? focusArea = null)
     {
+        if (_outputFormat == OutputFormat.Json) return;
+
         if (tests.Count == 0)
         {
             _console.MarkupLine("[dim]No existing tests found.[/]");
@@ -88,6 +95,8 @@ public sealed class ResultPresenter
     /// </summary>
     public void ShowSuites(IReadOnlyList<SuiteSummary> suites)
     {
+        if (_outputFormat == OutputFormat.Json) return;
+
         if (suites.Count == 0)
         {
             _console.MarkupLine("[dim]No suites found.[/]");
@@ -109,6 +118,8 @@ public sealed class ResultPresenter
     /// </summary>
     public void ShowUpdateSummary(UpdateResult result)
     {
+        if (_outputFormat == OutputFormat.Json) return;
+
         _console.WriteLine();
         _console.MarkupLine("Results:");
         _console.MarkupLine($"  {OutputSymbols.SuccessMarkup} {result.UpToDate} up to date");
@@ -134,6 +145,8 @@ public sealed class ResultPresenter
     /// </summary>
     public void ShowCompletion(string suitePath, int testCount)
     {
+        if (_outputFormat == OutputFormat.Json) return;
+
         _console.MarkupLine($"{OutputSymbols.SuccessMarkup} Written to [cyan]{Markup.Escape(suitePath)}[/]");
         _console.MarkupLine($"{OutputSymbols.SuccessMarkup} Index updated");
     }

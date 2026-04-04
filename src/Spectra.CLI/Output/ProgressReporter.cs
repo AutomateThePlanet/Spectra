@@ -1,3 +1,4 @@
+using Spectra.CLI.Infrastructure;
 using Spectre.Console;
 
 namespace Spectra.CLI.Output;
@@ -8,10 +9,12 @@ namespace Spectra.CLI.Output;
 public sealed class ProgressReporter
 {
     private readonly IAnsiConsole _console;
+    private readonly OutputFormat _outputFormat;
 
-    public ProgressReporter(IAnsiConsole? console = null)
+    public ProgressReporter(IAnsiConsole? console = null, OutputFormat outputFormat = OutputFormat.Human)
     {
         _console = console ?? AnsiConsole.Console;
+        _outputFormat = outputFormat;
     }
 
     /// <summary>
@@ -19,6 +22,9 @@ public sealed class ProgressReporter
     /// </summary>
     public async Task<T> StatusAsync<T>(string message, Func<Task<T>> action)
     {
+        if (_outputFormat == OutputFormat.Json)
+            return await action();
+
         T result = default!;
 
         await _console.Status()
@@ -37,6 +43,12 @@ public sealed class ProgressReporter
     /// </summary>
     public async Task StatusAsync(string message, Func<Task> action)
     {
+        if (_outputFormat == OutputFormat.Json)
+        {
+            await action();
+            return;
+        }
+
         await _console.Status()
             .Spinner(Spinner.Known.Dots)
             .SpinnerStyle(Style.Parse("cyan"))
@@ -54,6 +66,12 @@ public sealed class ProgressReporter
         int total,
         Func<Action<int>, Task> action)
     {
+        if (_outputFormat == OutputFormat.Json)
+        {
+            await action(_ => { });
+            return;
+        }
+
         await _console.Progress()
             .AutoClear(false)
             .Columns(
@@ -77,6 +95,7 @@ public sealed class ProgressReporter
     /// </summary>
     public void Success(string message)
     {
+        if (_outputFormat == OutputFormat.Json) return;
         _console.MarkupLine($"{OutputSymbols.SuccessMarkup} {Markup.Escape(message)}");
     }
 
@@ -85,6 +104,7 @@ public sealed class ProgressReporter
     /// </summary>
     public void Error(string message)
     {
+        if (_outputFormat == OutputFormat.Json) return;
         _console.MarkupLine($"{OutputSymbols.ErrorMarkup} {Markup.Escape(message)}");
     }
 
@@ -93,6 +113,7 @@ public sealed class ProgressReporter
     /// </summary>
     public void Warning(string message)
     {
+        if (_outputFormat == OutputFormat.Json) return;
         _console.MarkupLine($"{OutputSymbols.WarningMarkup} {Markup.Escape(message)}");
     }
 
@@ -101,6 +122,7 @@ public sealed class ProgressReporter
     /// </summary>
     public void Info(string message)
     {
+        if (_outputFormat == OutputFormat.Json) return;
         _console.MarkupLine($"{OutputSymbols.InfoMarkup} {Markup.Escape(message)}");
     }
 
@@ -109,6 +131,7 @@ public sealed class ProgressReporter
     /// </summary>
     public void Loading(string message)
     {
+        if (_outputFormat == OutputFormat.Json) return;
         _console.MarkupLine($"[cyan]{OutputSymbols.Loading}[/] {Markup.Escape(message)}");
     }
 
@@ -117,6 +140,7 @@ public sealed class ProgressReporter
     /// </summary>
     public void BlankLine()
     {
+        if (_outputFormat == OutputFormat.Json) return;
         _console.WriteLine();
     }
 }

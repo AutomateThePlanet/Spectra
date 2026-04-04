@@ -17,16 +17,18 @@ public sealed class IndexHandler
 {
     private readonly VerbosityLevel _verbosity;
     private readonly bool _dryRun;
+    private readonly OutputFormat _outputFormat;
 
     /// <summary>
     /// Threshold for enabling parallel file processing.
     /// </summary>
     private const int ParallelThreshold = 50;
 
-    public IndexHandler(VerbosityLevel verbosity = VerbosityLevel.Normal, bool dryRun = false)
+    public IndexHandler(VerbosityLevel verbosity = VerbosityLevel.Normal, bool dryRun = false, OutputFormat outputFormat = OutputFormat.Human)
     {
         _verbosity = verbosity;
         _dryRun = dryRun;
+        _outputFormat = outputFormat;
     }
 
     public async Task<int> ExecuteAsync(string? suite, bool rebuild, CancellationToken ct = default)
@@ -164,7 +166,7 @@ public sealed class IndexHandler
         }
 
         var success = errors == 0;
-        NextStepHints.Print("index", success, _verbosity);
+        NextStepHints.Print("index", success, _verbosity, outputFormat: _outputFormat);
         return success ? ExitCodes.Success : ExitCodes.Error;
     }
 

@@ -27,26 +27,22 @@ public sealed class UpdateCommand : Command
             "--delete-orphaned",
             "Automatically delete orphaned tests");
 
-        var noInteractionOption = new Option<bool>(
-            "--no-interaction",
-            "Disable interactive prompts (requires --suite)");
-
         AddArgument(suiteArgument);
         AddOption(diffOption);
         AddOption(deleteOrphanedOption);
-        AddOption(noInteractionOption);
 
         this.SetHandler(async (context) =>
         {
             var suite = context.ParseResult.GetValueForArgument(suiteArgument);
             var showDiff = context.ParseResult.GetValueForOption(diffOption);
             var deleteOrphaned = context.ParseResult.GetValueForOption(deleteOrphanedOption);
-            var noInteraction = context.ParseResult.GetValueForOption(noInteractionOption);
+            var noInteraction = context.ParseResult.GetValueForOption(GlobalOptions.NoInteractionOption);
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
             var dryRun = context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption);
             var noReview = context.ParseResult.GetValueForOption(GlobalOptions.NoReviewOption);
+            var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
 
-            var handler = new UpdateHandler(verbosity, dryRun, noReview, noInteraction);
+            var handler = new UpdateHandler(verbosity, dryRun, noReview, noInteraction, outputFormat);
             context.ExitCode = await handler.ExecuteAsync(
                 suite,
                 showDiff,

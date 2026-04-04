@@ -11,10 +11,12 @@ namespace Spectra.CLI.Commands.Config;
 public sealed class ConfigHandler
 {
     private readonly VerbosityLevel _verbosity;
+    private readonly OutputFormat _outputFormat;
 
-    public ConfigHandler(VerbosityLevel verbosity = VerbosityLevel.Normal)
+    public ConfigHandler(VerbosityLevel verbosity = VerbosityLevel.Normal, OutputFormat outputFormat = OutputFormat.Human)
     {
         _verbosity = verbosity;
+        _outputFormat = outputFormat;
     }
 
     /// <summary>

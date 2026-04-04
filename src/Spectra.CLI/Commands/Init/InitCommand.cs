@@ -60,8 +60,10 @@ public static class InitCommand
                 isInteractive = !Console.IsInputRedirected && !Console.IsOutputRedirected;
             }
 
+            var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
+
             var logger = LoggingSetup.CreateLogger<InitHandler>(verbosity);
-            var handler = new InitHandler(logger, interactive: isInteractive);
+            var handler = new InitHandler(logger, interactive: isInteractive, outputFormat: outputFormat);
 
             context.ExitCode = await handler.HandleAsync(force, context.GetCancellationToken());
         });

@@ -28,7 +28,9 @@ public sealed class ShowCommand : Command
             var showRaw = context.ParseResult.GetValueForOption(rawOption);
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
 
-            var handler = new ShowHandler(verbosity);
+            var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
+
+            var handler = new ShowHandler(verbosity, outputFormat);
             context.ExitCode = await handler.ExecuteAsync(
                 testId,
                 showRaw,

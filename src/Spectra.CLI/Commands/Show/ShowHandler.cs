@@ -12,10 +12,12 @@ namespace Spectra.CLI.Commands.Show;
 public sealed class ShowHandler
 {
     private readonly VerbosityLevel _verbosity;
+    private readonly OutputFormat _outputFormat;
 
-    public ShowHandler(VerbosityLevel verbosity = VerbosityLevel.Normal)
+    public ShowHandler(VerbosityLevel verbosity = VerbosityLevel.Normal, OutputFormat outputFormat = OutputFormat.Human)
     {
         _verbosity = verbosity;
+        _outputFormat = outputFormat;
     }
 
     /// <summary>

@@ -22,7 +22,9 @@ public sealed class ValidateCommand : Command
             var suite = context.ParseResult.GetValueForOption(suiteOption);
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
 
-            var handler = new ValidateHandler(verbosity);
+            var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
+
+            var handler = new ValidateHandler(verbosity, outputFormat);
             context.ExitCode = await handler.ExecuteAsync(suite, context.GetCancellationToken());
         });
     }

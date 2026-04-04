@@ -33,6 +33,22 @@ public static class GlobalOptions
         description: "Skip interactive review (CI mode)");
 
     /// <summary>
+    /// Output format: human-readable or structured JSON.
+    /// </summary>
+    public static readonly Option<OutputFormat> OutputFormatOption = new(
+        name: "--output-format",
+        getDefaultValue: () => OutputFormat.Human,
+        description: "Output format: human (default) or json");
+
+    /// <summary>
+    /// Disable interactive prompts (for CI/automation/SKILL workflows).
+    /// </summary>
+    public static readonly Option<bool> NoInteractionOption = new(
+        name: "--no-interaction",
+        getDefaultValue: () => false,
+        description: "Disable interactive prompts (for CI/automation)");
+
+    /// <summary>
     /// Adds global options to a root command.
     /// </summary>
     public static void AddTo(RootCommand command)
@@ -42,5 +58,7 @@ public static class GlobalOptions
         command.AddGlobalOption(VerbosityOption);
         command.AddGlobalOption(DryRunOption);
         command.AddGlobalOption(NoReviewOption);
+        command.AddGlobalOption(OutputFormatOption);
+        command.AddGlobalOption(NoInteractionOption);
     }
 }

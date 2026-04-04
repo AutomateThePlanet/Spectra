@@ -28,7 +28,9 @@ public sealed class ListCommand : Command
             var showAll = context.ParseResult.GetValueForOption(allOption);
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
 
-            var handler = new ListHandler(verbosity);
+            var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
+
+            var handler = new ListHandler(verbosity, outputFormat);
             context.ExitCode = await handler.ExecuteAsync(
                 suite,
                 showAll,

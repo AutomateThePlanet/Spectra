@@ -22,8 +22,9 @@ public static class AnalysisPresenter
     /// <summary>
     /// Displays the categorized behavior breakdown from analysis.
     /// </summary>
-    public static void DisplayBreakdown(BehaviorAnalysisResult result)
+    public static void DisplayBreakdown(BehaviorAnalysisResult result, OutputFormat outputFormat = OutputFormat.Human)
     {
+        if (outputFormat == OutputFormat.Json) return;
         if (Console.IsOutputRedirected)
             return;
 
@@ -61,8 +62,11 @@ public static class AnalysisPresenter
         BehaviorAnalysisResult analysis,
         int generatedCount,
         string suiteName,
-        IReadOnlyList<BehaviorCategory>? generatedCategories = null)
+        IReadOnlyList<BehaviorCategory>? generatedCategories = null,
+        OutputFormat outputFormat = OutputFormat.Human)
     {
+        if (outputFormat == OutputFormat.Json) return;
+
         var remaining = analysis.TotalBehaviors - analysis.AlreadyCovered - generatedCount;
         if (remaining <= 0)
             return;
@@ -91,8 +95,9 @@ public static class AnalysisPresenter
     /// <summary>
     /// Displays a message when all behaviors are already covered.
     /// </summary>
-    public static void DisplayAllCovered(int totalBehaviors)
+    public static void DisplayAllCovered(int totalBehaviors, OutputFormat outputFormat = OutputFormat.Human)
     {
+        if (outputFormat == OutputFormat.Json) return;
         if (Console.IsOutputRedirected)
             return;
 

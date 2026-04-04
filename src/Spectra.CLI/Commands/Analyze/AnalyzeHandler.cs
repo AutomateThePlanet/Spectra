@@ -20,10 +20,12 @@ namespace Spectra.CLI.Commands.Analyze;
 public sealed class AnalyzeHandler
 {
     private readonly VerbosityLevel _verbosity;
+    private readonly OutputFormat _outputFormat;
 
-    public AnalyzeHandler(VerbosityLevel verbosity = VerbosityLevel.Normal)
+    public AnalyzeHandler(VerbosityLevel verbosity = VerbosityLevel.Normal, OutputFormat outputFormat = OutputFormat.Human)
     {
         _verbosity = verbosity;
+        _outputFormat = outputFormat;
     }
 
     /// <summary>
@@ -187,7 +189,7 @@ public sealed class AnalyzeHandler
             Console.WriteLine($"Automation Coverage:    {autoCoverage.Percentage:F1}% ({autoCoverage.Automated}/{autoCoverage.TotalTests} tests)");
 
             var hasGaps = docCoverage.Percentage < 100 || reqCoverage.Percentage < 100 || autoCoverage.Percentage < 100;
-            NextStepHints.Print("analyze", true, _verbosity, new HintContext { HasAutoLink = autoLink, HasGaps = hasGaps });
+            NextStepHints.Print("analyze", true, _verbosity, new HintContext { HasAutoLink = autoLink, HasGaps = hasGaps }, _outputFormat);
             return ExitCodes.Success;
         }
         catch (OperationCanceledException)

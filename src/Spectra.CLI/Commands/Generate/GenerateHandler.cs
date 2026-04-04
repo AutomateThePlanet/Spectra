@@ -16,6 +16,7 @@ using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Grounding;
 using Spectra.Core.Models.Profile;
 using Spectre.Console;
+using Spectra.CLI.Results;
 using Spectra.Core.Parsing;
 using Spectra.Core.Profile;
 using ProfilePriority = Spectra.Core.Models.Profile.Priority;
@@ -32,6 +33,7 @@ public sealed class GenerateHandler
     private readonly bool _noReview;
     private readonly bool _noInteraction;
     private readonly bool _skipCritic;
+    private readonly OutputFormat _outputFormat;
     private readonly ProgressReporter _progress;
     private readonly ResultPresenter _results;
     private readonly GapPresenter _gapPresenter;
@@ -42,17 +44,19 @@ public sealed class GenerateHandler
         bool dryRun = false,
         bool noReview = false,
         bool noInteraction = false,
-        bool skipCritic = false)
+        bool skipCritic = false,
+        OutputFormat outputFormat = OutputFormat.Human)
     {
         _verbosity = verbosity;
         _dryRun = dryRun;
         _noReview = noReview;
         _noInteraction = noInteraction;
         _skipCritic = skipCritic;
-        _progress = new ProgressReporter();
-        _results = new ResultPresenter();
+        _outputFormat = outputFormat;
+        _progress = new ProgressReporter(outputFormat: outputFormat);
+        _results = new ResultPresenter(outputFormat: outputFormat);
         _gapPresenter = new GapPresenter();
-        _verification = new VerificationPresenter();
+        _verification = new VerificationPresenter(outputFormat);
     }
 
     public async Task<int> ExecuteAsync(
@@ -71,12 +75,24 @@ public sealed class GenerateHandler
         // Validate: --no-interaction requires --suite
         if (isNonInteractive && !isDirectMode)
         {
+            if (_outputFormat == OutputFormat.Json)
+            {
+                JsonResultWriter.Write(new ErrorResult
+                {
+                    Command = "generate",
+                    Status = "failed",
+                    Error = "Missing required arguments in non-interactive mode",
+                    MissingArguments = ["suite"]
+                });
+                return ExitCodes.MissingArguments;
+            }
+
             _progress.Error("--suite is required when using --no-interaction");
             Console.Error.WriteLine();
             Console.Error.WriteLine("Usage: spectra ai generate <suite> [--focus <description>] [--no-interaction]");
             Console.Error.WriteLine();
             Console.Error.WriteLine("Run 'spectra ai generate --help' for more information.");
-            return ExitCodes.Error;
+            return ExitCodes.MissingArguments;
         }
 
         if (isDirectMode)
@@ -187,11 +203,11 @@ public sealed class GenerateHandler
 
             if (analysisResult is not null)
             {
-                AnalysisPresenter.DisplayBreakdown(analysisResult);
+                AnalysisPresenter.DisplayBreakdown(analysisResult, _outputFormat);
 
                 if (analysisResult.RecommendedCount == 0)
                 {
-                    AnalysisPresenter.DisplayAllCovered(analysisResult.TotalBehaviors);
+                    AnalysisPresenter.DisplayAllCovered(analysisResult.TotalBehaviors, _outputFormat);
                     return ExitCodes.Success;
                 }
 
@@ -389,7 +405,7 @@ public sealed class GenerateHandler
         if (analysisResult is not null)
         {
             AnalysisPresenter.DisplayGapNotification(
-                analysisResult, testsToWrite.Count, suite);
+                analysisResult, testsToWrite.Count, suite, outputFormat: _outputFormat);
         }
 
         // Token usage if verbose
@@ -399,7 +415,7 @@ public sealed class GenerateHandler
             _progress.Info($"Token usage: {result.TokenUsage.InputTokens} in / {result.TokenUsage.OutputTokens} out");
         }
 
-        NextStepHints.Print("generate", true, _verbosity, new HintContext { SuiteName = suite });
+        NextStepHints.Print("generate", true, _verbosity, new HintContext { SuiteName = suite }, _outputFormat);
         return ExitCodes.Success;
     }
 
@@ -571,11 +587,11 @@ public sealed class GenerateHandler
 
             if (analysisResult is not null)
             {
-                AnalysisPresenter.DisplayBreakdown(analysisResult);
+                AnalysisPresenter.DisplayBreakdown(analysisResult, _outputFormat);
 
                 if (analysisResult.RecommendedCount == 0)
                 {
-                    AnalysisPresenter.DisplayAllCovered(analysisResult.TotalBehaviors);
+                    AnalysisPresenter.DisplayAllCovered(analysisResult.TotalBehaviors, _outputFormat);
                     session.Complete();
                     return ExitCodes.Success;
                 }
@@ -895,10 +911,10 @@ public sealed class GenerateHandler
         if (analysisResult is not null)
         {
             AnalysisPresenter.DisplayGapNotification(
-                analysisResult, allGeneratedTests.Count, suiteName);
+                analysisResult, allGeneratedTests.Count, suiteName, outputFormat: _outputFormat);
         }
 
-        NextStepHints.Print("generate", true, _verbosity, new HintContext { SuiteName = suiteName });
+        NextStepHints.Print("generate", true, _verbosity, new HintContext { SuiteName = suiteName }, _outputFormat);
         return ExitCodes.Success;
     }
 

@@ -30,7 +30,9 @@ public sealed class IndexCommand : Command
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
             var dryRun = context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption);
 
-            var handler = new IndexHandler(verbosity, dryRun);
+            var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
+
+            var handler = new IndexHandler(verbosity, dryRun, outputFormat);
             context.ExitCode = await handler.ExecuteAsync(suite, rebuild, context.GetCancellationToken());
         });
     }

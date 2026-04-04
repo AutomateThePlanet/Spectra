@@ -18,6 +18,7 @@ public sealed class InitHandler
     private readonly ILogger<InitHandler> _logger;
     private readonly string _workingDirectory;
     private readonly bool _interactive;
+    private readonly OutputFormat _outputFormat;
 
     private const string ConfigFileName = "spectra.config.json";
     private const string SkillPath = ".github/skills/test-generation/SKILL.md";
@@ -30,11 +31,12 @@ public sealed class InitHandler
     private const string TemplatesDir = "templates";
     private const string BugReportTemplatePath = "templates/bug-report.md";
 
-    public InitHandler(ILogger<InitHandler> logger, string? workingDirectory = null, bool interactive = false)
+    public InitHandler(ILogger<InitHandler> logger, string? workingDirectory = null, bool interactive = false, OutputFormat outputFormat = OutputFormat.Human)
     {
         _logger = logger;
         _workingDirectory = workingDirectory ?? Directory.GetCurrentDirectory();
         _interactive = interactive;
+        _outputFormat = outputFormat;
     }
 
     /// <summary>
@@ -116,7 +118,7 @@ public sealed class InitHandler
             }
 
             NextStepHints.Print("init", true,
-                _interactive ? VerbosityLevel.Normal : VerbosityLevel.Quiet);
+                _interactive ? VerbosityLevel.Normal : VerbosityLevel.Quiet, outputFormat: _outputFormat);
             return ExitCodes.Success;
         }
         catch (Exception ex)

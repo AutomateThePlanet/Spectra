@@ -1,3 +1,4 @@
+using Spectra.CLI.Infrastructure;
 using Spectre.Console;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Grounding;
@@ -9,11 +10,20 @@ namespace Spectra.CLI.Output;
 /// </summary>
 public sealed class VerificationPresenter
 {
+    private readonly OutputFormat _outputFormat;
+
+    public VerificationPresenter(OutputFormat outputFormat = OutputFormat.Human)
+    {
+        _outputFormat = outputFormat;
+    }
+
     /// <summary>
     /// Displays a summary of verification results.
     /// </summary>
     public void ShowSummary(IReadOnlyList<(TestCase Test, VerificationResult Result)> results)
     {
+        if (_outputFormat == OutputFormat.Json) return;
+
         var grounded = results.Count(r => r.Result.Verdict == VerificationVerdict.Grounded);
         var partial = results.Count(r => r.Result.Verdict == VerificationVerdict.Partial);
         var hallucinated = results.Count(r => r.Result.Verdict == VerificationVerdict.Hallucinated);
@@ -41,6 +51,8 @@ public sealed class VerificationPresenter
     /// </summary>
     public void ShowPartialDetails(IReadOnlyList<(TestCase Test, VerificationResult Result)> results)
     {
+        if (_outputFormat == OutputFormat.Json) return;
+
         var partials = results.Where(r => r.Result.Verdict == VerificationVerdict.Partial).ToList();
 
         if (partials.Count == 0)
@@ -53,7 +65,7 @@ public sealed class VerificationPresenter
         {
             var unverifiedClaims = result.Findings
                 .Where(f => f.Status != FindingStatus.Grounded)
-                .Take(2) // Show at most 2 unverified claims
+                .Take(2)
                 .ToList();
 
             if (unverifiedClaims.Count > 0)
@@ -70,6 +82,8 @@ public sealed class VerificationPresenter
     /// </summary>
     public void ShowRejectedDetails(IReadOnlyList<(TestCase Test, VerificationResult Result)> results)
     {
+        if (_outputFormat == OutputFormat.Json) return;
+
         var rejected = results.Where(r => r.Result.Verdict == VerificationVerdict.Hallucinated).ToList();
 
         if (rejected.Count == 0)
@@ -97,6 +111,8 @@ public sealed class VerificationPresenter
     /// </summary>
     public void ShowSkippedNotice()
     {
+        if (_outputFormat == OutputFormat.Json) return;
+
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine($"  {OutputSymbols.InfoMarkup} [cyan]Verification skipped (--skip-critic)[/]");
     }
@@ -114,6 +130,8 @@ public sealed class VerificationPresenter
     /// </summary>
     public void ShowCriticUnavailable(string reason)
     {
+        if (_outputFormat == OutputFormat.Json) return;
+
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine($"  {OutputSymbols.WarningMarkup} [yellow]Critic unavailable: {Markup.Escape(reason)}[/]");
     }
@@ -123,6 +141,8 @@ public sealed class VerificationPresenter
     /// </summary>
     public void ShowVerificationComplete(int total, int grounded, int partial, int rejected)
     {
+        if (_outputFormat == OutputFormat.Json) return;
+
         var written = grounded + partial;
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine($"  {OutputSymbols.SuccessMarkup} [green]{written} tests written[/]");
