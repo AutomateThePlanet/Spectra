@@ -32,10 +32,33 @@ public sealed class GenerateCommand : Command
             "--skip-critic",
             "Skip grounding verification (faster, but no verification metadata)");
 
+        var fromSuggestionsOption = new Option<string?>(
+            "--from-suggestions",
+            "Generate from previous session suggestions (optionally pass indices like 1,3)")
+        {
+            Arity = ArgumentArity.ZeroOrOne
+        };
+
+        var fromDescriptionOption = new Option<string?>(
+            "--from-description",
+            "Create a test from a plain-language behavior description");
+
+        var contextOption = new Option<string?>(
+            "--context",
+            "Additional context for --from-description");
+
+        var autoCompleteOption = new Option<bool>(
+            "--auto-complete",
+            "Run all phases without prompts (analyze, generate, suggestions, finalize)");
+
         AddArgument(suiteArgument);
         AddOption(countOption);
         AddOption(focusOption);
         AddOption(skipCriticOption);
+        AddOption(fromSuggestionsOption);
+        AddOption(fromDescriptionOption);
+        AddOption(contextOption);
+        AddOption(autoCompleteOption);
 
         this.SetHandler(async (context) =>
         {
@@ -43,6 +66,10 @@ public sealed class GenerateCommand : Command
             var count = context.ParseResult.GetValueForOption(countOption);
             var focus = context.ParseResult.GetValueForOption(focusOption);
             var skipCritic = context.ParseResult.GetValueForOption(skipCriticOption);
+            var fromSuggestions = context.ParseResult.GetValueForOption(fromSuggestionsOption);
+            var fromDescription = context.ParseResult.GetValueForOption(fromDescriptionOption);
+            var descContext = context.ParseResult.GetValueForOption(contextOption);
+            var autoComplete = context.ParseResult.GetValueForOption(autoCompleteOption);
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
             var dryRun = context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption);
             var noReview = context.ParseResult.GetValueForOption(GlobalOptions.NoReviewOption);
@@ -50,7 +77,10 @@ public sealed class GenerateCommand : Command
             var noInteraction = context.ParseResult.GetValueForOption(GlobalOptions.NoInteractionOption);
 
             var handler = new GenerateHandler(verbosity, dryRun, noReview, noInteraction, skipCritic, outputFormat);
-            context.ExitCode = await handler.ExecuteAsync(suite, count, focus, context.GetCancellationToken());
+            context.ExitCode = await handler.ExecuteAsync(
+                suite, count, focus,
+                fromSuggestions, fromDescription, descContext, autoComplete,
+                context.GetCancellationToken());
         });
     }
 }

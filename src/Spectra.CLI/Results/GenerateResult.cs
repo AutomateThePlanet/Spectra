@@ -20,6 +20,14 @@ public sealed class GenerateResult : CommandResult
 
     [JsonPropertyName("files_created")]
     public required IReadOnlyList<string> FilesCreated { get; init; }
+
+    [JsonPropertyName("duplicate_warnings")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<DuplicateWarning>? DuplicateWarnings { get; init; }
+
+    [JsonPropertyName("session")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SessionCounts? Session { get; init; }
 }
 
 public sealed class GenerateAnalysis
@@ -73,4 +81,34 @@ public sealed class GenerateSuggestion
 
     [JsonPropertyName("category")]
     public required string Category { get; init; }
+}
+
+public sealed class DuplicateWarning
+{
+    [JsonPropertyName("new_test")]
+    public required string NewTest { get; init; }
+
+    [JsonPropertyName("similar_to")]
+    public required string SimilarTo { get; init; }
+
+    [JsonPropertyName("similarity")]
+    public double Similarity { get; init; }
+
+    [JsonPropertyName("title")]
+    public required string Title { get; init; }
+}
+
+public sealed class SessionCounts
+{
+    [JsonPropertyName("from_docs")]
+    public int FromDocs { get; init; }
+
+    [JsonPropertyName("from_suggestions")]
+    public int FromSuggestions { get; init; }
+
+    [JsonPropertyName("from_description")]
+    public int FromDescription { get; init; }
+
+    [JsonPropertyName("total")]
+    public int Total { get; init; }
 }

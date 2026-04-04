@@ -17,6 +17,8 @@ using Spectra.Core.Models.Grounding;
 using Spectra.Core.Models.Profile;
 using Spectre.Console;
 using Spectra.CLI.Results;
+using Spectra.CLI.Session;
+using Spectra.CLI.Validation;
 using Spectra.Core.Parsing;
 using Spectra.Core.Profile;
 using ProfilePriority = Spectra.Core.Models.Profile.Priority;
@@ -65,6 +67,67 @@ public sealed class GenerateHandler
         string? focus,
         CancellationToken ct = default)
     {
+        return await ExecuteAsync(suite, count, focus, null, null, null, false, ct);
+    }
+
+    public async Task<int> ExecuteAsync(
+        string? suite,
+        int? count,
+        string? focus,
+        string? fromSuggestions,
+        string? fromDescription,
+        string? descContext,
+        bool autoComplete,
+        CancellationToken ct = default)
+    {
+        // Handle --from-suggestions mode
+        if (fromSuggestions is not null)
+        {
+            if (string.IsNullOrEmpty(suite))
+            {
+                if (_outputFormat == OutputFormat.Json)
+                {
+                    JsonResultWriter.Write(new ErrorResult
+                    {
+                        Command = "generate",
+                        Status = "failed",
+                        Error = "Missing required arguments: --from-suggestions requires <suite>",
+                        MissingArguments = ["suite"]
+                    });
+                }
+                else
+                {
+                    _progress.Error("--from-suggestions requires <suite>");
+                }
+                return ExitCodes.MissingArguments;
+            }
+            return await ExecuteFromSuggestionsAsync(suite, fromSuggestions, ct);
+        }
+
+        // Handle --from-description mode
+        if (!string.IsNullOrEmpty(fromDescription))
+        {
+            if (string.IsNullOrEmpty(suite))
+            {
+                if (_outputFormat == OutputFormat.Json)
+                {
+                    JsonResultWriter.Write(new ErrorResult
+                    {
+                        Command = "generate",
+                        Status = "failed",
+                        Error = "Missing required arguments: --from-description requires <suite>",
+                        MissingArguments = ["suite"]
+                    });
+                }
+                else
+                {
+                    _progress.Error("--from-description requires <suite>");
+                }
+                return ExitCodes.MissingArguments;
+            }
+            return await ExecuteFromDescriptionAsync(suite, fromDescription, descContext, ct);
+        }
+
         // Detect mode: direct if suite provided, interactive otherwise
         var isNonInteractive = _noInteraction ||
             Console.IsInputRedirected ||
@@ -97,7 +160,7 @@ public sealed class GenerateHandler
 
         if (isDirectMode)
         {
-            return await ExecuteDirectModeAsync(suite!, count, focus, ct);
+            return await ExecuteDirectModeAsync(suite!, count, focus, ct, autoComplete);
         }
         else
         {
@@ -109,7 +172,8 @@ public sealed class GenerateHandler
         string suite,
         int? count,
         string? focus,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool autoComplete = false)
     {
         var currentDir = Directory.GetCurrentDirectory();
         var configPath = Path.Combine(currentDir, "spectra.config.json");
@@ -915,6 +979,175 @@ public sealed class GenerateHandler
         }
 
         NextStepHints.Print("generate", true, _verbosity, new HintContext { SuiteName = suiteName }, _outputFormat);
+        return ExitCodes.Success;
+    }
+
+    /// <summary>
+    /// Handles --from-suggestions: loads session, generates from pending suggestions.
+    /// </summary>
+    private async Task<int> ExecuteFromSuggestionsAsync(
+        string suite,
+        string suggestionsArg,
+        CancellationToken ct)
+    {
+        var currentDir = Directory.GetCurrentDirectory();
+        var sessionStore = new SessionStore(currentDir);
+        var session = await sessionStore.LoadAsync(suite, ct);
+
+        if (session is null)
+        {
+            if (_outputFormat == OutputFormat.Json)
+            {
+                JsonResultWriter.Write(new ErrorResult
+                {
+                    Command = "generate",
+                    Status = "failed",
+                    Error = $"No active session found for suite '{suite}'. Run 'spectra ai generate {suite}' first."
+                });
+            }
+            else
+            {
+                _progress.Error($"No active session found for suite '{suite}'. Run 'spectra ai generate {suite}' first.");
+            }
+            return ExitCodes.Error;
+        }
+
+        var pending = session.Suggestions.Where(s => s.Status == SuggestionStatus.Pending).ToList();
+
+        // If specific indices provided, filter
+        if (!string.IsNullOrEmpty(suggestionsArg))
+        {
+            var indices = suggestionsArg.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(s => int.TryParse(s, out var n) ? n : -1)
+                .Where(n => n > 0)
+                .ToHashSet();
+
+            if (indices.Count > 0)
+            {
+                pending = pending.Where(s => indices.Contains(s.Index)).ToList();
+            }
+        }
+
+        if (pending.Count == 0)
+        {
+            _progress.Info("No pending suggestions to generate.");
+            return ExitCodes.Success;
+        }
+
+        // Generate tests for each pending suggestion using the focus approach
+        var configPath = Path.Combine(currentDir, "spectra.config.json");
+        var config = await LoadConfigAsync(configPath, ct);
+        if (config is null) return ExitCodes.Error;
+
+        var testsDir = config.Tests?.Dir ?? "tests";
+        var testsPath = Path.Combine(currentDir, testsDir);
+        var suitePath = Path.Combine(testsPath, suite);
+
+        var focus = string.Join(", ", pending.Select(s => s.Title));
+        var result = await ExecuteDirectModeAsync(suite, pending.Count, focus, ct);
+
+        // Mark suggestions as generated
+        foreach (var s in pending)
+            s.Status = SuggestionStatus.Generated;
+
+        await sessionStore.SaveAsync(session, ct);
+        return result;
+    }
+
+    /// <summary>
+    /// Handles --from-description: creates a test from a user description.
+    /// </summary>
+    private async Task<int> ExecuteFromDescriptionAsync(
+        string suite,
+        string description,
+        string? context,
+        CancellationToken ct)
+    {
+        var currentDir = Directory.GetCurrentDirectory();
+        var configPath = Path.Combine(currentDir, "spectra.config.json");
+
+        var config = await LoadConfigAsync(configPath, ct);
+        if (config is null) return ExitCodes.Error;
+
+        var testsDir = config.Tests?.Dir ?? "tests";
+        var testsPath = Path.Combine(currentDir, testsDir);
+        var suitePath = Path.Combine(testsPath, suite);
+
+        if (!Directory.Exists(suitePath))
+            Directory.CreateDirectory(suitePath);
+
+        // Scan existing IDs
+        var globalIdScanner = new GlobalIdScanner();
+        var allExistingIds = await globalIdScanner.ScanAllIdsAsync(testsPath, ct);
+
+        var generator = new UserDescribedGenerator();
+        _progress.Loading("Creating test case from your description...");
+
+        var test = await generator.GenerateAsync(
+            description, context, suite, allExistingIds,
+            config, currentDir, testsPath,
+            status => _progress.Info($"  {status}"),
+            ct);
+
+        if (test is null)
+        {
+            _progress.Error("Failed to generate test from description.");
+            return ExitCodes.Error;
+        }
+
+        // Write the test
+        var writer = new TestFileWriter();
+        var filePath = TestFileWriter.GetFilePath(testsPath, suite, test.Id);
+        var testWithPath = new TestCase
+        {
+            Id = test.Id,
+            Title = test.Title,
+            Priority = test.Priority,
+            Tags = test.Tags,
+            Component = test.Component,
+            Preconditions = test.Preconditions,
+            Environment = test.Environment,
+            EstimatedDuration = test.EstimatedDuration,
+            DependsOn = test.DependsOn,
+            SourceRefs = test.SourceRefs,
+            RelatedWorkItems = test.RelatedWorkItems,
+            Custom = test.Custom,
+            Steps = test.Steps,
+            ExpectedResult = test.ExpectedResult,
+            TestData = test.TestData,
+            FilePath = Path.GetRelativePath(testsPath, filePath),
+            Grounding = test.Grounding
+        };
+
+        await writer.WriteAsync(filePath, testWithPath, ct);
+        _progress.Success($"{test.Id} written to tests/{suite}/");
+
+        // Update session
+        var sessionStore = new SessionStore(currentDir);
+        var session = await sessionStore.LoadAsync(suite, ct);
+        if (session is not null)
+        {
+            session.UserDescribed.Add(test.Id);
+            await sessionStore.SaveAsync(session, ct);
+        }
+
+        if (_outputFormat == OutputFormat.Json)
+        {
+            JsonResultWriter.Write(new GenerateResult
+            {
+                Command = "generate",
+                Status = "completed",
+                Suite = suite,
+                Generation = new GenerateGeneration
+                {
+                    TestsGenerated = 1,
+                    TestsWritten = 1,
+                    TestsRejectedByCritic = 0
+                },
+                FilesCreated = [Path.GetRelativePath(currentDir, filePath)]
+            });
+        }
+
         return ExitCodes.Success;
     }
 
