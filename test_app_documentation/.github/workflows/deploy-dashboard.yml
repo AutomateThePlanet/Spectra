@@ -4,6 +4,7 @@
 # when test files, documentation, execution data, or configuration change.
 #
 # Required GitHub Secrets:
+#   GH_PACKAGES_TOKEN    - GitHub PAT with read:packages scope (to install Spectra CLI)
 #   CLOUDFLARE_API_TOKEN  - Cloudflare API token with "Edit Cloudflare Pages" permissions
 #   CLOUDFLARE_ACCOUNT_ID - Your Cloudflare account ID
 #
@@ -51,7 +52,13 @@ jobs:
           dotnet-version: '8.0'
 
       - name: Install SPECTRA CLI
-        run: dotnet tool install -g spectra-cli
+        run: |
+          dotnet nuget add source "https://nuget.pkg.github.com/AutomateThePlanet/index.json" \
+            --name github-packages \
+            --username AutomateThePlanet \
+            --password ${{ secrets.GH_PACKAGES_TOKEN }} \
+            --store-password-in-clear-text
+          dotnet tool install -g Spectra.CLI
 
       - name: Run coverage analysis with auto-linking
         run: spectra ai analyze --coverage --auto-link

@@ -1,0 +1,492 @@
+{
+  "suite": "gdpr",
+  "generated_at": "2026-03-24T11:56:26.2012555Z",
+  "test_count": 25,
+  "tests": [
+    {
+      "id": "TC-100",
+      "file": "gdpr\\TC-100.md",
+      "title": "Verify citizen can access personal data export via My Data portal",
+      "priority": "high",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-of-access"
+      ],
+      "component": "data-export",
+      "estimated_duration": "3m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-of-Access-(Article-15)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-101",
+      "file": "gdpr\\TC-101.md",
+      "title": "Verify data export includes all required data categories",
+      "priority": "high",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-of-access"
+      ],
+      "component": "data-export",
+      "estimated_duration": "5m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-of-Access-(Article-15)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-102",
+      "file": "gdpr\\TC-102.md",
+      "title": "Verify data export excludes internal clerk notes",
+      "priority": "medium",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-of-access",
+        "data-minimization"
+      ],
+      "component": "data-export",
+      "estimated_duration": "5m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-of-Access-(Article-15)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-103",
+      "file": "gdpr\\TC-103.md",
+      "title": "Verify large dataset export triggers email notification",
+      "priority": "medium",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-of-access",
+        "performance"
+      ],
+      "component": "data-export",
+      "estimated_duration": "30m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-of-Access-(Article-15)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-104",
+      "file": "gdpr\\TC-104.md",
+      "title": "Verify export file is encrypted with citizen-set password",
+      "priority": "high",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-of-access",
+        "security"
+      ],
+      "component": "data-export",
+      "estimated_duration": "4m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-of-Access-(Article-15)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-105",
+      "file": "gdpr\\TC-105.md",
+      "title": "Verify export file auto-deletes after 7 days",
+      "priority": "medium",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-of-access",
+        "data-retention"
+      ],
+      "component": "data-export",
+      "estimated_duration": "10m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-of-Access-(Article-15)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-106",
+      "file": "gdpr\\TC-106.md",
+      "title": "Verify citizen can update email address with re-verification",
+      "priority": "high",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-to-rectification"
+      ],
+      "component": "profile-management",
+      "estimated_duration": "5m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-to-Rectification-(Article-16)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-107",
+      "file": "gdpr\\TC-107.md",
+      "title": "Verify citizen can update phone number with re-verification",
+      "priority": "high",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-to-rectification"
+      ],
+      "component": "profile-management",
+      "estimated_duration": "5m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-to-Rectification-(Article-16)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-108",
+      "file": "gdpr\\TC-108.md",
+      "title": "Verify EGN correction requires administrator approval",
+      "priority": "high",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-to-rectification",
+        "identity-verification"
+      ],
+      "component": "profile-management",
+      "estimated_duration": "8m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-to-Rectification-(Article-16)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-109",
+      "file": "gdpr\\TC-109.md",
+      "title": "Verify rectification retains previous values in version history",
+      "priority": "medium",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-to-rectification",
+        "audit"
+      ],
+      "component": "profile-management",
+      "estimated_duration": "4m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-to-Rectification-(Article-16)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-110",
+      "file": "gdpr\\TC-110.md",
+      "title": "Verify account deletion blocked when active applications exist",
+      "priority": "high",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-to-erasure",
+        "negative"
+      ],
+      "component": "account-management",
+      "estimated_duration": "3m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-to-Erasure-(Article-17)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-111",
+      "file": "gdpr\\TC-111.md",
+      "title": "Verify personal data anonymization on account deletion",
+      "priority": "high",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-to-erasure"
+      ],
+      "component": "account-management",
+      "estimated_duration": "10m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-to-Erasure-(Article-17)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-112",
+      "file": "gdpr\\TC-112.md",
+      "title": "Verify uploaded documents permanently deleted on account deletion",
+      "priority": "high",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-to-erasure"
+      ],
+      "component": "account-management",
+      "estimated_duration": "8m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-to-Erasure-(Article-17)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-113",
+      "file": "gdpr\\TC-113.md",
+      "title": "Verify payment records retained with anonymized data",
+      "priority": "high",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-to-erasure",
+        "data-retention"
+      ],
+      "component": "account-management",
+      "estimated_duration": "6m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-to-Erasure-(Article-17)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-114",
+      "file": "gdpr\\TC-114.md",
+      "title": "Verify account deletion completes within 30 days",
+      "priority": "medium",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-to-erasure",
+        "compliance"
+      ],
+      "component": "account-management",
+      "estimated_duration": "5m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-to-Erasure-(Article-17)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-115",
+      "file": "gdpr\\TC-115.md",
+      "title": "Verify citizen receives confirmation email after deletion",
+      "priority": "medium",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-to-erasure"
+      ],
+      "component": "account-management",
+      "estimated_duration": "4m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-to-Erasure-(Article-17)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-116",
+      "file": "gdpr\\TC-116.md",
+      "title": "Verify data portability export in JSON format",
+      "priority": "high",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-to-data-portability"
+      ],
+      "component": "data-export",
+      "estimated_duration": "5m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-to-Data-Portability-(Article-20)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-117",
+      "file": "gdpr\\TC-117.md",
+      "title": "Verify data portability export in CSV format",
+      "priority": "medium",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-to-data-portability"
+      ],
+      "component": "data-export",
+      "estimated_duration": "5m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-to-Data-Portability-(Article-20)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-118",
+      "file": "gdpr\\TC-118.md",
+      "title": "Verify marketing communications opt-out takes effect within 24 hours",
+      "priority": "high",
+      "tags": [
+        "gdpr",
+        "data-subject-rights",
+        "right-to-object",
+        "consent"
+      ],
+      "component": "consent-management",
+      "estimated_duration": "6m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Right-to-Object-(Article-21)"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-119",
+      "file": "gdpr\\TC-119.md",
+      "title": "Verify consent records include document version and timestamp",
+      "priority": "medium",
+      "tags": [
+        "gdpr",
+        "consent-management",
+        "audit"
+      ],
+      "component": "consent-management",
+      "estimated_duration": "5m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Consent-Records"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-120",
+      "file": "gdpr\\TC-120.md",
+      "title": "Verify consent records retained for 5 years after withdrawal",
+      "priority": "medium",
+      "tags": [
+        "gdpr",
+        "consent-management",
+        "data-retention"
+      ],
+      "component": "consent-management",
+      "estimated_duration": "4m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Consent-Records"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-121",
+      "file": "gdpr\\TC-121.md",
+      "title": "Verify cookie banner displays on first visit",
+      "priority": "high",
+      "tags": [
+        "gdpr",
+        "consent-management",
+        "cookies"
+      ],
+      "component": "cookie-banner",
+      "estimated_duration": "3m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Cookie-Banner"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-122",
+      "file": "gdpr\\TC-122.md",
+      "title": "Verify strictly necessary cookies cannot be disabled",
+      "priority": "high",
+      "tags": [
+        "gdpr",
+        "consent-management",
+        "cookies"
+      ],
+      "component": "cookie-banner",
+      "estimated_duration": "3m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Cookie-Banner"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-123",
+      "file": "gdpr\\TC-123.md",
+      "title": "Verify analytics cookies are off by default",
+      "priority": "medium",
+      "tags": [
+        "gdpr",
+        "consent-management",
+        "cookies"
+      ],
+      "component": "cookie-banner",
+      "estimated_duration": "3m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Cookie-Banner"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-124",
+      "file": "gdpr\\TC-124.md",
+      "title": "Verify cookie preferences stored in first-party cookie",
+      "priority": "medium",
+      "tags": [
+        "gdpr",
+        "consent-management",
+        "cookies"
+      ],
+      "component": "cookie-banner",
+      "estimated_duration": "4m",
+      "source_refs": [
+        "docs/spectra-test-docs/docs/gdpr-compliance/gdpr-compliance.md#Cookie-Banner"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "bugs": []
+    }
+  ]
+}

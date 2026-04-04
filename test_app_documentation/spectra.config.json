@@ -111,6 +111,14 @@
     ],
     "requirements_file": "docs/requirements/_requirements.yaml"
   },
+  "execution": {},
+  "bug_tracking": {
+    "provider": "auto",
+    "template": "templates/bug-report.md",
+    "default_severity": "medium",
+    "auto_attach_screenshots": true,
+    "auto_prompt_on_failure": true
+  },
   "profile": {
     "auto_load": true,
     "validate_on_load": true,

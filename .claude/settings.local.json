@@ -109,7 +109,14 @@
       "Bash(git mv:*)",
       "Bash(gh run:*)",
       "Bash(git check-ignore:*)",
-      "Bash(xargs -I {} gh run view {} --repo AutomateThePlanet/Spectra --log-failed)"
+      "Bash(xargs -I {} gh run view {} --repo AutomateThePlanet/Spectra --log-failed)",
+      "Bash(python3 -c \"import json; json.load\\(open\\(''src/Spectra.CLI/Templates/spectra.config.json''\\)\\); print\\(''Valid JSON''\\)\")",
+      "Bash(cd:*)",
+      "Bash(that opens a dialog/popup/modal.\" Reinforced in Result Collection section.:*)",
+      "Bash(cp:*)",
+      "Bash(dotnet nuget:*)",
+      "Bash(gh release:*)",
+      "Bash(sed -i 's/- \\\\[ \\\\] T0/- [x] T0/g' specs/019-smart-test-count/tasks.md)"
     ]
   }
 }

@@ -1,3 +1,4 @@
 # SPECTRA
-.execution/
+.execution/*.db
+.execution/*.db-*
 .spectra.lock
