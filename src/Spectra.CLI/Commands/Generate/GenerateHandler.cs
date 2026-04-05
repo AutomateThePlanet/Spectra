@@ -272,6 +272,30 @@ public sealed class GenerateHandler
                 if (analysisResult.RecommendedCount == 0)
                 {
                     AnalysisPresenter.DisplayAllCovered(analysisResult.TotalBehaviors, _outputFormat);
+                    if (_outputFormat == OutputFormat.Json)
+                    {
+                        JsonResultWriter.Write(new GenerateResult
+                        {
+                            Command = "generate",
+                            Status = "completed",
+                            Suite = suite,
+                            Analysis = new GenerateAnalysis
+                            {
+                                TotalBehaviors = analysisResult.TotalBehaviors,
+                                AlreadyCovered = analysisResult.AlreadyCovered,
+                                Recommended = 0,
+                                Breakdown = analysisResult.Breakdown?.ToDictionary(
+                                    kvp => kvp.Key.ToString(), kvp => kvp.Value)
+                            },
+                            Generation = new GenerateGeneration
+                            {
+                                TestsGenerated = 0,
+                                TestsWritten = 0,
+                                TestsRejectedByCritic = 0
+                            },
+                            FilesCreated = []
+                        });
+                    }
                     return ExitCodes.Success;
                 }
 
@@ -359,6 +383,16 @@ public sealed class GenerateHandler
                 Console.Error.WriteLine($"You can retry with: spectra ai generate {suite} --focus \"{focus ?? ""}\"");
             }
 
+            if (_outputFormat == OutputFormat.Json)
+            {
+                JsonResultWriter.Write(new ErrorResult
+                {
+                    Command = "generate",
+                    Status = "failed",
+                    Error = string.Join("; ", result.Errors)
+                });
+            }
+
             return ExitCodes.Error;
         }
 
@@ -367,6 +401,30 @@ public sealed class GenerateHandler
             _progress.Warning($"No tests generated (requested: {effectiveCount})");
             _progress.BlankLine();
             ShowCountMismatchReason(0, effectiveCount, documentMap.Documents.Count, existingTests.Count, focus);
+            if (_outputFormat == OutputFormat.Json)
+            {
+                JsonResultWriter.Write(new GenerateResult
+                {
+                    Command = "generate",
+                    Status = "completed",
+                    Suite = suite,
+                    Analysis = analysisResult is not null ? new GenerateAnalysis
+                    {
+                        TotalBehaviors = analysisResult.TotalBehaviors,
+                        AlreadyCovered = analysisResult.AlreadyCovered,
+                        Recommended = analysisResult.RecommendedCount,
+                        Breakdown = analysisResult.Breakdown?.ToDictionary(
+                            kvp => kvp.Key.ToString(), kvp => kvp.Value)
+                    } : null,
+                    Generation = new GenerateGeneration
+                    {
+                        TestsGenerated = 0,
+                        TestsWritten = 0,
+                        TestsRejectedByCritic = 0
+                    },
+                    FilesCreated = []
+                });
+            }
             return ExitCodes.Success;
         }
 
@@ -421,6 +479,28 @@ public sealed class GenerateHandler
                 _progress.BlankLine();
                 _progress.Warning("All generated tests were rejected as hallucinated");
                 _progress.Info("Try adding more documentation or narrowing the focus");
+                if (_outputFormat == OutputFormat.Json)
+                {
+                    JsonResultWriter.Write(new GenerateResult
+                    {
+                        Command = "generate",
+                        Status = "completed",
+                        Suite = suite,
+                        Generation = new GenerateGeneration
+                        {
+                            TestsGenerated = result.Tests.Count,
+                            TestsWritten = 0,
+                            TestsRejectedByCritic = result.Tests.Count,
+                            Grounding = new GroundingCounts
+                            {
+                                Grounded = 0,
+                                Partial = 0,
+                                Hallucinated = result.Tests.Count
+                            }
+                        },
+                        FilesCreated = []
+                    });
+                }
                 return ExitCodes.Success;
             }
         }
@@ -477,6 +557,44 @@ public sealed class GenerateHandler
         {
             _progress.BlankLine();
             _progress.Info($"Token usage: {result.TokenUsage.InputTokens} in / {result.TokenUsage.OutputTokens} out");
+        }
+
+        // JSON output for SKILL/CI workflows
+        if (_outputFormat == OutputFormat.Json)
+        {
+            var rejectedCount = verificationResults.Count(r => r.Result?.Verdict == VerificationVerdict.Hallucinated);
+            var groundedCount = verificationResults.Count(r => r.Result?.Verdict == VerificationVerdict.Grounded);
+            var partialCount = verificationResults.Count(r => r.Result?.Verdict == VerificationVerdict.Partial);
+
+            JsonResultWriter.Write(new GenerateResult
+            {
+                Command = "generate",
+                Status = "completed",
+                Suite = suite,
+                Analysis = analysisResult is not null ? new GenerateAnalysis
+                {
+                    TotalBehaviors = analysisResult.TotalBehaviors,
+                    AlreadyCovered = analysisResult.AlreadyCovered,
+                    Recommended = analysisResult.RecommendedCount,
+                    Breakdown = analysisResult.Breakdown?.ToDictionary(
+                        kvp => kvp.Key.ToString(), kvp => kvp.Value)
+                } : null,
+                Generation = new GenerateGeneration
+                {
+                    TestsGenerated = result.Tests.Count,
+                    TestsWritten = testsToWrite.Count,
+                    TestsRejectedByCritic = rejectedCount,
+                    Grounding = verificationResults.Count > 0 ? new GroundingCounts
+                    {
+                        Grounded = groundedCount,
+                        Partial = partialCount,
+                        Hallucinated = rejectedCount
+                    } : null
+                },
+                FilesCreated = testsToWrite
+                    .Select(t => Path.GetRelativePath(currentDir, TestFileWriter.GetFilePath(testsPath, suite, t.Id)))
+                    .ToList()
+            });
         }
 
         NextStepHints.Print("generate", true, _verbosity, new HintContext { SuiteName = suite }, _outputFormat);
