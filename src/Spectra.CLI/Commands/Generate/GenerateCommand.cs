@@ -20,6 +20,10 @@ public sealed class GenerateCommand : Command
             Arity = ArgumentArity.ZeroOrOne
         };
 
+        var suiteOption = new Option<string?>(
+            ["--suite", "-s"],
+            "Target suite name for generated tests (alternative to positional argument)");
+
         var countOption = new Option<int?>(
             ["--count", "-n"],
             "Number of tests to generate (default: 5)");
@@ -52,6 +56,7 @@ public sealed class GenerateCommand : Command
             "Run all phases without prompts (analyze, generate, suggestions, finalize)");
 
         AddArgument(suiteArgument);
+        AddOption(suiteOption);
         AddOption(countOption);
         AddOption(focusOption);
         AddOption(skipCriticOption);
@@ -62,7 +67,9 @@ public sealed class GenerateCommand : Command
 
         this.SetHandler(async (context) =>
         {
-            var suite = context.ParseResult.GetValueForArgument(suiteArgument);
+            // --suite option takes priority over positional argument
+            var suite = context.ParseResult.GetValueForOption(suiteOption)
+                        ?? context.ParseResult.GetValueForArgument(suiteArgument);
             var count = context.ParseResult.GetValueForOption(countOption);
             var focus = context.ParseResult.GetValueForOption(focusOption);
             var skipCritic = context.ParseResult.GetValueForOption(skipCriticOption);

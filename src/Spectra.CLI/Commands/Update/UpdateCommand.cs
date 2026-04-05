@@ -19,6 +19,10 @@ public sealed class UpdateCommand : Command
             Arity = ArgumentArity.ZeroOrOne
         };
 
+        var suiteOption = new Option<string?>(
+            ["--suite", "-s"],
+            "Target suite name to update (alternative to positional argument)");
+
         var diffOption = new Option<bool>(
             ["--diff", "-d"],
             "Show diff of proposed changes without applying");
@@ -28,12 +32,14 @@ public sealed class UpdateCommand : Command
             "Automatically delete orphaned tests");
 
         AddArgument(suiteArgument);
+        AddOption(suiteOption);
         AddOption(diffOption);
         AddOption(deleteOrphanedOption);
 
         this.SetHandler(async (context) =>
         {
-            var suite = context.ParseResult.GetValueForArgument(suiteArgument);
+            var suite = context.ParseResult.GetValueForOption(suiteOption)
+                        ?? context.ParseResult.GetValueForArgument(suiteArgument);
             var showDiff = context.ParseResult.GetValueForOption(diffOption);
             var deleteOrphaned = context.ParseResult.GetValueForOption(deleteOrphanedOption);
             var noInteraction = context.ParseResult.GetValueForOption(GlobalOptions.NoInteractionOption);

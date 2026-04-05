@@ -66,25 +66,19 @@ public static class AgentContent
 
         Use `runInTerminal` to invoke SPECTRA CLI commands and `getTerminalOutput` to read the results. Always pass `--output-format json --verbosity quiet`.
 
-        **IMPORTANT:** The suite name is a **positional argument**, NOT a flag. Write `spectra ai generate {suite}`, NOT `spectra ai generate --suite {suite}`.
+        **CRITICAL:** Do NOT use MCP tools for generation. Do NOT manually create files. Use CLI only.
 
-        New suites are created automatically — do NOT manually create directories, _index.json files, or test files. Just run the generate command.
+        New suites are created automatically — just run the generate command.
 
-        ### Generation Session Flow
+        ### Generation Flow
 
-        1. **Analyze & Generate**: `spectra ai generate {suite} --output-format json --verbosity quiet`
+        1. **Generate**: `spectra ai generate --suite {suite} --output-format json --verbosity quiet`
            - Creates the suite if it doesn't exist
            - Analyzes documentation and generates tests
-           - Results include grounding verdicts (grounded/partial/hallucinated)
+           - JSON output includes analysis, generation counts, and files created
 
-        2. **Suggestions**: After generation, review remaining gaps
-           - `spectra ai generate {suite} --from-suggestions --output-format json --verbosity quiet`
-
-        3. **User-Described**: Create tests from the user's own descriptions
-           - `spectra ai generate {suite} --from-description "{text}" --output-format json --verbosity quiet`
-
-        ### Full Auto Mode
-        - `spectra ai generate {suite} --auto-complete --output-format json --verbosity quiet`
+        2. **From Description**: Create tests from user descriptions
+           - `spectra ai generate --suite {suite} --from-description "{text}" --output-format json --verbosity quiet`
 
         ### Troubleshooting
         - If command produces no output, retry with `--verbosity normal` instead of `quiet`
