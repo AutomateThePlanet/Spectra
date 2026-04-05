@@ -5,7 +5,10 @@ namespace Spectra.CLI.Skills;
 /// </summary>
 public static class SkillContent
 {
-    private const string ToolsList = "vscode/getProjectSetupInfo, vscode/installExtension, vscode/memory, vscode/newWorkspace, vscode/resolveMemoryFileUri, vscode/runCommand, vscode/vscodeAPI, vscode/extensions, vscode/askQuestions, execute/runNotebookCell, execute/testFailure, execute/getTerminalOutput, execute/awaitTerminal, execute/killTerminal, execute/createAndRunTask, execute/runInTerminal, execute/runTests, read/getNotebookSummary, read/problems, read/readFile, read/viewImage, read/terminalSelection, read/terminalLastCommand, agent/runSubagent, edit/createDirectory, edit/createFile, edit/createJupyterNotebook, edit/editFiles, edit/editNotebook, edit/rename, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/textSearch, search/usages, web/fetch, web/githubRepo, browser/openBrowserPage, todo";
+    // Only include tools the SKILLs actually need — restricting the list prevents
+    // GPT-4o from using edit/createFile to manually create test files or MCP tools.
+    private const string GenerateToolsList = "execute/runInTerminal, execute/awaitTerminal, execute/getTerminalOutput, read/readFile, read/terminalLastCommand, search/listDirectory";
+    private const string ReadOnlyToolsList = "execute/runInTerminal, execute/awaitTerminal, execute/getTerminalOutput, read/readFile, read/terminalLastCommand, read/problems, search/listDirectory, search/textSearch";
 
     public static readonly Dictionary<string, string> All = new()
     {
@@ -21,76 +24,59 @@ public static class SkillContent
         ---
         name: SPECTRA Generate
         description: Generates test cases from documentation with AI verification and gap analysis.
-        tools: [{{ToolsList}}]
+        tools: [{{GenerateToolsList}}]
         model: GPT-4o
         disable-model-invocation: true
         ---
 
-        When the user asks to generate, create, or write test cases, follow this two-step flow.
+        You generate test cases using the SPECTRA CLI. Follow these exact steps in order.
 
-        **CRITICAL RULES:**
-        1. Use `runInTerminal` to execute CLI commands. After execution, use `readFile` to read `.spectra/last-result.json` for the result.
-        2. Do NOT use MCP tools (like `list_available_suites`, `start_execution_run`, `rebuild_indexes`, etc.) — those are for test execution, not generation.
-        3. Do NOT manually create test files, _index.json, or directories. SPECTRA handles all file creation.
-        4. New suites are created automatically when they don't exist yet.
+        ## Step 1: Analyze documentation
 
-        ## Step 1: Analyze (always do this first)
+        Determine the suite name from the user's request, then run this exact command using `runInTerminal`:
 
-        Run the analysis to find out how many test cases are recommended:
+        ```
+        spectra ai generate --suite {suite} --analyze-only --output-format json --verbosity quiet
+        ```
 
-            spectra ai generate --suite {suite} --analyze-only --output-format json --verbosity quiet
+        Wait for the command to complete using `awaitTerminal`.
 
-        After the command finishes, read the result file:
+        Then read the result using `readFile` on the file `.spectra/last-result.json`.
 
-            .spectra/last-result.json
+        Tell the user what was found:
+        - How many testable behaviors were found (analysis.total_behaviors)
+        - How many are already covered (analysis.already_covered)
+        - How many new tests are recommended (analysis.recommended)
+        - Breakdown by category if available
 
-        Present the analysis to the user:
-        - "I found **{analysis.total_behaviors}** testable behaviors in the documentation"
-        - "**{analysis.already_covered}** are already covered by existing tests"
-        - "I recommend generating **{analysis.recommended}** new test cases"
-        - Show breakdown by category if available (e.g., "8 happy path, 5 negative, 4 edge case")
-        - Ask: "Would you like me to generate these {analysis.recommended} test cases?"
+        Ask the user: "Would you like me to generate these N test cases?"
 
-        **Wait for user approval before proceeding to Step 2.**
+        STOP HERE. Wait for user response before continuing.
 
-        ## Step 2: Generate (after user approves)
+        ## Step 2: Generate test cases
 
-        Run the generation with the approved count:
+        Only proceed after the user approves. Run this command using `runInTerminal`:
 
-            spectra ai generate --suite {suite} --count {approved_count} --output-format json --verbosity quiet
+        ```
+        spectra ai generate --suite {suite} --count {approved_count} --output-format json --verbosity quiet
+        ```
 
-        After the command finishes, read the result file:
+        Wait for the command to complete using `awaitTerminal`. This may take 1-2 minutes.
 
-            .spectra/last-result.json
+        Then read the result using `readFile` on the file `.spectra/last-result.json`.
 
-        Present the results:
-        - "Generated **{generation.tests_written}** test cases for the {suite} suite"
-        - "{generation.tests_rejected_by_critic} tests rejected by verification"
-        - Show grounding breakdown if available (grounded/partial/hallucinated)
-        - List the files created
-
-        ## From Description (user describes a specific test)
-
-            spectra ai generate --suite {suite} --from-description "{description}" --output-format json --verbosity quiet
-
-        ## Troubleshooting
-
-        - If the command produces no output, read `.spectra/last-result.json` for the result
-        - If the result file doesn't exist, retry with `--verbosity normal` to see errors
-        - Valid verbosity levels: `quiet`, `normal` (NOT `debug`)
-
-        ### Examples of user requests:
-        - "Generate test cases for the checkout suite"
-        - "Create negative test cases for authentication"
-        - "Generate 10 high-priority tests for payments"
-        - "Add a test case for IBAN validation"
+        Tell the user what was created:
+        - How many tests were generated (generation.tests_generated)
+        - How many were written to disk (generation.tests_written)
+        - How many were rejected by verification (generation.tests_rejected_by_critic)
+        - List the files created (files_created)
         """;
 
     public const string Coverage = $$"""
         ---
         name: SPECTRA Coverage
         description: Analyzes test coverage across documentation, requirements, and automation.
-        tools: [{{ToolsList}}]
+        tools: [{{ReadOnlyToolsList}}]
         model: GPT-4o
         disable-model-invocation: true
         ---
@@ -131,7 +117,7 @@ public static class SkillContent
         ---
         name: SPECTRA Dashboard
         description: Generates the SPECTRA visual dashboard with suite browser, test viewer, and coverage visualizations.
-        tools: [{{ToolsList}}]
+        tools: [{{ReadOnlyToolsList}}]
         model: GPT-4o
         disable-model-invocation: true
         ---
@@ -163,7 +149,7 @@ public static class SkillContent
         ---
         name: SPECTRA Validate
         description: Validates all test case files for correct format, unique IDs, and required fields.
-        tools: [{{ToolsList}}]
+        tools: [{{ReadOnlyToolsList}}]
         model: GPT-4o
         disable-model-invocation: true
         ---
@@ -196,7 +182,7 @@ public static class SkillContent
         ---
         name: SPECTRA List
         description: Lists test suites, shows test case details, and browses the test repository.
-        tools: [{{ToolsList}}]
+        tools: [{{ReadOnlyToolsList}}]
         model: GPT-4o
         disable-model-invocation: true
         ---
@@ -230,7 +216,7 @@ public static class SkillContent
         ---
         name: SPECTRA Profile
         description: Creates or updates the generation profile that controls how AI generates test cases.
-        tools: [{{ToolsList}}]
+        tools: [{{ReadOnlyToolsList}}]
         model: GPT-4o
         disable-model-invocation: true
         ---

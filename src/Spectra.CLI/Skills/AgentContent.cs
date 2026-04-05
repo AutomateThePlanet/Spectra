@@ -11,13 +11,14 @@ public static class AgentContent
         ["spectra-generation.agent.md"] = GenerationAgent,
     };
 
-    private const string ToolsList = "vscode/getProjectSetupInfo, vscode/installExtension, vscode/memory, vscode/newWorkspace, vscode/resolveMemoryFileUri, vscode/runCommand, vscode/vscodeAPI, vscode/extensions, vscode/askQuestions, execute/runNotebookCell, execute/testFailure, execute/getTerminalOutput, execute/awaitTerminal, execute/killTerminal, execute/createAndRunTask, execute/runInTerminal, execute/runTests, read/getNotebookSummary, read/problems, read/readFile, read/viewImage, read/terminalSelection, read/terminalLastCommand, agent/runSubagent, edit/createDirectory, edit/createFile, edit/createJupyterNotebook, edit/editFiles, edit/editNotebook, edit/rename, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/textSearch, search/usages, web/fetch, web/githubRepo, browser/openBrowserPage, todo";
+    private const string ExecutionToolsList = "vscode/getProjectSetupInfo, vscode/installExtension, vscode/memory, vscode/newWorkspace, vscode/resolveMemoryFileUri, vscode/runCommand, vscode/vscodeAPI, vscode/extensions, vscode/askQuestions, execute/runNotebookCell, execute/testFailure, execute/getTerminalOutput, execute/awaitTerminal, execute/killTerminal, execute/createAndRunTask, execute/runInTerminal, execute/runTests, read/getNotebookSummary, read/problems, read/readFile, read/viewImage, read/terminalSelection, read/terminalLastCommand, agent/runSubagent, edit/createDirectory, edit/createFile, edit/createJupyterNotebook, edit/editFiles, edit/editNotebook, edit/rename, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/textSearch, search/usages, web/fetch, web/githubRepo, browser/openBrowserPage, todo";
+    private const string GenerationToolsList = "execute/runInTerminal, execute/awaitTerminal, execute/getTerminalOutput, read/readFile, read/terminalLastCommand, search/listDirectory";
 
     public const string ExecutionAgent = $$"""
         ---
         name: SPECTRA Execution
         description: Executes manual test cases through SPECTRA with optional documentation lookup.
-        tools: [spectra/*, {{ToolsList}}]
+        tools: [spectra/*, {{ExecutionToolsList}}]
         model: GPT-4o
         disable-model-invocation: true
         ---
@@ -53,7 +54,7 @@ public static class AgentContent
         ---
         name: SPECTRA Generation
         description: Generates test cases from documentation with AI verification and gap analysis.
-        tools: [{{ToolsList}}]
+        tools: [{{GenerationToolsList}}]
         model: GPT-4o
         disable-model-invocation: true
         ---
