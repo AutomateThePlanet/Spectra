@@ -23,9 +23,11 @@ public static class SkillContent
 
         When the user asks to generate, create, or write test cases:
 
+        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool. Do NOT just display the command — run it.**
+
         1. Determine the suite name from the user's request
         2. Determine any filters: focus area, count, priority, tags
-        3. Run the CLI command in terminal:
+        3. Use `runInTerminal` to execute:
 
            spectra ai generate --suite {suite} [--count {n}] [--focus "{focus}"] --output-format json --verbosity quiet
 
@@ -34,15 +36,15 @@ public static class SkillContent
            - Grounding breakdown (grounded/partial/rejected)
            - Any remaining gaps or suggestions
 
-        5. If the user wants to generate from suggestions:
+        5. If the user wants to generate from suggestions, use `runInTerminal`:
 
            spectra ai generate --suite {suite} --from-suggestions --output-format json --verbosity quiet
 
-        6. If the user describes a test case to create:
+        6. If the user describes a test case to create, use `runInTerminal`:
 
            spectra ai generate --suite {suite} --from-description "{description}" [--context "{context}"] --output-format json --verbosity quiet
 
-        7. For full automated generation:
+        7. For full automated generation, use `runInTerminal`:
 
            spectra ai generate --suite {suite} --auto-complete --output-format json --verbosity quiet
 
@@ -62,9 +64,11 @@ public static class SkillContent
         description: Analyze test coverage across documentation, requirements, and automation.
         ---
 
+        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool. Do NOT just display the command — run it.**
+
         When the user asks about coverage, gaps, or what needs testing:
 
-        1. Run:
+        1. Use `runInTerminal` to execute:
 
            spectra ai analyze --coverage --auto-link --output-format json --verbosity quiet
 
@@ -96,9 +100,11 @@ public static class SkillContent
         description: Generate the SPECTRA visual dashboard with suite browser, test viewer, and coverage visualizations.
         ---
 
+        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool. Do NOT just display the command — run it.**
+
         When the user asks to generate, update, or build the dashboard:
 
-        1. Run:
+        1. Use `runInTerminal` to execute:
 
            spectra dashboard --output ./site --output-format json --verbosity quiet
 
@@ -121,9 +127,11 @@ public static class SkillContent
         description: Validate all test case files for correct format, unique IDs, and required fields.
         ---
 
+        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool. Do NOT just display the command — run it.**
+
         When the user asks to validate, check, or verify test files:
 
-        1. Run:
+        1. Use `runInTerminal` to execute:
 
            spectra validate --output-format json --verbosity quiet
 
@@ -147,15 +155,17 @@ public static class SkillContent
         description: List test suites, show test case details, and browse the test repository.
         ---
 
+        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool. Do NOT just display the command — run it.**
+
         When the user asks to list, show, browse, or find test cases:
 
-        1. To list suites:
+        1. To list suites, use `runInTerminal`:
 
            spectra list --output-format json --verbosity quiet
 
            Present: suite names with test counts
 
-        2. To show a specific test:
+        2. To show a specific test, use `runInTerminal`:
 
            spectra show {test-id} --output-format json --verbosity quiet
 
@@ -174,6 +184,8 @@ public static class SkillContent
         description: Create or update the generation profile that controls how AI generates test cases.
         ---
 
+        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool. Do NOT just display the command — run it.**
+
         When the user asks to configure, set up, or change generation preferences:
 
         1. Ask what they want to configure:
@@ -183,7 +195,7 @@ public static class SkillContent
            - Default priority
            - Formatting preferences
 
-        2. Build the CLI command:
+        2. Use `runInTerminal` to execute:
 
            spectra init-profile --output-format json --verbosity quiet --no-interaction
 
