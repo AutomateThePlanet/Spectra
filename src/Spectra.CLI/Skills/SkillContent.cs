@@ -26,54 +26,64 @@ public static class SkillContent
         disable-model-invocation: true
         ---
 
-        When the user asks to generate, create, or write test cases:
+        When the user asks to generate, create, or write test cases, follow this two-step flow.
 
         **CRITICAL RULES:**
-        1. You MUST use `runInTerminal` to execute CLI commands and `getTerminalOutput` to read the output. Do NOT just display commands — actually execute them.
-        2. Do NOT use MCP tools (like `list_available_suites`, `start_execution_run`, `rebuild_indexes`, `analyze_coverage_gaps`, etc.) for test generation. MCP tools are ONLY for test execution. Test GENERATION uses the `spectra ai generate` CLI command via the terminal.
-        3. Do NOT manually create test files, _index.json, directories, or any other files. SPECTRA creates everything automatically.
-        4. Always use `getTerminalOutput` after `runInTerminal` to read the JSON result.
+        1. Use `runInTerminal` to execute CLI commands. After execution, use `readFile` to read `.spectra/last-result.json` for the result.
+        2. Do NOT use MCP tools (like `list_available_suites`, `start_execution_run`, `rebuild_indexes`, etc.) — those are for test execution, not generation.
+        3. Do NOT manually create test files, _index.json, or directories. SPECTRA handles all file creation.
+        4. New suites are created automatically when they don't exist yet.
 
-        ## CLI Syntax
+        ## Step 1: Analyze (always do this first)
 
-            spectra ai generate --suite {suite} --output-format json --verbosity quiet
+        Run the analysis to find out how many test cases are recommended:
 
-        New suites are created automatically when they don't exist yet.
+            spectra ai generate --suite {suite} --analyze-only --output-format json --verbosity quiet
 
-        ## Steps
+        After the command finishes, read the result file:
 
-        1. Determine the suite name from the user's request (e.g., "notifications", "checkout", "authentication")
-        2. Use `runInTerminal` to execute the command, then `getTerminalOutput` to read the JSON result:
+            .spectra/last-result.json
 
-           spectra ai generate --suite {suite} --output-format json --verbosity quiet
+        Present the analysis to the user:
+        - "I found **{analysis.total_behaviors}** testable behaviors in the documentation"
+        - "**{analysis.already_covered}** are already covered by existing tests"
+        - "I recommend generating **{analysis.recommended}** new test cases"
+        - Show breakdown by category if available (e.g., "8 happy path, 5 negative, 4 edge case")
+        - Ask: "Would you like me to generate these {analysis.recommended} test cases?"
 
-           Optional flags: `--count {n}`, `--focus "{focus}"`, `--skip-critic`
+        **Wait for user approval before proceeding to Step 2.**
 
-        3. Parse the JSON output and present results to the user:
-           - analysis.total_behaviors: total testable behaviors found in docs
-           - analysis.recommended: how many tests were recommended
-           - generation.tests_generated: how many tests were generated
-           - generation.tests_written: how many tests were written to disk
-           - generation.grounding: grounded/partial/hallucinated counts
-           - files_created: list of test files created
+        ## Step 2: Generate (after user approves)
 
-        4. If the user wants to generate from a description:
+        Run the generation with the approved count:
 
-           spectra ai generate --suite {suite} --from-description "{description}" --output-format json --verbosity quiet
+            spectra ai generate --suite {suite} --count {approved_count} --output-format json --verbosity quiet
 
-        5. Continue the conversation — offer to generate more, switch suites, or check coverage
+        After the command finishes, read the result file:
+
+            .spectra/last-result.json
+
+        Present the results:
+        - "Generated **{generation.tests_written}** test cases for the {suite} suite"
+        - "{generation.tests_rejected_by_critic} tests rejected by verification"
+        - Show grounding breakdown if available (grounded/partial/hallucinated)
+        - List the files created
+
+        ## From Description (user describes a specific test)
+
+            spectra ai generate --suite {suite} --from-description "{description}" --output-format json --verbosity quiet
 
         ## Troubleshooting
 
-        - If the command produces no JSON output, retry with `--verbosity normal` to see error details
+        - If the command produces no output, read `.spectra/last-result.json` for the result
+        - If the result file doesn't exist, retry with `--verbosity normal` to see errors
         - Valid verbosity levels: `quiet`, `normal` (NOT `debug`)
-        - New suites are fully supported — the command creates the suite directory and generates tests from documentation
 
         ### Examples of user requests:
         - "Generate test cases for the checkout suite"
         - "Create negative test cases for authentication"
         - "Generate 10 high-priority tests for payments"
-        - "Add a test case for IBAN validation — it's not documented"
+        - "Add a test case for IBAN validation"
         """;
 
     public const string Coverage = $$"""

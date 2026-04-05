@@ -67,7 +67,7 @@ public sealed class GenerateHandler
         string? focus,
         CancellationToken ct = default)
     {
-        return await ExecuteAsync(suite, count, focus, null, null, null, false, ct);
+        return await ExecuteAsync(suite, count, focus, null, null, null, false, false, ct);
     }
 
     public async Task<int> ExecuteAsync(
@@ -78,6 +78,7 @@ public sealed class GenerateHandler
         string? fromDescription,
         string? descContext,
         bool autoComplete,
+        bool analyzeOnly = false,
         CancellationToken ct = default)
     {
         // Handle --from-suggestions mode
@@ -160,7 +161,7 @@ public sealed class GenerateHandler
 
         if (isDirectMode)
         {
-            return await ExecuteDirectModeAsync(suite!, count, focus, ct, autoComplete);
+            return await ExecuteDirectModeAsync(suite!, count, focus, ct, autoComplete, analyzeOnly);
         }
         else
         {
@@ -173,7 +174,8 @@ public sealed class GenerateHandler
         int? count,
         string? focus,
         CancellationToken ct,
-        bool autoComplete = false)
+        bool autoComplete = false,
+        bool analyzeOnly = false)
     {
         var currentDir = Directory.GetCurrentDirectory();
         var configPath = Path.Combine(currentDir, "spectra.config.json");
@@ -307,6 +309,63 @@ public sealed class GenerateHandler
                 _progress.Warning("Behavior analysis unavailable, using default count of 20");
                 effectiveCount = 20;
             }
+        }
+
+        // --analyze-only: stop after analysis, output recommendation
+        if (analyzeOnly)
+        {
+            var analyzeResult = new GenerateResult
+            {
+                Command = "generate",
+                Status = "analyzed",
+                Suite = suite,
+                Analysis = analysisResult is not null ? new GenerateAnalysis
+                {
+                    TotalBehaviors = analysisResult.TotalBehaviors,
+                    AlreadyCovered = analysisResult.AlreadyCovered,
+                    Recommended = analysisResult.RecommendedCount,
+                    Breakdown = analysisResult.Breakdown?.ToDictionary(
+                        kvp => kvp.Key.ToString(), kvp => kvp.Value)
+                } : new GenerateAnalysis
+                {
+                    TotalBehaviors = 0,
+                    AlreadyCovered = existingTests.Count,
+                    Recommended = effectiveCount
+                },
+                Generation = new GenerateGeneration
+                {
+                    TestsGenerated = 0,
+                    TestsWritten = 0,
+                    TestsRejectedByCritic = 0
+                },
+                FilesCreated = []
+            };
+
+            WriteResultFile(analyzeResult);
+
+            if (_outputFormat == OutputFormat.Json)
+            {
+                JsonResultWriter.Write(analyzeResult);
+            }
+            else
+            {
+                _progress.BlankLine();
+                _progress.Info($"Analysis complete for suite '{suite}':");
+                _progress.Info($"  Total testable behaviors: {analyzeResult.Analysis!.TotalBehaviors}");
+                _progress.Info($"  Already covered: {analyzeResult.Analysis.AlreadyCovered}");
+                _progress.Info($"  Recommended new tests: {analyzeResult.Analysis.Recommended}");
+                if (analyzeResult.Analysis.Breakdown is not null)
+                {
+                    foreach (var (category, categoryCount) in analyzeResult.Analysis.Breakdown)
+                    {
+                        _progress.Info($"    {category}: {categoryCount}");
+                    }
+                }
+                _progress.BlankLine();
+                _progress.Info($"To generate, run: spectra ai generate --suite {suite} --count {analyzeResult.Analysis.Recommended}");
+            }
+
+            return ExitCodes.Success;
         }
 
         // Analyze coverage gaps (filtered by suite)
@@ -559,42 +618,47 @@ public sealed class GenerateHandler
             _progress.Info($"Token usage: {result.TokenUsage.InputTokens} in / {result.TokenUsage.OutputTokens} out");
         }
 
-        // JSON output for SKILL/CI workflows
+        // Build result for JSON output and file
+        var rejectedCount = verificationResults.Count(r => r.Result?.Verdict == VerificationVerdict.Hallucinated);
+        var groundedCount = verificationResults.Count(r => r.Result?.Verdict == VerificationVerdict.Grounded);
+        var partialCount = verificationResults.Count(r => r.Result?.Verdict == VerificationVerdict.Partial);
+
+        var generateResult = new GenerateResult
+        {
+            Command = "generate",
+            Status = "completed",
+            Suite = suite,
+            Analysis = analysisResult is not null ? new GenerateAnalysis
+            {
+                TotalBehaviors = analysisResult.TotalBehaviors,
+                AlreadyCovered = analysisResult.AlreadyCovered,
+                Recommended = analysisResult.RecommendedCount,
+                Breakdown = analysisResult.Breakdown?.ToDictionary(
+                    kvp => kvp.Key.ToString(), kvp => kvp.Value)
+            } : null,
+            Generation = new GenerateGeneration
+            {
+                TestsGenerated = result.Tests.Count,
+                TestsWritten = testsToWrite.Count,
+                TestsRejectedByCritic = rejectedCount,
+                Grounding = verificationResults.Count > 0 ? new GroundingCounts
+                {
+                    Grounded = groundedCount,
+                    Partial = partialCount,
+                    Hallucinated = rejectedCount
+                } : null
+            },
+            FilesCreated = testsToWrite
+                .Select(t => Path.GetRelativePath(currentDir, TestFileWriter.GetFilePath(testsPath, suite, t.Id)))
+                .ToList()
+        };
+
+        // Always write result file for SKILL/agent consumption
+        WriteResultFile(generateResult);
+
         if (_outputFormat == OutputFormat.Json)
         {
-            var rejectedCount = verificationResults.Count(r => r.Result?.Verdict == VerificationVerdict.Hallucinated);
-            var groundedCount = verificationResults.Count(r => r.Result?.Verdict == VerificationVerdict.Grounded);
-            var partialCount = verificationResults.Count(r => r.Result?.Verdict == VerificationVerdict.Partial);
-
-            JsonResultWriter.Write(new GenerateResult
-            {
-                Command = "generate",
-                Status = "completed",
-                Suite = suite,
-                Analysis = analysisResult is not null ? new GenerateAnalysis
-                {
-                    TotalBehaviors = analysisResult.TotalBehaviors,
-                    AlreadyCovered = analysisResult.AlreadyCovered,
-                    Recommended = analysisResult.RecommendedCount,
-                    Breakdown = analysisResult.Breakdown?.ToDictionary(
-                        kvp => kvp.Key.ToString(), kvp => kvp.Value)
-                } : null,
-                Generation = new GenerateGeneration
-                {
-                    TestsGenerated = result.Tests.Count,
-                    TestsWritten = testsToWrite.Count,
-                    TestsRejectedByCritic = rejectedCount,
-                    Grounding = verificationResults.Count > 0 ? new GroundingCounts
-                    {
-                        Grounded = groundedCount,
-                        Partial = partialCount,
-                        Hallucinated = rejectedCount
-                    } : null
-                },
-                FilesCreated = testsToWrite
-                    .Select(t => Path.GetRelativePath(currentDir, TestFileWriter.GetFilePath(testsPath, suite, t.Id)))
-                    .ToList()
-            });
+            JsonResultWriter.Write(generateResult);
         }
 
         NextStepHints.Print("generate", true, _verbosity, new HintContext { SuiteName = suite }, _outputFormat);
@@ -1552,6 +1616,31 @@ public sealed class GenerateHandler
             return false;
 
         return true;
+    }
+
+    /// <summary>
+    /// Writes a result file to .spectra/last-result.json for external tool consumption.
+    /// </summary>
+    private static void WriteResultFile(GenerateResult result)
+    {
+        try
+        {
+            var spectraDir = Path.Combine(Directory.GetCurrentDirectory(), ".spectra");
+            Directory.CreateDirectory(spectraDir);
+            var resultPath = Path.Combine(spectraDir, "last-result.json");
+            var json = JsonSerializer.Serialize(result, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+                Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+            });
+            File.WriteAllText(resultPath, json);
+        }
+        catch
+        {
+            // Non-critical — don't fail the command if file write fails
+        }
     }
 
     /// <summary>

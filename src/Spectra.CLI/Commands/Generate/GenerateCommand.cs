@@ -55,6 +55,10 @@ public sealed class GenerateCommand : Command
             "--auto-complete",
             "Run all phases without prompts (analyze, generate, suggestions, finalize)");
 
+        var analyzeOnlyOption = new Option<bool>(
+            "--analyze-only",
+            "Only analyze documentation and output recommended test count (no generation)");
+
         AddArgument(suiteArgument);
         AddOption(suiteOption);
         AddOption(countOption);
@@ -64,6 +68,7 @@ public sealed class GenerateCommand : Command
         AddOption(fromDescriptionOption);
         AddOption(contextOption);
         AddOption(autoCompleteOption);
+        AddOption(analyzeOnlyOption);
 
         this.SetHandler(async (context) =>
         {
@@ -77,6 +82,7 @@ public sealed class GenerateCommand : Command
             var fromDescription = context.ParseResult.GetValueForOption(fromDescriptionOption);
             var descContext = context.ParseResult.GetValueForOption(contextOption);
             var autoComplete = context.ParseResult.GetValueForOption(autoCompleteOption);
+            var analyzeOnly = context.ParseResult.GetValueForOption(analyzeOnlyOption);
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
             var dryRun = context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption);
             var noReview = context.ParseResult.GetValueForOption(GlobalOptions.NoReviewOption);
@@ -86,7 +92,7 @@ public sealed class GenerateCommand : Command
             var handler = new GenerateHandler(verbosity, dryRun, noReview, noInteraction, skipCritic, outputFormat);
             context.ExitCode = await handler.ExecuteAsync(
                 suite, count, focus,
-                fromSuggestions, fromDescription, descContext, autoComplete,
+                fromSuggestions, fromDescription, descContext, autoComplete, analyzeOnly,
                 context.GetCancellationToken());
         });
     }
