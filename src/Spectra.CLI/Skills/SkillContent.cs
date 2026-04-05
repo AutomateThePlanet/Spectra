@@ -5,6 +5,8 @@ namespace Spectra.CLI.Skills;
 /// </summary>
 public static class SkillContent
 {
+    private const string ToolsList = "vscode/getProjectSetupInfo, vscode/installExtension, vscode/memory, vscode/newWorkspace, vscode/resolveMemoryFileUri, vscode/runCommand, vscode/vscodeAPI, vscode/extensions, vscode/askQuestions, execute/runNotebookCell, execute/testFailure, execute/getTerminalOutput, execute/awaitTerminal, execute/killTerminal, execute/createAndRunTask, execute/runInTerminal, execute/runTests, read/getNotebookSummary, read/problems, read/readFile, read/viewImage, read/terminalSelection, read/terminalLastCommand, agent/runSubagent, edit/createDirectory, edit/createFile, edit/createJupyterNotebook, edit/editFiles, edit/editNotebook, edit/rename, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/textSearch, search/usages, web/fetch, web/githubRepo, browser/openBrowserPage, todo";
+
     public static readonly Dictionary<string, string> All = new()
     {
         ["spectra-generate"] = Generate,
@@ -15,19 +17,22 @@ public static class SkillContent
         ["spectra-init-profile"] = InitProfile,
     };
 
-    public const string Generate = """
+    public const string Generate = $$"""
         ---
         name: SPECTRA Generate
-        description: Generate test cases from documentation. Analyzes docs, recommends count, generates with AI verification.
+        description: Generates test cases from documentation with AI verification and gap analysis.
+        tools: [{{ToolsList}}]
+        model: GPT-4o
+        disable-model-invocation: true
         ---
 
         When the user asks to generate, create, or write test cases:
 
-        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool. Do NOT just display the command — run it.**
+        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
 
         1. Determine the suite name from the user's request
         2. Determine any filters: focus area, count, priority, tags
-        3. Use `runInTerminal` to execute:
+        3. Use `runInTerminal` to execute, then `getTerminalOutput` to read the result:
 
            spectra ai generate --suite {suite} [--count {n}] [--focus "{focus}"] --output-format json --verbosity quiet
 
@@ -58,17 +63,20 @@ public static class SkillContent
         - "What gaps do we still have in the search suite?"
         """;
 
-    public const string Coverage = """
+    public const string Coverage = $$"""
         ---
         name: SPECTRA Coverage
-        description: Analyze test coverage across documentation, requirements, and automation.
+        description: Analyzes test coverage across documentation, requirements, and automation.
+        tools: [{{ToolsList}}]
+        model: GPT-4o
+        disable-model-invocation: true
         ---
 
-        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool. Do NOT just display the command — run it.**
+        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
 
         When the user asks about coverage, gaps, or what needs testing:
 
-        1. Use `runInTerminal` to execute:
+        1. Use `runInTerminal` to execute, then `getTerminalOutput` to read the result:
 
            spectra ai analyze --coverage --auto-link --output-format json --verbosity quiet
 
@@ -94,17 +102,20 @@ public static class SkillContent
         - "Which requirements aren't tested?"
         """;
 
-    public const string Dashboard = """
+    public const string Dashboard = $$"""
         ---
         name: SPECTRA Dashboard
-        description: Generate the SPECTRA visual dashboard with suite browser, test viewer, and coverage visualizations.
+        description: Generates the SPECTRA visual dashboard with suite browser, test viewer, and coverage visualizations.
+        tools: [{{ToolsList}}]
+        model: GPT-4o
+        disable-model-invocation: true
         ---
 
-        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool. Do NOT just display the command — run it.**
+        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
 
         When the user asks to generate, update, or build the dashboard:
 
-        1. Use `runInTerminal` to execute:
+        1. Use `runInTerminal` to execute, then `getTerminalOutput` to read the result:
 
            spectra dashboard --output ./site --output-format json --verbosity quiet
 
@@ -121,17 +132,20 @@ public static class SkillContent
         - "Build the site"
         """;
 
-    public const string Validate = """
+    public const string Validate = $$"""
         ---
         name: SPECTRA Validate
-        description: Validate all test case files for correct format, unique IDs, and required fields.
+        description: Validates all test case files for correct format, unique IDs, and required fields.
+        tools: [{{ToolsList}}]
+        model: GPT-4o
+        disable-model-invocation: true
         ---
 
-        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool. Do NOT just display the command — run it.**
+        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
 
         When the user asks to validate, check, or verify test files:
 
-        1. Use `runInTerminal` to execute:
+        1. Use `runInTerminal` to execute, then `getTerminalOutput` to read the result:
 
            spectra validate --output-format json --verbosity quiet
 
@@ -149,23 +163,26 @@ public static class SkillContent
         - "Check if everything is valid before I push"
         """;
 
-    public const string List = """
+    public const string List = $$"""
         ---
         name: SPECTRA List
-        description: List test suites, show test case details, and browse the test repository.
+        description: Lists test suites, shows test case details, and browses the test repository.
+        tools: [{{ToolsList}}]
+        model: GPT-4o
+        disable-model-invocation: true
         ---
 
-        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool. Do NOT just display the command — run it.**
+        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
 
         When the user asks to list, show, browse, or find test cases:
 
-        1. To list suites, use `runInTerminal`:
+        1. To list suites, use `runInTerminal` then `getTerminalOutput`:
 
            spectra list --output-format json --verbosity quiet
 
            Present: suite names with test counts
 
-        2. To show a specific test, use `runInTerminal`:
+        2. To show a specific test, use `runInTerminal` then `getTerminalOutput`:
 
            spectra show {test-id} --output-format json --verbosity quiet
 
@@ -178,13 +195,16 @@ public static class SkillContent
         - "How many tests are in the authentication suite?"
         """;
 
-    public const string InitProfile = """
+    public const string InitProfile = $$"""
         ---
         name: SPECTRA Profile
-        description: Create or update the generation profile that controls how AI generates test cases.
+        description: Creates or updates the generation profile that controls how AI generates test cases.
+        tools: [{{ToolsList}}]
+        model: GPT-4o
+        disable-model-invocation: true
         ---
 
-        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool. Do NOT just display the command — run it.**
+        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
 
         When the user asks to configure, set up, or change generation preferences:
 
@@ -195,7 +215,7 @@ public static class SkillContent
            - Default priority
            - Formatting preferences
 
-        2. Use `runInTerminal` to execute:
+        2. Use `runInTerminal` to execute, then `getTerminalOutput` to read the result:
 
            spectra init-profile --output-format json --verbosity quiet --no-interaction
 

@@ -11,19 +11,13 @@ public static class AgentContent
         ["spectra-generation.agent.md"] = GenerationAgent,
     };
 
-    public const string ExecutionAgent = """
+    private const string ToolsList = "vscode/getProjectSetupInfo, vscode/installExtension, vscode/memory, vscode/newWorkspace, vscode/resolveMemoryFileUri, vscode/runCommand, vscode/vscodeAPI, vscode/extensions, vscode/askQuestions, execute/runNotebookCell, execute/testFailure, execute/getTerminalOutput, execute/awaitTerminal, execute/killTerminal, execute/createAndRunTask, execute/runInTerminal, execute/runTests, read/getNotebookSummary, read/problems, read/readFile, read/viewImage, read/terminalSelection, read/terminalLastCommand, agent/runSubagent, edit/createDirectory, edit/createFile, edit/createJupyterNotebook, edit/editFiles, edit/editNotebook, edit/rename, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/textSearch, search/usages, web/fetch, web/githubRepo, browser/openBrowserPage, todo";
+
+    public const string ExecutionAgent = $$"""
         ---
         name: SPECTRA Execution
         description: Executes manual test cases through SPECTRA with optional documentation lookup.
-        tools:
-          - "spectra/*"
-          - "github/get_copilot_space"
-          - "github/list_copilot_spaces"
-          - "read"
-          - "edit"
-          - "search"
-          - "terminal"
-          - "browser"
+        tools: [spectra/*, {{ToolsList}}]
         model: GPT-4o
         disable-model-invocation: true
         ---
@@ -55,16 +49,11 @@ public static class AgentContent
         - Include test case ID, step number, and expected vs actual results
         """;
 
-    public const string GenerationAgent = """
+    public const string GenerationAgent = $$"""
         ---
         name: SPECTRA Generation
         description: Generates test cases from documentation with AI verification and gap analysis.
-        tools:
-          - "terminal"
-          - "read"
-          - "search"
-          - "github/get_copilot_space"
-          - "github/list_copilot_spaces"
+        tools: [{{ToolsList}}]
         model: GPT-4o
         disable-model-invocation: true
         ---
@@ -75,7 +64,7 @@ public static class AgentContent
 
         ## Workflow
 
-        Use the terminal to invoke SPECTRA CLI commands with `--output-format json --verbosity quiet`.
+        Use `runInTerminal` to invoke SPECTRA CLI commands and `getTerminalOutput` to read the results. Always pass `--output-format json --verbosity quiet`.
 
         ### Generation Session Flow
 
