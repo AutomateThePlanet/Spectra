@@ -28,32 +28,55 @@ public static class SkillContent
 
         When the user asks to generate, create, or write test cases:
 
-        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
+        **IMPORTANT: You MUST execute all CLI commands using `runInTerminal` and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
 
-        1. Determine the suite name from the user's request
+        ## CLI Syntax
+
+        The suite name is a **positional argument** (NOT a flag). Correct syntax:
+
+            spectra ai generate {suite} [options]
+
+        **WRONG:** `spectra ai generate --suite {suite}` — this will fail.
+
+        New suites are created automatically — you do NOT need to create directories, _index.json files, or any other files manually. Just run the generate command with the suite name and SPECTRA handles everything.
+
+        ## Steps
+
+        1. Determine the suite name from the user's request (e.g., "notifications", "checkout", "auth")
         2. Determine any filters: focus area, count, priority, tags
         3. Use `runInTerminal` to execute, then `getTerminalOutput` to read the result:
 
-           spectra ai generate --suite {suite} [--count {n}] [--focus "{focus}"] --output-format json --verbosity quiet
+           spectra ai generate {suite} --output-format json --verbosity quiet
+
+           Optional flags: `--count {n}`, `--focus "{focus}"`, `--skip-critic`
 
         4. Parse the JSON output and present results:
            - How many tests were generated
            - Grounding breakdown (grounded/partial/rejected)
            - Any remaining gaps or suggestions
 
-        5. If the user wants to generate from suggestions, use `runInTerminal`:
+        5. If the user wants to generate from suggestions:
 
-           spectra ai generate --suite {suite} --from-suggestions --output-format json --verbosity quiet
+           spectra ai generate {suite} --from-suggestions --output-format json --verbosity quiet
 
-        6. If the user describes a test case to create, use `runInTerminal`:
+        6. If the user describes a test case to create:
 
-           spectra ai generate --suite {suite} --from-description "{description}" [--context "{context}"] --output-format json --verbosity quiet
+           spectra ai generate {suite} --from-description "{description}" --output-format json --verbosity quiet
 
-        7. For full automated generation, use `runInTerminal`:
+           Optional: `--context "{context}"`
 
-           spectra ai generate --suite {suite} --auto-complete --output-format json --verbosity quiet
+        7. For full automated generation (all phases, no prompts):
+
+           spectra ai generate {suite} --auto-complete --output-format json --verbosity quiet
 
         8. Continue the conversation — offer to generate more, switch suites, or check coverage
+
+        ## Troubleshooting
+
+        - If the command produces no JSON output, use `--verbosity normal` instead of `quiet` to see error details
+        - The `--verbosity` flag accepts: `quiet`, `normal` (NOT `debug`)
+        - New suites with no existing tests are fully supported — the command will generate tests from documentation
+        - Do NOT try to manually create _index.json, test files, or directories — SPECTRA manages these automatically
 
         ### Examples of user requests:
         - "Generate test cases for the checkout suite"
@@ -72,7 +95,7 @@ public static class SkillContent
         disable-model-invocation: true
         ---
 
-        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
+        **IMPORTANT: You MUST execute all CLI commands using `runInTerminal` and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
 
         When the user asks about coverage, gaps, or what needs testing:
 
@@ -111,7 +134,7 @@ public static class SkillContent
         disable-model-invocation: true
         ---
 
-        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
+        **IMPORTANT: You MUST execute all CLI commands using `runInTerminal` and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
 
         When the user asks to generate, update, or build the dashboard:
 
@@ -141,7 +164,7 @@ public static class SkillContent
         disable-model-invocation: true
         ---
 
-        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
+        **IMPORTANT: You MUST execute all CLI commands using `runInTerminal` and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
 
         When the user asks to validate, check, or verify test files:
 
@@ -172,7 +195,7 @@ public static class SkillContent
         disable-model-invocation: true
         ---
 
-        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
+        **IMPORTANT: You MUST execute all CLI commands using `runInTerminal` and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
 
         When the user asks to list, show, browse, or find test cases:
 
@@ -204,7 +227,7 @@ public static class SkillContent
         disable-model-invocation: true
         ---
 
-        **IMPORTANT: You MUST execute all CLI commands using the `runInTerminal` tool and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
+        **IMPORTANT: You MUST execute all CLI commands using `runInTerminal` and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
 
         When the user asks to configure, set up, or change generation preferences:
 
