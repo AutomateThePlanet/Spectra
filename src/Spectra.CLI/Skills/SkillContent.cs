@@ -28,7 +28,9 @@ public static class SkillContent
 
         When the user asks to generate, create, or write test cases:
 
-        **IMPORTANT: You MUST execute all CLI commands using `runInTerminal` and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
+        **CRITICAL RULES:**
+        1. You MUST use `runInTerminal` to execute CLI commands and `getTerminalOutput` to read the output. Do NOT just display commands.
+        2. Do NOT use MCP tools (like `list_available_suites`, `start_execution_run`, `rebuild_indexes`, etc.) for test generation. MCP tools are for test EXECUTION only. Test GENERATION is done exclusively through the `spectra ai generate` CLI command via the terminal.
 
         ## CLI Syntax
 
@@ -95,7 +97,9 @@ public static class SkillContent
         disable-model-invocation: true
         ---
 
-        **IMPORTANT: You MUST execute all CLI commands using `runInTerminal` and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
+        **CRITICAL RULES:**
+        1. You MUST use `runInTerminal` to execute CLI commands and `getTerminalOutput` to read the output. Do NOT just display commands.
+        2. Do NOT use MCP tools (like `analyze_coverage_gaps`, etc.) for coverage analysis. Use the `spectra ai analyze` CLI command via the terminal.
 
         When the user asks about coverage, gaps, or what needs testing:
 
@@ -134,7 +138,9 @@ public static class SkillContent
         disable-model-invocation: true
         ---
 
-        **IMPORTANT: You MUST execute all CLI commands using `runInTerminal` and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
+        **CRITICAL RULES:**
+        1. You MUST use `runInTerminal` to execute CLI commands and `getTerminalOutput` to read the output. Do NOT just display commands.
+        2. Do NOT use MCP tools for dashboard generation. Use the `spectra dashboard` CLI command via the terminal.
 
         When the user asks to generate, update, or build the dashboard:
 
@@ -164,7 +170,9 @@ public static class SkillContent
         disable-model-invocation: true
         ---
 
-        **IMPORTANT: You MUST execute all CLI commands using `runInTerminal` and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
+        **CRITICAL RULES:**
+        1. You MUST use `runInTerminal` to execute CLI commands and `getTerminalOutput` to read the output. Do NOT just display commands.
+        2. Do NOT use MCP tools (like `validate_tests`) for validation. Use the `spectra validate` CLI command via the terminal.
 
         When the user asks to validate, check, or verify test files:
 
@@ -195,7 +203,9 @@ public static class SkillContent
         disable-model-invocation: true
         ---
 
-        **IMPORTANT: You MUST execute all CLI commands using `runInTerminal` and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
+        **CRITICAL RULES:**
+        1. You MUST use `runInTerminal` to execute CLI commands and `getTerminalOutput` to read the output. Do NOT just display commands.
+        2. Do NOT use MCP tools (like `list_available_suites`, `find_test_cases`) for listing. Use the `spectra list` CLI command via the terminal.
 
         When the user asks to list, show, browse, or find test cases:
 
@@ -227,7 +237,9 @@ public static class SkillContent
         disable-model-invocation: true
         ---
 
-        **IMPORTANT: You MUST execute all CLI commands using `runInTerminal` and read output with `getTerminalOutput`. Do NOT just display the command — run it.**
+        **CRITICAL RULES:**
+        1. You MUST use `runInTerminal` to execute CLI commands and `getTerminalOutput` to read the output. Do NOT just display commands.
+        2. Do NOT use MCP tools for profile configuration. Use the `spectra init-profile` CLI command via the terminal.
 
         When the user asks to configure, set up, or change generation preferences:
 
