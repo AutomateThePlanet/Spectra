@@ -188,6 +188,9 @@ public sealed class GenerateHandler
             return ExitCodes.Error;
         }
 
+        // Mark result file as in-progress so agents know the command is running
+        WriteInProgressResultFile(suite, analyzeOnly ? "analyzing" : "generating");
+
         // Auto-refresh document index before generation
         var indexService = new DocumentIndexService();
         await indexService.EnsureIndexAsync(currentDir, config.Source, forceRebuild: false, ct);
@@ -393,9 +396,6 @@ public sealed class GenerateHandler
 
             _gapPresenter.ShowUncoveredAreas(gaps);
         }
-
-        // Mark result file as "generating" so agents know the command is in progress
-        WriteInProgressResultFile(suite);
 
         // Check duplicates status message
         await _progress.StatusAsync("Checking for duplicates...", async () =>
@@ -1641,9 +1641,8 @@ public sealed class GenerateHandler
 
     private static string GetResultFilePath()
     {
-        var spectraDir = Path.Combine(Directory.GetCurrentDirectory(), ".spectra");
-        Directory.CreateDirectory(spectraDir);
-        return Path.Combine(spectraDir, "last-result.json");
+        // Write to workspace root (not .spectra/) for reliable VS Code file watcher detection
+        return Path.Combine(Directory.GetCurrentDirectory(), ".spectra-result.json");
     }
 
     /// <summary>
@@ -1693,14 +1692,14 @@ public sealed class GenerateHandler
     /// <summary>
     /// Writes an in-progress marker so agents know the command is still running.
     /// </summary>
-    private static void WriteInProgressResultFile(string suite)
+    private static void WriteInProgressResultFile(string suite, string status = "generating")
     {
         try
         {
             var result = new GenerateResult
             {
                 Command = "generate",
-                Status = "generating",
+                Status = status,
                 Suite = suite,
                 Generation = new GenerateGeneration
                 {

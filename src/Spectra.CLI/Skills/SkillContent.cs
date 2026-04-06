@@ -44,15 +44,13 @@ public static class SkillContent
         ### Tool call 2: awaitTerminal
         Wait for the command to finish.
 
-        ### Tool call 3: listDirectory
-        List the `.spectra` directory to refresh the file cache.
-
-        ### Tool call 4: readFile
-        Read the file `.spectra/last-result.json`.
-        If the file cannot be read, call `listDirectory` on `.spectra` again and retry `readFile` once more.
+        ### Tool call 3: readFile
+        Read the file `.spectra-result.json`.
+        If the file cannot be read, retry `readFile` once more.
 
         ### Your response:
         Check the `status` field in the JSON:
+        - If `"status": "analyzing"` → the command is STILL RUNNING. Tell the user "Analyzing documentation, please wait..." Then call `awaitTerminal` and `readFile` again. Keep checking until the status changes.
         - If `"status": "failed"` → tell the user the error from the `error` field.
         - If `"status": "analyzed"` → tell the user:
           - "I analyzed the documentation and found **{analysis.recommended}** testable behaviors to cover."
@@ -64,17 +62,17 @@ public static class SkillContent
 
         ## After user approves:
 
-        ### Tool call 5: runInTerminal
+        ### Tool call 4: runInTerminal
         Run this command (replace {count} with the number the user approved):
         ```
         spectra ai generate --suite {suite} --count {count} --output-format json --verbosity quiet
         ```
 
-        ### Tool call 6: awaitTerminal
+        ### Tool call 5: awaitTerminal
         Wait for the command to finish. This command takes 1-2 minutes because it calls an AI model.
 
-        ### Tool call 7: readFile
-        Read the file `.spectra/last-result.json`.
+        ### Tool call 6: readFile
+        Read the file `.spectra-result.json`.
 
         Check the `status` field:
         - If `"status": "generating"` → the command is STILL RUNNING. Tell the user "Generating tests, please wait..." Then call `awaitTerminal` and `readFile` again. Keep checking until the status is no longer "generating". Do NOT give up — the generation will finish eventually.
