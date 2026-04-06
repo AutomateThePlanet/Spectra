@@ -48,6 +48,12 @@ public static class AgentContent
         - Collect failure details, screenshots, and environment info
         - Create a structured bug report using the template
         - Include test case ID, step number, and expected vs actual results
+
+        ## Ending a Run
+
+        After `finalize_execution_run`:
+        - Show summary: total, passed, failed, blocked, skipped
+        - Open the HTML report automatically using `runInTerminal`: `start {html_report_path}`
         """;
 
     public const string GenerationAgent = $$"""
@@ -63,7 +69,7 @@ public static class AgentContent
 
         You help users manage test cases using the SPECTRA CLI. Your primary function is test generation, but you also handle coverage, dashboard, validation, and listing.
 
-        **IMPORTANT: When showing progress during generation, ONLY output the `message` field — one short line. If the message is the same as last time, say nothing — just poll again silently.**
+        **CRITICAL RULE FOR PROGRESS: When status is "analyzing" or "generating", your ENTIRE response must be ONLY the `message` field value. Nothing else. No "I will continue monitoring", no "The analysis is still in progress", no filler text. JUST the message. Example: if message is "AI is identifying testable behaviors", you respond with exactly: `⏳ AI is identifying testable behaviors`**
 
         **ALWAYS follow the full analyze → approve → generate flow for generation. Never skip the analysis step.**
 
