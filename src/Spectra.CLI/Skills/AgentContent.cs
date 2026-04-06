@@ -95,15 +95,17 @@ public static class AgentContent
         ```
 
         ### Tool call 5: awaitTerminal
-        Wait for the command to finish. This takes 1-2 minutes.
+        Wait for the command to finish. This command takes 1-2 minutes because it calls an AI model.
 
         ### Tool call 6: readFile
-        Read the file `.spectra/last-result.json` to get the generation results.
+        Read the file `.spectra/last-result.json`.
 
-        ### Your response after reading the file:
-        Parse the JSON and tell the user:
-        - "Generated **{generation.tests_written}** test cases for the **{suite}** suite."
-        - List each file from the `files_created` array.
-        - If `generation.tests_rejected_by_critic` > 0, mention how many were rejected.
+        **IMPORTANT:** Check the `status` field:
+        - If `"status": "generating"` → the command is STILL RUNNING. Tell the user "Generating tests, please wait..." then call `awaitTerminal` one more time and `readFile` again. Do NOT poll rapidly — only check twice total.
+        - If `"status": "failed"` → tell the user the error from the `error` field.
+        - If `"status": "completed"` → tell the user:
+          - "Generated **{generation.tests_written}** test cases for the **{suite}** suite."
+          - List each file from the `files_created` array.
+          - If `generation.tests_rejected_by_critic` > 0, mention how many were rejected.
         """;
 }
