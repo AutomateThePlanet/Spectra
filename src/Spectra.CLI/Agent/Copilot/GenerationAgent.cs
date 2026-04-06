@@ -99,34 +99,42 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 tools,
                 ct);
 
-            // Subscribe to events ONLY for tool call status updates (not delta spam)
+            // Track tool calls to show composing message after last tool
+            var toolCallCount = 0;
             using var subscription = session.On(evt =>
             {
-                switch (evt)
+                if (evt is ToolExecutionStartEvent toolStart)
                 {
-                    case ToolExecutionStartEvent toolStart:
-                        var friendlyName = toolStart.Data.ToolName switch
-                        {
-                            "report_intent" => "Planning test generation strategy...",
-                            "ListDocumentationFiles" or "GetDocumentMap" => "Scanning documentation files...",
-                            "ReadDocument" or "LoadSourceDocument" => "Reading source documentation...",
-                            "ReadTestIndex" => "Checking existing test cases...",
-                            "CheckDuplicates" or "CheckDuplicatesBatch" => "Checking for duplicate tests...",
-                            "GetNextTestIds" => "Allocating test case IDs...",
-                            "BatchWriteTests" => "Writing test cases...",
-                            "SearchSourceDocs" => "Searching documentation...",
-                            _ => $"Processing: {toolStart.Data.ToolName}"
-                        };
-                        _onStatus?.Invoke(friendlyName);
-                        break;
+                    toolCallCount++;
+                    var friendlyName = toolStart.Data.ToolName switch
+                    {
+                        "report_intent" => "Planning test generation strategy...",
+                        "ListDocumentationFiles" or "GetDocumentMap" => "Scanning documentation files...",
+                        "ReadDocument" or "LoadSourceDocument" => "Reading source documentation...",
+                        "ReadTestIndex" => "Checking existing test cases...",
+                        "CheckDuplicates" or "CheckDuplicatesBatch" => "Checking for duplicate tests...",
+                        "GetNextTestIds" => $"Preparing to generate {requestedCount} test cases...",
+                        "BatchWriteTests" => "Writing test cases...",
+                        "SearchSourceDocs" => "Searching documentation...",
+                        _ => $"Processing: {toolStart.Data.ToolName}"
+                    };
+                    _onStatus?.Invoke(friendlyName);
+
+                    // After IDs are allocated, the AI composes test cases (long wait)
+                    // Schedule a delayed status update
+                    if (toolStart.Data.ToolName == "GetNextTestIds")
+                    {
+                        _ = Task.Delay(3000).ContinueWith(_ =>
+                            _onStatus?.Invoke($"AI is writing {requestedCount} test cases — this takes about a minute..."));
+                    }
                 }
             });
 
             // Build the combined prompt with system instructions and user request
             var fullPrompt = BuildFullPrompt(prompt, requestedCount);
 
-            // Send and wait for the complete response (handles agent loop internally)
-            _onStatus?.Invoke("AI is composing test cases — this takes about a minute...");
+            // Send and wait for the complete response
+            _onStatus?.Invoke("Starting AI generation...");
             var response = await session.SendAndWaitAsync(
                 new MessageOptions { Prompt = fullPrompt },
                 timeout: TimeSpan.FromMinutes(5),

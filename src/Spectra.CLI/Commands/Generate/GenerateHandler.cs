@@ -1730,11 +1730,16 @@ public sealed class GenerateHandler
         }
     }
 
+    private static string? _lastProgressMessage;
+
     /// <summary>
     /// Updates the progress message in the result file without changing status.
+    /// Skips write if the message hasn't changed (reduces disk I/O and file watcher noise).
     /// </summary>
     private static void UpdateProgress(string suite, string status, string message)
     {
+        if (message == _lastProgressMessage) return;
+        _lastProgressMessage = message;
         WriteInProgressResultFile(suite, status, message);
     }
 

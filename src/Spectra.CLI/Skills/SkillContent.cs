@@ -33,7 +33,7 @@ public static class SkillContent
 
         You generate test cases by running CLI commands. Follow the exact tool sequence below.
 
-        **IMPORTANT: When showing progress, ONLY output the `message` field from the JSON — nothing else. One short line. Do NOT add filler like "I'll continue monitoring" or "The current step remains". Just the message.**
+        **IMPORTANT: When showing progress, ONLY output the `message` field — one short line, nothing else. If the message is the same as last time, say nothing — just poll again silently.**
 
         ## When user asks to generate test cases:
 
