@@ -99,19 +99,19 @@ public static class SkillContent
 
         ### Tool call 1: runInTerminal
         ```
-        spectra ai analyze --coverage --auto-link --verbosity normal
+        spectra ai analyze --coverage --auto-link --format markdown --output coverage.md --verbosity normal
         ```
 
         ### Tool call 2: awaitTerminal
 
-        ### Tool call 3: terminalLastCommand
-        Read the terminal output to get the coverage results.
+        ### Tool call 3: readFile `coverage.md`
+        Read the generated coverage report.
 
         ### Your response:
-        Show the three coverage sections:
-        - **Documentation coverage**: X% — list uncovered docs
-        - **Requirements coverage**: X% — list untested requirements
-        - **Automation coverage**: X% — list unlinked tests
+        Show the three coverage sections from the report:
+        - **Documentation coverage**: X% (N/M documents) — list uncovered docs
+        - **Requirements coverage**: X% (N/M requirements) — list untested requirements
+        - **Automation coverage**: X% (N/M tests) — list unlinked tests
 
         If the user asks to improve coverage, suggest generating tests for uncovered areas.
         """;
@@ -127,22 +127,25 @@ public static class SkillContent
 
         # SPECTRA Dashboard
 
-        You generate the dashboard by running a CLI command. Follow these steps:
+        You generate the dashboard by running CLI commands. Follow these steps:
 
         ### Tool call 1: runInTerminal
+        First link automation and generate the dashboard:
         ```
-        spectra dashboard --output ./site --verbosity normal
+        spectra ai analyze --coverage --auto-link --verbosity normal && spectra dashboard --output ./site --verbosity normal
         ```
 
         ### Tool call 2: awaitTerminal
 
-        ### Tool call 3: terminalLastCommand
-        Read the terminal output to confirm the dashboard was generated.
+        ### Tool call 3: runInTerminal
+        Open the dashboard in the default browser:
+        ```
+        start ./site/index.html
+        ```
 
         ### Your response:
-        - "Dashboard generated at `./site/index.html`"
-        - Show how many suites and tests are included
-        - Suggest: "Open `./site/index.html` in your browser to view it"
+        - "Dashboard generated and opened in your browser."
+        - Show the coverage summary if visible in the output.
         """;
 
     public const string Validate = $$"""
