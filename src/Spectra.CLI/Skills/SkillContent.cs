@@ -93,36 +93,27 @@ public static class SkillContent
         disable-model-invocation: true
         ---
 
-        **CRITICAL RULES:**
-        1. You MUST use `runInTerminal` to execute CLI commands and `getTerminalOutput` to read the output. Do NOT just display commands.
-        2. Do NOT use MCP tools (like `analyze_coverage_gaps`, etc.) for coverage analysis. Use the `spectra ai analyze` CLI command via the terminal.
+        # SPECTRA Coverage
 
-        When the user asks about coverage, gaps, or what needs testing:
+        You analyze test coverage by running a CLI command. Follow these steps:
 
-        1. Use `runInTerminal` to execute, then `getTerminalOutput` to read the result:
+        ### Tool call 1: runInTerminal
+        ```
+        spectra ai analyze --coverage --auto-link --verbosity normal
+        ```
 
-           spectra ai analyze --coverage --auto-link --output-format json --verbosity quiet
+        ### Tool call 2: awaitTerminal
 
-        2. Parse JSON and present:
-           - Documentation coverage: X%
-           - Requirements coverage: X%
-           - Automation coverage: X%
-           - Uncovered areas with specific docs/requirements
-           - Undocumented tests count
+        ### Tool call 3: terminalLastCommand
+        Read the terminal output to get the coverage results.
 
-        3. If the user asks about a specific area:
-           - Reference the uncovered_areas from the JSON
-           - Suggest generating tests for uncovered docs
+        ### Your response:
+        Show the three coverage sections:
+        - **Documentation coverage**: X% — list uncovered docs
+        - **Requirements coverage**: X% — list untested requirements
+        - **Automation coverage**: X% — list unlinked tests
 
-        4. If the user wants to improve coverage:
-           - Suggest: "I can generate tests for {uncovered_doc}. Want me to?"
-           - If yes, use the spectra-generate SKILL
-
-        ### Examples:
-        - "How's our test coverage?"
-        - "What areas don't have tests yet?"
-        - "Show me coverage for the authentication module"
-        - "Which requirements aren't tested?"
+        If the user asks to improve coverage, suggest generating tests for uncovered areas.
         """;
 
     public const string Dashboard = $$"""
@@ -134,27 +125,24 @@ public static class SkillContent
         disable-model-invocation: true
         ---
 
-        **CRITICAL RULES:**
-        1. You MUST use `runInTerminal` to execute CLI commands and `getTerminalOutput` to read the output. Do NOT just display commands.
-        2. Do NOT use MCP tools for dashboard generation. Use the `spectra dashboard` CLI command via the terminal.
+        # SPECTRA Dashboard
 
-        When the user asks to generate, update, or build the dashboard:
+        You generate the dashboard by running a CLI command. Follow these steps:
 
-        1. Use `runInTerminal` to execute, then `getTerminalOutput` to read the result:
+        ### Tool call 1: runInTerminal
+        ```
+        spectra dashboard --output ./site --verbosity normal
+        ```
 
-           spectra dashboard --output ./site --output-format json --verbosity quiet
+        ### Tool call 2: awaitTerminal
 
-        2. Parse JSON and confirm:
-           - "Dashboard generated at ./site/index.html"
-           - Include: X suites, Y tests, Z runs
+        ### Tool call 3: terminalLastCommand
+        Read the terminal output to confirm the dashboard was generated.
 
-        3. If the project has Cloudflare Pages configured:
-           - Mention: "Push to main to auto-deploy, or open ./site/index.html locally"
-
-        ### Examples:
-        - "Generate the dashboard"
-        - "Update the dashboard with latest results"
-        - "Build the site"
+        ### Your response:
+        - "Dashboard generated at `./site/index.html`"
+        - Show how many suites and tests are included
+        - Suggest: "Open `./site/index.html` in your browser to view it"
         """;
 
     public const string Validate = $$"""
@@ -166,28 +154,23 @@ public static class SkillContent
         disable-model-invocation: true
         ---
 
-        **CRITICAL RULES:**
-        1. You MUST use `runInTerminal` to execute CLI commands and `getTerminalOutput` to read the output. Do NOT just display commands.
-        2. Do NOT use MCP tools (like `validate_tests`) for validation. Use the `spectra validate` CLI command via the terminal.
+        # SPECTRA Validate
 
-        When the user asks to validate, check, or verify test files:
+        You validate test cases by running a CLI command. Follow these steps:
 
-        1. Use `runInTerminal` to execute, then `getTerminalOutput` to read the result:
+        ### Tool call 1: runInTerminal
+        ```
+        spectra validate --output-format json --verbosity normal
+        ```
 
-           spectra validate --output-format json --verbosity quiet
+        ### Tool call 2: awaitTerminal
 
-        2. Parse JSON and present:
-           - If all valid: "All {total} tests are valid"
-           - If errors: list each error with file, line, and message
+        ### Tool call 3: terminalLastCommand
+        Read the terminal output to get the validation results.
 
-        3. If errors found, suggest fixes:
-           - Missing field: "Add {field} to the frontmatter in {file}"
-           - Duplicate ID: "Change the ID in {file} — {id} is already used in {other_file}"
-
-        ### Examples:
-        - "Validate all test cases"
-        - "Are there any formatting errors?"
-        - "Check if everything is valid before I push"
+        ### Your response:
+        - If no errors: "All tests are valid."
+        - If errors found: list each error with file and message. Suggest fixes.
         """;
 
     public const string List = $$"""
@@ -199,29 +182,41 @@ public static class SkillContent
         disable-model-invocation: true
         ---
 
-        **CRITICAL RULES:**
-        1. You MUST use `runInTerminal` to execute CLI commands and `getTerminalOutput` to read the output. Do NOT just display commands.
-        2. Do NOT use MCP tools (like `list_available_suites`, `find_test_cases`) for listing. Use the `spectra list` CLI command via the terminal.
+        # SPECTRA List
 
-        When the user asks to list, show, browse, or find test cases:
+        You list tests and suites by running CLI commands. Follow these steps:
 
-        1. To list suites, use `runInTerminal` then `getTerminalOutput`:
+        ## To list all suites:
 
-           spectra list --output-format json --verbosity quiet
+        ### Tool call 1: runInTerminal
+        ```
+        spectra list --verbosity normal
+        ```
 
-           Present: suite names with test counts
+        ### Tool call 2: awaitTerminal
 
-        2. To show a specific test, use `runInTerminal` then `getTerminalOutput`:
+        ### Tool call 3: terminalLastCommand
+        Read the terminal output to get the list of suites and test counts.
 
-           spectra show {test-id} --output-format json --verbosity quiet
+        ### Your response:
+        Show each suite with its test count.
 
-           Present: full test case details (title, steps, expected results, metadata)
+        ---
 
-        ### Examples:
-        - "List all test suites"
-        - "Show me TC-101"
-        - "What tests do we have for checkout?"
-        - "How many tests are in the authentication suite?"
+        ## To show a specific test:
+
+        ### Tool call 1: runInTerminal
+        ```
+        spectra show {test-id} --verbosity normal
+        ```
+
+        ### Tool call 2: awaitTerminal
+
+        ### Tool call 3: terminalLastCommand
+        Read the terminal output to get the test details.
+
+        ### Your response:
+        Show the test title, steps, expected result, priority, and tags.
         """;
 
     public const string InitProfile = $$"""
@@ -233,28 +228,27 @@ public static class SkillContent
         disable-model-invocation: true
         ---
 
-        **CRITICAL RULES:**
-        1. You MUST use `runInTerminal` to execute CLI commands and `getTerminalOutput` to read the output. Do NOT just display commands.
-        2. Do NOT use MCP tools for profile configuration. Use the `spectra init-profile` CLI command via the terminal.
+        # SPECTRA Profile
 
-        When the user asks to configure, set up, or change generation preferences:
+        You configure the generation profile by running a CLI command.
 
-        1. Ask what they want to configure:
-           - Detail level (high-level / detailed / very detailed)
-           - Negative scenario focus (minimum count per feature)
-           - Domain-specific needs (payments, auth, GDPR, etc.)
-           - Default priority
-           - Formatting preferences
+        First ask the user what they want to configure:
+        - Detail level (high-level / detailed / very detailed)
+        - Negative scenario focus
+        - Domain-specific needs
+        - Default priority
 
-        2. Use `runInTerminal` to execute, then `getTerminalOutput` to read the result:
+        ### Tool call 1: runInTerminal
+        ```
+        spectra init-profile --verbosity normal
+        ```
 
-           spectra init-profile --output-format json --verbosity quiet --no-interaction
+        ### Tool call 2: awaitTerminal
 
-        3. Confirm the profile was created/updated
+        ### Tool call 3: terminalLastCommand
+        Read the terminal output to confirm the profile was created/updated.
 
-        ### Examples:
-        - "Set up a generation profile"
-        - "I want more detailed test steps"
-        - "Configure SPECTRA for payment domain testing"
+        ### Your response:
+        Confirm what was configured and where the profile was saved.
         """;
 }
