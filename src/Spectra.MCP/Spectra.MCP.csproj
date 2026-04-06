@@ -10,7 +10,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>spectra-mcp</ToolCommandName>
     <PackageId>Spectra.MCP</PackageId>
-    <Version>1.22.0</Version>
+    <Version>1.22.1</Version>
     <Authors>Spectra</Authors>
     <Description>Spectra MCP Server for test execution</Description>
     <PackageOutputPath>./nupkg</PackageOutputPath>

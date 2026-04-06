@@ -105,7 +105,19 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 switch (evt)
                 {
                     case ToolExecutionStartEvent toolStart:
-                        _onStatus?.Invoke($"Tool: {toolStart.Data.ToolName}");
+                        var friendlyName = toolStart.Data.ToolName switch
+                        {
+                            "report_intent" => "Planning test generation strategy...",
+                            "ListDocumentationFiles" or "GetDocumentMap" => "Scanning documentation files...",
+                            "ReadDocument" or "LoadSourceDocument" => "Reading source documentation...",
+                            "ReadTestIndex" => "Checking existing test cases...",
+                            "CheckDuplicates" or "CheckDuplicatesBatch" => "Checking for duplicate tests...",
+                            "GetNextTestIds" => "Allocating test case IDs...",
+                            "BatchWriteTests" => "Writing test cases...",
+                            "SearchSourceDocs" => "Searching documentation...",
+                            _ => $"Processing: {toolStart.Data.ToolName}"
+                        };
+                        _onStatus?.Invoke(friendlyName);
                         break;
                 }
             });

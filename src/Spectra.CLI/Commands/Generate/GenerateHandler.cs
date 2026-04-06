@@ -413,7 +413,11 @@ public sealed class GenerateHandler
             config,
             currentDir,
             testsPath,
-            status => _progress.Info($"  {status}"),
+            status =>
+            {
+                _progress.Info($"  {status}");
+                UpdateProgress(suite, "generating", status);
+            },
             ct);
 
         if (!createResult.Success)
