@@ -116,7 +116,10 @@
       "Bash(cp:*)",
       "Bash(dotnet nuget:*)",
       "Bash(gh release:*)",
-      "Bash(sed -i 's/- \\\\[ \\\\] T0/- [x] T0/g' specs/019-smart-test-count/tasks.md)"
+      "Bash(sed -i 's/- \\\\[ \\\\] T0/- [x] T0/g' specs/019-smart-test-count/tasks.md)",
+      "Bash(rm:*)",
+      "Bash(powershell.exe -Command \"Remove-Item .spectra/last-result.json -ErrorAction SilentlyContinue; spectra ai generate --suite notifications --analyze-only --output-format json --verbosity quiet; Write-Host '---FILE---'; Get-Content .spectra/last-result.json\")",
+      "Bash(wc:*)"
     ]
   }
 }
