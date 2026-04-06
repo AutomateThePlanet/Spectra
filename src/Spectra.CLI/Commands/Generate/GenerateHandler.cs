@@ -180,6 +180,9 @@ public sealed class GenerateHandler
         var currentDir = Directory.GetCurrentDirectory();
         var configPath = Path.Combine(currentDir, "spectra.config.json");
 
+        // Delete stale result file so agents don't read old results
+        DeleteResultFile();
+
         // Load config
         var config = await LoadConfigAsync(configPath, ct);
         if (config is null)
@@ -1634,6 +1637,42 @@ public sealed class GenerateHandler
         Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
     };
 
+    private static string GetResultFilePath()
+    {
+        var spectraDir = Path.Combine(Directory.GetCurrentDirectory(), ".spectra");
+        Directory.CreateDirectory(spectraDir);
+        return Path.Combine(spectraDir, "last-result.json");
+    }
+
+    /// <summary>
+    /// Writes JSON to the result file with explicit flush to ensure Windows NTFS writes to disk.
+    /// </summary>
+    private static void FlushWriteFile(string path, string json)
+    {
+        using var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+        using var writer = new StreamWriter(fs);
+        writer.Write(json);
+        writer.Flush();
+        fs.Flush(true); // Force OS to flush to disk
+    }
+
+    /// <summary>
+    /// Deletes the result file at the start of a command to prevent stale reads.
+    /// </summary>
+    private static void DeleteResultFile()
+    {
+        try
+        {
+            var path = GetResultFilePath();
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch
+        {
+            // Non-critical
+        }
+    }
+
     /// <summary>
     /// Writes a result file to .spectra/last-result.json for external tool consumption.
     /// </summary>
@@ -1641,10 +1680,7 @@ public sealed class GenerateHandler
     {
         try
         {
-            var spectraDir = Path.Combine(Directory.GetCurrentDirectory(), ".spectra");
-            Directory.CreateDirectory(spectraDir);
-            var resultPath = Path.Combine(spectraDir, "last-result.json");
-            File.WriteAllText(resultPath, JsonSerializer.Serialize(result, ResultFileOptions));
+            FlushWriteFile(GetResultFilePath(), JsonSerializer.Serialize(result, ResultFileOptions));
         }
         catch
         {
@@ -1659,16 +1695,13 @@ public sealed class GenerateHandler
     {
         try
         {
-            var spectraDir = Path.Combine(Directory.GetCurrentDirectory(), ".spectra");
-            Directory.CreateDirectory(spectraDir);
-            var resultPath = Path.Combine(spectraDir, "last-result.json");
             var errorResult = new ErrorResult
             {
                 Command = "generate",
                 Status = "failed",
                 Error = error
             };
-            File.WriteAllText(resultPath, JsonSerializer.Serialize(errorResult, ResultFileOptions));
+            FlushWriteFile(GetResultFilePath(), JsonSerializer.Serialize(errorResult, ResultFileOptions));
         }
         catch
         {
