@@ -512,7 +512,7 @@ public sealed class GenerateHandler
                     $"Verifying batch {batchNum} ({batchResult.Tests.Count} tests)...");
 
                 batchVerificationResults = await VerifyTestsAsync(
-                    batchResult.Tests, documentMap, config.Ai.Critic!, generatorModel, ct);
+                    batchResult.Tests, documentMap, config.Ai.Critic!, generatorModel, ct, suite);
 
                 _verification.ShowSummary(batchVerificationResults);
                 allVerificationResults.AddRange(batchVerificationResults);
@@ -1456,7 +1456,8 @@ public sealed class GenerateHandler
         DocumentMap documentMap,
         CriticConfig criticConfig,
         string generatorModel,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? suite = null)
     {
         var results = new List<(TestCase Test, VerificationResult Result)>();
 
@@ -1504,8 +1505,10 @@ public sealed class GenerateHandler
             .ToList();
 
         // Verify each test
-        foreach (var test in tests)
+        for (var i = 0; i < tests.Count; i++)
         {
+            var test = tests[i];
+
             // T013: Skip verification for tests with Manual verdict — pass through as-is
             if (test.Grounding is not null && test.Grounding.Verdict == VerificationVerdict.Manual)
             {
@@ -1517,6 +1520,12 @@ public sealed class GenerateHandler
                     CriticModel = critic.ModelName
                 }));
                 continue;
+            }
+
+            if (suite is not null)
+            {
+                UpdateProgress(suite, "generating",
+                    $"Verifying test {i + 1}/{tests.Count}: {test.Id} ({critic.ModelName})...");
             }
 
             await _progress.StatusAsync($"Verifying {test.Id} ({critic.ModelName})...", async () =>
