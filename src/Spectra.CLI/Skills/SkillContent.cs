@@ -31,56 +31,45 @@ public static class SkillContent
 
         # SPECTRA Test Generation
 
-        You generate test cases by running CLI commands. You MUST follow the exact tool sequence below.
+        You generate test cases by running CLI commands. Follow the exact tool sequence below.
+
+        **IMPORTANT: When showing progress, ONLY output the `message` field from the JSON — nothing else. One short line. Do NOT add filler like "I'll continue monitoring" or "The current step remains". Just the message.**
 
         ## When user asks to generate test cases:
 
         ### Tool call 1: runInTerminal
-        Run this command (replace {suite} with the suite name from the user's request):
         ```
         spectra ai generate --suite {suite} --analyze-only --output-format json --verbosity quiet
         ```
 
         ### Tool call 2: awaitTerminal
-        Wait for the command to finish.
 
-        ### Tool call 3: readFile
-        Read the file `.spectra-result.json`.
-        If the file cannot be read, retry `readFile` once more.
+        ### Tool call 3: readFile `.spectra-result.json`
 
-        ### Your response:
-        Check the `status` field in the JSON:
-        - If `"status": "analyzing"` → the command is STILL RUNNING. Show the `message` field to the user (it contains the current step). Then call `awaitTerminal` and `readFile` again. Keep checking until the status changes.
-        - If `"status": "failed"` → tell the user the error from the `error` field.
-        - If `"status": "analyzed"` → tell the user:
-          - "I analyzed the documentation and found **{analysis.recommended}** testable behaviors to cover."
-          - "Shall I generate **{analysis.recommended}** test cases for the **{suite}** suite?"
+        **Check `status`:**
+        - `"analyzing"` → output ONLY: the `message` field — then `awaitTerminal` + `readFile` again.
+        - `"failed"` → tell user the `error`.
+        - `"analyzed"` → "I found **{analysis.recommended}** testable behaviors. Generate **{analysis.recommended}** test cases for **{suite}**?"
 
-        Then STOP and wait for the user to respond.
+        STOP. Wait for user.
 
         ---
 
         ## After user approves:
 
         ### Tool call 4: runInTerminal
-        Run this command (replace {count} with the number the user approved):
         ```
         spectra ai generate --suite {suite} --count {count} --output-format json --verbosity quiet
         ```
 
         ### Tool call 5: awaitTerminal
-        Wait for the command to finish. This command takes 1-2 minutes because it calls an AI model.
 
-        ### Tool call 6: readFile
-        Read the file `.spectra-result.json`.
+        ### Tool call 6: readFile `.spectra-result.json`
 
-        Check the `status` field:
-        - If `"status": "generating"` → the command is STILL RUNNING. Show the `message` field to the user (it contains the current step, e.g., "Generating 20 test cases using github-models..."). Then call `awaitTerminal` and `readFile` again. Keep checking until the status is no longer "generating". Do NOT give up — the generation will finish eventually.
-        - If `"status": "failed"` → tell the user the error from the `error` field.
-        - If `"status": "completed"` → tell the user:
-          - "Generated **{generation.tests_written}** test cases for the **{suite}** suite."
-          - List each file from the `files_created` array.
-          - If `generation.tests_rejected_by_critic` > 0, mention how many were rejected.
+        **Check `status`:**
+        - `"generating"` → output ONLY: the `message` field — then `awaitTerminal` + `readFile` again. Keep going until done.
+        - `"failed"` → tell user the `error`.
+        - `"completed"` → "Generated **{generation.tests_written}** test cases." + list `files_created`.
         """;
 
     public const string Coverage = $$"""

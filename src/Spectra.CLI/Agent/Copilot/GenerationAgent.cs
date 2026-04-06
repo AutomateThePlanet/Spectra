@@ -126,7 +126,7 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
             var fullPrompt = BuildFullPrompt(prompt, requestedCount);
 
             // Send and wait for the complete response (handles agent loop internally)
-            _onStatus?.Invoke("Generating test cases...");
+            _onStatus?.Invoke("AI is composing test cases — this takes about a minute...");
             var response = await session.SendAndWaitAsync(
                 new MessageOptions { Prompt = fullPrompt },
                 timeout: TimeSpan.FromMinutes(5),
