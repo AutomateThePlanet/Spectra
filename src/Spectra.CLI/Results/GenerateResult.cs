@@ -48,6 +48,10 @@ public sealed class GenerateAnalysis
 
 public sealed class GenerateGeneration
 {
+    [JsonPropertyName("tests_requested")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int TestsRequested { get; init; }
+
     [JsonPropertyName("tests_generated")]
     public int TestsGenerated { get; init; }
 

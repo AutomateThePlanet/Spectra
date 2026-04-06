@@ -99,8 +99,8 @@ public static class AgentContent
         ### Tool call 6: readFile `.spectra-result.json`
 
         **Check `status`:**
-        - `"generating"` → output ONLY: the `message` field — then `awaitTerminal` + `readFile` again. Keep going until done.
+        - `"generating"` → output ONLY the `message` field, then `awaitTerminal` + `readFile` again. Keep going until done.
         - `"failed"` → tell user the `error`.
-        - `"completed"` → "Generated **{generation.tests_written}** test cases." + list `files_created`.
+        - `"completed"` → "Generated **{generation.tests_written}** test cases." If `message` exists, show it. List `files_created`. If tests_written < tests_requested, say "Run again to generate more."
         """;
 }

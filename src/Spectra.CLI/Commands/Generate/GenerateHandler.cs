@@ -653,11 +653,19 @@ public sealed class GenerateHandler
         var groundedCount = verificationResults.Count(r => r.Result?.Verdict == VerificationVerdict.Grounded);
         var partialCount = verificationResults.Count(r => r.Result?.Verdict == VerificationVerdict.Partial);
 
+        // Build completion message
+        string? completionMessage = null;
+        if (result.Tests.Count < effectiveCount)
+        {
+            completionMessage = $"Generated {testsToWrite.Count} of {effectiveCount} requested. AI models have a response length limit (~30-40 tests per request). Run the command again to generate more.";
+        }
+
         var generateResult = new GenerateResult
         {
             Command = "generate",
             Status = "completed",
             Suite = suite,
+            Message = completionMessage,
             Analysis = analysisResult is not null ? new GenerateAnalysis
             {
                 TotalBehaviors = analysisResult.TotalBehaviors,
@@ -668,6 +676,7 @@ public sealed class GenerateHandler
             } : null,
             Generation = new GenerateGeneration
             {
+                TestsRequested = effectiveCount,
                 TestsGenerated = result.Tests.Count,
                 TestsWritten = testsToWrite.Count,
                 TestsRejectedByCritic = rejectedCount,
@@ -1735,16 +1744,12 @@ public sealed class GenerateHandler
         }
     }
 
-    private static string? _lastProgressMessage;
-
     /// <summary>
-    /// Updates the progress message in the result file without changing status.
-    /// Skips write if the message hasn't changed (reduces disk I/O and file watcher noise).
+    /// Updates the progress message in the result file.
+    /// Always writes to update the timestamp so polling agents see fresh content.
     /// </summary>
     private static void UpdateProgress(string suite, string status, string message)
     {
-        if (message == _lastProgressMessage) return;
-        _lastProgressMessage = message;
         WriteInProgressResultFile(suite, status, message);
     }
 
