@@ -184,6 +184,7 @@ public sealed class GenerateHandler
         var config = await LoadConfigAsync(configPath, ct);
         if (config is null)
         {
+            WriteErrorResultFile("No spectra.config.json found. Run 'spectra init' first.", suite);
             return ExitCodes.Error;
         }
 
@@ -205,6 +206,7 @@ public sealed class GenerateHandler
             _progress.Error("No source documentation found in docs/");
             Console.Error.WriteLine();
             Console.Error.WriteLine("Please add documentation files or check your spectra.config.json.");
+            WriteErrorResultFile("No source documentation found in docs/. Add documentation files or check spectra.config.json.", suite);
             return ExitCodes.Error;
         }
 
@@ -406,7 +408,9 @@ public sealed class GenerateHandler
 
         if (!createResult.Success)
         {
+            var authError = $"AI provider '{createResult.ProviderName}' authentication failed. Check your AI provider configuration in spectra.config.json.";
             AuthHandler.WriteAuthError(createResult.ProviderName!, createResult.AuthResult!);
+            WriteErrorResultFile(authError, suite);
             return ExitCodes.Error;
         }
 
@@ -415,6 +419,7 @@ public sealed class GenerateHandler
         if (!await agent.IsAvailableAsync(ct))
         {
             _progress.Error($"AI provider '{agent.ProviderName}' is not available.");
+            WriteErrorResultFile($"AI provider '{agent.ProviderName}' is not available. Check your network connection and API credentials.", suite);
             return ExitCodes.Error;
         }
 
@@ -442,13 +447,16 @@ public sealed class GenerateHandler
                 Console.Error.WriteLine($"You can retry with: spectra ai generate {suite} --focus \"{focus ?? ""}\"");
             }
 
+            var errorMsg = string.Join("; ", result.Errors);
+            WriteErrorResultFile(errorMsg, suite);
+
             if (_outputFormat == OutputFormat.Json)
             {
                 JsonResultWriter.Write(new ErrorResult
                 {
                     Command = "generate",
                     Status = "failed",
-                    Error = string.Join("; ", result.Errors)
+                    Error = errorMsg
                 });
             }
 
@@ -1618,6 +1626,14 @@ public sealed class GenerateHandler
         return true;
     }
 
+    private static readonly JsonSerializerOptions ResultFileOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+    };
+
     /// <summary>
     /// Writes a result file to .spectra/last-result.json for external tool consumption.
     /// </summary>
@@ -1628,18 +1644,35 @@ public sealed class GenerateHandler
             var spectraDir = Path.Combine(Directory.GetCurrentDirectory(), ".spectra");
             Directory.CreateDirectory(spectraDir);
             var resultPath = Path.Combine(spectraDir, "last-result.json");
-            var json = JsonSerializer.Serialize(result, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-                Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
-            });
-            File.WriteAllText(resultPath, json);
+            File.WriteAllText(resultPath, JsonSerializer.Serialize(result, ResultFileOptions));
         }
         catch
         {
             // Non-critical — don't fail the command if file write fails
+        }
+    }
+
+    /// <summary>
+    /// Writes an error result file so SKILL/agent can report failures to the user.
+    /// </summary>
+    private static void WriteErrorResultFile(string error, string? suite = null)
+    {
+        try
+        {
+            var spectraDir = Path.Combine(Directory.GetCurrentDirectory(), ".spectra");
+            Directory.CreateDirectory(spectraDir);
+            var resultPath = Path.Combine(spectraDir, "last-result.json");
+            var errorResult = new ErrorResult
+            {
+                Command = "generate",
+                Status = "failed",
+                Error = error
+            };
+            File.WriteAllText(resultPath, JsonSerializer.Serialize(errorResult, ResultFileOptions));
+        }
+        catch
+        {
+            // Non-critical
         }
     }
 
