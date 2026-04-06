@@ -394,6 +394,9 @@ public sealed class GenerateHandler
             _gapPresenter.ShowUncoveredAreas(gaps);
         }
 
+        // Mark result file as "generating" so agents know the command is in progress
+        WriteInProgressResultFile(suite);
+
         // Check duplicates status message
         await _progress.StatusAsync("Checking for duplicates...", async () =>
         {
@@ -1684,6 +1687,34 @@ public sealed class GenerateHandler
         catch
         {
             // Non-critical — don't fail the command if file write fails
+        }
+    }
+
+    /// <summary>
+    /// Writes an in-progress marker so agents know the command is still running.
+    /// </summary>
+    private static void WriteInProgressResultFile(string suite)
+    {
+        try
+        {
+            var result = new GenerateResult
+            {
+                Command = "generate",
+                Status = "generating",
+                Suite = suite,
+                Generation = new GenerateGeneration
+                {
+                    TestsGenerated = 0,
+                    TestsWritten = 0,
+                    TestsRejectedByCritic = 0
+                },
+                FilesCreated = []
+            };
+            FlushWriteFile(GetResultFilePath(), JsonSerializer.Serialize(result, ResultFileOptions));
+        }
+        catch
+        {
+            // Non-critical
         }
     }
 
