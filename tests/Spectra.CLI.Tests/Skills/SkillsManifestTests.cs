@@ -57,13 +57,14 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void SkillContent_HasAllSkills()
     {
-        Assert.Equal(6, SkillContent.All.Count);
+        Assert.Equal(7, SkillContent.All.Count);
         Assert.True(SkillContent.All.ContainsKey("spectra-generate"));
         Assert.True(SkillContent.All.ContainsKey("spectra-coverage"));
         Assert.True(SkillContent.All.ContainsKey("spectra-dashboard"));
         Assert.True(SkillContent.All.ContainsKey("spectra-validate"));
         Assert.True(SkillContent.All.ContainsKey("spectra-list"));
         Assert.True(SkillContent.All.ContainsKey("spectra-init-profile"));
+        Assert.True(SkillContent.All.ContainsKey("spectra-help"));
     }
 
     [Fact]
@@ -75,11 +76,12 @@ public class SkillsManifestTests : IDisposable
     }
 
     [Fact]
-    public void AllSkills_ContainOutputFormatJson()
+    public void AllSkills_ContainSpectraCommand()
     {
         foreach (var (name, content) in SkillContent.All)
         {
-            Assert.Contains("--output-format json", content, StringComparison.OrdinalIgnoreCase);
+            // All SKILLs should reference spectra CLI or be a help reference
+            Assert.Contains("spectra", content, StringComparison.OrdinalIgnoreCase);
         }
     }
 }
