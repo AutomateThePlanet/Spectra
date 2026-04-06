@@ -114,13 +114,15 @@ dotnet run --project src/Spectra.CLI -- <command>
 # --no-interaction              Fail with exit 3 if required args missing
 # --verbosity quiet             Minimal output (only final result)
 
-# Test Generation (006 + 021-generation-session)
+# Test Generation (006 + 021-generation-session + 023-copilot-chat)
 spectra ai generate                              # Interactive session (analyze → generate → suggest → loop)
-spectra ai generate checkout                     # Direct mode (specific suite)
+spectra ai generate --suite checkout             # Direct mode (--suite flag or positional arg)
 spectra ai generate checkout --focus "negative"  # Direct mode with focus
 spectra ai generate checkout --no-interaction    # CI mode (no prompts, exit codes)
 spectra ai generate --dry-run                    # Preview without writing
 spectra ai generate checkout --skip-critic       # Skip grounding verification (008)
+spectra ai generate --suite checkout --analyze-only  # Analysis only (no generation) — for SKILL two-step flow
+spectra ai generate --suite checkout --count 80  # Batch generation (auto-batches in groups of 30)
 
 # Generation Session (021-generation-session)
 spectra ai generate checkout --auto-complete --output-format json   # All phases, no prompts (CI)
@@ -177,6 +179,7 @@ spectra config list-automation-dirs                 # List dirs with existence s
 - **Tests:** xUnit with structured results (never throw on validation errors)
 
 ## Recent Changes
+- 023-copilot-chat-integration: ✅ COMPLETE - Full VS Code Copilot Chat integration for test generation and all CLI features. Added `--suite` option (flag alternative to positional arg) for LLM-friendly syntax. Added `--analyze-only` flag for two-step analyze→approve→generate flow. Automatic batch generation for large counts (batches of 30, writes per batch, index updates per batch). Live progress via `.spectra-result.json` with status lifecycle: analyzing→analyzed→generating→completed/failed. BehaviorAnalyzer timeout increased 30s→2min with proper error handling (was silently failing). 7 bundled SKILLs (generate, coverage, dashboard, validate, list, init-profile, help) with explicit tool-call-sequence format. Both agents (Generation, Execution) handle all SPECTRA commands with help reference. Progress messages from AI tool calls (scanning docs, reading docs, allocating IDs, verifying tests). Per-test verification progress. Critic verification per batch. Smart fallback count accounting for existing tests. Result file with `FileStream.Flush(true)` for Windows NTFS reliability. 1241 total passing.
 - 022-bundled-skills: ✅ COMPLETE - Bundled SKILL files and agent prompts for Copilot Chat integration. 6 SKILL files (generate, coverage, dashboard, validate, list, init-profile) and 2 agent prompts (execution, generation) created by `spectra init` in `.github/skills/` and `.github/agents/`. Each SKILL contains CLI commands with `--output-format json --verbosity quiet`, JSON parsing instructions, and example user requests. New `SkillContent`, `AgentContent` static classes with bundled content. New `SkillsManifest` with SHA-256 hash tracking for safe updates. New `spectra update-skills` command (updates unmodified files, skips user-customized). New `--skip-skills` flag on init. New `FileHasher` utility. 10 new tests, 1241 total passing.
 - 021-generation-session: ✅ COMPLETE - Four-phase generation session flow (Analysis → Generation → Suggestions → User-Described). Session state persisted in `.spectra/session.json` (1-hour TTL). New `Session/` directory: `GenerationSessionState`, `SessionStore`, `SuggestionBuilder`, `SessionSummary`. New `UserDescribedGenerator` creates tests from plain-language descriptions with `grounding.verdict: manual`. New `DuplicateDetector` with Levenshtein similarity (80% threshold). New `SuggestionPresenter` for interactive suggestions menu. New CLI flags: `--from-suggestions [indices]`, `--from-description`, `--context`, `--auto-complete`. Interactive mode loops Phases 3-4 until user exits with session summary. 20 new tests, 1231 total passing.
 - 020-cli-non-interactive: ✅ COMPLETE - CLI non-interactive mode and structured JSON output for SKILL/CI workflows. New global options: `--output-format` (human/json) and `--no-interaction` on all commands. New `OutputFormat` enum, `ExitCodes.MissingArguments` (exit code 3). New `Results/` directory with typed result models per command (`GenerateResult`, `AnalyzeCoverageResult`, `ValidateResult`, `DashboardResult`, `ListResult`, `ShowResult`, `InitResult`, `DocsIndexResult`, `ErrorResult`). New `JsonResultWriter` serializes any result to stdout as JSON (camelCase, enums as strings, null omission). All presenters (`ProgressReporter`, `ResultPresenter`, `VerificationPresenter`, `AnalysisPresenter`, `NextStepHints`) suppress output when `OutputFormat.Json`. All 12 command handlers updated. Standardized exit codes: 0 (success), 1 (error), 2 (validation), 3 (missing args). 7 new tests, 1211 total passing.
