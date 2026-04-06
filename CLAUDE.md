@@ -145,8 +145,8 @@ spectra dashboard --preview                        # Sample data + branding veri
 spectra dashboard --output ./site --output-format json  # JSON output for SKILL
 
 # Documentation Index (010-document-index)
-spectra docs index                               # Incremental update (only changed files)
-spectra docs index --force                       # Full rebuild
+spectra docs index                               # Incremental update + auto-extract requirements
+spectra docs index --force                       # Full rebuild + auto-extract requirements
 
 # Coverage Analysis (003 + unified coverage overhaul)
 spectra ai analyze --coverage                                    # Unified three-section report (doc, req, auto)
@@ -156,6 +156,7 @@ spectra ai analyze --coverage --auto-link                        # Write automat
 spectra ai analyze --coverage --output-format json               # Structured JSON to stdout (SKILL)
 spectra ai analyze --extract-requirements            # Extract requirements from docs
 spectra ai analyze --extract-requirements --dry-run  # Preview without writing
+spectra ai analyze --extract-requirements --output-format json  # JSON output for SKILL/CI
 
 # Validation with JSON output
 spectra validate --output-format json              # JSON errors for SKILL/CI

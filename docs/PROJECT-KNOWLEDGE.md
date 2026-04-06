@@ -225,11 +225,11 @@ spectra index --suite checkout   # Specific suite
 
 #### `spectra docs index`
 
-Build or refresh the documentation index.
+Build or refresh the documentation index, then auto-extract requirements.
 
 ```bash
-spectra docs index          # Incremental update
-spectra docs index --force  # Full rebuild
+spectra docs index          # Incremental update + auto-extract requirements
+spectra docs index --force  # Full rebuild + auto-extract requirements
 ```
 
 #### `spectra dashboard`

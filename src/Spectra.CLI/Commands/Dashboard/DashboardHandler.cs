@@ -2,6 +2,7 @@ using System.Text.Json;
 using Spectra.CLI.Dashboard;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Output;
+using Spectra.CLI.Results;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Dashboard;
 
@@ -142,6 +143,21 @@ public sealed class DashboardHandler
             foreach (var warning in generator.BrandingWarnings)
             {
                 Console.WriteLine($"Branding: Warning — {warning}");
+            }
+
+            if (_outputFormat == OutputFormat.Json)
+            {
+                JsonResultWriter.Write(new DashboardResult
+                {
+                    Command = "dashboard",
+                    Status = "success",
+                    OutputPath = Path.GetRelativePath(currentDir, outputPath),
+                    PagesGenerated = 1,
+                    SuitesIncluded = data.Suites.Count,
+                    TestsIncluded = data.Tests.Count,
+                    RunsIncluded = data.Runs.Count
+                });
+                return ExitCodes.Success;
             }
 
             if (_verbosity >= VerbosityLevel.Normal)

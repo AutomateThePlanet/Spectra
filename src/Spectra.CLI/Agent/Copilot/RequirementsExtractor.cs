@@ -25,6 +25,7 @@ public sealed class RequirementsExtractor
     /// <summary>
     /// Extracts testable requirements from source documents.
     /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when the AI extraction call fails.</exception>
     public async Task<IReadOnlyList<RequirementDefinition>> ExtractAsync(
         IReadOnlyList<Spectra.Core.Models.DocumentEntry> documents,
         IReadOnlyList<RequirementDefinition> existingRequirements,
@@ -33,31 +34,35 @@ public sealed class RequirementsExtractor
         if (documents.Count == 0)
             return [];
 
-        try
+        var service = await CopilotService.GetInstanceAsync(ct);
+
+        _onStatus?.Invoke("Creating extraction session...");
+        await using var session = await service.CreateGenerationSessionAsync(
+            _provider,
+            ct: ct);
+
+        var prompt = await BuildExtractionPromptAsync(documents, existingRequirements, ct);
+
+        _onStatus?.Invoke("Extracting requirements from documentation...");
+        var response = await session.SendAndWaitAsync(
+            new MessageOptions { Prompt = prompt },
+            timeout: TimeSpan.FromMinutes(3),
+            cancellationToken: ct);
+
+        var responseText = response?.Data?.Content ?? "";
+
+        if (string.IsNullOrWhiteSpace(responseText))
+            throw new InvalidOperationException(
+                "AI provider returned an empty response. Check your provider configuration and connectivity.");
+
+        var results = ParseResponse(responseText);
+        if (results.Count == 0)
         {
-            var service = await CopilotService.GetInstanceAsync(ct);
-
-            _onStatus?.Invoke("Creating extraction session...");
-            await using var session = await service.CreateGenerationSessionAsync(
-                _provider,
-                ct: ct);
-
-            var prompt = await BuildExtractionPromptAsync(documents, existingRequirements, ct);
-
-            _onStatus?.Invoke("Extracting requirements from documentation...");
-            var response = await session.SendAndWaitAsync(
-                new MessageOptions { Prompt = prompt },
-                timeout: TimeSpan.FromMinutes(3),
-                cancellationToken: ct);
-
-            var responseText = response?.Data?.Content ?? "";
-            return ParseResponse(responseText);
+            _onStatus?.Invoke("Warning: AI response could not be parsed into requirements. Raw response starts with: " +
+                              responseText[..Math.Min(200, responseText.Length)]);
         }
-        catch (Exception ex)
-        {
-            _onStatus?.Invoke($"Extraction failed: {ex.Message}");
-            return [];
-        }
+
+        return results;
     }
 
     private async Task<string> BuildExtractionPromptAsync(

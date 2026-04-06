@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Output;
+using Spectra.CLI.Results;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Profile;
@@ -158,7 +159,34 @@ public sealed class ValidateHandler
         totalErrors += result.Errors.Count + totalProfileErrors;
         totalWarnings += result.Warnings.Count;
 
-        // Output results
+        // Collect all errors for JSON output
+        var allErrors = result.Errors
+            .Select(e => new Results.ValidationError
+            {
+                File = string.IsNullOrEmpty(e.TestId) ? e.FilePath : $"{e.FilePath} ({e.TestId})",
+                Line = 0,
+                Message = $"[{e.Code}] {e.Message}"
+            })
+            .ToList();
+
+        var testCount = allSuites.Sum(s => s.TestCount);
+        var suiteCount = allSuites.Count;
+
+        if (_outputFormat == OutputFormat.Json)
+        {
+            JsonResultWriter.Write(new ValidateResult
+            {
+                Command = "validate",
+                Status = result.IsValid ? "success" : "failed",
+                Message = result.IsValid ? "Validation passed." : $"{totalErrors} error(s) found.",
+                TotalFiles = testCount,
+                Valid = testCount - allErrors.Count,
+                Errors = allErrors
+            });
+            return result.IsValid ? ExitCodes.Success : ExitCodes.Error;
+        }
+
+        // Human output
         if (result.Errors.Count > 0)
         {
             Console.Error.WriteLine("\nErrors:");
@@ -182,10 +210,6 @@ public sealed class ValidateHandler
                 Console.WriteLine($"  [{warning.Code}] {location}: {warning.Message}");
             }
         }
-
-        // Summary
-        var testCount = allSuites.Sum(s => s.TestCount);
-        var suiteCount = allSuites.Count;
 
         if (_verbosity >= VerbosityLevel.Normal)
         {

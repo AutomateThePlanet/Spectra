@@ -36,6 +36,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Agent\Resources\spectra-execution.agent.md" />
     <EmbeddedResource Include="Agent\Resources\SKILL.md" />
+    <EmbeddedResource Include="Skills\Content\Skills\*.md" />
+    <EmbeddedResource Include="Skills\Content\Agents\*.md" />
     <EmbeddedResource Include="Templates\deploy-dashboard.yml" />
     <EmbeddedResource Include="Dashboard\Templates\index.html" />
     <EmbeddedResource Include="Dashboard\Templates\scripts\app.js" />

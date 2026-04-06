@@ -4,6 +4,7 @@ using Spectra.CLI.Coverage;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Output;
 using Spectra.CLI.IO;
+using Spectra.CLI.Results;
 using Spectra.CLI.Source;
 using Spectra.Core.Coverage;
 using Spectra.Core.Models;
@@ -229,7 +230,19 @@ public sealed class AnalyzeHandler
 
             if (config is null)
             {
-                Console.Error.WriteLine("No spectra.config.json found. Run 'spectra init' first.");
+                if (_outputFormat == OutputFormat.Json)
+                {
+                    JsonResultWriter.Write(new ErrorResult
+                    {
+                        Command = "extract-requirements",
+                        Status = "failed",
+                        Error = "No spectra.config.json found. Run 'spectra init' first."
+                    });
+                }
+                else
+                {
+                    Console.Error.WriteLine("No spectra.config.json found. Run 'spectra init' first.");
+                }
                 return ExitCodes.Error;
             }
 
@@ -243,12 +256,35 @@ public sealed class AnalyzeHandler
 
             if (documentMap.Documents.Count == 0)
             {
-                Console.WriteLine("No documentation files found. Add docs to your source directory.");
+                if (_outputFormat == OutputFormat.Json)
+                {
+                    JsonResultWriter.Write(new ExtractRequirementsResult
+                    {
+                        Command = "extract-requirements",
+                        Status = "success",
+                        Message = "No documentation files found.",
+                        ExtractedCount = 0,
+                        NewCount = 0,
+                        DuplicatesSkipped = 0,
+                        TotalInFile = 0,
+                        RequirementsFile = config.Coverage.RequirementsFile
+                    });
+                }
+                else
+                {
+                    Console.WriteLine("No documentation files found. Add docs to your source directory.");
+                }
                 return ExitCodes.Success;
             }
 
             // Load existing requirements
             var reqsPath = Path.Combine(currentDir, config.Coverage.RequirementsFile);
+
+            // Ensure requirements directory exists
+            var reqsDir = Path.GetDirectoryName(reqsPath);
+            if (!string.IsNullOrEmpty(reqsDir))
+                Directory.CreateDirectory(reqsDir);
+
             var parser = new Spectra.Core.Parsing.RequirementsParser();
             var existing = await parser.ParseAsync(reqsPath, ct);
 
@@ -256,12 +292,24 @@ public sealed class AnalyzeHandler
             var provider = config.Ai.Providers.FirstOrDefault(p => p.Enabled);
             if (provider is null)
             {
-                Console.Error.WriteLine("No AI provider configured. Run 'spectra init' to configure.");
+                if (_outputFormat == OutputFormat.Json)
+                {
+                    JsonResultWriter.Write(new ErrorResult
+                    {
+                        Command = "extract-requirements",
+                        Status = "failed",
+                        Error = "No AI provider configured. Run 'spectra init' to configure."
+                    });
+                }
+                else
+                {
+                    Console.Error.WriteLine("No AI provider configured. Run 'spectra init' to configure.");
+                }
                 return ExitCodes.Error;
             }
 
             // Extract requirements
-            if (_verbosity >= VerbosityLevel.Normal)
+            if (_outputFormat != OutputFormat.Json && _verbosity >= VerbosityLevel.Normal)
             {
                 Console.WriteLine($"Extracting requirements from {documentMap.Documents.Count} document(s)...");
             }
@@ -269,13 +317,53 @@ public sealed class AnalyzeHandler
             var extractor = new Agent.Copilot.RequirementsExtractor(
                 provider,
                 currentDir,
-                _verbosity >= VerbosityLevel.Normal ? Console.WriteLine : null);
+                _outputFormat != OutputFormat.Json && _verbosity >= VerbosityLevel.Normal ? Console.WriteLine : null);
 
-            var extracted = await extractor.ExtractAsync(documentMap.Documents, existing, ct);
+            IReadOnlyList<RequirementDefinition> extracted;
+            try
+            {
+                extracted = await extractor.ExtractAsync(documentMap.Documents, existing, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                if (_outputFormat == OutputFormat.Json)
+                {
+                    JsonResultWriter.Write(new ErrorResult
+                    {
+                        Command = "extract-requirements",
+                        Status = "failed",
+                        Error = $"Requirements extraction failed: {ex.Message}"
+                    });
+                }
+                else
+                {
+                    Console.Error.WriteLine($"Requirements extraction failed: {ex.Message}");
+                    if (_verbosity >= VerbosityLevel.Detailed)
+                        Console.Error.WriteLine(ex.StackTrace);
+                }
+                return ExitCodes.Error;
+            }
 
             if (extracted.Count == 0)
             {
-                Console.WriteLine("No requirements found in documentation.");
+                if (_outputFormat == OutputFormat.Json)
+                {
+                    JsonResultWriter.Write(new ExtractRequirementsResult
+                    {
+                        Command = "extract-requirements",
+                        Status = "success",
+                        Message = "No requirements found in documentation.",
+                        ExtractedCount = 0,
+                        NewCount = 0,
+                        DuplicatesSkipped = 0,
+                        TotalInFile = existing.Count,
+                        RequirementsFile = Path.GetRelativePath(currentDir, reqsPath)
+                    });
+                }
+                else
+                {
+                    Console.WriteLine("No requirements found in documentation.");
+                }
                 return ExitCodes.Success;
             }
 
@@ -285,21 +373,46 @@ public sealed class AnalyzeHandler
 
             if (dryRun)
             {
-                Console.WriteLine();
-                Console.WriteLine($"Extracted {extracted.Count} requirement(s) (dry run — no files written):");
-                Console.WriteLine();
-
                 var withIds = writer.AllocateIds(existing, result.Merged);
-                foreach (var req in withIds)
-                {
-                    Console.WriteLine($"  {req.Id}  [{req.Priority}]  {req.Title}");
-                    Console.WriteLine($"          Source: {req.Source}");
-                }
 
-                if (result.Duplicates.Count > 0)
+                if (_outputFormat == OutputFormat.Json)
+                {
+                    JsonResultWriter.Write(new ExtractRequirementsResult
+                    {
+                        Command = "extract-requirements",
+                        Status = "success",
+                        Message = "Dry run — no files written.",
+                        ExtractedCount = extracted.Count,
+                        NewCount = result.Merged.Count,
+                        DuplicatesSkipped = result.SkippedCount,
+                        TotalInFile = existing.Count + result.Merged.Count,
+                        RequirementsFile = Path.GetRelativePath(currentDir, reqsPath),
+                        Requirements = withIds.Select(r => new RequirementEntry
+                        {
+                            Id = r.Id,
+                            Title = r.Title,
+                            Source = r.Source,
+                            Priority = r.Priority ?? "medium"
+                        }).ToList()
+                    });
+                }
+                else
                 {
                     Console.WriteLine();
-                    Console.WriteLine($"  {result.Duplicates.Count} duplicate(s) would be skipped");
+                    Console.WriteLine($"Extracted {extracted.Count} requirement(s) (dry run — no files written):");
+                    Console.WriteLine();
+
+                    foreach (var req in withIds)
+                    {
+                        Console.WriteLine($"  {req.Id}  [{req.Priority}]  {req.Title}");
+                        Console.WriteLine($"          Source: {req.Source}");
+                    }
+
+                    if (result.Duplicates.Count > 0)
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine($"  {result.Duplicates.Count} duplicate(s) would be skipped");
+                    }
                 }
 
                 return ExitCodes.Success;
@@ -308,19 +421,42 @@ public sealed class AnalyzeHandler
             var writeResult = await writer.MergeAndWriteAsync(reqsPath, extracted, ct);
 
             // Report results
-            Console.WriteLine();
-            Console.WriteLine($"Requirements extraction complete:");
-            Console.WriteLine($"  New:        {writeResult.Merged.Count}");
-            Console.WriteLine($"  Duplicates: {writeResult.SkippedCount} (skipped)");
-            Console.WriteLine($"  Total:      {writeResult.TotalInFile}");
-            Console.WriteLine($"  File:       {Path.GetRelativePath(currentDir, reqsPath)}");
-
-            if (writeResult.Merged.Count > 0 && _verbosity >= VerbosityLevel.Normal)
+            if (_outputFormat == OutputFormat.Json)
+            {
+                JsonResultWriter.Write(new ExtractRequirementsResult
+                {
+                    Command = "extract-requirements",
+                    Status = "success",
+                    ExtractedCount = extracted.Count,
+                    NewCount = writeResult.Merged.Count,
+                    DuplicatesSkipped = writeResult.SkippedCount,
+                    TotalInFile = writeResult.TotalInFile,
+                    RequirementsFile = Path.GetRelativePath(currentDir, reqsPath),
+                    Requirements = writeResult.Merged.Select(r => new RequirementEntry
+                    {
+                        Id = r.Id,
+                        Title = r.Title,
+                        Source = r.Source,
+                        Priority = r.Priority ?? "medium"
+                    }).ToList()
+                });
+            }
+            else
             {
                 Console.WriteLine();
-                foreach (var req in writeResult.Merged)
+                Console.WriteLine($"Requirements extraction complete:");
+                Console.WriteLine($"  New:        {writeResult.Merged.Count}");
+                Console.WriteLine($"  Duplicates: {writeResult.SkippedCount} (skipped)");
+                Console.WriteLine($"  Total:      {writeResult.TotalInFile}");
+                Console.WriteLine($"  File:       {Path.GetRelativePath(currentDir, reqsPath)}");
+
+                if (writeResult.Merged.Count > 0 && _verbosity >= VerbosityLevel.Normal)
                 {
-                    Console.WriteLine($"  + {req.Id}  [{req.Priority}]  {req.Title}");
+                    Console.WriteLine();
+                    foreach (var req in writeResult.Merged)
+                    {
+                        Console.WriteLine($"  + {req.Id}  [{req.Priority}]  {req.Title}");
+                    }
                 }
             }
 
@@ -333,10 +469,20 @@ public sealed class AnalyzeHandler
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Error: {ex.Message}");
-            if (_verbosity >= VerbosityLevel.Detailed)
+            if (_outputFormat == OutputFormat.Json)
             {
-                Console.Error.WriteLine(ex.StackTrace);
+                JsonResultWriter.Write(new ErrorResult
+                {
+                    Command = "extract-requirements",
+                    Status = "failed",
+                    Error = ex.Message
+                });
+            }
+            else
+            {
+                Console.Error.WriteLine($"Error: {ex.Message}");
+                if (_verbosity >= VerbosityLevel.Detailed)
+                    Console.Error.WriteLine(ex.StackTrace);
             }
             return ExitCodes.Error;
         }

@@ -1,5 +1,7 @@
 using System.Text.Json;
 using Spectra.CLI.Infrastructure;
+using Spectra.CLI.Output;
+using Spectra.CLI.Results;
 using Spectra.Core.Index;
 using Spectra.Core.Models.Config;
 
@@ -73,6 +75,7 @@ public sealed class ListHandler
             }
 
             var totalTests = 0;
+            var suiteEntries = new List<SuiteEntry>();
 
             foreach (var suiteDir in suiteDirs)
             {
@@ -81,29 +84,54 @@ public sealed class ListHandler
 
                 if (!File.Exists(indexPath))
                 {
-                    Console.WriteLine($"{suiteName}/ (no index - run 'spectra index')");
+                    suiteEntries.Add(new SuiteEntry { Name = suiteName, TestCount = 0 });
+                    if (_outputFormat != OutputFormat.Json)
+                        Console.WriteLine($"{suiteName}/ (no index - run 'spectra index')");
                     continue;
                 }
 
                 var index = await indexReader.ReadAsync(indexPath, ct);
                 if (index is null)
                 {
-                    Console.WriteLine($"{suiteName}/ (invalid index)");
+                    suiteEntries.Add(new SuiteEntry { Name = suiteName, TestCount = 0 });
+                    if (_outputFormat != OutputFormat.Json)
+                        Console.WriteLine($"{suiteName}/ (invalid index)");
                     continue;
                 }
 
-                Console.WriteLine($"{suiteName}/ ({index.TestCount} tests)");
-
-                if (showAll || _verbosity >= VerbosityLevel.Detailed)
+                suiteEntries.Add(new SuiteEntry
                 {
-                    foreach (var test in index.Tests)
+                    Name = suiteName,
+                    TestCount = index.TestCount
+                });
+
+                if (_outputFormat != OutputFormat.Json)
+                {
+                    Console.WriteLine($"{suiteName}/ ({index.TestCount} tests)");
+
+                    if (showAll || _verbosity >= VerbosityLevel.Detailed)
                     {
-                        var priority = test.Priority.ToString().ToLowerInvariant();
-                        Console.WriteLine($"  {test.Id}: {test.Title} [{priority}]");
+                        foreach (var test in index.Tests)
+                        {
+                            var priority = test.Priority.ToString().ToLowerInvariant();
+                            Console.WriteLine($"  {test.Id}: {test.Title} [{priority}]");
+                        }
                     }
                 }
 
                 totalTests += index.TestCount;
+            }
+
+            if (_outputFormat == OutputFormat.Json)
+            {
+                JsonResultWriter.Write(new ListResult
+                {
+                    Command = "list",
+                    Status = "success",
+                    Message = $"{totalTests} test(s) in {suiteDirs.Count} suite(s)",
+                    Suites = suiteEntries
+                });
+                return ExitCodes.Success;
             }
 
             Console.WriteLine();

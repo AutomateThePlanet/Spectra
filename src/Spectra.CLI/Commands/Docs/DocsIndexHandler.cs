@@ -1,8 +1,11 @@
 using System.Text.Json;
+using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Output;
+using Spectra.CLI.Results;
 using Spectra.CLI.Source;
 using Spectra.Core.Models.Config;
+using Spectra.Core.Parsing;
 
 namespace Spectra.CLI.Commands.Docs;
 
@@ -58,12 +61,96 @@ public sealed class DocsIndexHandler
             force ? "Rebuilding documentation index..." : "Updating documentation index...",
             async () => await indexService.EnsureIndexAsync(currentDir, config.Source, force, ct));
 
-        _progress.Success($"Documentation index updated: {index.TotalDocuments} documents, " +
-                          $"{index.TotalWordCount:N0} words, ~{index.TotalEstimatedTokens:N0} tokens");
-        _progress.Info($"Index written to: {Path.GetRelativePath(currentDir, indexPath)}");
+        if (_outputFormat != OutputFormat.Json)
+        {
+            _progress.Success($"Documentation index updated: {index.TotalDocuments} documents, " +
+                              $"{index.TotalWordCount:N0} words, ~{index.TotalEstimatedTokens:N0} tokens");
+            _progress.Info($"Index written to: {Path.GetRelativePath(currentDir, indexPath)}");
+        }
+
+        // Auto-extract requirements if AI provider is configured
+        await TryExtractRequirementsAsync(currentDir, config, ct);
+
+        if (_outputFormat == OutputFormat.Json)
+        {
+            JsonResultWriter.Write(new DocsIndexResult
+            {
+                Command = "docs-index",
+                Status = "success",
+                DocumentsIndexed = index.TotalDocuments,
+                DocumentsUpdated = index.TotalDocuments,
+                IndexPath = Path.GetRelativePath(currentDir, indexPath)
+            });
+            return ExitCodes.Success;
+        }
 
         NextStepHints.Print("docs-index", true, _verbosity, outputFormat: _outputFormat);
         return ExitCodes.Success;
+    }
+
+    private async Task TryExtractRequirementsAsync(string currentDir, SpectraConfig config, CancellationToken ct)
+    {
+        var provider = config.Ai.Providers.FirstOrDefault(p => p.Enabled);
+        if (provider is null)
+            return;
+
+        var reqsPath = Path.Combine(currentDir, config.Coverage.RequirementsFile);
+
+        // Ensure requirements directory exists
+        var reqsDir = Path.GetDirectoryName(reqsPath);
+        if (!string.IsNullOrEmpty(reqsDir))
+            Directory.CreateDirectory(reqsDir);
+
+        var parser = new RequirementsParser();
+        var existing = await parser.ParseAsync(reqsPath, ct);
+
+        var docBuilder = new DocumentMapBuilder();
+        var documentMap = await docBuilder.BuildAsync(currentDir, ct);
+
+        if (documentMap.Documents.Count == 0)
+            return;
+
+        if (_verbosity >= VerbosityLevel.Normal)
+            _progress.Info($"Extracting requirements from {documentMap.Documents.Count} document(s)...");
+
+        try
+        {
+            var extractor = new RequirementsExtractor(
+                provider,
+                currentDir,
+                _verbosity >= VerbosityLevel.Normal ? s => _progress.Info(s) : null);
+
+            var extracted = await extractor.ExtractAsync(documentMap.Documents, existing, ct);
+
+            if (extracted.Count == 0)
+            {
+                if (_verbosity >= VerbosityLevel.Normal)
+                    _progress.Info("No new requirements found in documentation.");
+                return;
+            }
+
+            if (_dryRun)
+            {
+                _progress.Info($"Would extract {extracted.Count} requirement(s) (dry run).");
+                return;
+            }
+
+            var writer = new RequirementsWriter();
+            var writeResult = await writer.MergeAndWriteAsync(reqsPath, extracted, ct);
+
+            _progress.Success($"Requirements extracted: {writeResult.Merged.Count} new, " +
+                              $"{writeResult.SkippedCount} duplicates skipped, {writeResult.TotalInFile} total");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _progress.Warning($"Requirements extraction failed: {ex.Message}");
+            if (_verbosity >= VerbosityLevel.Detailed)
+                Console.Error.WriteLine(ex.StackTrace);
+        }
     }
 
     private static async Task<SpectraConfig?> LoadConfigAsync(string configPath, CancellationToken ct)

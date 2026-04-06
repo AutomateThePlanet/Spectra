@@ -105,7 +105,7 @@ dotnet tool install -g Spectra.CLI
 # Initialize (creates config, dirs, SKILL files, agent prompts)
 spectra init
 
-# Build the document index
+# Build the document index (also extracts requirements automatically)
 spectra docs index
 
 # Generate tests — interactive session with analysis, suggestions, and more

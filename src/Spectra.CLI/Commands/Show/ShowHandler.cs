@@ -1,5 +1,7 @@
 using System.Text.Json;
 using Spectra.CLI.Infrastructure;
+using Spectra.CLI.Output;
+using Spectra.CLI.Results;
 using Spectra.Core.Index;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Parsing;
@@ -78,11 +80,24 @@ public sealed class ShowHandler
                 if (testEntry is not null)
                 {
                     var testPath = Path.Combine(testsDir, testEntry.File);
-                    return await DisplayTestAsync(testPath, showRaw, ct);
+                    var suiteName = Path.GetFileName(suiteDir);
+                    return await DisplayTestAsync(testPath, suiteName, showRaw, ct);
                 }
             }
 
-            Console.Error.WriteLine($"Test not found: {testId}");
+            if (_outputFormat == OutputFormat.Json)
+            {
+                JsonResultWriter.Write(new ErrorResult
+                {
+                    Command = "show",
+                    Status = "failed",
+                    Error = $"Test not found: {testId}"
+                });
+            }
+            else
+            {
+                Console.Error.WriteLine($"Test not found: {testId}");
+            }
             return ExitCodes.Error;
         }
         catch (OperationCanceledException)
@@ -97,7 +112,7 @@ public sealed class ShowHandler
         }
     }
 
-    private async Task<int> DisplayTestAsync(string testPath, bool showRaw, CancellationToken ct)
+    private async Task<int> DisplayTestAsync(string testPath, string suiteName, bool showRaw, CancellationToken ct)
     {
         if (!File.Exists(testPath))
         {
@@ -128,6 +143,28 @@ public sealed class ShowHandler
         }
 
         var test = result.Value!;
+
+        if (_outputFormat == OutputFormat.Json)
+        {
+            JsonResultWriter.Write(new ShowResult
+            {
+                Command = "show",
+                Status = "success",
+                Test = new TestDetail
+                {
+                    Id = test.Id,
+                    Title = test.Title,
+                    Priority = test.Priority.ToString().ToLowerInvariant(),
+                    Suite = suiteName,
+                    Component = test.Component,
+                    Tags = test.Tags.ToList(),
+                    SourceRefs = test.SourceRefs.ToList(),
+                    Steps = test.Steps.ToList(),
+                    ExpectedResults = [test.ExpectedResult]
+                }
+            });
+            return ExitCodes.Success;
+        }
 
         Console.WriteLine($"ID:        {test.Id}");
         Console.WriteLine($"Title:     {test.Title}");

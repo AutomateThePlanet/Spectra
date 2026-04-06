@@ -98,16 +98,18 @@ Reports a summary of updated, unchanged, and skipped files.
 
 ### `spectra docs index`
 
-Build or incrementally update the documentation index (`docs/_index.md`).
+Build or incrementally update the documentation index (`docs/_index.md`), then automatically extract testable requirements.
 
 ```bash
-spectra docs index                # Incremental update (only changed files)
-spectra docs index --force        # Full rebuild
+spectra docs index                # Incremental update + auto-extract requirements
+spectra docs index --force        # Full rebuild + auto-extract requirements
 ```
 
 The index contains per-document metadata (title, sections with summaries, key entities, word/token counts, content hashes). The AI agent reads this lightweight index (~1-2K tokens) instead of scanning all files.
 
 Content hashes enable incremental updates — only changed files are re-indexed. The index is also auto-refreshed before `spectra ai generate` runs.
+
+After indexing, requirements are automatically extracted from the documentation using the configured AI provider and merged into `_requirements.yaml`. If no provider is configured, the extraction step is skipped.
 
 See [Document Index](document-index.md) for full details.
 
