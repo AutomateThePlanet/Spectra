@@ -272,7 +272,11 @@ public sealed class GenerateHandler
                 async () =>
                 {
                     var provider = config.Ai.Providers?.FirstOrDefault(p => p.Enabled);
-                    var analyzer = new BehaviorAnalyzer(provider);
+                    var analyzer = new BehaviorAnalyzer(provider, status =>
+                    {
+                        _progress.Info($"  {status}");
+                        UpdateProgress(suite, progressStatus, status);
+                    });
                     return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct);
                 });
 

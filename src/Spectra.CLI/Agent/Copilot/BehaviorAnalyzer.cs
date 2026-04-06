@@ -16,14 +16,16 @@ namespace Spectra.CLI.Agent.Copilot;
 public sealed class BehaviorAnalyzer
 {
     private readonly SpectraProviderConfig? _provider;
+    private readonly Action<string>? _onStatus;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    public BehaviorAnalyzer(SpectraProviderConfig? provider)
+    public BehaviorAnalyzer(SpectraProviderConfig? provider, Action<string>? onStatus = null)
     {
         _provider = provider;
+        _onStatus = onStatus;
     }
 
     /// <summary>
@@ -42,6 +44,7 @@ public sealed class BehaviorAnalyzer
 
         try
         {
+            _onStatus?.Invoke("Connecting to AI for behavior analysis...");
             var service = await CopilotService.GetInstanceAsync(ct);
 
             await using var session = await service.CreateGenerationSessionAsync(
@@ -51,16 +54,35 @@ public sealed class BehaviorAnalyzer
 
             var prompt = BuildAnalysisPrompt(documents, focusArea);
 
+            _onStatus?.Invoke($"Analyzing {documents.Count} documents for testable behaviors...");
             var response = await session.SendAndWaitAsync(
                 new MessageOptions { Prompt = prompt },
-                timeout: TimeSpan.FromSeconds(30),
+                timeout: TimeSpan.FromMinutes(2),
                 cancellationToken: ct);
 
             var responseText = response?.Data?.Content ?? "";
 
+            if (string.IsNullOrWhiteSpace(responseText))
+            {
+                _onStatus?.Invoke("AI returned empty response for behavior analysis");
+                return null;
+            }
+
             var behaviors = ParseAnalysisResponse(responseText);
             if (behaviors is null || behaviors.Count == 0)
+            {
+                _onStatus?.Invoke("Could not parse behaviors from AI response");
+                // Save debug response
+                try
+                {
+                    var debugPath = Path.Combine(Directory.GetCurrentDirectory(), ".spectra-debug-analysis.txt");
+                    File.WriteAllText(debugPath, responseText);
+                }
+                catch { /* non-critical */ }
                 return null;
+            }
+
+            _onStatus?.Invoke($"Found {behaviors.Count} testable behaviors");
 
             // Apply focus filter if specified
             if (!string.IsNullOrWhiteSpace(focusArea))
@@ -89,9 +111,14 @@ public sealed class BehaviorAnalyzer
                 TotalWords = totalWords
             };
         }
-        catch
+        catch (TimeoutException)
         {
-            // Analysis failure is non-fatal — caller falls back to default count
+            _onStatus?.Invoke("Behavior analysis timed out (2 min). Using default count.");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _onStatus?.Invoke($"Behavior analysis failed: {ex.Message}");
             return null;
         }
     }
