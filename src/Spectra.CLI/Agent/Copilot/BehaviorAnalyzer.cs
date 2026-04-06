@@ -55,6 +55,15 @@ public sealed class BehaviorAnalyzer
             var prompt = BuildAnalysisPrompt(documents, focusArea);
 
             _onStatus?.Invoke($"Analyzing {documents.Count} documents for testable behaviors...");
+
+            // Schedule delayed message updates so polling agents see progress
+            _ = Task.Delay(5000, ct).ContinueWith(_ =>
+                _onStatus?.Invoke("AI is identifying testable behaviors — this may take up to a minute..."), TaskContinuationOptions.OnlyOnRanToCompletion);
+            _ = Task.Delay(20000, ct).ContinueWith(_ =>
+                _onStatus?.Invoke("Still analyzing — categorizing behaviors by type (happy path, negative, edge case)..."), TaskContinuationOptions.OnlyOnRanToCompletion);
+            _ = Task.Delay(40000, ct).ContinueWith(_ =>
+                _onStatus?.Invoke("Almost done — computing recommended test count..."), TaskContinuationOptions.OnlyOnRanToCompletion);
+
             var response = await session.SendAndWaitAsync(
                 new MessageOptions { Prompt = prompt },
                 timeout: TimeSpan.FromMinutes(2),
