@@ -180,9 +180,6 @@ public sealed class GenerateHandler
         var currentDir = Directory.GetCurrentDirectory();
         var configPath = Path.Combine(currentDir, "spectra.config.json");
 
-        // Delete stale result file so agents don't read old results
-        DeleteResultFile();
-
         // Load config
         var config = await LoadConfigAsync(configPath, ct);
         if (config is null)
@@ -370,6 +367,8 @@ public sealed class GenerateHandler
                 _progress.Info($"To generate, run: spectra ai generate --suite {suite} --count {analyzeResult.Analysis.Recommended}");
             }
 
+            Console.Out.Flush();
+            Console.Error.Flush();
             return ExitCodes.Success;
         }
 
