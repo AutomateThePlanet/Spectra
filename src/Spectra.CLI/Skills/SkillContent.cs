@@ -35,6 +35,8 @@ public static class SkillContent
 
         **IMPORTANT: When showing progress, ONLY output the `message` field — one short line, nothing else. If the message is the same as last time, say nothing — just poll again silently.**
 
+        **ALWAYS follow the full analyze → approve → generate flow, even if the user says "generate more tests" or "add more". Never skip the analysis step.**
+
         ## When user asks to generate test cases:
 
         ### Tool call 1: runInTerminal
@@ -49,7 +51,7 @@ public static class SkillContent
         **Check `status`:**
         - `"analyzing"` → output ONLY: the `message` field — then `awaitTerminal` + `readFile` again.
         - `"failed"` → tell user the `error`.
-        - `"analyzed"` → "I found **{analysis.recommended}** testable behaviors. Generate **{analysis.recommended}** test cases for **{suite}**?"
+        - `"analyzed"` → "**{analysis.already_covered}** tests already exist. I recommend generating **{analysis.recommended}** more. Shall I proceed?"
 
         STOP. Wait for user.
 

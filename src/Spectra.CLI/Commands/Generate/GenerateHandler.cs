@@ -314,9 +314,10 @@ public sealed class GenerateHandler
             }
             else
             {
-                // Analysis failed — fall back to default
-                _progress.Warning("Behavior analysis unavailable, using default count of 20");
-                effectiveCount = 20;
+                // Analysis failed — fall back to default, reduce by existing test count
+                var defaultCount = config.Generation?.DefaultCount ?? 15;
+                effectiveCount = Math.Max(5, defaultCount - existingTests.Count);
+                _progress.Warning($"Behavior analysis unavailable, using default count of {effectiveCount} (accounting for {existingTests.Count} existing tests)");
             }
         }
 
