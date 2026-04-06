@@ -189,13 +189,15 @@ public sealed class GenerateHandler
         }
 
         // Mark result file as in-progress so agents know the command is running
-        WriteInProgressResultFile(suite, analyzeOnly ? "analyzing" : "generating");
+        var progressStatus = analyzeOnly ? "analyzing" : "generating";
+        WriteInProgressResultFile(suite, progressStatus, "Loading documentation...");
 
         // Auto-refresh document index before generation
         var indexService = new DocumentIndexService();
         await indexService.EnsureIndexAsync(currentDir, config.Source, forceRebuild: false, ct);
 
         // Load source documents with full content for grounded generation
+        UpdateProgress(suite, progressStatus, $"Loading {suite} documentation...");
         var documents = await _progress.StatusAsync(
             $"Loading {suite} suite...",
             async () =>
@@ -241,6 +243,7 @@ public sealed class GenerateHandler
 
         _progress.Success($"Loading {suite} suite... {existingTests.Count} existing tests");
         _progress.Success($"Scanning documentation... {documents.Count} relevant files");
+        UpdateProgress(suite, progressStatus, $"Found {documents.Count} docs, {existingTests.Count} existing tests");
 
         if (allExistingIds.Count > existingTests.Count)
         {
@@ -263,6 +266,7 @@ public sealed class GenerateHandler
         else
         {
             // No --count: perform AI-powered behavior analysis
+            UpdateProgress(suite, progressStatus, "Analyzing testable behaviors in documentation...");
             analysisResult = await _progress.StatusAsync(
                 $"Analyzing {suite} documentation...",
                 async () =>
@@ -404,6 +408,7 @@ public sealed class GenerateHandler
         });
 
         // Create agent using Copilot SDK
+        UpdateProgress(suite, "generating", "Connecting to AI provider...");
         var createResult = await AgentFactory.CreateAgentAsync(
             config,
             currentDir,
@@ -429,6 +434,7 @@ public sealed class GenerateHandler
         }
 
         // Generate tests
+        UpdateProgress(suite, "generating", $"Generating {effectiveCount} test cases using {agent.ProviderName}...");
         var prompt = BuildPrompt(suite, effectiveCount, allExistingIds, effectiveProfile, focus);
         GenerationResult result = null!;
         await _progress.StatusAsync("Generating tests...", async () =>
@@ -501,6 +507,7 @@ public sealed class GenerateHandler
         }
 
         // Display generated tests
+        UpdateProgress(suite, "generating", $"Generated {result.Tests.Count} tests, verifying quality...");
         _progress.Success($"Generated {result.Tests.Count} tests:");
         _progress.BlankLine();
         _results.ShowGeneratedTests(result.Tests);
@@ -582,6 +589,7 @@ public sealed class GenerateHandler
         }
 
         // Write tests with grounding metadata
+        UpdateProgress(suite, "generating", $"Writing {testsToWrite.Count} test files to tests/{suite}/...");
         var writer = new TestFileWriter();
 
         foreach (var test in testsToWrite)
@@ -1692,7 +1700,7 @@ public sealed class GenerateHandler
     /// <summary>
     /// Writes an in-progress marker so agents know the command is still running.
     /// </summary>
-    private static void WriteInProgressResultFile(string suite, string status = "generating")
+    private static void WriteInProgressResultFile(string suite, string status = "generating", string? message = null)
     {
         try
         {
@@ -1701,6 +1709,7 @@ public sealed class GenerateHandler
                 Command = "generate",
                 Status = status,
                 Suite = suite,
+                Message = message,
                 Generation = new GenerateGeneration
                 {
                     TestsGenerated = 0,
@@ -1715,6 +1724,14 @@ public sealed class GenerateHandler
         {
             // Non-critical
         }
+    }
+
+    /// <summary>
+    /// Updates the progress message in the result file without changing status.
+    /// </summary>
+    private static void UpdateProgress(string suite, string status, string message)
+    {
+        WriteInProgressResultFile(suite, status, message);
     }
 
     /// <summary>

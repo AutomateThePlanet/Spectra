@@ -50,7 +50,7 @@ public static class SkillContent
 
         ### Your response:
         Check the `status` field in the JSON:
-        - If `"status": "analyzing"` → the command is STILL RUNNING. Tell the user "Analyzing documentation, please wait..." Then call `awaitTerminal` and `readFile` again. Keep checking until the status changes.
+        - If `"status": "analyzing"` → the command is STILL RUNNING. Show the `message` field to the user (it contains the current step). Then call `awaitTerminal` and `readFile` again. Keep checking until the status changes.
         - If `"status": "failed"` → tell the user the error from the `error` field.
         - If `"status": "analyzed"` → tell the user:
           - "I analyzed the documentation and found **{analysis.recommended}** testable behaviors to cover."
@@ -75,7 +75,7 @@ public static class SkillContent
         Read the file `.spectra-result.json`.
 
         Check the `status` field:
-        - If `"status": "generating"` → the command is STILL RUNNING. Tell the user "Generating tests, please wait..." Then call `awaitTerminal` and `readFile` again. Keep checking until the status is no longer "generating". Do NOT give up — the generation will finish eventually.
+        - If `"status": "generating"` → the command is STILL RUNNING. Show the `message` field to the user (it contains the current step, e.g., "Generating 20 test cases using github-models..."). Then call `awaitTerminal` and `readFile` again. Keep checking until the status is no longer "generating". Do NOT give up — the generation will finish eventually.
         - If `"status": "failed"` → tell the user the error from the `error` field.
         - If `"status": "completed"` → tell the user:
           - "Generated **{generation.tests_written}** test cases for the **{suite}** suite."

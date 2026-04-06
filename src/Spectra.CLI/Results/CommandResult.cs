@@ -15,6 +15,10 @@ public class CommandResult
 
     [JsonPropertyName("timestamp")]
     public string Timestamp { get; init; } = DateTimeOffset.UtcNow.ToString("o");
+
+    [JsonPropertyName("message")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Message { get; set; }
 }
 
 /// <summary>
