@@ -74,13 +74,19 @@ public static class AgentContent
         ### Tool call 2: awaitTerminal
         Wait for the command to finish.
 
-        ### Tool call 3: readFile
-        Read the file `.spectra/last-result.json` to get the analysis results.
+        ### Tool call 3: listDirectory
+        List the `.spectra` directory to refresh the file cache.
 
-        ### Your response after reading the file:
-        Parse the JSON and tell the user:
-        - "I analyzed the documentation and found **{analysis.recommended}** testable behaviors to cover."
-        - "Shall I generate **{analysis.recommended}** test cases for the **{suite}** suite?"
+        ### Tool call 4: readFile
+        Read the file `.spectra/last-result.json`.
+        If the file cannot be read, call `listDirectory` on `.spectra` again and retry `readFile` once more.
+
+        ### Your response:
+        Check the `status` field in the JSON:
+        - If `"status": "failed"` → tell the user the error from the `error` field.
+        - If `"status": "analyzed"` → tell the user:
+          - "I analyzed the documentation and found **{analysis.recommended}** testable behaviors to cover."
+          - "Shall I generate **{analysis.recommended}** test cases for the **{suite}** suite?"
 
         Then STOP and wait for the user to respond.
 
@@ -88,20 +94,20 @@ public static class AgentContent
 
         ## After user approves:
 
-        ### Tool call 4: runInTerminal
+        ### Tool call 5: runInTerminal
         Run this command (replace {count} with the number the user approved):
         ```
         spectra ai generate --suite {suite} --count {count} --output-format json --verbosity quiet
         ```
 
-        ### Tool call 5: awaitTerminal
+        ### Tool call 6: awaitTerminal
         Wait for the command to finish. This command takes 1-2 minutes because it calls an AI model.
 
-        ### Tool call 6: readFile
+        ### Tool call 7: readFile
         Read the file `.spectra/last-result.json`.
 
-        **IMPORTANT:** Check the `status` field:
-        - If `"status": "generating"` → the command is STILL RUNNING. Tell the user "Generating tests, please wait..." then call `awaitTerminal` one more time and `readFile` again. Do NOT poll rapidly — only check twice total.
+        Check the `status` field:
+        - If `"status": "generating"` → the command is STILL RUNNING. Tell the user "Generating tests, please wait..." Then call `awaitTerminal` and `readFile` again. Keep checking until the status is no longer "generating". Do NOT give up — the generation will finish eventually.
         - If `"status": "failed"` → tell the user the error from the `error` field.
         - If `"status": "completed"` → tell the user:
           - "Generated **{generation.tests_written}** test cases for the **{suite}** suite."
