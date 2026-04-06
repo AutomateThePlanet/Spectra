@@ -110,14 +110,17 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                         "report_intent" => "Planning test generation strategy...",
                         "ListDocumentationFiles" or "GetDocumentMap" => "Scanning documentation files...",
                         "ReadDocument" or "LoadSourceDocument" => "Reading source documentation...",
-                        "ReadTestIndex" => "Checking existing test cases...",
+                        "ReadTestIndex" or "GetExistingTestDetails" => "Checking existing test cases...",
                         "CheckDuplicates" or "CheckDuplicatesBatch" => "Checking for duplicate tests...",
                         "GetNextTestIds" => $"Preparing to generate {requestedCount} test cases...",
                         "BatchWriteTests" => "Writing test cases...",
                         "SearchSourceDocs" => "Searching documentation...",
-                        _ => $"Processing: {toolStart.Data.ToolName}"
+                        // Suppress internal/noisy tool names
+                        "powershell" or "view" or "bash" or "sh" or "cmd" => null,
+                        _ => null // Don't show unknown tool names
                     };
-                    _onStatus?.Invoke(friendlyName);
+                    if (friendlyName is not null)
+                        _onStatus?.Invoke(friendlyName);
 
                     if (toolStart.Data.ToolName == "GetNextTestIds")
                     {
