@@ -56,18 +56,23 @@ public sealed class BehaviorAnalyzer
 
             _onStatus?.Invoke($"Analyzing {documents.Count} documents for testable behaviors...");
 
-            // Schedule delayed message updates so polling agents see progress
-            _ = Task.Delay(5000, ct).ContinueWith(_ =>
+            // Schedule delayed message updates, cancelled when AI call completes
+            using var timerCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var timerToken = timerCts.Token;
+            _ = Task.Delay(5000, timerToken).ContinueWith(_ =>
                 _onStatus?.Invoke("AI is identifying testable behaviors — this may take up to a minute..."), TaskContinuationOptions.OnlyOnRanToCompletion);
-            _ = Task.Delay(20000, ct).ContinueWith(_ =>
+            _ = Task.Delay(20000, timerToken).ContinueWith(_ =>
                 _onStatus?.Invoke("Still analyzing — categorizing behaviors by type (happy path, negative, edge case)..."), TaskContinuationOptions.OnlyOnRanToCompletion);
-            _ = Task.Delay(40000, ct).ContinueWith(_ =>
+            _ = Task.Delay(40000, timerToken).ContinueWith(_ =>
                 _onStatus?.Invoke("Almost done — computing recommended test count..."), TaskContinuationOptions.OnlyOnRanToCompletion);
 
             var response = await session.SendAndWaitAsync(
                 new MessageOptions { Prompt = prompt },
                 timeout: TimeSpan.FromMinutes(2),
                 cancellationToken: ct);
+
+            // Cancel delayed timers so they don't overwrite the final result
+            await timerCts.CancelAsync();
 
             var responseText = response?.Data?.Content ?? "";
 

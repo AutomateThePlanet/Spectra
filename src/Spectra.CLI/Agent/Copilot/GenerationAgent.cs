@@ -99,13 +99,12 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 tools,
                 ct);
 
-            // Track tool calls to show composing message after last tool
-            var toolCallCount = 0;
+            // Track tool calls and schedule delayed composing message
+            using var timerCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             using var subscription = session.On(evt =>
             {
                 if (evt is ToolExecutionStartEvent toolStart)
                 {
-                    toolCallCount++;
                     var friendlyName = toolStart.Data.ToolName switch
                     {
                         "report_intent" => "Planning test generation strategy...",
@@ -120,12 +119,11 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                     };
                     _onStatus?.Invoke(friendlyName);
 
-                    // After IDs are allocated, the AI composes test cases (long wait)
-                    // Schedule a delayed status update
                     if (toolStart.Data.ToolName == "GetNextTestIds")
                     {
-                        _ = Task.Delay(3000).ContinueWith(_ =>
-                            _onStatus?.Invoke($"AI is writing {requestedCount} test cases — this takes about a minute..."));
+                        _ = Task.Delay(3000, timerCts.Token).ContinueWith(_ =>
+                            _onStatus?.Invoke($"AI is writing {requestedCount} test cases — this takes about a minute..."),
+                            TaskContinuationOptions.OnlyOnRanToCompletion);
                     }
                 }
             });
@@ -139,6 +137,9 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 new MessageOptions { Prompt = fullPrompt },
                 timeout: TimeSpan.FromMinutes(5),
                 cancellationToken: ct);
+
+            // Cancel delayed timers so they don't overwrite the final result
+            await timerCts.CancelAsync();
 
             var responseText = response?.Data?.Content ?? "";
 
