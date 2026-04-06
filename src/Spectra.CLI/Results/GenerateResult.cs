@@ -61,6 +61,10 @@ public sealed class GenerateGeneration
     [JsonPropertyName("tests_rejected_by_critic")]
     public int TestsRejectedByCritic { get; init; }
 
+    [JsonPropertyName("batches_completed")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int BatchesCompleted { get; init; }
+
     [JsonPropertyName("grounding")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public GroundingCounts? Grounding { get; init; }

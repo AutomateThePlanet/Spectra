@@ -30,6 +30,8 @@ namespace Spectra.CLI.Commands.Generate;
 /// </summary>
 public sealed class GenerateHandler
 {
+    private const int BatchSize = 30;
+
     private readonly VerbosityLevel _verbosity;
     private readonly bool _dryRun;
     private readonly bool _noReview;
@@ -442,34 +444,140 @@ public sealed class GenerateHandler
             return ExitCodes.Error;
         }
 
-        // Generate tests
-        UpdateProgress(suite, "generating", $"Generating {effectiveCount} test cases using {agent.ProviderName}...");
-        var prompt = BuildPrompt(suite, effectiveCount, allExistingIds, effectiveProfile, focus);
-        GenerationResult result = null!;
-        await _progress.StatusAsync("Generating tests...", async () =>
-        {
-            result = await agent.GenerateTestsAsync(prompt, documents, existingTests, effectiveCount, ct);
-        });
+        // --- Batch generation loop ---
+        var generatorModel = agent.ProviderName;
+        var writer = new TestFileWriter();
+        var allWrittenTests = new List<TestCase>();
+        var allFilesCreated = new List<string>();
+        var allVerificationResults = new List<(TestCase Test, VerificationResult Result)>();
+        var totalGenerated = 0;
+        var totalRejected = 0;
+        var mutableExistingTests = new List<TestCase>(existingTests);
+        var mutableExistingIds = new HashSet<string>(allExistingIds);
+        var batchErrors = new List<string>();
+        var batchesCompleted = 0;
 
-        if (!result.IsSuccess)
+        for (var batchNum = 1; totalGenerated < effectiveCount; batchNum++)
         {
-            _progress.Error("AI generation failed:");
-            foreach (var error in result.Errors)
+            var remaining = effectiveCount - totalGenerated;
+            var batchRequestCount = Math.Min(remaining, BatchSize);
+
+            UpdateProgress(suite, "generating",
+                $"Generating batch {batchNum}: {allWrittenTests.Count}/{effectiveCount} tests complete...");
+            _progress.Info($"Batch {batchNum}: requesting {batchRequestCount} tests ({allWrittenTests.Count}/{effectiveCount} complete)");
+
+            var prompt = BuildPrompt(suite, batchRequestCount, mutableExistingIds, effectiveProfile, focus);
+            GenerationResult batchResult = null!;
+
+            await _progress.StatusAsync($"Generating batch {batchNum}...", async () =>
             {
-                Console.Error.WriteLine($"  {error}");
+                batchResult = await agent.GenerateTestsAsync(
+                    prompt, documents, mutableExistingTests, batchRequestCount, ct);
+            });
+
+            // Handle batch failure — keep tests from prior batches
+            if (!batchResult.IsSuccess)
+            {
+                batchErrors.AddRange(batchResult.Errors);
+                _progress.Warning($"Batch {batchNum} failed: {string.Join("; ", batchResult.Errors)}");
+                break;
             }
 
-            // Note partial success if any tests were generated before failure
-            if (result.Tests.Count > 0)
+            // Handle empty batch — AI has nothing more to generate
+            if (batchResult.Tests.Count == 0)
             {
-                Console.Error.WriteLine();
-                Console.Error.WriteLine($"{result.Tests.Count} tests were written before the error.");
-                Console.Error.WriteLine($"You can retry with: spectra ai generate {suite} --focus \"{focus ?? ""}\"");
+                _progress.Info($"Batch {batchNum} returned 0 tests — generation complete.");
+                break;
             }
 
-            var errorMsg = string.Join("; ", result.Errors);
+            totalGenerated += batchResult.Tests.Count;
+            _progress.Success($"Batch {batchNum}: generated {batchResult.Tests.Count} tests");
+            _results.ShowGeneratedTests(batchResult.Tests);
+
+            // Dry-run: show first batch only, don't write
+            if (_dryRun)
+            {
+                _progress.BlankLine();
+                _progress.Info("Dry run - no files written");
+                break;
+            }
+
+            // Per-batch verification
+            var batchTestsToWrite = batchResult.Tests.ToList();
+            var batchVerificationResults = new List<(TestCase Test, VerificationResult Result)>();
+
+            if (ShouldVerify(config.Ai.Critic))
+            {
+                UpdateProgress(suite, "generating",
+                    $"Verifying batch {batchNum} ({batchResult.Tests.Count} tests)...");
+
+                batchVerificationResults = await VerifyTestsAsync(
+                    batchResult.Tests, documentMap, config.Ai.Critic!, generatorModel, ct);
+
+                _verification.ShowSummary(batchVerificationResults);
+                allVerificationResults.AddRange(batchVerificationResults);
+
+                batchTestsToWrite = batchVerificationResults
+                    .Where(r => r.Result.Verdict != VerificationVerdict.Hallucinated)
+                    .Select(r => r.Test)
+                    .ToList();
+
+                totalRejected += batchVerificationResults
+                    .Count(r => r.Result.Verdict == VerificationVerdict.Hallucinated);
+
+                if (batchTestsToWrite.Count == 0)
+                {
+                    _progress.Warning($"Batch {batchNum}: all tests rejected by critic");
+                    continue; // Try another batch
+                }
+            }
+            else if (_skipCritic && batchNum == 1)
+            {
+                _verification.ShowSkippedNotice();
+            }
+
+            // Per-batch write
+            UpdateProgress(suite, "generating",
+                $"Writing batch {batchNum}: {batchTestsToWrite.Count} test files...");
+
+            foreach (var test in batchTestsToWrite)
+            {
+                var filePath = TestFileWriter.GetFilePath(testsPath, suite, test.Id);
+                var verification = batchVerificationResults.FirstOrDefault(r => r.Test.Id == test.Id);
+                var testWithPath = CreateTestWithGrounding(
+                    test, verification.Result, generatorModel, filePath, testsPath);
+                await writer.WriteAsync(filePath, testWithPath, ct);
+
+                allFilesCreated.Add(Path.GetRelativePath(currentDir, filePath));
+                mutableExistingIds.Add(test.Id);
+            }
+
+            allWrittenTests.AddRange(batchTestsToWrite);
+            mutableExistingTests.AddRange(batchTestsToWrite);
+            batchesCompleted++;
+
+            // Per-batch index update
+            var allTestsForIndex = new List<TestCase>(existingTests);
+            allTestsForIndex.AddRange(allWrittenTests);
+            var indexGenerator = new IndexGenerator();
+            var batchIndex = indexGenerator.Generate(suite, allTestsForIndex);
+            var indexWriter = new IndexWriter();
+            await indexWriter.WriteAsync(Path.Combine(suitePath, "_index.json"), batchIndex, ct);
+
+            _progress.Success($"Progress: {allWrittenTests.Count}/{effectiveCount} tests written to disk");
+        }
+        // --- End batch loop ---
+
+        if (_dryRun)
+        {
+            return ExitCodes.Success;
+        }
+
+        // Handle total failure (no tests from any batch)
+        if (allWrittenTests.Count == 0 && batchErrors.Count > 0)
+        {
+            var errorMsg = string.Join("; ", batchErrors);
             WriteErrorResultFile(errorMsg, suite);
-
             if (_outputFormat == OutputFormat.Json)
             {
                 JsonResultWriter.Write(new ErrorResult
@@ -479,186 +587,37 @@ public sealed class GenerateHandler
                     Error = errorMsg
                 });
             }
-
             return ExitCodes.Error;
         }
 
-        if (result.Tests.Count == 0)
+        if (allWrittenTests.Count == 0)
         {
             _progress.Warning($"No tests generated (requested: {effectiveCount})");
             _progress.BlankLine();
             ShowCountMismatchReason(0, effectiveCount, documentMap.Documents.Count, existingTests.Count, focus);
-            if (_outputFormat == OutputFormat.Json)
-            {
-                JsonResultWriter.Write(new GenerateResult
-                {
-                    Command = "generate",
-                    Status = "completed",
-                    Suite = suite,
-                    Analysis = analysisResult is not null ? new GenerateAnalysis
-                    {
-                        TotalBehaviors = analysisResult.TotalBehaviors,
-                        AlreadyCovered = analysisResult.AlreadyCovered,
-                        Recommended = analysisResult.RecommendedCount,
-                        Breakdown = analysisResult.Breakdown?.ToDictionary(
-                            kvp => kvp.Key.ToString(), kvp => kvp.Value)
-                    } : null,
-                    Generation = new GenerateGeneration
-                    {
-                        TestsGenerated = 0,
-                        TestsWritten = 0,
-                        TestsRejectedByCritic = 0
-                    },
-                    FilesCreated = []
-                });
-            }
             return ExitCodes.Success;
         }
 
-        // Display generated tests
-        UpdateProgress(suite, "generating", $"Generated {result.Tests.Count} tests, verifying quality...");
-        _progress.Success($"Generated {result.Tests.Count} tests:");
         _progress.BlankLine();
-        _results.ShowGeneratedTests(result.Tests);
-
-        // Warn if fewer tests than requested
-        if (result.Tests.Count < effectiveCount)
-        {
-            _progress.BlankLine();
-            _progress.Warning($"Generated {result.Tests.Count} of {effectiveCount} requested tests");
-            ShowCountMismatchReason(result.Tests.Count, effectiveCount, documentMap.Documents.Count, existingTests.Count, focus);
-        }
-
-        // Preview or write tests
-        if (_dryRun)
-        {
-            _progress.BlankLine();
-            _progress.Info("Dry run - no files written");
-            return ExitCodes.Success;
-        }
-
-        // Verify tests against documentation if critic is configured
-        var verificationResults = new List<(TestCase Test, VerificationResult Result)>();
-        var testsToWrite = result.Tests.ToList();
-        var generatorModel = agent.ProviderName;
-
-        if (ShouldVerify(config.Ai.Critic))
-        {
-            verificationResults = await VerifyTestsAsync(
-                result.Tests,
-                documentMap,
-                config.Ai.Critic!,
-                generatorModel,
-                ct);
-
-            // Show verification summary
-            _verification.ShowSummary(verificationResults);
-            _verification.ShowPartialDetails(verificationResults);
-            _verification.ShowRejectedDetails(verificationResults);
-
-            // Filter out hallucinated tests
-            testsToWrite = verificationResults
-                .Where(r => r.Result.Verdict != VerificationVerdict.Hallucinated)
-                .Select(r => r.Test)
-                .ToList();
-
-            if (testsToWrite.Count == 0)
-            {
-                _progress.BlankLine();
-                _progress.Warning("All generated tests were rejected as hallucinated");
-                _progress.Info("Try adding more documentation or narrowing the focus");
-                if (_outputFormat == OutputFormat.Json)
-                {
-                    JsonResultWriter.Write(new GenerateResult
-                    {
-                        Command = "generate",
-                        Status = "completed",
-                        Suite = suite,
-                        Generation = new GenerateGeneration
-                        {
-                            TestsGenerated = result.Tests.Count,
-                            TestsWritten = 0,
-                            TestsRejectedByCritic = result.Tests.Count,
-                            Grounding = new GroundingCounts
-                            {
-                                Grounded = 0,
-                                Partial = 0,
-                                Hallucinated = result.Tests.Count
-                            }
-                        },
-                        FilesCreated = []
-                    });
-                }
-                return ExitCodes.Success;
-            }
-        }
-        else if (_skipCritic)
-        {
-            _verification.ShowSkippedNotice();
-        }
-
-        // Write tests with grounding metadata
-        UpdateProgress(suite, "generating", $"Writing {testsToWrite.Count} test files to tests/{suite}/...");
-        var writer = new TestFileWriter();
-
-        foreach (var test in testsToWrite)
-        {
-            var filePath = TestFileWriter.GetFilePath(testsPath, suite, test.Id);
-
-            // Get verification result for this test if available
-            var verification = verificationResults.FirstOrDefault(r => r.Test.Id == test.Id);
-            var testWithPath = CreateTestWithGrounding(
-                test,
-                verification.Result,
-                generatorModel,
-                filePath,
-                testsPath);
-
-            await writer.WriteAsync(filePath, testWithPath, ct);
-        }
-
-        _progress.BlankLine();
-        _results.ShowCompletion($"tests/{suite}/", testsToWrite.Count);
-
-        // Update index
-        var allTests = new List<TestCase>(existingTests);
-        allTests.AddRange(testsToWrite);
-
-        var indexGenerator = new IndexGenerator();
-        var index = indexGenerator.Generate(suite, allTests);
-
-        var indexWriter = new IndexWriter();
-        await indexWriter.WriteAsync(Path.Combine(suitePath, "_index.json"), index, ct);
+        _results.ShowCompletion($"tests/{suite}/", allWrittenTests.Count);
 
         // Show remaining gaps
-        var remainingGaps = gapAnalyzer.GetRemainingGaps(gaps, testsToWrite);
+        var remainingGaps = gapAnalyzer.GetRemainingGaps(gaps, allWrittenTests);
         _gapPresenter.ShowRemainingGaps(remainingGaps);
 
-        // Smart count: show behavior gap notification if analysis was performed
         if (analysisResult is not null)
         {
             AnalysisPresenter.DisplayGapNotification(
-                analysisResult, testsToWrite.Count, suite, outputFormat: _outputFormat);
+                analysisResult, allWrittenTests.Count, suite, outputFormat: _outputFormat);
         }
 
-        // Token usage if verbose
-        if (_verbosity >= VerbosityLevel.Detailed && result.TokenUsage is not null)
-        {
-            _progress.BlankLine();
-            _progress.Info($"Token usage: {result.TokenUsage.InputTokens} in / {result.TokenUsage.OutputTokens} out");
-        }
+        // Build final result from accumulated totals
+        var finalGroundedCount = allVerificationResults.Count(r => r.Result?.Verdict == VerificationVerdict.Grounded);
+        var finalPartialCount = allVerificationResults.Count(r => r.Result?.Verdict == VerificationVerdict.Partial);
 
-        // Build result for JSON output and file
-        var rejectedCount = verificationResults.Count(r => r.Result?.Verdict == VerificationVerdict.Hallucinated);
-        var groundedCount = verificationResults.Count(r => r.Result?.Verdict == VerificationVerdict.Grounded);
-        var partialCount = verificationResults.Count(r => r.Result?.Verdict == VerificationVerdict.Partial);
-
-        // Build completion message
-        string? completionMessage = null;
-        if (result.Tests.Count < effectiveCount)
-        {
-            completionMessage = $"Generated {testsToWrite.Count} of {effectiveCount} requested. AI models have a response length limit (~30-40 tests per request). Run the command again to generate more.";
-        }
+        string? completionMessage = allWrittenTests.Count < effectiveCount
+            ? $"Generated {allWrittenTests.Count} of {effectiveCount} requested across {batchesCompleted} batch(es)."
+            : null;
 
         var generateResult = new GenerateResult
         {
@@ -677,22 +636,20 @@ public sealed class GenerateHandler
             Generation = new GenerateGeneration
             {
                 TestsRequested = effectiveCount,
-                TestsGenerated = result.Tests.Count,
-                TestsWritten = testsToWrite.Count,
-                TestsRejectedByCritic = rejectedCount,
-                Grounding = verificationResults.Count > 0 ? new GroundingCounts
+                TestsGenerated = totalGenerated,
+                TestsWritten = allWrittenTests.Count,
+                TestsRejectedByCritic = totalRejected,
+                BatchesCompleted = batchesCompleted,
+                Grounding = allVerificationResults.Count > 0 ? new GroundingCounts
                 {
-                    Grounded = groundedCount,
-                    Partial = partialCount,
-                    Hallucinated = rejectedCount
+                    Grounded = finalGroundedCount,
+                    Partial = finalPartialCount,
+                    Hallucinated = totalRejected
                 } : null
             },
-            FilesCreated = testsToWrite
-                .Select(t => Path.GetRelativePath(currentDir, TestFileWriter.GetFilePath(testsPath, suite, t.Id)))
-                .ToList()
+            FilesCreated = allFilesCreated
         };
 
-        // Always write result file for SKILL/agent consumption
         WriteResultFile(generateResult);
 
         if (_outputFormat == OutputFormat.Json)
@@ -700,6 +657,8 @@ public sealed class GenerateHandler
             JsonResultWriter.Write(generateResult);
         }
 
+        Console.Out.Flush();
+        Console.Error.Flush();
         NextStepHints.Print("generate", true, _verbosity, new HintContext { SuiteName = suite }, _outputFormat);
         return ExitCodes.Success;
     }
