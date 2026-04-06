@@ -51,7 +51,7 @@ public static class SkillContent
         **Check `status`:**
         - `"analyzing"` → output ONLY: the `message` field — then `awaitTerminal` + `readFile` again.
         - `"failed"` → tell user the `error`.
-        - `"analyzed"` → "**{analysis.already_covered}** tests already exist. I recommend generating **{analysis.recommended}** more. Shall I proceed?"
+        - `"analyzed"` → "**{analysis.already_covered}** tests already exist. I recommend generating **{analysis.recommended}** more:" + show each `analysis.breakdown` entry as a bullet (e.g., "- Happy Path: 25") + "Shall I proceed?"
 
         STOP. Wait for user.
 
