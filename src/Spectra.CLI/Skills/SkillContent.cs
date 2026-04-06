@@ -29,47 +29,52 @@ public static class SkillContent
         disable-model-invocation: true
         ---
 
-        You generate test cases using the SPECTRA CLI. Follow these exact steps in order.
+        # SPECTRA Test Generation
 
-        ## Step 1: Analyze documentation
+        You generate test cases by running CLI commands. You MUST follow the exact tool sequence below.
 
-        Determine the suite name from the user's request, then run this exact command using `runInTerminal`:
+        ## When user asks to generate test cases:
 
+        ### Tool call 1: runInTerminal
+        Run this command (replace {suite} with the suite name from the user's request):
         ```
         spectra ai generate --suite {suite} --analyze-only --output-format json --verbosity quiet
         ```
 
-        Wait for the command to complete using `awaitTerminal`.
+        ### Tool call 2: awaitTerminal
+        Wait for the command to finish.
 
-        Then read the result using `readFile` on the file `.spectra/last-result.json`.
+        ### Tool call 3: readFile
+        Read the file `.spectra/last-result.json` to get the analysis results.
 
-        Tell the user what was found:
-        - How many testable behaviors were found (analysis.total_behaviors)
-        - How many are already covered (analysis.already_covered)
-        - How many new tests are recommended (analysis.recommended)
-        - Breakdown by category if available
+        ### Your response after reading the file:
+        Parse the JSON and tell the user:
+        - "I analyzed the documentation and found **{analysis.recommended}** testable behaviors to cover."
+        - "Shall I generate **{analysis.recommended}** test cases for the **{suite}** suite?"
 
-        Ask the user: "Would you like me to generate these N test cases?"
+        Then STOP and wait for the user to respond.
 
-        STOP HERE. Wait for user response before continuing.
+        ---
 
-        ## Step 2: Generate test cases
+        ## After user approves:
 
-        Only proceed after the user approves. Run this command using `runInTerminal`:
-
+        ### Tool call 4: runInTerminal
+        Run this command (replace {count} with the number the user approved):
         ```
-        spectra ai generate --suite {suite} --count {approved_count} --output-format json --verbosity quiet
+        spectra ai generate --suite {suite} --count {count} --output-format json --verbosity quiet
         ```
 
-        Wait for the command to complete using `awaitTerminal`. This may take 1-2 minutes.
+        ### Tool call 5: awaitTerminal
+        Wait for the command to finish. This takes 1-2 minutes.
 
-        Then read the result using `readFile` on the file `.spectra/last-result.json`.
+        ### Tool call 6: readFile
+        Read the file `.spectra/last-result.json` to get the generation results.
 
-        Tell the user what was created:
-        - How many tests were generated (generation.tests_generated)
-        - How many were written to disk (generation.tests_written)
-        - How many were rejected by verification (generation.tests_rejected_by_critic)
-        - List the files created (files_created)
+        ### Your response after reading the file:
+        Parse the JSON and tell the user:
+        - "Generated **{generation.tests_written}** test cases for the **{suite}** suite."
+        - List each file from the `files_created` array.
+        - If `generation.tests_rejected_by_critic` > 0, mention how many were rejected.
         """;
 
     public const string Coverage = $$"""
