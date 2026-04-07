@@ -309,20 +309,44 @@ public sealed class AnalyzeHandler
             }
 
             // Extract requirements
-            if (_outputFormat != OutputFormat.Json && _verbosity >= VerbosityLevel.Normal)
+            if (_verbosity >= VerbosityLevel.Normal)
             {
-                Console.WriteLine($"Extracting requirements from {documentMap.Documents.Count} document(s)...");
+                // Write to stderr so it doesn't interfere with JSON on stdout
+                Console.Error.WriteLine($"Extracting requirements from {documentMap.Documents.Count} document(s)...");
             }
 
             var extractor = new Agent.Copilot.RequirementsExtractor(
                 provider,
                 currentDir,
-                _outputFormat != OutputFormat.Json && _verbosity >= VerbosityLevel.Normal ? Console.WriteLine : null);
+                _verbosity >= VerbosityLevel.Normal ? s => Console.Error.WriteLine(s) : null);
 
             IReadOnlyList<RequirementDefinition> extracted;
             try
             {
-                extracted = await extractor.ExtractAsync(documentMap.Documents, existing, ct);
+                // Hard timeout via Task.WhenAny — Copilot SDK may not honor CancellationToken
+                var extractTask = extractor.ExtractAsync(documentMap.Documents, existing, ct);
+                var deadlineTask = Task.Delay(TimeSpan.FromMinutes(2), ct);
+                var completed = await Task.WhenAny(extractTask, deadlineTask);
+
+                if (completed == deadlineTask)
+                {
+                    if (_outputFormat == OutputFormat.Json)
+                    {
+                        JsonResultWriter.Write(new ErrorResult
+                        {
+                            Command = "extract-requirements",
+                            Status = "failed",
+                            Error = "Requirements extraction timed out after 2 minutes. Check your AI provider configuration and connectivity."
+                        });
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine("Requirements extraction timed out after 2 minutes. Check your AI provider configuration and connectivity.");
+                    }
+                    return ExitCodes.Error;
+                }
+
+                extracted = await extractTask;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

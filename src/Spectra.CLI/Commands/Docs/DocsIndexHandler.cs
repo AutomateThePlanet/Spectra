@@ -120,7 +120,18 @@ public sealed class DocsIndexHandler
                 currentDir,
                 _verbosity >= VerbosityLevel.Normal ? s => _progress.Info(s) : null);
 
-            var extracted = await extractor.ExtractAsync(documentMap.Documents, existing, ct);
+            // Hard timeout via Task.WhenAny — Copilot SDK may not honor CancellationToken
+            var extractTask = extractor.ExtractAsync(documentMap.Documents, existing, ct);
+            var deadlineTask = Task.Delay(TimeSpan.FromSeconds(60), ct);
+            var completed = await Task.WhenAny(extractTask, deadlineTask);
+
+            if (completed == deadlineTask)
+            {
+                _progress.Warning("Requirements extraction timed out. Run 'spectra ai analyze --extract-requirements' separately.");
+                return;
+            }
+
+            var extracted = await extractTask;
 
             if (extracted.Count == 0)
             {

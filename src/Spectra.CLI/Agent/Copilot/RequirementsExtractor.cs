@@ -44,11 +44,22 @@ public sealed class RequirementsExtractor
         var prompt = await BuildExtractionPromptAsync(documents, existingRequirements, ct);
 
         _onStatus?.Invoke("Extracting requirements from documentation...");
-        var response = await session.SendAndWaitAsync(
-            new MessageOptions { Prompt = prompt },
-            timeout: TimeSpan.FromMinutes(3),
-            cancellationToken: ct);
 
+        // Use Task.WhenAny as a hard timeout — the SDK doesn't always honor CancellationToken
+        var sendTask = session.SendAndWaitAsync(
+            new MessageOptions { Prompt = prompt },
+            timeout: TimeSpan.FromMinutes(2),
+            cancellationToken: ct);
+        var delayTask = Task.Delay(TimeSpan.FromMinutes(2), ct);
+
+        var completedTask = await Task.WhenAny(sendTask, delayTask);
+        if (completedTask == delayTask)
+        {
+            throw new TimeoutException(
+                "AI provider did not respond within 2 minutes. Check your provider configuration and connectivity.");
+        }
+
+        var response = await sendTask;
         var responseText = response?.Data?.Content ?? "";
 
         if (string.IsNullOrWhiteSpace(responseText))
@@ -58,8 +69,11 @@ public sealed class RequirementsExtractor
         var results = ParseResponse(responseText);
         if (results.Count == 0)
         {
-            _onStatus?.Invoke("Warning: AI response could not be parsed into requirements. Raw response starts with: " +
-                              responseText[..Math.Min(200, responseText.Length)]);
+            _onStatus?.Invoke("Warning: AI response could not be parsed into requirements.");
+        }
+        else
+        {
+            _onStatus?.Invoke($"Extracted {results.Count} requirement(s) from AI response.");
         }
 
         return results;
@@ -100,7 +114,7 @@ public sealed class RequirementsExtractor
 
             {{existingTitles}}
 
-            Respond ONLY with a JSON array. No markdown, no explanation. Example:
+            Respond ONLY with a JSON array. No markdown, no explanation, no code fences. Keep responses under 50 requirements. Example:
             [
               {"title": "User can reset password via email", "source": "docs/auth.md", "priority": "high"},
               {"title": "System displays warning on weak password", "source": "docs/auth.md", "priority": "medium"}
@@ -122,10 +136,23 @@ public sealed class RequirementsExtractor
             var jsonStart = responseText.IndexOf('[');
             var jsonEnd = responseText.LastIndexOf(']');
 
-            if (jsonStart < 0 || jsonEnd < 0 || jsonEnd <= jsonStart)
+            if (jsonStart < 0)
                 return [];
 
-            var jsonText = responseText[jsonStart..(jsonEnd + 1)];
+            string jsonText;
+            if (jsonEnd < 0 || jsonEnd <= jsonStart)
+            {
+                // Response was truncated before closing ']' — recover partial JSON
+                // Find the last complete JSON object (ends with '}')
+                var lastBrace = responseText.LastIndexOf('}');
+                if (lastBrace <= jsonStart)
+                    return [];
+                jsonText = responseText[jsonStart..(lastBrace + 1)] + "]";
+            }
+            else
+            {
+                jsonText = responseText[jsonStart..(jsonEnd + 1)];
+            }
 
             var items = JsonSerializer.Deserialize<List<ExtractedItem>>(jsonText, new JsonSerializerOptions
             {
