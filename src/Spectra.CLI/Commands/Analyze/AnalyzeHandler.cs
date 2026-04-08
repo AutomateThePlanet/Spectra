@@ -31,6 +31,15 @@ public sealed class AnalyzeHandler
         _outputFormat = outputFormat;
     }
 
+    private static Progress.ProgressManager CreateCoverageProgress() =>
+        new("analyze-coverage", Progress.ProgressPhases.Coverage, title: "Coverage Analysis");
+
+    private static Progress.ProgressManager CreateExtractProgress() =>
+        new("extract-criteria", Progress.ProgressPhases.ExtractCriteria, title: "Criteria Extraction");
+
+    private static Progress.ProgressManager CreateResultOnlyProgress(string command) =>
+        new(command, [], title: command);
+
     /// <summary>
     /// Executes the analyze command.
     /// </summary>
@@ -41,6 +50,8 @@ public sealed class AnalyzeHandler
         bool autoLink = false,
         CancellationToken ct = default)
     {
+        var progress = CreateCoverageProgress();
+        progress.Reset();
         try
         {
             var basePath = Directory.GetCurrentDirectory();
@@ -60,8 +71,11 @@ public sealed class AnalyzeHandler
             if (config is null)
             {
                 Console.Error.WriteLine("No spectra.config.json found. Run 'spectra init' first.");
+                progress.Fail("No spectra.config.json found");
                 return ExitCodes.Error;
             }
+
+            progress.Update("scanning-tests", "Scanning test suites...");
 
             if (_verbosity >= VerbosityLevel.Normal)
             {
@@ -99,14 +113,20 @@ public sealed class AnalyzeHandler
 
             // === Unified three-section coverage analysis ===
 
+            progress.Update("analyzing-docs", $"Matching {allTests.Count} tests to documentation...");
+
             // 1. Documentation coverage
             var docAnalyzer = new DocumentationCoverageAnalyzer();
             var docCoverage = docAnalyzer.Analyze(documentMap, allTests);
+
+            progress.Update("analyzing-criteria", "Matching tests to acceptance criteria...");
 
             // 2. Acceptance criteria coverage
             var criteriaFilePath = Path.Combine(basePath, config.Coverage.CriteriaFile);
             var criteriaAnalyzer = new AcceptanceCriteriaCoverageAnalyzer();
             var criteriaCoverage = await criteriaAnalyzer.AnalyzeAsync(criteriaFilePath, allTests, ct);
+
+            progress.Update("analyzing-automation", "Scanning automation directories...");
 
             // 3. Automation coverage
             var suiteIndexes = await LoadSuiteIndexesAsync(testsDir, ct);
@@ -191,17 +211,29 @@ public sealed class AnalyzeHandler
             Console.WriteLine($"Acceptance Criteria Coverage:  {criteriaCoverage.Percentage:F1}% ({criteriaCoverage.CoveredCriteria}/{criteriaCoverage.TotalCriteria} acceptance criteria)");
             Console.WriteLine($"Automation Coverage:           {autoCoverage.Percentage:F1}% ({autoCoverage.Automated}/{autoCoverage.TotalTests} tests)");
 
+            var coverageResult = new AnalyzeCoverageResult
+            {
+                Command = "analyze-coverage",
+                Status = "completed",
+                Documentation = new CoverageSection { Percentage = (double)docCoverage.Percentage, Covered = docCoverage.CoveredDocs, Total = docCoverage.TotalDocs },
+                AcceptanceCriteria = new CoverageSection { Percentage = (double)criteriaCoverage.Percentage, Covered = criteriaCoverage.CoveredCriteria, Total = criteriaCoverage.TotalCriteria },
+                Automation = new AutomationSection { Percentage = (double)autoCoverage.Percentage, Linked = autoCoverage.Automated, Total = autoCoverage.TotalTests }
+            };
+            progress.Complete(coverageResult);
+
             var hasGaps = docCoverage.Percentage < 100 || criteriaCoverage.Percentage < 100 || autoCoverage.Percentage < 100;
             NextStepHints.Print("analyze", true, _verbosity, new HintContext { HasAutoLink = autoLink, HasGaps = hasGaps }, _outputFormat);
             return ExitCodes.Success;
         }
         catch (OperationCanceledException)
         {
+            progress.Fail("Operation cancelled");
             Console.WriteLine("\nOperation cancelled.");
             return ExitCodes.Cancelled;
         }
         catch (Exception ex)
         {
+            progress.Fail(ex.Message);
             Console.Error.WriteLine($"Error: {ex.Message}");
             return ExitCodes.Error;
         }
@@ -216,6 +248,8 @@ public sealed class AnalyzeHandler
         bool force = false,
         CancellationToken ct = default)
     {
+        var extractProgress = CreateExtractProgress();
+        extractProgress.Reset();
         try
         {
             var currentDir = Directory.GetCurrentDirectory();
@@ -313,6 +347,8 @@ public sealed class AnalyzeHandler
                 }
                 return ExitCodes.Error;
             }
+
+            extractProgress.Update("extracting", $"Extracting acceptance criteria from {documentMap.Documents.Count} document(s)...");
 
             if (_verbosity >= VerbosityLevel.Normal)
             {
@@ -536,6 +572,7 @@ public sealed class AnalyzeHandler
                 }
 
                 // Write updated index
+                extractProgress.Update("building-index", "Rebuilding criteria index...");
                 var indexWriter = new CriteriaIndexWriter();
                 await indexWriter.WriteAsync(criteriaIndexPath, criteriaIndex, ct);
             }
@@ -549,28 +586,31 @@ public sealed class AnalyzeHandler
             }
 
             // Report results
+            var extractResult = new ExtractCriteriaResult
+            {
+                Command = "extract-criteria",
+                Status = documentsFailed == documentMap.Documents.Count ? "failed"
+                       : documentsFailed > 0 ? "partial"
+                       : "completed",
+                Message = dryRun ? "Dry run — no files written." : null,
+                DocumentsProcessed = documentsProcessed,
+                DocumentsSkipped = documentsSkipped,
+                DocumentsFailed = documentsFailed,
+                FailedDocuments = failedDocuments.Count > 0 ? failedDocuments : null,
+                CriteriaExtracted = criteriaExtracted,
+                CriteriaNew = criteriaNew,
+                CriteriaUpdated = criteriaUpdated,
+                CriteriaUnchanged = criteriaUnchanged,
+                OrphanedCriteria = orphanedCount,
+                TotalCriteria = totalCriteria,
+                IndexFile = Path.GetRelativePath(currentDir, criteriaIndexPath),
+                Criteria = allNewCriteria.Count > 0 ? allNewCriteria : null
+            };
+            extractProgress.Complete(extractResult);
+
             if (_outputFormat == OutputFormat.Json)
             {
-                JsonResultWriter.Write(new ExtractCriteriaResult
-                {
-                    Command = "extract-criteria",
-                    Status = documentsFailed == documentMap.Documents.Count ? "failed"
-                           : documentsFailed > 0 ? "partial"
-                           : "success",
-                    Message = dryRun ? "Dry run — no files written." : null,
-                    DocumentsProcessed = documentsProcessed,
-                    DocumentsSkipped = documentsSkipped,
-                    DocumentsFailed = documentsFailed,
-                    FailedDocuments = failedDocuments.Count > 0 ? failedDocuments : null,
-                    CriteriaExtracted = criteriaExtracted,
-                    CriteriaNew = criteriaNew,
-                    CriteriaUpdated = criteriaUpdated,
-                    CriteriaUnchanged = criteriaUnchanged,
-                    OrphanedCriteria = orphanedCount,
-                    TotalCriteria = totalCriteria,
-                    IndexFile = Path.GetRelativePath(currentDir, criteriaIndexPath),
-                    Criteria = allNewCriteria.Count > 0 ? allNewCriteria : null
-                });
+                JsonResultWriter.Write(extractResult);
             }
             else
             {
@@ -652,6 +692,8 @@ public sealed class AnalyzeHandler
         bool dryRun,
         CancellationToken ct = default)
     {
+        var importProgress = CreateResultOnlyProgress("import-criteria");
+        importProgress.Reset();
         try
         {
             var currentDir = Directory.GetCurrentDirectory();
@@ -1000,22 +1042,25 @@ public sealed class AnalyzeHandler
             var relativeOutputPath = Path.GetRelativePath(currentDir, outputFilePath);
 
             // 11. Report results
+            var importResult = new ImportCriteriaResult
+            {
+                Command = "import-criteria",
+                Status = "completed",
+                Message = dryRun ? "Dry run — no files written." : null,
+                Imported = importedCount,
+                Split = splitCount,
+                Normalized = normalizedCount,
+                Merged = mergeResult.MergedCount,
+                New = mergeResult.NewCount,
+                TotalCriteria = totalCriteria,
+                File = relativeOutputPath,
+                SourceBreakdown = sourceBreakdown.Count > 0 ? sourceBreakdown : null
+            };
+            importProgress.WriteResultOnly(importResult);
+
             if (_outputFormat == OutputFormat.Json)
             {
-                JsonResultWriter.Write(new ImportCriteriaResult
-                {
-                    Command = "import-criteria",
-                    Status = "success",
-                    Message = dryRun ? "Dry run — no files written." : null,
-                    Imported = importedCount,
-                    Split = splitCount,
-                    Normalized = normalizedCount,
-                    Merged = mergeResult.MergedCount,
-                    New = mergeResult.NewCount,
-                    TotalCriteria = totalCriteria,
-                    File = relativeOutputPath,
-                    SourceBreakdown = sourceBreakdown.Count > 0 ? sourceBreakdown : null
-                });
+                JsonResultWriter.Write(importResult);
             }
             else
             {
@@ -1082,6 +1127,8 @@ public sealed class AnalyzeHandler
         string? priority,
         CancellationToken ct = default)
     {
+        var listProgress = CreateResultOnlyProgress("list-criteria");
+        listProgress.Reset();
         try
         {
             var currentDir = Directory.GetCurrentDirectory();
@@ -1226,17 +1273,20 @@ public sealed class AnalyzeHandler
                 ? Math.Round((decimal)coveredCount / totalCount * 100, 1)
                 : 0m;
 
+            var listResult = new ListCriteriaResult
+            {
+                Command = "list-criteria",
+                Status = "completed",
+                Criteria = entries,
+                Total = totalCount,
+                Covered = coveredCount,
+                CoveragePct = coveragePct
+            };
+            listProgress.WriteResultOnly(listResult);
+
             if (_outputFormat == OutputFormat.Json)
             {
-                JsonResultWriter.Write(new ListCriteriaResult
-                {
-                    Command = "list-criteria",
-                    Status = "success",
-                    Criteria = entries,
-                    Total = totalCount,
-                    Covered = coveredCount,
-                    CoveragePct = coveragePct
-                });
+                JsonResultWriter.Write(listResult);
             }
             else
             {

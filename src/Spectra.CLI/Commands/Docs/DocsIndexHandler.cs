@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Output;
@@ -22,13 +21,8 @@ public sealed class DocsIndexHandler
     private readonly bool _skipCriteria;
     private readonly ProgressReporter _progress;
 
-    private static readonly JsonSerializerOptions ResultFileOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        Converters = { new JsonStringEnumConverter() }
-    };
+    private static readonly Progress.ProgressManager _progressManager =
+        new("docs-index", Progress.ProgressPhases.DocsIndex, title: "Documentation Index");
 
     public DocsIndexHandler(
         VerbosityLevel verbosity = VerbosityLevel.Normal,
@@ -233,95 +227,36 @@ public sealed class DocsIndexHandler
 
     // ── Result/progress file helpers ──
 
-    private static string GetResultFilePath() =>
-        Path.Combine(Directory.GetCurrentDirectory(), ".spectra-result.json");
-
-    private static string GetProgressPagePath() =>
-        Path.Combine(Directory.GetCurrentDirectory(), ".spectra-progress.html");
-
     private static void DeleteResultFiles()
     {
-        try
-        {
-            var resultPath = GetResultFilePath();
-            if (File.Exists(resultPath))
-                File.Delete(resultPath);
-
-            var progressPath = GetProgressPagePath();
-            if (File.Exists(progressPath))
-                File.Delete(progressPath);
-        }
-        catch
-        {
-            // Non-critical
-        }
-    }
-
-    private static void FlushWriteFile(string path, string json)
-    {
-        using var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
-        using var writer = new StreamWriter(fs);
-        writer.Write(json);
-        writer.Flush();
-        fs.Flush(true); // Force OS to flush to disk
+        _progressManager.Reset();
     }
 
     private static void WriteResultFile(DocsIndexResult result, bool isTerminal)
     {
-        try
-        {
-            var json = JsonSerializer.Serialize(result, ResultFileOptions);
-            FlushWriteFile(GetResultFilePath(), json);
-            Progress.ProgressPageWriter.WriteProgressPage(GetProgressPagePath(), json, isTerminal);
-        }
-        catch
-        {
-            // Non-critical
-        }
+        if (isTerminal)
+            _progressManager.Complete(result);
+        else
+            _progressManager.Update(result);
     }
 
     private static void WriteProgressResult(string status, string message, string currentDir, string indexPath,
         int documentsIndexed = 0, int documentsTotal = 0)
     {
-        try
+        var result = new DocsIndexResult
         {
-            var result = new DocsIndexResult
-            {
-                Command = "docs-index",
-                Status = status,
-                Message = message,
-                DocumentsIndexed = documentsIndexed,
-                DocumentsTotal = documentsTotal,
-                IndexPath = Path.GetRelativePath(currentDir, indexPath)
-            };
-            var json = JsonSerializer.Serialize(result, ResultFileOptions);
-            FlushWriteFile(GetResultFilePath(), json);
-            Progress.ProgressPageWriter.WriteProgressPage(GetProgressPagePath(), json, isTerminal: false);
-        }
-        catch
-        {
-            // Non-critical
-        }
+            Command = "docs-index",
+            Status = status,
+            Message = message,
+            DocumentsIndexed = documentsIndexed,
+            DocumentsTotal = documentsTotal,
+            IndexPath = Path.GetRelativePath(currentDir, indexPath)
+        };
+        _progressManager.Update(result);
     }
 
     private static void WriteErrorResult(string error)
     {
-        try
-        {
-            var result = new DocsIndexResult
-            {
-                Command = "docs-index",
-                Status = "failed",
-                Message = error,
-                IndexPath = ""
-            };
-            var json = JsonSerializer.Serialize(result, ResultFileOptions);
-            FlushWriteFile(GetResultFilePath(), json);
-            Progress.ProgressPageWriter.WriteProgressPage(GetProgressPagePath(), json, isTerminal: true);
-        }
-        catch
-        {
-            // Non-critical
-        }
+        _progressManager.Fail(error);
     }
 }

@@ -99,12 +99,13 @@ spectra ai generate --suite {suite} --count {count} --no-interaction --output-fo
 
 ## Coverage analysis
 
-**Step 1** — runInTerminal:
+**Step 1** — show preview `.spectra-progress.html`
+**Step 2** — runInTerminal:
 ```
-spectra ai analyze --coverage --auto-link --format markdown --output coverage.md --no-interaction
+spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet
 ```
-**Step 2** — awaitTerminal. Wait for the command to finish.
-**Step 3** — readFile `coverage.md`
+**Step 3** — awaitTerminal. Wait for the command to finish.
+**Step 4** — readFile `.spectra-result.json`
 
 Show: Documentation coverage %, Acceptance criteria coverage %, Automation coverage %, uncovered areas.
 
@@ -112,12 +113,13 @@ Show: Documentation coverage %, Acceptance criteria coverage %, Automation cover
 
 ## Extract acceptance criteria
 
-**Step 1** — runInTerminal:
+**Step 1** — show preview `.spectra-progress.html`
+**Step 2** — runInTerminal:
 ```
-spectra ai analyze --extract-criteria --no-interaction
+spectra ai analyze --extract-criteria --no-interaction --output-format json --verbosity quiet
 ```
-**Step 2** — awaitTerminal. Wait for the command to finish. This takes 1-5 minutes for large doc sets.
-**Step 3** — readFile `.spectra-result.json`
+**Step 3** — awaitTerminal. Wait for the command to finish. This takes 1-5 minutes for large doc sets.
+**Step 4** — readFile `.spectra-result.json`
 
 Show: documents processed, criteria extracted, new/updated/unchanged counts.
 
@@ -129,16 +131,16 @@ Show: documents processed, criteria extracted, new/updated/unchanged counts.
 
 **"generate the dashboard"**, **"build the dashboard"**, **"regenerate dashboard"** → full regeneration:
 
-**Step 1** — runInTerminal:
+**Step 1** — show preview `.spectra-progress.html`
+**Step 2** — runInTerminal:
 ```
-spectra ai analyze --coverage --auto-link --no-interaction && spectra dashboard --output ./site --no-interaction
+spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet && spectra dashboard --output ./site --no-interaction --output-format json --verbosity quiet
 ```
+**Step 3** — awaitTerminal. Wait for the command to finish.
+**Step 4** — readFile `.spectra-result.json`
+**Step 5** — show preview site/index.html
 
-**Step 2** — awaitTerminal. Wait for the command to finish.
-
-**Step 3**: show preview site/index.html
-
-Report: "Dashboard generated." Show suite count and test count if visible.
+Report: "Dashboard generated." Show suite count and test count from result JSON.
 
 ---
 
@@ -152,12 +154,12 @@ Report: "Say 'regenerate dashboard' to rebuild with latest data."
 
 ## Validate tests
 
-#### runInTerminal
+**Step 1** — runInTerminal:
 ```
-spectra validate --output-format json --verbosity quiet
+spectra validate --no-interaction --output-format json --verbosity quiet
 ```
-#### awaitTerminal
-#### terminalLastCommand
+**Step 2** — awaitTerminal
+**Step 3** — readFile `.spectra-result.json`
 
 Parse JSON. If no errors: "All tests are valid." If errors: list each with file and message.
 
@@ -167,11 +169,11 @@ Parse JSON. If no errors: "All tests are valid." If errors: list each with file 
 
 #### runInTerminal
 ```
-spectra list --output-format json --verbosity quiet
+spectra list --no-interaction --output-format json --verbosity quiet
 ```
 or
 ```
-spectra show {test-id} --output-format json --verbosity quiet
+spectra show {test-id} --no-interaction --output-format json --verbosity quiet
 ```
 #### awaitTerminal
 #### terminalLastCommand
@@ -182,14 +184,15 @@ Parse and show results.
 
 ## Update tests
 
-#### runInTerminal
+**Step 1** — show preview `.spectra-progress.html`
+**Step 2** — runInTerminal:
 ```
-spectra ai update --suite {suite} --diff --verbosity normal
+spectra ai update --suite {suite} --no-interaction --output-format json --verbosity quiet
 ```
-#### awaitTerminal
-#### terminalLastCommand
+**Step 3** — awaitTerminal
+**Step 4** — readFile `.spectra-result.json`
 
-Show which tests are UP_TO_DATE, OUTDATED, ORPHANED.
+Show which tests are UP_TO_DATE, OUTDATED, ORPHANED from the classification field.
 
 ---
 

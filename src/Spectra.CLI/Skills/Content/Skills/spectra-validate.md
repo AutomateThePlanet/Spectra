@@ -12,13 +12,13 @@ You validate test cases by running a CLI command. Follow these steps:
 
 ### Tool call 1: runInTerminal
 ```
-spectra validate --output-format json --verbosity quiet
+spectra validate --no-interaction --output-format json --verbosity quiet
 ```
 
 ### Tool call 2: awaitTerminal
 
-### Tool call 3: terminalLastCommand
-Parse the JSON output.
+### Tool call 3: readFile `.spectra-result.json`
+Parse the JSON result.
 
 ### Your response:
 - If `status` is "success": "All **{totalFiles}** tests are valid."

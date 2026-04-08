@@ -16,12 +16,12 @@ public static class ProgressPageWriter
     /// <param name="htmlPath">Path to write the HTML file.</param>
     /// <param name="jsonData">Current result JSON to embed inline.</param>
     /// <param name="isTerminal">True if status is completed/failed — omits auto-refresh.</param>
-    public static void WriteProgressPage(string htmlPath, string jsonData, bool isTerminal)
+    public static void WriteProgressPage(string htmlPath, string jsonData, bool isTerminal, string? title = null)
     {
         try
         {
             var workspaceRoot = Path.GetDirectoryName(htmlPath) ?? Directory.GetCurrentDirectory();
-            var html = BuildHtml(jsonData, isTerminal, workspaceRoot);
+            var html = BuildHtml(jsonData, isTerminal, workspaceRoot, title);
             var tempPath = htmlPath + ".tmp";
             using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.Read))
             using (var writer = new StreamWriter(fs, Encoding.UTF8))
@@ -46,7 +46,7 @@ public static class ProgressPageWriter
     {
     }
 
-    private static string BuildHtml(string jsonData, bool isTerminal, string workspaceRoot)
+    private static string BuildHtml(string jsonData, bool isTerminal, string workspaceRoot, string? title = null)
     {
         var refreshTag = isTerminal ? "" : """<meta http-equiv="refresh" content="2">""";
         var escapedJson = HttpUtility.HtmlEncode(jsonData);
@@ -61,7 +61,7 @@ public static class ProgressPageWriter
                 <meta http-equiv="cache-control" content="no-cache">
                 <meta http-equiv="pragma" content="no-cache">
                 {{refreshTag}}
-                <title>SPECTRA — Progress</title>
+                <title>SPECTRA — {{Escape(title ?? "Progress")}}</title>
                 <link rel="preconnect" href="https://fonts.googleapis.com">
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
                 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -331,7 +331,7 @@ public static class ProgressPageWriter
             <body>
                 <nav class="nav">
                     <span class="nav-logo">SPECTRA</span>
-                    <span class="nav-title">Progress</span>
+                    <span class="nav-title">{{Escape(title ?? "Progress")}}</span>
                 </nav>
                 <div class="container" data-workspace="{{escapedRoot}}">
                     {{BuildBody(jsonData, isTerminal, workspaceRoot)}}
@@ -405,6 +405,66 @@ public static class ProgressPageWriter
                 sb.Append("</div>");
             }
 
+            // Coverage summary cards
+            if (root.TryGetProperty("documentationCoverage", out var docCov))
+            {
+                var docPct = docCov.TryGetProperty("percentage", out var dp) ? dp.GetDecimal() : 0;
+                var critPct = root.TryGetProperty("acceptanceCriteriaCoverage", out var critCov)
+                    && critCov.TryGetProperty("percentage", out var cp) ? cp.GetDecimal() : 0;
+                var autoPct = root.TryGetProperty("automationCoverage", out var autoCov)
+                    && autoCov.TryGetProperty("percentage", out var ap) ? ap.GetDecimal() : 0;
+
+                sb.Append("""<div class="summary-grid">""");
+                sb.Append($"""<div class="summary-card"><div class="summary-number">{docPct:F0}%</div><div class="summary-label">Doc Coverage</div></div>""");
+                sb.Append($"""<div class="summary-card"><div class="summary-number">{critPct:F0}%</div><div class="summary-label">Criteria Coverage</div></div>""");
+                sb.Append($"""<div class="summary-card"><div class="summary-number">{autoPct:F0}%</div><div class="summary-label">Automation</div></div>""");
+                sb.Append("</div>");
+            }
+
+            // Update summary cards
+            if (root.TryGetProperty("testsUpdated", out var tu))
+            {
+                var updated = tu.GetInt32();
+                var removed = root.TryGetProperty("testsRemoved", out var tr2) ? tr2.GetInt32() : 0;
+                var unchanged = root.TryGetProperty("testsUnchanged", out var tun) ? tun.GetInt32() : 0;
+
+                sb.Append("""<div class="summary-grid">""");
+                sb.Append($"""<div class="summary-card"><div class="summary-number">{updated}</div><div class="summary-label">Updated</div></div>""");
+                if (removed > 0)
+                    sb.Append($"""<div class="summary-card"><div class="summary-number red">{removed}</div><div class="summary-label">Removed</div></div>""");
+                sb.Append($"""<div class="summary-card"><div class="summary-number muted">{unchanged}</div><div class="summary-label">Unchanged</div></div>""");
+                sb.Append("</div>");
+            }
+
+            // Extract criteria summary cards
+            if (root.TryGetProperty("criteriaNew", out var cn))
+            {
+                var newCriteria = cn.GetInt32();
+                var updatedCriteria = root.TryGetProperty("criteriaUpdated", out var cu) ? cu.GetInt32() : 0;
+                var totalCriteria = root.TryGetProperty("totalCriteria", out var tc) ? tc.GetInt32() : 0;
+                var docsProcessed = root.TryGetProperty("documentsProcessed", out var dpx) ? dpx.GetInt32() : 0;
+
+                sb.Append("""<div class="summary-grid">""");
+                sb.Append($"""<div class="summary-card"><div class="summary-number">{docsProcessed}</div><div class="summary-label">Docs Processed</div></div>""");
+                sb.Append($"""<div class="summary-card"><div class="summary-number green">{newCriteria}</div><div class="summary-label">New Criteria</div></div>""");
+                if (updatedCriteria > 0)
+                    sb.Append($"""<div class="summary-card"><div class="summary-number">{updatedCriteria}</div><div class="summary-label">Updated</div></div>""");
+                sb.Append($"""<div class="summary-card"><div class="summary-number">{totalCriteria}</div><div class="summary-label">Total Criteria</div></div>""");
+                sb.Append("</div>");
+            }
+
+            // Dashboard summary cards
+            if (root.TryGetProperty("suitesIncluded", out var si))
+            {
+                var suites = si.GetInt32();
+                var tests = root.TryGetProperty("testsIncluded", out var ti) ? ti.GetInt32() : 0;
+
+                sb.Append("""<div class="summary-grid">""");
+                sb.Append($"""<div class="summary-card"><div class="summary-number">{suites}</div><div class="summary-label">Suites</div></div>""");
+                sb.Append($"""<div class="summary-card"><div class="summary-number">{tests}</div><div class="summary-label">Tests</div></div>""");
+                sb.Append("</div>");
+            }
+
             // Error section
             if (status == "failed" && !string.IsNullOrEmpty(error))
             {
@@ -447,32 +507,44 @@ public static class ProgressPageWriter
         }
     }
 
-    private static bool IsDocsIndexCommand(string status) =>
-        status is "scanning" or "indexing" or "extracting-criteria";
+    private static (string[] phases, int currentIdx) ResolvePhases(string status)
+    {
+        return status switch
+        {
+            // Generate
+            "analyzing" => (ProgressPhases.Generate, 0),
+            "analyzed" => (ProgressPhases.Generate, 1),
+            "generating" => (ProgressPhases.Generate, 2),
+            // Docs index
+            "scanning" => (ProgressPhases.DocsIndex, 0),
+            "indexing" => (ProgressPhases.DocsIndex, 1),
+            "extracting-criteria" => (ProgressPhases.DocsIndex, 2),
+            // Update
+            "classifying" => (ProgressPhases.Update, 0),
+            "updating" => (ProgressPhases.Update, 1),
+            "verifying" => (ProgressPhases.Update, 2),
+            // Coverage
+            "scanning-tests" => (ProgressPhases.Coverage, 0),
+            "analyzing-docs" => (ProgressPhases.Coverage, 1),
+            "analyzing-criteria" => (ProgressPhases.Coverage, 2),
+            "analyzing-automation" => (ProgressPhases.Coverage, 3),
+            // Extract criteria
+            "scanning-docs" => (ProgressPhases.ExtractCriteria, 0),
+            "extracting" => (ProgressPhases.ExtractCriteria, 1),
+            "building-index" => (ProgressPhases.ExtractCriteria, 2),
+            // Dashboard
+            "collecting-data" => (ProgressPhases.Dashboard, 0),
+            "generating-html" => (ProgressPhases.Dashboard, 1),
+            // Shared terminal
+            "completed" => (ProgressPhases.Generate, 3), // Index doesn't matter for completed
+            "failed" => (ProgressPhases.Generate, -1),
+            _ => (ProgressPhases.Generate, -1)
+        };
+    }
 
     private static string BuildStepper(string status)
     {
-        // Determine which phase set to use based on status
-        var isDocsIndex = IsDocsIndexCommand(status);
-        var phases = isDocsIndex
-            ? new[] { "scanning", "indexing", "extracting-criteria", "completed" }
-            : new[] { "analyzing", "analyzed", "generating", "completed" };
-
-        var currentIdx = status switch
-        {
-            // Generate phases
-            "analyzing" => 0,
-            "analyzed" => 1,
-            "generating" => 2,
-            // Docs index phases
-            "scanning" => 0,
-            "indexing" => 1,
-            "extracting-criteria" => 2,
-            // Shared
-            "completed" => 3,
-            "failed" => -1,
-            _ => -1
-        };
+        var (phases, currentIdx) = ResolvePhases(status);
 
         var sb = new StringBuilder();
         sb.Append("""<div class="stepper">""");
@@ -498,6 +570,18 @@ public static class ProgressPageWriter
                 "scanning" => "Scanning",
                 "indexing" => "Indexing",
                 "extracting-criteria" => "Extracting Criteria",
+                "classifying" => "Classifying",
+                "updating" => "Updating",
+                "verifying" => "Verifying",
+                "scanning-tests" => "Scanning Tests",
+                "analyzing-docs" => "Analyzing Docs",
+                "analyzing-criteria" => "Analyzing Criteria",
+                "analyzing-automation" => "Analyzing Automation",
+                "scanning-docs" => "Scanning Docs",
+                "extracting" => "Extracting",
+                "building-index" => "Building Index",
+                "collecting-data" => "Collecting Data",
+                "generating-html" => "Generating HTML",
                 "completed" => "Completed",
                 _ => phases[i]
             };
@@ -511,9 +595,9 @@ public static class ProgressPageWriter
 
     private static string BuildStatusCard(string status, string suite, string message, string timestamp)
     {
-        var spinnerHtml = status is "analyzing" or "generating" or "scanning" or "indexing" or "extracting-criteria"
-            ? """<span class="spinner"></span>"""
-            : "";
+        var spinnerHtml = status is "completed" or "failed" or "analyzed"
+            ? ""
+            : """<span class="spinner"></span>""";
 
         var statusLabel = status switch
         {
@@ -523,6 +607,18 @@ public static class ProgressPageWriter
             "scanning" => "Scanning Documents",
             "indexing" => "Indexing Documents",
             "extracting-criteria" => "Extracting Acceptance Criteria",
+            "classifying" => "Classifying Tests",
+            "updating" => "Updating Tests",
+            "verifying" => "Verifying Tests",
+            "scanning-tests" => "Scanning Test Suites",
+            "analyzing-docs" => "Analyzing Documentation Coverage",
+            "analyzing-criteria" => "Analyzing Acceptance Criteria Coverage",
+            "analyzing-automation" => "Analyzing Automation Coverage",
+            "scanning-docs" => "Scanning Documentation",
+            "extracting" => "Extracting Acceptance Criteria",
+            "building-index" => "Building Criteria Index",
+            "collecting-data" => "Collecting Dashboard Data",
+            "generating-html" => "Generating Dashboard HTML",
             "completed" => "Complete",
             "failed" => "Failed",
             _ => status

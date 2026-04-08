@@ -8,9 +8,9 @@ public sealed class AnalyzeCoverageResult : CommandResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public CoverageSection? Documentation { get; init; }
 
-    [JsonPropertyName("requirements")]
+    [JsonPropertyName("acceptanceCriteria")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public CoverageSection? Requirements { get; init; }
+    public CoverageSection? AcceptanceCriteria { get; init; }
 
     [JsonPropertyName("automation")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

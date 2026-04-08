@@ -17,6 +17,9 @@ namespace Spectra.CLI.Commands.Validate;
 /// </summary>
 public sealed class ValidateHandler
 {
+    private static readonly Progress.ProgressManager _progressManager =
+        new("validate", [], title: "Validation");
+
     private readonly VerbosityLevel _verbosity;
     private readonly OutputFormat _outputFormat;
 
@@ -28,6 +31,7 @@ public sealed class ValidateHandler
 
     public async Task<int> ExecuteAsync(string? suite, CancellationToken cancellationToken = default)
     {
+        _progressManager.Reset();
         var currentDir = Directory.GetCurrentDirectory();
         var configPath = Path.Combine(currentDir, "spectra.config.json");
 
@@ -172,17 +176,20 @@ public sealed class ValidateHandler
         var testCount = allSuites.Sum(s => s.TestCount);
         var suiteCount = allSuites.Count;
 
+        var validateResult = new ValidateResult
+        {
+            Command = "validate",
+            Status = result.IsValid ? "success" : "failed",
+            Message = result.IsValid ? "Validation passed." : $"{totalErrors} error(s) found.",
+            TotalFiles = testCount,
+            Valid = testCount - allErrors.Count,
+            Errors = allErrors
+        };
+        _progressManager.WriteResultOnly(validateResult);
+
         if (_outputFormat == OutputFormat.Json)
         {
-            JsonResultWriter.Write(new ValidateResult
-            {
-                Command = "validate",
-                Status = result.IsValid ? "success" : "failed",
-                Message = result.IsValid ? "Validation passed." : $"{totalErrors} error(s) found.",
-                TotalFiles = testCount,
-                Valid = testCount - allErrors.Count,
-                Errors = allErrors
-            });
+            JsonResultWriter.Write(validateResult);
             return result.IsValid ? ExitCodes.Success : ExitCodes.Error;
         }
 

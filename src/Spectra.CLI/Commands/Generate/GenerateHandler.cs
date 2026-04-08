@@ -198,7 +198,7 @@ public sealed class GenerateHandler
         WriteInProgressResultFile(suite, progressStatus, "Loading documentation...");
 
         // Open progress page in browser
-        Progress.ProgressPageWriter.OpenInBrowser(GetProgressPagePath());
+        Progress.ProgressPageWriter.OpenInBrowser(_progressManager.ProgressPath);
 
         // Auto-refresh document index before generation
         var indexService = new DocumentIndexService();
@@ -1671,143 +1671,49 @@ public sealed class GenerateHandler
         return true;
     }
 
-    private static readonly JsonSerializerOptions ResultFileOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
-    };
+    private static readonly Progress.ProgressManager _progressManager =
+        new("generate", Progress.ProgressPhases.Generate, title: "Test Generation");
 
-    private static string GetResultFilePath()
-    {
-        // Write to workspace root (not .spectra/) for reliable VS Code file watcher detection
-        return Path.Combine(Directory.GetCurrentDirectory(), ".spectra-result.json");
-    }
-
-    private static string GetProgressPagePath()
-    {
-        return Path.Combine(Directory.GetCurrentDirectory(), ".spectra-progress.html");
-    }
-
-    /// <summary>
-    /// Writes JSON to the result file with explicit flush to ensure Windows NTFS writes to disk.
-    /// </summary>
-    private static void FlushWriteFile(string path, string json)
-    {
-        using var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
-        using var writer = new StreamWriter(fs);
-        writer.Write(json);
-        writer.Flush();
-        fs.Flush(true); // Force OS to flush to disk
-    }
-
-    /// <summary>
-    /// Deletes the result and progress files at the start of a command to prevent stale reads.
-    /// </summary>
     private static void DeleteResultFile()
     {
-        try
-        {
-            var path = GetResultFilePath();
-            if (File.Exists(path))
-                File.Delete(path);
-
-            var progressPath = GetProgressPagePath();
-            if (File.Exists(progressPath))
-                File.Delete(progressPath);
-        }
-        catch
-        {
-            // Non-critical
-        }
+        _progressManager.Reset();
     }
 
-    /// <summary>
-    /// Writes a result file to .spectra-result.json for external tool consumption.
-    /// Also updates the progress HTML page.
-    /// </summary>
     private static void WriteResultFile(GenerateResult result)
     {
-        try
-        {
-            var json = JsonSerializer.Serialize(result, ResultFileOptions);
-            FlushWriteFile(GetResultFilePath(), json);
-
-            var isTerminal = result.Status is "completed" or "failed";
-            Progress.ProgressPageWriter.WriteProgressPage(GetProgressPagePath(), json, isTerminal);
-        }
-        catch
-        {
-            // Non-critical — don't fail the command if file write fails
-        }
+        if (result.Status is "completed" or "failed")
+            _progressManager.Complete(result);
+        else
+            _progressManager.Update(result);
     }
 
-    /// <summary>
-    /// Writes an in-progress marker so agents know the command is still running.
-    /// Also updates the progress HTML page.
-    /// </summary>
     private static void WriteInProgressResultFile(string suite, string status = "generating", string? message = null)
     {
-        try
+        var result = new GenerateResult
         {
-            var result = new GenerateResult
+            Command = "generate",
+            Status = status,
+            Suite = suite,
+            Message = message,
+            Generation = new GenerateGeneration
             {
-                Command = "generate",
-                Status = status,
-                Suite = suite,
-                Message = message,
-                Generation = new GenerateGeneration
-                {
-                    TestsGenerated = 0,
-                    TestsWritten = 0,
-                    TestsRejectedByCritic = 0
-                },
-                FilesCreated = []
-            };
-            var json = JsonSerializer.Serialize(result, ResultFileOptions);
-            FlushWriteFile(GetResultFilePath(), json);
-
-            Progress.ProgressPageWriter.WriteProgressPage(GetProgressPagePath(), json, isTerminal: false);
-        }
-        catch
-        {
-            // Non-critical
-        }
+                TestsGenerated = 0,
+                TestsWritten = 0,
+                TestsRejectedByCritic = 0
+            },
+            FilesCreated = []
+        };
+        _progressManager.Update(result);
     }
 
-    /// <summary>
-    /// Updates the progress message in the result file.
-    /// Always writes to update the timestamp so polling agents see fresh content.
-    /// </summary>
     private static void UpdateProgress(string suite, string status, string message)
     {
         WriteInProgressResultFile(suite, status, message);
     }
 
-    /// <summary>
-    /// Writes an error result file so SKILL/agent can report failures to the user.
-    /// Also updates the progress HTML page.
-    /// </summary>
     private static void WriteErrorResultFile(string error, string? suite = null)
     {
-        try
-        {
-            var errorResult = new ErrorResult
-            {
-                Command = "generate",
-                Status = "failed",
-                Error = error
-            };
-            var json = JsonSerializer.Serialize(errorResult, ResultFileOptions);
-            FlushWriteFile(GetResultFilePath(), json);
-
-            Progress.ProgressPageWriter.WriteProgressPage(GetProgressPagePath(), json, isTerminal: true);
-        }
-        catch
-        {
-            // Non-critical
-        }
+        _progressManager.Fail(error);
     }
 
     /// <summary>

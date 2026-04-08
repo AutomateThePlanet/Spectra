@@ -122,4 +122,124 @@ public class ProgressPageWriterTests : IDisposable
         Assert.Contains(">5<", content);
         Assert.Contains("Written", content, StringComparison.OrdinalIgnoreCase);
     }
+
+    // === New phase tests for spec 025 ===
+
+    [Fact]
+    public void WriteProgressPage_ShowsClassifyingStatus()
+    {
+        var path = CreateTempHtmlPath();
+        var json = """{"status": "classifying", "suite": "checkout"}""";
+
+        ProgressPageWriter.WriteProgressPage(path, json, isTerminal: false);
+
+        var content = File.ReadAllText(path);
+        Assert.Contains("Classifying Tests", content, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void WriteProgressPage_ShowsScanningTestsStatus()
+    {
+        var path = CreateTempHtmlPath();
+        var json = """{"status": "scanning-tests"}""";
+
+        ProgressPageWriter.WriteProgressPage(path, json, isTerminal: false);
+
+        var content = File.ReadAllText(path);
+        Assert.Contains("Scanning Test Suites", content, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void WriteProgressPage_ShowsCollectingDataStatus()
+    {
+        var path = CreateTempHtmlPath();
+        var json = """{"status": "collecting-data"}""";
+
+        ProgressPageWriter.WriteProgressPage(path, json, isTerminal: false);
+
+        var content = File.ReadAllText(path);
+        Assert.Contains("Collecting Dashboard Data", content, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void WriteProgressPage_ShowsExtractingStatus()
+    {
+        var path = CreateTempHtmlPath();
+        var json = """{"status": "extracting"}""";
+
+        ProgressPageWriter.WriteProgressPage(path, json, isTerminal: false);
+
+        var content = File.ReadAllText(path);
+        Assert.Contains("Extracting Acceptance Criteria", content, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void WriteProgressPage_ShowsCoverageCards()
+    {
+        var path = CreateTempHtmlPath();
+        var json = """{"status": "completed", "documentationCoverage": {"percentage": 67.5, "covered": 8, "total": 12}, "acceptanceCriteriaCoverage": {"percentage": 74.0, "covered": 37, "total": 50}, "automationCoverage": {"percentage": 12.0, "covered": 31, "total": 259}}""";
+
+        ProgressPageWriter.WriteProgressPage(path, json, isTerminal: true);
+
+        var content = File.ReadAllText(path);
+        Assert.Contains("Doc Coverage", content);
+        Assert.Contains("Criteria Coverage", content);
+        Assert.Contains("Automation", content);
+    }
+
+    [Fact]
+    public void WriteProgressPage_ShowsUpdateCards()
+    {
+        var path = CreateTempHtmlPath();
+        var json = """{"status": "completed", "testsUpdated": 3, "testsRemoved": 1, "testsUnchanged": 12}""";
+
+        ProgressPageWriter.WriteProgressPage(path, json, isTerminal: true);
+
+        var content = File.ReadAllText(path);
+        Assert.Contains("Updated", content);
+        Assert.Contains("Unchanged", content);
+    }
+
+    [Fact]
+    public void WriteProgressPage_WithTitle_ShowsTitleInHeader()
+    {
+        var path = CreateTempHtmlPath();
+        var json = """{"status": "scanning-tests"}""";
+
+        ProgressPageWriter.WriteProgressPage(path, json, isTerminal: false, title: "Coverage Analysis");
+
+        var content = File.ReadAllText(path);
+        Assert.Contains("Coverage Analysis", content);
+    }
+
+    [Fact]
+    public void WriteProgressPage_WithoutTitle_ShowsProgressAsDefault()
+    {
+        var path = CreateTempHtmlPath();
+        var json = """{"status": "analyzing"}""";
+
+        ProgressPageWriter.WriteProgressPage(path, json, isTerminal: false);
+
+        var content = File.ReadAllText(path);
+        Assert.Contains("<title>SPECTRA", content);
+    }
+
+    [Fact]
+    public void WriteProgressPage_AllNewStatuses_ShowSpinner()
+    {
+        var statuses = new[] { "classifying", "updating", "verifying", "scanning-tests",
+            "analyzing-docs", "analyzing-criteria", "analyzing-automation",
+            "scanning-docs", "extracting", "building-index", "collecting-data", "generating-html" };
+
+        foreach (var status in statuses)
+        {
+            var path = CreateTempHtmlPath();
+            var json = $$$"""{"status": "{{{status}}}"}""";
+
+            ProgressPageWriter.WriteProgressPage(path, json, isTerminal: false);
+
+            var content = File.ReadAllText(path);
+            Assert.Contains("spinner", content);
+        }
+    }
 }
