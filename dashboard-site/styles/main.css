@@ -1320,15 +1320,40 @@ details.result-row[open] summary::before {
     padding: 0;
     margin: 0.75rem 0 0 0;
     font-size: 0.85rem;
-    max-height: 500px;
-    overflow: hidden;
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
     transition: max-height 0.3s ease, opacity 0.3s ease;
 }
 
 .coverage-detail-list.collapsed {
     max-height: 0;
+    overflow: hidden;
     opacity: 0;
     margin: 0;
+}
+
+.coverage-detail-filter {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+}
+
+.coverage-detail-filter input {
+    flex: 1;
+    padding: 0.35rem 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.8rem;
+    background: var(--bg-primary, #fff);
+    color: var(--text-primary);
+}
+
+.coverage-detail-filter .filter-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
 }
 
 .coverage-detail-list li {
