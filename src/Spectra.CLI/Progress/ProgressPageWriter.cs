@@ -175,10 +175,10 @@ public static class ProgressPageWriter
                         letter-spacing: 0.05em;
                         margin-bottom: 1rem;
                     }
-                    .status-badge.analyzing, .status-badge.scanning { background: var(--color-primary-light); color: var(--color-primary); }
+                    .status-badge.analyzing, .status-badge.scanning, .status-badge.scanning-tests, .status-badge.scanning-docs, .status-badge.classifying { background: var(--color-primary-light); color: var(--color-primary); }
                     .status-badge.analyzed { background: var(--color-passed-bg); color: var(--color-passed); }
-                    .status-badge.generating, .status-badge.indexing, .status-badge.extracting-criteria { background: var(--color-warning-bg); color: var(--color-warning); }
-                    .status-badge.completed { background: var(--color-passed-bg); color: var(--color-passed); }
+                    .status-badge.generating, .status-badge.indexing, .status-badge.extracting-criteria, .status-badge.extracting, .status-badge.updating, .status-badge.verifying, .status-badge.analyzing-docs, .status-badge.analyzing-criteria, .status-badge.analyzing-automation, .status-badge.building-index, .status-badge.collecting-data, .status-badge.generating-html { background: var(--color-warning-bg); color: var(--color-warning); }
+                    .status-badge.completed, .status-badge.success { background: var(--color-passed-bg); color: var(--color-passed); }
                     .status-badge.failed { background: var(--color-failed-bg); color: var(--color-failed); }
                     .suite-name { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
                     .status-message {
@@ -325,6 +325,47 @@ public static class ProgressPageWriter
                         border-radius: 50%;
                         background: var(--color-primary);
                         animation: pulse 2s ease-in-out infinite;
+                    }
+
+                    /* Responsive — narrow VS Code panels and small screens */
+                    @media (max-width: 600px) {
+                        .container { padding: 1rem; }
+                        .nav { padding: 10px 16px; }
+                        .nav-logo { font-size: 1.1rem; }
+                        .nav-title { font-size: 0.8rem; }
+
+                        .stepper {
+                            flex-wrap: wrap;
+                            gap: 4px 0;
+                            padding: 1rem;
+                            justify-content: flex-start;
+                        }
+                        .step { font-size: 0.75rem; gap: 5px; }
+                        .step-line { width: 20px; margin: 0 2px; }
+                        .step-dot { width: 10px; height: 10px; }
+
+                        .status-card { padding: 1.25rem; }
+                        .suite-name { font-size: 1.2rem; }
+                        .status-message { font-size: 0.85rem; }
+
+                        .summary-grid { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.5rem; }
+                        .summary-card { padding: 0.75rem; }
+                        .summary-number { font-size: 1.5rem; }
+                        .summary-label { font-size: 0.65rem; }
+
+                        .breakdown { padding: 1rem; }
+                        .files-section { padding: 1rem; }
+                        .file-item { font-size: 0.7rem; padding: 5px 8px; }
+                    }
+
+                    @media (max-width: 400px) {
+                        .container { padding: 0.5rem; }
+                        .stepper { padding: 0.75rem; }
+                        .step { font-size: 0.7rem; }
+                        .step-line { width: 12px; }
+                        .status-card { padding: 1rem; }
+                        .summary-grid { grid-template-columns: 1fr 1fr; }
+                    }
                     }
                 </style>
             </head>
