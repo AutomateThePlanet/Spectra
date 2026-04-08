@@ -13,6 +13,9 @@ namespace Spectra.CLI.Commands.Dashboard;
 /// </summary>
 public sealed class DashboardHandler
 {
+    private static readonly Progress.ProgressManager _progressManager =
+        new("dashboard", Progress.ProgressPhases.Dashboard, title: "Dashboard Generation");
+
     private readonly VerbosityLevel _verbosity;
     private readonly bool _dryRun;
     private readonly OutputFormat _outputFormat;
@@ -31,6 +34,7 @@ public sealed class DashboardHandler
         bool preview = false,
         CancellationToken ct = default)
     {
+        _progressManager.Reset();
         var currentDir = Directory.GetCurrentDirectory();
 
         // Resolve output path
@@ -87,6 +91,7 @@ public sealed class DashboardHandler
                 }
 
                 // Collect data
+                _progressManager.Update("collecting-data", "Loading test suites and coverage data...");
                 var collector = new DataCollector(currentDir);
                 data = await collector.CollectAsync();
 
@@ -133,6 +138,7 @@ public sealed class DashboardHandler
                 Console.WriteLine($"Generating dashboard to: {outputPath}");
             }
 
+            _progressManager.Update("generating-html", $"Generating dashboard to {Path.GetRelativePath(currentDir, outputPath)}...");
             var generator = new DashboardGenerator(
                 templatePath is not null ? Path.Combine(templatePath, "index.html") : null,
                 brandingConfig,
@@ -145,18 +151,21 @@ public sealed class DashboardHandler
                 Console.WriteLine($"Branding: Warning — {warning}");
             }
 
+            var dashboardResult = new DashboardResult
+            {
+                Command = "dashboard",
+                Status = "completed",
+                OutputPath = Path.GetRelativePath(currentDir, outputPath),
+                PagesGenerated = 1,
+                SuitesIncluded = data.Suites.Count,
+                TestsIncluded = data.Tests.Count,
+                RunsIncluded = data.Runs.Count
+            };
+            _progressManager.Complete(dashboardResult);
+
             if (_outputFormat == OutputFormat.Json)
             {
-                JsonResultWriter.Write(new DashboardResult
-                {
-                    Command = "dashboard",
-                    Status = "success",
-                    OutputPath = Path.GetRelativePath(currentDir, outputPath),
-                    PagesGenerated = 1,
-                    SuitesIncluded = data.Suites.Count,
-                    TestsIncluded = data.Tests.Count,
-                    RunsIncluded = data.Runs.Count
-                });
+                JsonResultWriter.Write(dashboardResult);
                 return ExitCodes.Success;
             }
 
@@ -175,6 +184,7 @@ public sealed class DashboardHandler
         }
         catch (Exception ex)
         {
+            _progressManager.Fail($"Error generating dashboard: {ex.Message}");
             Console.Error.WriteLine($"Error generating dashboard: {ex.Message}");
             if (_verbosity >= VerbosityLevel.Detailed)
             {

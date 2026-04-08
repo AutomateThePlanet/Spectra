@@ -86,4 +86,84 @@ public class SkillsManifestTests : IDisposable
             Assert.Contains("spectra", content, StringComparison.OrdinalIgnoreCase);
         }
     }
+
+    [Fact]
+    public void AllSkills_WithCommands_IncludeNoInteractionFlag()
+    {
+        var skillsWithCommands = new[] { "spectra-generate", "spectra-coverage", "spectra-dashboard",
+            "spectra-validate", "spectra-criteria", "spectra-docs" };
+
+        foreach (var skillName in skillsWithCommands)
+        {
+            var content = SkillContent.All[skillName];
+            // Every command line in these SKILLs should include --no-interaction
+            var commandLines = content.Split('\n')
+                .Where(l => l.TrimStart().StartsWith("spectra "))
+                .ToList();
+
+            Assert.All(commandLines, line =>
+                Assert.Contains("--no-interaction", line));
+        }
+    }
+
+    [Fact]
+    public void AllSkills_WithCommands_IncludeOutputFormatJson()
+    {
+        var skillsWithCommands = new[] { "spectra-generate", "spectra-coverage", "spectra-dashboard",
+            "spectra-validate", "spectra-criteria", "spectra-docs" };
+
+        foreach (var skillName in skillsWithCommands)
+        {
+            var content = SkillContent.All[skillName];
+            var commandLines = content.Split('\n')
+                .Where(l => l.TrimStart().StartsWith("spectra "))
+                .ToList();
+
+            Assert.All(commandLines, line =>
+                Assert.Contains("--output-format json", line));
+        }
+    }
+
+    [Fact]
+    public void AllSkills_WithCommands_IncludeVerbosityQuiet()
+    {
+        var skillsWithCommands = new[] { "spectra-coverage", "spectra-dashboard",
+            "spectra-validate", "spectra-criteria", "spectra-docs" };
+
+        foreach (var skillName in skillsWithCommands)
+        {
+            var content = SkillContent.All[skillName];
+            var commandLines = content.Split('\n')
+                .Where(l => l.TrimStart().StartsWith("spectra "))
+                .ToList();
+
+            Assert.All(commandLines, line =>
+                Assert.Contains("--verbosity quiet", line));
+        }
+    }
+
+    [Fact]
+    public void LongRunningSkills_IncludeProgressPageStep()
+    {
+        var longRunningSkills = new[] { "spectra-coverage", "spectra-dashboard", "spectra-docs" };
+
+        foreach (var skillName in longRunningSkills)
+        {
+            var content = SkillContent.All[skillName];
+            Assert.Contains(".spectra-progress.html", content);
+        }
+    }
+
+    [Fact]
+    public void AllSkills_WithCommands_IncludeResultFileRead()
+    {
+        var skillsWithResultFile = new[] { "spectra-generate", "spectra-coverage", "spectra-dashboard",
+            "spectra-validate", "spectra-criteria", "spectra-docs" };
+
+        foreach (var skillName in skillsWithResultFile)
+        {
+            var content = SkillContent.All[skillName];
+            Assert.Contains(".spectra-result.json", content);
+        }
+    }
 }

@@ -20,6 +20,9 @@ namespace Spectra.CLI.Commands.Update;
 /// </summary>
 public sealed class UpdateHandler
 {
+    private static readonly Progress.ProgressManager _progressManager =
+        new("update", Progress.ProgressPhases.Update, title: "Test Update");
+
     private readonly VerbosityLevel _verbosity;
     private readonly bool _dryRun;
     private readonly bool _noReview;
@@ -53,6 +56,8 @@ public sealed class UpdateHandler
         bool deleteOrphaned = false,
         CancellationToken ct = default)
     {
+        _progressManager.Reset();
+
         // Detect mode: direct if suite provided, interactive otherwise
         var isNonInteractive = _noInteraction ||
             Console.IsInputRedirected ||
@@ -201,6 +206,8 @@ public sealed class UpdateHandler
         bool deleteOrphaned,
         CancellationToken ct)
     {
+        _progressManager.Update("classifying", $"Analyzing changes in {suite} suite...");
+
         // Read existing tests
         var batchReader = new BatchReadTestsTool();
         var readResult = await _progress.StatusAsync(
@@ -333,6 +340,7 @@ public sealed class UpdateHandler
         }
 
         // Apply changes
+        _progressManager.Update("updating", $"Applying changes to {suite}...");
         var orphanedCount = 0;
         if (!_dryRun)
         {
@@ -400,6 +408,24 @@ public sealed class UpdateHandler
             reviewResult.ToUpdate.Count,
             orphanedCount,
             reviewResult.ToDelete.Count);
+
+        var updateResult = new Results.UpdateResult
+        {
+            Command = "update",
+            Status = "completed",
+            Suite = suite,
+            TestsUpdated = reviewResult.ToUpdate.Count,
+            TestsRemoved = orphanedCount + reviewResult.ToDelete.Count,
+            TestsUnchanged = proposals.Count(p => p.Classification == UpdateClassification.UpToDate),
+            Classification = new Results.UpdateClassificationCounts
+            {
+                UpToDate = proposals.Count(p => p.Classification == UpdateClassification.UpToDate),
+                Outdated = proposals.Count(p => p.Classification == UpdateClassification.Outdated),
+                Orphaned = proposals.Count(p => p.Classification == UpdateClassification.Orphaned),
+                Redundant = proposals.Count(p => p.Classification == UpdateClassification.Redundant)
+            }
+        };
+        _progressManager.Complete(updateResult);
 
         return ExitCodes.Success;
     }
