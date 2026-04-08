@@ -69,7 +69,7 @@ public class SampleDataFactoryTests
 
         Assert.NotNull(data.CoverageSummary);
         Assert.True(data.CoverageSummary.Documentation.Total > 0);
-        Assert.True(data.CoverageSummary.Requirements.Total > 0);
+        Assert.True(data.CoverageSummary.AcceptanceCriteria.Total > 0);
         Assert.True(data.CoverageSummary.Automation.Total > 0);
     }
 
@@ -97,7 +97,7 @@ public class SampleDataFactoryTests
 
         var coverage = data.CoverageSummary!;
         Assert.InRange(coverage.Documentation.Percentage, 0, 100);
-        Assert.InRange(coverage.Requirements.Percentage, 0, 100);
+        Assert.InRange(coverage.AcceptanceCriteria.Percentage, 0, 100);
         Assert.InRange(coverage.Automation.Percentage, 0, 100);
     }
 

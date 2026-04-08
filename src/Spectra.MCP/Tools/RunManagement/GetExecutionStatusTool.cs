@@ -112,9 +112,8 @@ public sealed class GetExecutionStatusTool : IMcpTool
         var instruction = run.Status switch
         {
             RunStatus.Running when currentTest is not null =>
-                $"NEXT STEP: Call advance_test_case with status PASSED, FAILED, or BLOCKED for test {currentTest.TestId} (\"{currentTest.Title}\"). " +
-                $"You can also call get_test_case_details first to review the full test steps. " +
-                $"Progress: {progress}.",
+                $"NEXT STEP: Call get_test_case_details for test {currentTest.TestId} to get the full steps, preconditions, and expected result. " +
+                $"You MUST present the full test details to the user before asking for a result. Progress: {progress}.",
             RunStatus.Running =>
                 "All tests have been executed. Call finalize_execution_run to complete the run and generate reports.",
             RunStatus.Paused =>

@@ -190,9 +190,15 @@ public sealed class GenerateHandler
             return ExitCodes.Error;
         }
 
+        // Clear stale result/progress files from previous runs
+        DeleteResultFile();
+
         // Mark result file as in-progress so agents know the command is running
         var progressStatus = analyzeOnly ? "analyzing" : "generating";
         WriteInProgressResultFile(suite, progressStatus, "Loading documentation...");
+
+        // Open progress page in browser
+        Progress.ProgressPageWriter.OpenInBrowser(GetProgressPagePath());
 
         // Auto-refresh document index before generation
         var indexService = new DocumentIndexService();
@@ -320,10 +326,33 @@ public sealed class GenerateHandler
             }
             else
             {
-                // Analysis failed — fall back to default, reduce by existing test count
-                var defaultCount = config.Generation?.DefaultCount ?? 15;
-                effectiveCount = Math.Max(5, defaultCount - existingTests.Count);
-                _progress.Warning($"Behavior analysis unavailable, using default count of {effectiveCount} (accounting for {existingTests.Count} existing tests)");
+                // Analysis failed — retry once before falling back
+                _progress.Warning("Behavior analysis did not return results, retrying...");
+                UpdateProgress(suite, progressStatus, "Retrying behavior analysis...");
+                analysisResult = await _progress.StatusAsync(
+                    $"Retrying {suite} analysis...",
+                    async () =>
+                    {
+                        var provider = config.Ai.Providers?.FirstOrDefault(p => p.Enabled);
+                        var analyzer = new BehaviorAnalyzer(provider, status =>
+                        {
+                            UpdateProgress(suite, progressStatus, status);
+                        });
+                        return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct);
+                    });
+
+                if (analysisResult is not null)
+                {
+                    AnalysisPresenter.DisplayBreakdown(analysisResult, _outputFormat);
+                    effectiveCount = analysisResult.RecommendedCount;
+                }
+                else
+                {
+                    // Both attempts failed — fall back to default
+                    var defaultCount = config.Generation?.DefaultCount ?? 15;
+                    effectiveCount = Math.Max(5, defaultCount - existingTests.Count);
+                    _progress.Warning($"Behavior analysis unavailable after retry, using default count of {effectiveCount} (accounting for {existingTests.Count} existing tests)");
+                }
             }
         }
 
@@ -595,6 +624,23 @@ public sealed class GenerateHandler
             _progress.Warning($"No tests generated (requested: {effectiveCount})");
             _progress.BlankLine();
             ShowCountMismatchReason(0, effectiveCount, documentMap.Documents.Count, existingTests.Count, focus);
+
+            // Write completed result so progress page stops spinning
+            WriteResultFile(new GenerateResult
+            {
+                Command = "generate",
+                Status = "completed",
+                Suite = suite,
+                Message = $"No tests generated (requested: {effectiveCount})",
+                Generation = new GenerateGeneration
+                {
+                    TestsRequested = effectiveCount,
+                    TestsGenerated = 0,
+                    TestsWritten = 0,
+                    TestsRejectedByCritic = 0
+                },
+                FilesCreated = []
+            });
             return ExitCodes.Success;
         }
 
@@ -1639,6 +1685,11 @@ public sealed class GenerateHandler
         return Path.Combine(Directory.GetCurrentDirectory(), ".spectra-result.json");
     }
 
+    private static string GetProgressPagePath()
+    {
+        return Path.Combine(Directory.GetCurrentDirectory(), ".spectra-progress.html");
+    }
+
     /// <summary>
     /// Writes JSON to the result file with explicit flush to ensure Windows NTFS writes to disk.
     /// </summary>
@@ -1652,7 +1703,7 @@ public sealed class GenerateHandler
     }
 
     /// <summary>
-    /// Deletes the result file at the start of a command to prevent stale reads.
+    /// Deletes the result and progress files at the start of a command to prevent stale reads.
     /// </summary>
     private static void DeleteResultFile()
     {
@@ -1661,6 +1712,10 @@ public sealed class GenerateHandler
             var path = GetResultFilePath();
             if (File.Exists(path))
                 File.Delete(path);
+
+            var progressPath = GetProgressPagePath();
+            if (File.Exists(progressPath))
+                File.Delete(progressPath);
         }
         catch
         {
@@ -1669,13 +1724,18 @@ public sealed class GenerateHandler
     }
 
     /// <summary>
-    /// Writes a result file to .spectra/last-result.json for external tool consumption.
+    /// Writes a result file to .spectra-result.json for external tool consumption.
+    /// Also updates the progress HTML page.
     /// </summary>
     private static void WriteResultFile(GenerateResult result)
     {
         try
         {
-            FlushWriteFile(GetResultFilePath(), JsonSerializer.Serialize(result, ResultFileOptions));
+            var json = JsonSerializer.Serialize(result, ResultFileOptions);
+            FlushWriteFile(GetResultFilePath(), json);
+
+            var isTerminal = result.Status is "completed" or "failed";
+            Progress.ProgressPageWriter.WriteProgressPage(GetProgressPagePath(), json, isTerminal);
         }
         catch
         {
@@ -1685,6 +1745,7 @@ public sealed class GenerateHandler
 
     /// <summary>
     /// Writes an in-progress marker so agents know the command is still running.
+    /// Also updates the progress HTML page.
     /// </summary>
     private static void WriteInProgressResultFile(string suite, string status = "generating", string? message = null)
     {
@@ -1704,7 +1765,10 @@ public sealed class GenerateHandler
                 },
                 FilesCreated = []
             };
-            FlushWriteFile(GetResultFilePath(), JsonSerializer.Serialize(result, ResultFileOptions));
+            var json = JsonSerializer.Serialize(result, ResultFileOptions);
+            FlushWriteFile(GetResultFilePath(), json);
+
+            Progress.ProgressPageWriter.WriteProgressPage(GetProgressPagePath(), json, isTerminal: false);
         }
         catch
         {
@@ -1723,6 +1787,7 @@ public sealed class GenerateHandler
 
     /// <summary>
     /// Writes an error result file so SKILL/agent can report failures to the user.
+    /// Also updates the progress HTML page.
     /// </summary>
     private static void WriteErrorResultFile(string error, string? suite = null)
     {
@@ -1734,7 +1799,10 @@ public sealed class GenerateHandler
                 Status = "failed",
                 Error = error
             };
-            FlushWriteFile(GetResultFilePath(), JsonSerializer.Serialize(errorResult, ResultFileOptions));
+            var json = JsonSerializer.Serialize(errorResult, ResultFileOptions);
+            FlushWriteFile(GetResultFilePath(), json);
+
+            Progress.ProgressPageWriter.WriteProgressPage(GetProgressPagePath(), json, isTerminal: true);
         }
         catch
         {

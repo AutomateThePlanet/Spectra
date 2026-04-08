@@ -1,0 +1,21 @@
+# Example acceptance criteria file. Delete this file after reviewing.
+#
+# You can:
+#   1. Run 'spectra ai analyze --extract-criteria' to auto-extract from your docs
+#   2. Import from Jira/ADO: 'spectra ai analyze --import-criteria ./export.csv'
+#   3. Write criteria manually in this format
+#
+criteria:
+  - id: AC-SAMPLE-001
+    text: "User MUST be able to log in with email and password"
+    rfc2119: MUST
+    component: auth
+    priority: high
+    tags: [authentication, login]
+
+  - id: AC-SAMPLE-002
+    text: "System SHOULD display password strength indicator"
+    rfc2119: SHOULD
+    component: auth
+    priority: medium
+    tags: [authentication, ux]

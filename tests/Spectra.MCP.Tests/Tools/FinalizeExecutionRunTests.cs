@@ -81,7 +81,7 @@ public class FinalizeExecutionRunTests : IAsyncDisposable
 
         Assert.Equal("Completed", response.GetProperty("run_status").GetString());
         Assert.Equal("2/2", response.GetProperty("progress").GetString());
-        Assert.Equal("start_execution_run", response.GetProperty("next_expected_action").GetString());
+        Assert.Equal("openBrowserPage", response.GetProperty("next_expected_action").GetString());
     }
 
     [Fact]

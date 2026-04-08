@@ -61,6 +61,10 @@ public sealed class TestIndexEntry
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public IReadOnlyList<string> Requirements { get; init; } = [];
 
+    [JsonPropertyName("criteria")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public IReadOnlyList<string> Criteria { get; init; } = [];
+
     [JsonPropertyName("bugs")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public IReadOnlyList<string> Bugs { get; init; } = [];

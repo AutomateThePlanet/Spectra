@@ -216,7 +216,7 @@ public class AdvanceTestCaseTests : IAsyncDisposable
         Assert.True(response.TryGetProperty("instruction", out var instruction));
         var text = instruction.GetString()!;
         Assert.Contains("NEXT STEP", text);
-        Assert.Contains("advance_test_case", text);
+        Assert.Contains("get_test_case_details", text);
     }
 
     [Fact]

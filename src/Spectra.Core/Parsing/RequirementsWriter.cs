@@ -1,3 +1,4 @@
+#pragma warning disable CS0618 // Obsolete type usage — this file IS the legacy implementation
 using System.Text.RegularExpressions;
 using Spectra.Core.Models.Coverage;
 using YamlDotNet.Serialization;

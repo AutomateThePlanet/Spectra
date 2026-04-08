@@ -1,0 +1,906 @@
+# Extracted from: docs/spectra-test-docs/docs/audit-log/audit-log.md
+# Doc hash: 83900fd3dc1c87c79894934b5058e2088a7affe7d13737b147f31c26f6599911
+# Generated at: 2026-04-07T11:43:20.8009922Z
+criteria:
+- id: AC-AUDIT-LOG-001
+  text: System MUST log all login, logout, and failed login attempts
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - authentication
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-002
+  text: System MUST log all application creation, modification, and status changes
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - application
+  - user-action
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-003
+  text: System MUST log all document upload, download, deletion, and signing operations
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - document
+  - user-action
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-004
+  text: System MUST log all payment initiation, confirmation, and refund operations
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - payment
+  - user-action
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-005
+  text: System MUST log all citizen record creation, modification, and deactivation
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - citizen
+  - user-action
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-006
+  text: System MUST log all user account creation, role changes, and deactivation
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - user-management
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-007
+  text: System MUST log all permission changes
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - permissions
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-008
+  text: System MUST log all report generation and export operations
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - reporting
+  - user-action
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-009
+  text: System MUST log security-sensitive search queries including EGN lookups and financial queries
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - search
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-010
+  text: System MUST log all configuration changes
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - configuration
+  - user-action
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-011
+  text: System MUST log scheduled job execution including start, end, and success/failure status
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - jobs
+  - system-event
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-012
+  text: System MUST log notification delivery events including sent, failed, and retried statuses
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - notifications
+  - system-event
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-013
+  text: System MUST log integration events including payment gateway callbacks and SSO authentication
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - integration
+  - system-event
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-014
+  text: System MUST log data purge execution
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-management
+  - system-event
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-015
+  text: System MUST log index rebuild operations
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - indexing
+  - system-event
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-016
+  text: System MUST log backup execution
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - backup
+  - system-event
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-017
+  text: System MUST log error events including HTTP 500, unhandled exceptions, and timeout errors
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - errors
+  - system-event
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-018
+  text: System MUST log every read access to citizen personal data including name, EGN, address, phone, and email
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-access
+  - privacy
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-019
+  text: System MUST log every export of data containing personal information
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-access
+  - privacy
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-020
+  text: System MUST log every print action on documents containing personal data
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-access
+  - privacy
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-021
+  text: System MUST log database queries that return more than 1,000 rows of personal data
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-access
+  - privacy
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-022
+  text: Each audit record MUST contain a unique UUID identifier
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-model
+  - audit
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-023
+  text: Each audit record MUST contain a UTC timestamp with millisecond precision
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-model
+  - audit
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-024
+  text: Each audit record MUST contain actor_id identifying the user who performed the action
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-model
+  - audit
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-025
+  text: Each audit record MUST contain actor_type enum value of INTERNAL_USER, CITIZEN, SYSTEM, or EXTERNAL_SYSTEM
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-model
+  - audit
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-026
+  text: Each audit record MUST contain source IP address
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-model
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-027
+  text: Each audit record MUST contain browser/client user agent string
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-model
+  - audit
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-028
+  text: Each audit record MUST contain an action code
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-model
+  - audit
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-029
+  text: Each audit record MUST contain a category enum value of USER_ACTION, SYSTEM_EVENT, DATA_ACCESS, or SECURITY
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-model
+  - audit
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-030
+  text: Each audit record MUST contain resource_type identifying the type of resource affected
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-model
+  - audit
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-031
+  text: Each audit record MUST contain resource_id identifying the affected resource
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-model
+  - audit
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-032
+  text: Each audit record MUST contain a human-readable description of the event
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-model
+  - audit
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-033
+  text: Each audit record MUST contain changes JSON with before/after values for modification events
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-model
+  - audit
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-034
+  text: Each audit record MUST contain metadata JSON with additional context including session ID, request ID, and correlation ID
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-model
+  - audit
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-035
+  text: Each audit record MUST contain severity enum value of INFO, WARNING, or CRITICAL
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-model
+  - audit
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-036
+  text: Each audit record MUST contain a SHA-256 hash of the record content plus the previous record's hash
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - data-model
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-037
+  text: Audit records MUST NOT be modified or deleted by any user including System Administrators
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - immutability
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-038
+  text: System MUST compute SHA-256 hash from record content and previous record's hash to create a blockchain-like chain
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - immutability
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-039
+  text: System MUST run a nightly job to verify the hash chain for the previous day
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - immutability
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-040
+  text: Tamper detection job MUST read all records for the previous day
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - immutability
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-041
+  text: Tamper detection job MUST recompute hashes sequentially
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - immutability
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-042
+  text: Tamper detection job MUST compare computed hashes with stored hashes
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - immutability
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-043
+  text: System MUST send CRITICAL alert to all System Administrators if hash mismatch is detected
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - immutability
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-044
+  text: System MUST write to a separate tamper log stored on an independent server if hash mismatch is detected
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - immutability
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-045
+  text: System MUST allow System Admins to trigger manual hash chain verification for any date range
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - immutability
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-046
+  text: Audit records MUST be stored in a separate database schema with restricted access
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - storage
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-047
+  text: Application database user MUST have INSERT and SELECT permissions only on audit table
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - storage
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-048
+  text: Application database user MUST NOT have UPDATE or DELETE permissions on audit table
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - storage
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-049
+  text: Database triggers MUST prevent UPDATE and DELETE operations on the audit table
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - storage
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-050
+  text: Database backups MUST include the audit log
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - storage
+  - backup
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-051
+  text: Database backups MUST be stored for 10 years on separate storage
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - storage
+  - backup
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-052
+  text: System MUST retain security events for 5 years
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - retention
+  - compliance
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-053
+  text: System MUST retain data access events for 3 years
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - retention
+  - compliance
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-054
+  text: System MUST retain user actions for 10 years
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - retention
+  - compliance
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-055
+  text: System MUST retain system events for 2 years
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - retention
+  - compliance
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-056
+  text: System MUST retain financial events for 10 years
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - retention
+  - compliance
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-057
+  text: Export process MUST generate a signed archive with all records for the retention period
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - retention
+  - export
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-058
+  text: Export process MUST verify the hash chain of the exported records
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - retention
+  - export
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-059
+  text: Export process MUST store the archive in encrypted form on immutable WORM storage
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - retention
+  - storage
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-060
+  text: Export process MUST remove records from active database only after successful verification and storage
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - retention
+  - export
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-061
+  text: System MUST add a record of the export itself to the audit log
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - retention
+  - audit
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-062
+  text: Audit Log Viewer MUST be available to Auditors, Directors, and System Admins
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - access-control
+  - viewer
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-063
+  text: Audit Log Viewer MUST support search by actor, action, resource, date range, severity, and category
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - search
+  - viewer
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-064
+  text: Audit Log Viewer MUST combine filters with AND logic
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - search
+  - viewer
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-065
+  text: Audit Log Viewer MUST sort results by timestamp descending with newest first
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - sorting
+  - viewer
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-066
+  text: Audit Log Viewer MUST allow each record to be expandable to show full details including changes JSON
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - viewer
+  - ux
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-067
+  text: Audit Log Viewer MUST show a diff view with before/after values side by side for modification events
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - viewer
+  - ux
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-068
+  text: Audit Log Viewer MUST use color-coded severity with blue for INFO, yellow for WARNING, and red for CRITICAL
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - viewer
+  - ux
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-069
+  text: Timeline View MUST show all audit events for a specific resource
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - viewer
+  - timeline
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-070
+  text: Timeline View MUST display events as cards on a vertical timeline
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - viewer
+  - timeline
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-071
+  text: Timeline View MUST show timestamp, actor, action, and brief description on each card
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - viewer
+  - timeline
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-072
+  text: Correlation View MUST allow auditors to follow a correlation ID
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - viewer
+  - correlation
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-073
+  text: Correlation View MUST show all related records in sequence
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - viewer
+  - correlation
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-074
+  text: System MUST support audit log export in CSV, JSON, and PDF formats
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - export
+  - formats
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-075
+  text: System MUST limit exports to a maximum of 500,000 records per export
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - export
+  - limits
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-076
+  text: System MUST log all exports in the audit log including who exported, date range, and filter criteria
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - export
+  - audit
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-077
+  text: PDF exports MUST include a cover page with export date, requestor, filter criteria, record count, and digital signature
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - export
+  - pdf
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-078
+  text: PDF exports MUST include a digital signature from the system's qualified electronic seal
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - export
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-079
+  text: Exported files MUST be encrypted with AES-256
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - export
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-080
+  text: Exported files MUST require a password set by the requestor
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - export
+  - security
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-081
+  text: Data Protection Officers MUST have read-only access to audit logs containing personal data access events
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - access-control
+  - compliance
+  linked_test_ids: []
+- id: AC-AUDIT-LOG-082
+  text: Data Protection Officers MUST have access without requiring System Admin privileges
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/audit-log/audit-log.md
+  component: audit-log
+  priority: high
+  tags:
+  - access-control
+  - compliance
+  linked_test_ids: []

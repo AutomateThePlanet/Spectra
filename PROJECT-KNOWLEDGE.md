@@ -1,0 +1,323 @@
+# SPECTRA Project Knowledge
+
+## What is SPECTRA?
+
+SPECTRA is an AI-native test case generation, execution, coverage analysis, and maintenance CLI tool. It reads product documentation, extracts testable behaviors, generates structured manual test cases (as Markdown files with YAML frontmatter), executes them through an MCP server with AI agent orchestration, and produces coverage reports and dashboards.
+
+## Architecture Overview
+
+```
+User → CLI (spectra) → AI Provider (Copilot SDK) → Test Files (Markdown/YAML)
+User → VS Code Copilot Chat → SKILL/Agent → CLI commands → Results
+User → VS Code Copilot Chat → MCP Server → Test Execution → Reports
+```
+
+### Three Main Components
+
+| Component | Purpose | Package |
+|-----------|---------|---------|
+| **Spectra.CLI** | CLI tool for generation, coverage, dashboard, validation | `Spectra.CLI` NuGet (global tool: `spectra`) |
+| **Spectra.MCP** | MCP execution server for AI-driven test execution | `Spectra.MCP` NuGet (global tool: `spectra-mcp`) |
+| **Spectra.Core** | Shared models, parsers, coverage analyzers | Referenced by CLI and MCP |
+
+### Supporting Components
+
+| Component | Purpose |
+|-----------|---------|
+| **dashboard-site/** | Static HTML/JS dashboard template with D3.js visualizations |
+| **SKILLs** (8 files) | VS Code Copilot Chat integration — each SKILL wraps CLI commands |
+| **Agents** (2 files) | Copilot Chat agent prompts for generation and execution workflows |
+
+## Technology Stack
+
+- **Language**: C# 12, .NET 8+
+- **AI Runtime**: GitHub Copilot SDK (sole runtime — supports github-models, azure-openai, azure-anthropic, openai, anthropic providers)
+- **CLI Framework**: System.CommandLine
+- **Terminal UX**: Spectre.Console
+- **Serialization**: System.Text.Json (JSON), YamlDotNet (YAML)
+- **CSV Parsing**: CsvHelper
+- **MCP Server**: ASP.NET Core
+- **State Storage**: Microsoft.Data.Sqlite (execution state in `.execution/spectra.db`)
+- **Testing**: xUnit
+- **Dashboard**: Vanilla JS + D3.js (treemap/donut charts)
+
+## Project Structure
+
+```
+src/
+├── Spectra.CLI/
+│   ├── Commands/           # CLI command handlers
+│   │   ├── Analyze/        # Coverage analysis + criteria extraction/import/list
+│   │   ├── Dashboard/      # Dashboard generation
+│   │   ├── Docs/           # Documentation index management
+│   │   ├── Generate/       # Test generation (direct + interactive modes)
+│   │   ├── Init/           # Project initialization
+│   │   └── Update/         # Test update with classification
+│   ├── Agent/Copilot/      # AI provider integration
+│   │   ├── CopilotGenerationAgent  # Test generation via Copilot SDK
+│   │   ├── CopilotCritic          # Grounding verification
+│   │   ├── CriteriaExtractor      # Per-document criteria extraction
+│   │   └── BehaviorAnalyzer       # Documentation behavior analysis
+│   ├── Skills/Content/     # Bundled SKILL and agent markdown files
+│   ├── Progress/           # Live progress HTML page writer
+│   ├── Results/            # Typed JSON result models per command
+│   ├── Coverage/           # Coverage report writer
+│   ├── Dashboard/          # Dashboard data collection + generation
+│   └── IO/                 # File writers for test cases
+├── Spectra.Core/
+│   ├── Models/             # All data models
+│   │   ├── Coverage/       # AcceptanceCriterion, CriteriaIndex, UnifiedCoverageReport
+│   │   ├── Dashboard/      # DashboardData, CoverageSummaryData
+│   │   ├── Execution/      # Run, TestResult, McpToolResponse
+│   │   └── Config/         # SpectraConfig, CoverageConfig
+│   ├── Parsing/            # YAML/Markdown parsers, criteria readers/writers, importers
+│   ├── Coverage/           # Coverage analyzers (documentation, criteria, automation)
+│   └── Update/             # TestClassifier for test updates
+├── Spectra.MCP/
+│   ├── Tools/              # MCP tool implementations (20+ tools)
+│   ├── Execution/          # ExecutionEngine, TestQueue, StateMachine
+│   ├── Reports/            # HTML/Markdown/JSON report generation
+│   └── Storage/            # SQLite repositories
+└── Spectra.GitHub/         # GitHub integration (future)
+
+dashboard-site/             # Static dashboard template
+tests/                      # xUnit test projects (1280+ tests)
+```
+
+## CLI Commands
+
+### Test Generation
+```bash
+spectra ai generate --suite {name}              # Interactive session
+spectra ai generate --suite {name} --count 15   # Direct mode with count
+spectra ai generate --suite {name} --focus "negative, high priority"  # Filtered
+spectra ai generate --suite {name} --analyze-only  # Analysis only
+spectra ai generate --suite {name} --skip-critic   # Skip verification
+spectra ai generate --suite {name} --no-interaction --output-format json  # CI mode
+```
+
+### Acceptance Criteria
+```bash
+spectra ai analyze --extract-criteria            # Incremental extraction from docs
+spectra ai analyze --extract-criteria --force    # Full re-extraction
+spectra ai analyze --import-criteria ./file.csv  # Import from CSV/YAML/JSON
+spectra ai analyze --list-criteria               # List all criteria
+spectra ai analyze --list-criteria --component checkout --priority high  # Filtered
+```
+
+### Coverage & Dashboard
+```bash
+spectra ai analyze --coverage --auto-link        # Unified coverage report
+spectra dashboard --output ./site                # Generate dashboard
+```
+
+### Other Commands
+```bash
+spectra ai update --suite {name}                 # Update tests (classify changes)
+spectra validate                                 # Validate test files
+spectra docs index                               # Rebuild documentation index
+spectra list / spectra show {id}                 # Browse tests
+spectra init                                     # Initialize project
+spectra update-skills                            # Sync bundled SKILL files
+```
+
+## Test Case Format
+
+Tests are Markdown files with YAML frontmatter in `tests/{suite}/`:
+
+```yaml
+---
+id: TC-101
+title: "Verify login with valid credentials"
+priority: high
+tags: [authentication, login]
+component: auth
+criteria: [AC-AUTH-001, AC-AUTH-002]     # Linked acceptance criteria
+automated_by: [LoginTests.cs]
+requirements: [REQ-001]                  # Legacy field (deprecated)
+grounding:
+  verdict: grounded
+  source: docs/auth.md
+---
+
+## Steps
+1. Navigate to login page
+2. Enter valid email and password
+3. Click Sign In
+
+## Expected Result
+User is redirected to dashboard with welcome message
+```
+
+## Acceptance Criteria System
+
+### Architecture
+```
+docs/
+├── feature1.md                          # Source documentation
+├── feature2.md
+└── requirements/
+    ├── _criteria_index.yaml             # Master index (auto-generated)
+    ├── feature1.criteria.yaml           # Per-document criteria
+    ├── feature2.criteria.yaml
+    └── imported/
+        └── jira-sprint-42.criteria.yaml # Imported from external sources
+```
+
+### Criterion Format
+```yaml
+criteria:
+  - id: AC-CHECKOUT-001
+    text: "System MUST validate IBAN format before submitting payment"
+    rfc2119: MUST
+    source_doc: docs/checkout.md
+    source_section: "Payment Validation"
+    component: checkout
+    priority: high
+    tags: [payment, validation]
+```
+
+### Key Features
+- **Per-document extraction**: Each doc processed independently (no truncation)
+- **SHA-256 incremental**: Only re-extracts changed documents
+- **Import**: CSV (Jira/ADO auto-column-detection), YAML, JSON
+- **AI splitting**: Compound criteria split into individual entries
+- **RFC 2119 normalization**: Informal language → MUST/SHOULD/MAY
+- **Merge/Replace**: `--merge` (default) matches by ID/source, `--replace` overwrites target file only
+
+## VS Code Copilot Chat Integration
+
+### 8 Bundled SKILLs
+| SKILL | Purpose |
+|-------|---------|
+| `spectra-generate` | Test generation (analyze → approve → generate flow) |
+| `spectra-coverage` | Coverage analysis |
+| `spectra-dashboard` | Dashboard generation and opening |
+| `spectra-validate` | Test validation |
+| `spectra-list` | Test listing and browsing |
+| `spectra-init-profile` | Generation profile setup |
+| `spectra-help` | Command reference |
+| `spectra-criteria` | Criteria extraction, import, listing |
+
+### 2 Agent Prompts
+| Agent | Purpose |
+|-------|---------|
+| `spectra-generation` | Primary: test generation. Also handles all CLI commands. |
+| `spectra-execution` | Test execution via MCP tools. Also handles CLI commands. |
+
+### SKILL Format Conventions
+- **Name**: lowercase-hyphenated (e.g., `spectra-generate`)
+- **Tools**: Include `browser/openBrowserPage` for preview capability
+- **CLI flags**: Always include `--no-interaction` to prevent terminal prompts
+- **Progress**: Generation commands use `.spectra-progress.html` for live status
+- **Steps**: Use `**Step N**` format (not `### Tool call N:`)
+- **Preview**: Use `show preview {file}` to open files in VS Code (not `start`)
+
+### Generation Flow (SKILL/Agent)
+1. `show preview .spectra-progress.html`
+2. `runInTerminal`: `spectra ai generate --suite {suite} --analyze-only --no-interaction --output-format json`
+3. `awaitTerminal` (wait for completion)
+4. `readFile .spectra-result.json` → show breakdown, ask to proceed
+5. `runInTerminal`: `spectra ai generate --suite {suite} --count {n} --no-interaction --output-format json`
+6. `awaitTerminal`
+7. `readFile .spectra-result.json` → show results
+
+## MCP Execution Server
+
+### Key MCP Tools
+- `start_execution_run`, `get_execution_status`, `pause/resume/cancel/finalize_execution_run`
+- `get_test_case_details`, `advance_test_case`, `skip_test_case`, `bulk_record_results`
+- `save_screenshot`, `save_clipboard_screenshot`, `add_test_note`
+- `list_active_runs`, `cancel_all_active_runs`
+- `find_test_cases`, `get_test_execution_history`, `list_saved_selections`
+
+### Execution Flow
+1. `list_active_runs` → check for active runs
+2. `start_execution_run` → begin with suite/selection/test_ids
+3. `get_test_case_details` → present test to user (MUST show full details)
+4. `advance_test_case` → record PASSED/FAILED/BLOCKED
+5. `finalize_execution_run` → generate reports, instruction to open HTML report
+
+### Reports
+- Generated in `.execution/reports/` as JSON, Markdown, and HTML
+- HTML report has professional styling (navy theme, pass rate circle, expandable test cards)
+- `finalize_execution_run` returns instruction: "show preview .execution/reports/{filename}"
+
+## Progress Page System
+
+The CLI generates a self-contained `.spectra-progress.html` during test generation:
+
+- **Auto-refresh**: `<meta http-equiv="refresh" content="2">` (removed on completion)
+- **Embedded JSON**: Status data is inline in HTML (no fetch needed)
+- **Phase stepper**: Analyzing → Analyzed → Generating → Completed
+- **Live status**: Spinner, current message, timestamp
+- **Summary cards**: Behaviors found, already covered, recommended, tests written
+- **File links**: Generated test files as `vscode://file/` clickable links
+- **Reset**: Both `.spectra-result.json` and `.spectra-progress.html` are deleted at command start
+
+## Coverage System
+
+Three-section unified coverage:
+
+1. **Documentation Coverage**: Which docs have linked tests
+2. **Acceptance Criteria Coverage**: Which criteria are tested (with per-source-type breakdown)
+3. **Automation Coverage**: Which tests have `automated_by` links to code
+
+## Config Schema (`spectra.config.json`)
+
+```json
+{
+  "source": { "mode": "local", "local_dir": "docs/" },
+  "tests": { "dir": "tests/", "id_prefix": "TC", "id_start": 100 },
+  "ai": {
+    "providers": [{ "name": "azure-anthropic", "model": "claude-sonnet-4-5", "enabled": true }],
+    "critic": { "provider": "azure-anthropic", "model": "claude-sonnet-4-5" }
+  },
+  "coverage": {
+    "criteria_file": "docs/requirements/_criteria_index.yaml",
+    "criteria_dir": "docs/requirements",
+    "automation_dirs": ["tests"]
+  }
+}
+```
+
+## Code Conventions
+
+- **C# 12, .NET 8+**
+- **Naming**: PascalCase types/methods, camelCase locals
+- **Async**: All I/O operations async with `Async` suffix
+- **Nullable**: Reference types enabled
+- **Tests**: xUnit, structured results (never throw on validation errors)
+- **Serialization**: `[JsonPropertyName("snake_case")]` for JSON, `[YamlMember(Alias = "snake_case")]` for YAML
+- **Atomic writes**: Temp file + rename pattern for all file writes
+- **Error handling**: Non-critical operations (progress files, browser open) wrapped in try/catch
+
+## Completed Feature Specs
+
+| # | Feature | Key Changes |
+|---|---------|-------------|
+| 023 | Criteria Extraction Overhaul | Per-doc extraction, import, rename requirements→criteria, progress page |
+| 023 | Copilot Chat Integration | SKILLs, agents, result file polling, batch generation |
+| 022 | Bundled Skills | 8 SKILLs + 2 agents embedded as resources, hash-tracked updates |
+| 021 | Generation Session | 4-phase flow, suggestions, user-described tests, duplicate detection |
+| 020 | CLI Non-Interactive | `--output-format json`, `--no-interaction`, exit codes |
+| 017 | MCP Tool Resilience | Auto-resolve run_id/test_handle, list_active_runs |
+| 015 | Requirements Extraction | AI-powered extraction (now superseded by 023) |
+| 014 | Open Source Ready | CI/CD, README, publish workflows |
+| 013 | CLI UX Improvements | NextStepHints, interactive prompts, config subcommands |
+| 012 | Dashboard Branding | Company logo, colors, dark theme, `--preview` |
+| 011 | Coverage Overhaul | Unified 3-type coverage, auto-link, requirements parser |
+| 010 | Document Index | `docs/_index.md`, SHA-256 incremental, sections/entities |
+| 010 | Smart Test Selection | find_test_cases, saved selections, execution history |
+| 009 | Copilot SDK Consolidation | Single AI runtime, removed legacy agents |
+| 008 | Grounding Verification | Dual-model critic, grounded/partial/hallucinated verdicts |
+| 006 | Conversational Generation | Direct/interactive modes, test updates, classification |
+
+## Test Counts (as of 2026-04-08)
+
+| Project | Tests |
+|---------|-------|
+| Spectra.Core.Tests | 462 |
+| Spectra.CLI.Tests | 466 |
+| Spectra.MCP.Tests | 351 |
+| **Total** | **1279** |

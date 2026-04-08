@@ -11,8 +11,8 @@ public sealed class CoverageSummaryData
     [JsonPropertyName("documentation")]
     public required DocumentationSectionData Documentation { get; init; }
 
-    [JsonPropertyName("requirements")]
-    public required RequirementsSectionData Requirements { get; init; }
+    [JsonPropertyName("acceptance_criteria")]
+    public required AcceptanceCriteriaSectionData AcceptanceCriteria { get; init; }
 
     [JsonPropertyName("automation")]
     public required AutomationSectionData Automation { get; init; }
@@ -45,9 +45,9 @@ public sealed class DocumentationSectionData
 }
 
 /// <summary>
-/// Requirements coverage section with per-requirement detail.
+/// Acceptance criteria coverage section with per-criterion detail.
 /// </summary>
-public sealed class RequirementsSectionData
+public sealed class AcceptanceCriteriaSectionData
 {
     [JsonPropertyName("covered")]
     public required int Covered { get; init; }
@@ -58,12 +58,12 @@ public sealed class RequirementsSectionData
     [JsonPropertyName("percentage")]
     public required decimal Percentage { get; init; }
 
-    [JsonPropertyName("has_requirements_file")]
-    public required bool HasRequirementsFile { get; init; }
+    [JsonPropertyName("has_criteria_file")]
+    public required bool HasCriteriaFile { get; init; }
 
     [JsonPropertyName("details")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public IReadOnlyList<RequirementCoverageDetail>? Details { get; init; }
+    public IReadOnlyList<CriteriaCoverageDetail>? Details { get; init; }
 }
 
 /// <summary>

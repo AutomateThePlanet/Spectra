@@ -95,4 +95,40 @@ public sealed class CoverageConfig
     /// </summary>
     [JsonPropertyName("requirements_file")]
     public string RequirementsFile { get; init; } = "docs/requirements/_requirements.yaml";
+
+    /// <summary>
+    /// Path to the criteria index YAML file.
+    /// </summary>
+    [JsonPropertyName("criteria_file")]
+    public string CriteriaFile { get; init; } = "docs/requirements/_criteria_index.yaml";
+
+    /// <summary>
+    /// Directory containing criteria files.
+    /// </summary>
+    [JsonPropertyName("criteria_dir")]
+    public string CriteriaDir { get; init; } = "docs/requirements";
+
+    /// <summary>
+    /// Import configuration for criteria.
+    /// </summary>
+    [JsonPropertyName("criteria_import")]
+    public CriteriaImportConfig CriteriaImport { get; init; } = new();
+}
+
+/// <summary>
+/// Configuration for criteria import behavior.
+/// </summary>
+public sealed class CriteriaImportConfig
+{
+    [JsonPropertyName("default_source_type")]
+    public string DefaultSourceType { get; init; } = "manual";
+
+    [JsonPropertyName("auto_split")]
+    public bool AutoSplit { get; init; } = true;
+
+    [JsonPropertyName("normalize_rfc2119")]
+    public bool NormalizeRfc2119 { get; init; } = true;
+
+    [JsonPropertyName("id_prefix")]
+    public string IdPrefix { get; init; } = "AC";
 }

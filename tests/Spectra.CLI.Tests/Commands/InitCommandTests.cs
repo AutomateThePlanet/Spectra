@@ -257,7 +257,7 @@ public class InitCommandTests : IDisposable
 
         var agentPath = Path.Combine(_testDir, ".github", "agents", "spectra-execution.agent.md");
         var content = await File.ReadAllTextAsync(agentPath);
-        Assert.Contains("name: SPECTRA Execution", content);
+        Assert.Contains("name: spectra-execution", content);
     }
 
     [Fact]

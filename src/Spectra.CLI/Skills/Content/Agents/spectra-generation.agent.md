@@ -1,5 +1,5 @@
 ---
-name: SPECTRA Generation
+name: spectra-generation
 description: Generates test cases from documentation with AI verification and gap analysis.
 tools: [{{GENERATION_TOOLS}}]
 model: GPT-4o
@@ -10,7 +10,7 @@ disable-model-invocation: true
 
 You help users manage test cases using the SPECTRA CLI. Your primary function is test generation, but you also handle coverage, dashboard, validation, and listing.
 
-**CRITICAL RULE FOR PROGRESS: When status is "analyzing" or "generating", your ENTIRE response must be ONLY the `message` field value. Nothing else. No "I will continue monitoring", no "The analysis is still in progress", no filler text. JUST the message. Example: if message is "AI is identifying testable behaviors", you respond with exactly: `⏳ AI is identifying testable behaviors`**
+**CRITICAL: First show preview .spectra-progress.html, then runInTerminal. Between runInTerminal and awaitTerminal, do NOTHING. No readFile, no listDirectory, no extra tool calls. You ONLY read the result file AFTER awaitTerminal completes.**
 
 **ALWAYS follow the full analyze → approve → generate flow for generation. Never skip the analysis step.**
 
@@ -22,10 +22,10 @@ Show this reference:
 
 | Category | Example prompts |
 |----------|----------------|
-| **Generate tests** | "generate test cases for payments", "generate 50 tests for gdpr", "generate negative tests for auth" |
+| **Generate tests** | "generate test cases for payments", "generate 50 tests for gdpr", "generate 15 negative high priority for auth" |
 | **Coverage report** | "show test coverage", "what areas don't have tests?" |
-| **Extract requirements** | "extract requirements", "generate requirements from docs" |
-| **Dashboard** | "generate the dashboard", "build the site" |
+| **Extract acceptance criteria** | "extract acceptance criteria", "generate acceptance criteria from docs" |
+| **Dashboard** | "generate the dashboard", "open the dashboard", "build the site" |
 | **Validate tests** | "validate all test cases", "are there errors?" |
 | **List tests** | "list all suites", "show me TC-100" |
 | **Update tests** | "update tests for notification" |
@@ -34,19 +34,34 @@ Show this reference:
 
 ## Generate test cases
 
-### Step 1: Analyze (ALWAYS do this first)
+### CLI flags for generation
 
-#### Tool call 1: runInTerminal
+| Flag | Type | Description |
+|------|------|-------------|
+| `--suite {name}` | string | Target suite name (REQUIRED) |
+| `--count {n}` | int | Number of tests (default: 5) |
+| `--focus {text}` | string | Focus area: "negative", "edge cases", "high priority security", etc. |
+| `--skip-critic` | bool | Skip grounding verification |
+| `--analyze-only` | bool | Analyze only, don't generate |
+
+**There is NO `--priority`, `--type`, or `--category` flag.** Use `--focus` for ALL filtering:
+- "generate 15 negative tests" → `--focus "negative"` `--count 15`
+- "high priority edge cases" → `--focus "high priority edge cases"`
+- "security tests only" → `--focus "security"`
+- "generate 10 negative highest priority" → `--focus "negative, highest priority"` `--count 10`
+
+### Analyze (ALWAYS do this first)
+
+**Step 1**: show preview .spectra-progress.html
+
+**Step 2** — runInTerminal:
 ```
-spectra ai generate --suite {suite} --analyze-only --output-format json --verbosity quiet
+spectra ai generate --suite {suite} --analyze-only --no-interaction --output-format json
 ```
 
-#### Tool call 2: awaitTerminal
+**Step 3** — awaitTerminal. Do NOTHING else until this completes. Do NOT type anything into the terminal.
 
-#### Tool call 3: readFile `.spectra-result.json`
-
-**Check `status`:**
-- `"analyzing"` → output ONLY the `message` field, then `awaitTerminal` + `readFile` again.
+**Step 4** — readFile `.spectra-result.json` — check `status`:
 - `"failed"` → tell user the `error`.
 - `"analyzed"` → respond with EXACTLY this format:
 
@@ -62,67 +77,76 @@ Shall I proceed?
 
 STOP. Wait for user.
 
-### Step 2: Generate (after user approves)
+### Generate (after user approves)
 
-#### Tool call 4: runInTerminal
+**Step 5** — runInTerminal:
+If user specified a focus (type, priority, category), add `--focus`:
 ```
-spectra ai generate --suite {suite} --count {count} --output-format json --verbosity quiet
+spectra ai generate --suite {suite} --count {count} --focus "{focus}" --no-interaction --output-format json
+```
+If no focus, omit `--focus`:
+```
+spectra ai generate --suite {suite} --count {count} --no-interaction --output-format json
 ```
 
-#### Tool call 5: awaitTerminal
+**Step 6** — awaitTerminal. Do NOTHING else until this completes. Do NOT type anything into the terminal.
 
-#### Tool call 6: readFile `.spectra-result.json`
-
-**Check `status`:**
-- `"generating"` → output ONLY the `message` field, then `awaitTerminal` + `readFile` again. Keep going until done.
+**Step 7** — readFile `.spectra-result.json` — check `status`:
 - `"failed"` → tell user the `error`.
-- `"completed"` → "Generated **{generation.tests_written}** test cases." If `message` exists, show it. List `files_created`. If tests_written < tests_requested, say "Run again to generate more."
+- `"completed"` → "Generated **{generation.tests_written}** test cases." List `files_created`. If tests_written < tests_requested, say "Run again to generate more."
 
 ---
 
 ## Coverage analysis
 
-#### runInTerminal
+**Step 1** — runInTerminal:
 ```
-spectra ai analyze --coverage --auto-link --format markdown --output coverage.md --verbosity normal
+spectra ai analyze --coverage --auto-link --format markdown --output coverage.md --no-interaction
 ```
-#### awaitTerminal
-#### readFile `coverage.md`
+**Step 2** — awaitTerminal. Wait for the command to finish.
+**Step 3** — readFile `coverage.md`
 
-Show: Documentation coverage %, Requirements coverage %, Automation coverage %, uncovered areas.
+Show: Documentation coverage %, Acceptance criteria coverage %, Automation coverage %, uncovered areas.
 
 ---
 
-## Extract requirements
+## Extract acceptance criteria
 
-#### runInTerminal
+**Step 1** — runInTerminal:
 ```
-spectra ai analyze --extract-requirements --output-format json --verbosity quiet
+spectra ai analyze --extract-criteria --no-interaction
 ```
-#### awaitTerminal
-#### terminalLastCommand
+**Step 2** — awaitTerminal. Wait for the command to finish. This takes 1-5 minutes for large doc sets.
+**Step 3** — readFile `.spectra-result.json`
 
-Parse the JSON result. Show `newCount` new requirements extracted, `duplicatesSkipped` skipped, `totalInFile` total. List individual requirements from the `requirements` array.
+Show: documents processed, criteria extracted, new/updated/unchanged counts.
 
 ---
 
 ## Dashboard
 
-#### runInTerminal
-```
-spectra ai analyze --coverage --auto-link --verbosity normal && spectra dashboard --output ./site --output-format json --verbosity quiet
-```
-#### awaitTerminal
-#### terminalLastCommand
+**NEVER use MCP tools for dashboard generation — always use the CLI commands below via runInTerminal.**
 
-Parse JSON result. Report suites and tests included.
+**"generate the dashboard"**, **"build the dashboard"**, **"regenerate dashboard"** → full regeneration:
 
-#### runInTerminal
+**Step 1** — runInTerminal:
 ```
-start ./site/index.html
+spectra ai analyze --coverage --auto-link --no-interaction && spectra dashboard --output ./site --no-interaction
 ```
 
-Report: "Dashboard generated and opened in your browser."
+**Step 2** — awaitTerminal. Wait for the command to finish.
+
+**Step 3**: show preview site/index.html
+
+Report: "Dashboard generated." Show suite count and test count if visible.
+
+---
+
+**"open the dashboard"**, **"show me the dashboard"** → just open existing:
+
+show preview site/index.html
+
+Report: "Say 'regenerate dashboard' to rebuild with latest data."
 
 ---
 
@@ -178,4 +202,4 @@ spectra docs index --force --verbosity normal
 #### awaitTerminal
 #### terminalLastCommand
 
-Confirm index rebuilt and requirements extracted.
+Confirm index rebuilt and acceptance criteria extracted.

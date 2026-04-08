@@ -1,0 +1,598 @@
+# Extracted from: docs/spectra-test-docs/docs/authentication/authentication.md
+# Doc hash: 28bbf03aab7eb686475771b8778d16c65f8c61f672acbcf7d5c6c002141b9608
+# Generated at: 2026-04-07T11:43:58.6138280Z
+criteria:
+- id: AC-AUTHENTICATION-001
+  text: System MUST support multiple authentication methods for internal employees and external citizens
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - authentication
+  - access
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-002
+  text: System MUST log all authentication events to the audit trail
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - audit
+  - logging
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-003
+  text: Passwords MUST be minimum 12 characters
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - password
+  - validation
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-004
+  text: Passwords MUST contain at least one uppercase letter, one lowercase letter, one digit, and one special character (!@#$%^&*)
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - password
+  - validation
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-005
+  text: System MUST NOT allow reuse of the last 5 passwords
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - password
+  - security
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-006
+  text: Passwords MUST expire every 90 days for internal users
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - password
+  - expiration
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-007
+  text: Passwords MUST NOT expire for citizens
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - password
+  - expiration
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-008
+  text: Temporary passwords issued by administrators MUST expire after 24 hours
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - password
+  - temporary
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-009
+  text: Temporary passwords MUST be changed on first login
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - password
+  - temporary
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-010
+  text: MFA MUST be mandatory for all internal users
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - mfa
+  - security
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-011
+  text: MFA MAY be optional for citizens
+  rfc2119: MAY
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: low
+  tags:
+  - mfa
+  - security
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-012
+  text: System MUST support TOTP as an MFA method
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - mfa
+  - totp
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-013
+  text: SMS OTP codes MUST be 6 digits and valid for 5 minutes
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - mfa
+  - sms
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-014
+  text: Email OTP codes MUST be 6 digits and valid for 10 minutes
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - mfa
+  - email
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-015
+  text: System MUST force MFA enrollment at next login if user has not enrolled and MFA is required
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - mfa
+  - enrollment
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-016
+  text: System MUST invalidate MFA session after 3 failed code entry attempts
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - mfa
+  - security
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-017
+  text: System MUST require user to restart login process from beginning after MFA session invalidation
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - mfa
+  - security
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-018
+  text: Internal users MUST be able to authenticate via Azure AD tenant using SAML 2.0
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - sso
+  - saml
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-019
+  text: System MUST hide username/password login form when SSO is enabled for user's domain
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - sso
+  - ui
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-020
+  text: System MUST redirect user to IdP automatically when SSO is enabled
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - sso
+  - redirect
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-021
+  text: System MUST provision new account automatically with Employee role and department from SAML assertion if SSO succeeds but user does not exist locally
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - sso
+  - provisioning
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-022
+  text: System MUST lock account for 30 minutes after 5 consecutive failed login attempts
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - lockout
+  - security
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-023
+  text: "System MUST display generic message during lockout: 'Your account has been temporarily locked. Please try again later or contact support.'"
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - lockout
+  - ux
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-024
+  text: System MUST NOT reveal whether account exists during lockout
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - lockout
+  - security
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-025
+  text: Administrator MAY manually unlock account before 30-minute window expires
+  rfc2119: MAY
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: low
+  tags:
+  - lockout
+  - admin
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-026
+  text: System MUST reset 30-minute lockout timer with each failed attempt during lockout
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - lockout
+  - security
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-027
+  text: Session timeout MUST be 30 minutes of inactivity for internal users
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - session
+  - timeout
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-028
+  text: Session timeout MUST be 60 minutes of inactivity for citizens
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - session
+  - timeout
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-029
+  text: System MUST allow maximum 3 concurrent sessions per user
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - session
+  - concurrency
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-030
+  text: System MUST terminate oldest session automatically when 4th session is initiated
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - session
+  - concurrency
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-031
+  text: Sessions MUST be bound to user's IP address
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - session
+  - security
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-032
+  text: System MUST invalidate session and require re-authentication if IP address changes mid-session
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - session
+  - security
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-033
+  text: Remember me option MUST extend session to 14 days
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - session
+  - remember-me
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-034
+  text: Remember me option MUST still require MFA on each new browser
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - session
+  - mfa
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-035
+  text: System MUST send password reset link to email with 1 hour validity
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - password-reset
+  - email
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-036
+  text: Password reset link MUST be usable exactly once
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - password-reset
+  - security
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-037
+  text: New password MUST meet password policy
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - password-reset
+  - validation
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-038
+  text: System MUST terminate all active sessions for user upon password change
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - password-reset
+  - session
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-039
+  text: System MUST always display 'If an account exists with this email, you will receive a reset link' regardless of whether email exists
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - password-reset
+  - security
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-040
+  text: Administrator-issued temporary password MUST be auto-generated with 16 characters meeting password policy
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - password-reset
+  - admin
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-041
+  text: Administrator-issued temporary password MUST be changed on first login
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - password-reset
+  - admin
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-042
+  text: Administrator-issued temporary password MUST expire after 24 hours if not used
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - password-reset
+  - admin
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-043
+  text: Administrator-issued temporary password MUST be sent to user's registered email
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - password-reset
+  - admin
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-044
+  text: Administrator-issued temporary password MUST NOT be displayed to administrator
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - password-reset
+  - security
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-045
+  text: System MUST enforce maximum 10 login attempts per minute per IP address
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - rate-limiting
+  - security
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-046
+  text: System MUST enforce maximum 3 password reset requests per hour per email address
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - rate-limiting
+  - password-reset
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-047
+  text: System MUST enforce maximum 5 MFA code requests per hour per user
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - rate-limiting
+  - mfa
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-048
+  text: System MUST block IP or user for 1 hour with HTTP 429 response after exceeding rate limits
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - rate-limiting
+  - security
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-049
+  text: System MUST log every authentication event with timestamp in UTC
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - audit
+  - logging
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-050
+  text: System MUST log user identifier or 'unknown' for failed attempts with invalid usernames
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - audit
+  - logging
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-051
+  text: System MUST log event type for each authentication event
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - audit
+  - logging
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-052
+  text: System MUST log source IP address for each authentication event
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - audit
+  - logging
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-053
+  text: System MUST log user agent string for each authentication event
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - audit
+  - logging
+  linked_test_ids: []
+- id: AC-AUTHENTICATION-054
+  text: System MUST log result (success/failure) and failure reason if applicable for each authentication event
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/authentication/authentication.md
+  component: authentication
+  priority: high
+  tags:
+  - audit
+  - logging
+  linked_test_ids: []

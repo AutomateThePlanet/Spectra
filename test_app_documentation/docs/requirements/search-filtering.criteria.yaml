@@ -1,0 +1,736 @@
+# Extracted from: docs/spectra-test-docs/docs/search/search-filtering.md
+# Doc hash: d5558fde11a48e63f2f444bb2cdebc2cf2fdef7a288bda311271c7dde4a52e27
+# Generated at: 2026-04-07T11:49:45.6247372Z
+criteria:
+- id: AC-SEARCH-FILTERING-001
+  text: The system MUST provide a search bar in the top navigation on every page for authenticated users
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - navigation
+  - ui
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-002
+  text: Autocomplete suggestions MUST be triggered after typing 3 or more characters with a 300ms debounce
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - autocomplete
+  - performance
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-003
+  text: 'Suggestions MUST be grouped by category: Applications, Citizens, Documents'
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - autocomplete
+  - ui
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-004
+  text: The system MUST display a maximum of 5 suggestions per category (15 total)
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - autocomplete
+  - limits
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-005
+  text: Each suggestion MUST show title/name, category icon, and a brief context line
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - autocomplete
+  - ui
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-006
+  text: Pressing Enter or clicking 'See all results' MUST open the full search results page
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - navigation
+  - ux
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-007
+  text: Pressing Escape or clicking outside MUST close the autocomplete dropdown
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - ux
+  - keyboard
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-008
+  text: The system MUST support exact phrase search using double quotes syntax
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - query
+  - syntax
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-009
+  text: The system MUST support field-specific search using colon syntax
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - query
+  - syntax
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-010
+  text: The system MUST support date range search using double-dot syntax
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - query
+  - date
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-011
+  text: The system MUST support numeric range search using double-dot syntax
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - query
+  - numeric
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-012
+  text: The system MUST support exclusion search using minus prefix syntax
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - query
+  - syntax
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-013
+  text: The system MUST support wildcard search using asterisk syntax
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - query
+  - syntax
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-014
+  text: The system MUST support OR operator for matching either term
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - query
+  - syntax
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-015
+  text: The system MUST automatically treat 10-digit numeric queries as EGN searches
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - egn
+  - auto-detection
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-016
+  text: The system MUST automatically treat queries matching pattern XX-YYYY-NNNNNN as reference number searches
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - reference
+  - auto-detection
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-017
+  text: Results MUST be displayed in a tabbed layout with All, Applications, Citizens, and Documents tabs
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - ui
+  - results
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-018
+  text: Each tab MUST show the result count
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - ui
+  - results
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-019
+  text: Tabs with zero results MUST be grayed out but still clickable
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - ui
+  - ux
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-020
+  text: Application result cards MUST display reference number as a link
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - results
+  - applications
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-021
+  text: Application result cards MUST display service name, status badge, submission date, and assigned clerk
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - results
+  - applications
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-022
+  text: Application result cards MUST display citizen name only if user has citizens.view permission, otherwise masked
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - permissions
+  - privacy
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-023
+  text: Citizen result cards MUST display full name as a link to citizen profile
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - results
+  - citizens
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-024
+  text: Citizen result cards MUST mask EGN as ******XXXX
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - privacy
+  - egn
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-025
+  text: Citizen result cards MUST display email, registration date, and account status
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - results
+  - citizens
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-026
+  text: Document result cards MUST display document name as a link
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - results
+  - documents
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-027
+  text: Document result cards MUST display type, related application reference, upload/generation date, and status
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - results
+  - documents
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-028
+  text: The system MUST support sorting by Relevance, Date, Status, and Name
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - sorting
+  - results
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-029
+  text: Relevance MUST be the default sort order for text searches
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - sorting
+  - default
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-030
+  text: The system MUST display 20 results per page
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - pagination
+  - results
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-031
+  text: The system MUST use infinite scroll on mobile and traditional pagination on desktop
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - pagination
+  - responsive
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-032
+  text: The system MUST show total result count in format 'Showing 1-20 of 342 results'
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - pagination
+  - ui
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-033
+  text: The system MUST display '10,000+ results' when total exceeds 10,000 without computing exact count
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - pagination
+  - performance
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-034
+  text: The system MUST provide a collapsible advanced filters panel on the left side of search results
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - filters
+  - ui
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-035
+  text: The advanced filters panel MUST include Status, Service Type, Date Range, Region, Assigned To, and Payment Status filters
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - filters
+  - options
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-036
+  text: Filters MUST combine with AND logic between different filter types
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - filters
+  - logic
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-037
+  text: Options within each filter MUST combine with OR logic
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - filters
+  - logic
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-038
+  text: Active filters MUST be shown as chips above the results with an 'x' to remove
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - filters
+  - ui
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-039
+  text: The system MUST provide a 'Clear all filters' link to reset all filters
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - filters
+  - ux
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-040
+  text: Changing any filter MUST immediately update results without requiring an Apply button
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - filters
+  - ux
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-041
+  text: URL query parameters MUST be updated to reflect current filters for bookmarking and sharing
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - filters
+  - url
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-042
+  text: Authenticated users MUST be able to save search queries by clicking 'Save this search'
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - saved-searches
+  - feature
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-043
+  text: Saved search names MUST be limited to a maximum of 50 characters
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - saved-searches
+  - validation
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-044
+  text: Users MUST be limited to a maximum of 20 saved searches
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - saved-searches
+  - limits
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-045
+  text: Saved searches MUST appear in the search bar dropdown before typing
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - saved-searches
+  - ui
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-046
+  text: Saved searches MUST be private and not shared between users
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - saved-searches
+  - privacy
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-047
+  text: New records MUST be indexed within 5 seconds of creation
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - indexing
+  - performance
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-048
+  text: Updated records MUST be re-indexed within 5 seconds
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - indexing
+  - performance
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-049
+  text: Deleted or deactivated records MUST be removed from the index within 1 minute
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - indexing
+  - performance
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-050
+  text: The system MUST support Bulgarian and English content with language-specific stemming
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - indexing
+  - i18n
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-051
+  text: The system MUST support Cyrillic and Latin transliteration for bidirectional matching
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - indexing
+  - i18n
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-052
+  text: Search results MUST be automatically filtered by the user's permissions
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - permissions
+  - security
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-053
+  text: Clerks MUST only see applications assigned to them or in their department queue
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - permissions
+  - clerks
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-054
+  text: Managers MUST see all applications in their department and sub-departments
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - permissions
+  - managers
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-055
+  text: Directors MUST see all applications in their directorate
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - permissions
+  - directors
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-056
+  text: Citizens MUST see only their own applications and documents in portal search
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - permissions
+  - citizens
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-057
+  text: Permission filtering MUST happen at the query level to ensure accurate result counts
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - permissions
+  - performance
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-058
+  text: Autocomplete suggestions MUST respond in less than 200ms
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - performance
+  - autocomplete
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-059
+  text: Search results first page MUST load in less than 500ms for queries matching up to 100,000 documents
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - performance
+  - results
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-060
+  text: Advanced filter changes MUST update results in less than 300ms
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - performance
+  - filters
+  linked_test_ids: []
+- id: AC-SEARCH-FILTERING-061
+  text: The search index MUST support up to 10 million documents
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/search/search-filtering.md
+  component: search-filtering
+  priority: high
+  tags:
+  - search
+  - performance
+  - scalability
+  linked_test_ids: []

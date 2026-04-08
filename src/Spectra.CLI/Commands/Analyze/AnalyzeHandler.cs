@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Agent.Tools;
 using Spectra.CLI.Coverage;
 using Spectra.CLI.Infrastructure;
@@ -11,6 +12,7 @@ using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Coverage;
 using Spectra.Core.Parsing;
+using Spectre.Console;
 using LegacyModels = Spectra.Core.Models;
 
 namespace Spectra.CLI.Commands.Analyze;
@@ -101,10 +103,10 @@ public sealed class AnalyzeHandler
             var docAnalyzer = new DocumentationCoverageAnalyzer();
             var docCoverage = docAnalyzer.Analyze(documentMap, allTests);
 
-            // 2. Requirements coverage
-            var reqFilePath = Path.Combine(basePath, config.Coverage.RequirementsFile);
-            var reqAnalyzer = new RequirementsCoverageAnalyzer();
-            var reqCoverage = await reqAnalyzer.AnalyzeAsync(reqFilePath, allTests, ct);
+            // 2. Acceptance criteria coverage
+            var criteriaFilePath = Path.Combine(basePath, config.Coverage.CriteriaFile);
+            var criteriaAnalyzer = new AcceptanceCriteriaCoverageAnalyzer();
+            var criteriaCoverage = await criteriaAnalyzer.AnalyzeAsync(criteriaFilePath, allTests, ct);
 
             // 3. Automation coverage
             var suiteIndexes = await LoadSuiteIndexesAsync(testsDir, ct);
@@ -148,7 +150,7 @@ public sealed class AnalyzeHandler
 
             // Build unified report
             var builder = new UnifiedCoverageBuilder();
-            var unifiedReport = builder.Build(docCoverage, reqCoverage, autoCoverage);
+            var unifiedReport = builder.Build(docCoverage, criteriaCoverage, autoCoverage);
 
             // Output
             var reportWriter = new CoverageReportWriter();
@@ -185,11 +187,11 @@ public sealed class AnalyzeHandler
 
             // Summary
             Console.WriteLine();
-            Console.WriteLine($"Documentation Coverage: {docCoverage.Percentage:F1}% ({docCoverage.CoveredDocs}/{docCoverage.TotalDocs} documents)");
-            Console.WriteLine($"Requirements Coverage:  {reqCoverage.Percentage:F1}% ({reqCoverage.CoveredRequirements}/{reqCoverage.TotalRequirements} requirements)");
-            Console.WriteLine($"Automation Coverage:    {autoCoverage.Percentage:F1}% ({autoCoverage.Automated}/{autoCoverage.TotalTests} tests)");
+            Console.WriteLine($"Documentation Coverage:        {docCoverage.Percentage:F1}% ({docCoverage.CoveredDocs}/{docCoverage.TotalDocs} documents)");
+            Console.WriteLine($"Acceptance Criteria Coverage:  {criteriaCoverage.Percentage:F1}% ({criteriaCoverage.CoveredCriteria}/{criteriaCoverage.TotalCriteria} acceptance criteria)");
+            Console.WriteLine($"Automation Coverage:           {autoCoverage.Percentage:F1}% ({autoCoverage.Automated}/{autoCoverage.TotalTests} tests)");
 
-            var hasGaps = docCoverage.Percentage < 100 || reqCoverage.Percentage < 100 || autoCoverage.Percentage < 100;
+            var hasGaps = docCoverage.Percentage < 100 || criteriaCoverage.Percentage < 100 || autoCoverage.Percentage < 100;
             NextStepHints.Print("analyze", true, _verbosity, new HintContext { HasAutoLink = autoLink, HasGaps = hasGaps }, _outputFormat);
             return ExitCodes.Success;
         }
@@ -206,10 +208,12 @@ public sealed class AnalyzeHandler
     }
 
     /// <summary>
-    /// Extracts testable requirements from documentation using AI.
+    /// Extracts testable acceptance criteria from documentation using AI, per-document.
+    /// Uses incremental extraction: skips documents whose hash hasn't changed.
     /// </summary>
-    public async Task<int> RunExtractRequirementsAsync(
+    public async Task<int> RunExtractCriteriaAsync(
         bool dryRun,
+        bool force = false,
         CancellationToken ct = default)
     {
         try
@@ -234,7 +238,7 @@ public sealed class AnalyzeHandler
                 {
                     JsonResultWriter.Write(new ErrorResult
                     {
-                        Command = "extract-requirements",
+                        Command = "extract-criteria",
                         Status = "failed",
                         Error = "No spectra.config.json found. Run 'spectra init' first."
                     });
@@ -246,28 +250,37 @@ public sealed class AnalyzeHandler
                 return ExitCodes.Error;
             }
 
+            // Resolve criteria directory and index file paths
+            var criteriaDir = Path.Combine(currentDir, config.Coverage.CriteriaDir);
+            var criteriaIndexPath = Path.Combine(currentDir, config.Coverage.CriteriaFile);
+
+            if (!dryRun)
+                Directory.CreateDirectory(criteriaDir);
+
             // Auto-refresh document index
             var indexService = new DocumentIndexService();
             await indexService.EnsureIndexAsync(currentDir, config.Source, forceRebuild: false, ct);
 
-            // Load source documents
-            var docBuilder = new DocumentMapBuilder();
+            // Build document map
+            var docBuilder = new DocumentMapBuilder(config.Source);
             var documentMap = await docBuilder.BuildAsync(currentDir, ct);
 
             if (documentMap.Documents.Count == 0)
             {
                 if (_outputFormat == OutputFormat.Json)
                 {
-                    JsonResultWriter.Write(new ExtractRequirementsResult
+                    JsonResultWriter.Write(new ExtractCriteriaResult
                     {
-                        Command = "extract-requirements",
+                        Command = "extract-criteria",
                         Status = "success",
                         Message = "No documentation files found.",
-                        ExtractedCount = 0,
-                        NewCount = 0,
-                        DuplicatesSkipped = 0,
-                        TotalInFile = 0,
-                        RequirementsFile = config.Coverage.RequirementsFile
+                        CriteriaExtracted = 0,
+                        CriteriaNew = 0,
+                        CriteriaUpdated = 0,
+                        CriteriaUnchanged = 0,
+                        OrphanedCriteria = 0,
+                        TotalCriteria = 0,
+                        IndexFile = Path.GetRelativePath(currentDir, criteriaIndexPath)
                     });
                 }
                 else
@@ -277,18 +290,11 @@ public sealed class AnalyzeHandler
                 return ExitCodes.Success;
             }
 
-            // Load existing requirements
-            var reqsPath = Path.Combine(currentDir, config.Coverage.RequirementsFile);
+            // Read existing criteria index
+            var indexReader = new CriteriaIndexReader();
+            var criteriaIndex = await indexReader.ReadAsync(criteriaIndexPath, ct);
 
-            // Ensure requirements directory exists
-            var reqsDir = Path.GetDirectoryName(reqsPath);
-            if (!string.IsNullOrEmpty(reqsDir))
-                Directory.CreateDirectory(reqsDir);
-
-            var parser = new Spectra.Core.Parsing.RequirementsParser();
-            var existing = await parser.ParseAsync(reqsPath, ct);
-
-            // Get primary provider
+            // Get primary AI provider
             var provider = config.Ai.Providers.FirstOrDefault(p => p.Enabled);
             if (provider is null)
             {
@@ -296,7 +302,7 @@ public sealed class AnalyzeHandler
                 {
                     JsonResultWriter.Write(new ErrorResult
                     {
-                        Command = "extract-requirements",
+                        Command = "extract-criteria",
                         Status = "failed",
                         Error = "No AI provider configured. Run 'spectra init' to configure."
                     });
@@ -308,178 +314,733 @@ public sealed class AnalyzeHandler
                 return ExitCodes.Error;
             }
 
-            // Extract requirements
             if (_verbosity >= VerbosityLevel.Normal)
             {
-                // Write to stderr so it doesn't interfere with JSON on stdout
-                Console.Error.WriteLine($"Extracting requirements from {documentMap.Documents.Count} document(s)...");
+                Console.Error.WriteLine($"Extracting acceptance criteria from {documentMap.Documents.Count} document(s)...");
+                if (force) Console.Error.WriteLine("  --force: re-extracting all documents.");
             }
 
-            var extractor = new Agent.Copilot.RequirementsExtractor(
+            var extractor = new Agent.Copilot.CriteriaExtractor(
                 provider,
-                currentDir,
                 _verbosity >= VerbosityLevel.Normal ? s => Console.Error.WriteLine(s) : null);
 
-            IReadOnlyList<RequirementDefinition> extracted;
-            try
-            {
-                // Hard timeout via Task.WhenAny — Copilot SDK may not honor CancellationToken
-                var extractTask = extractor.ExtractAsync(documentMap.Documents, existing, ct);
-                var deadlineTask = Task.Delay(TimeSpan.FromMinutes(2), ct);
-                var completed = await Task.WhenAny(extractTask, deadlineTask);
+            var fileWriter = new CriteriaFileWriter();
+            var fileReader = new CriteriaFileReader();
 
-                if (completed == deadlineTask)
+            // Counters
+            var documentsProcessed = 0;
+            var documentsSkipped = 0;
+            var documentsFailed = 0;
+            var failedDocuments = new List<string>();
+            var criteriaExtracted = 0;
+            var criteriaNew = 0;
+            var criteriaUpdated = 0;
+            var criteriaUnchanged = 0;
+            var allNewCriteria = new List<CriterionEntry>();
+
+            // Track which source docs we've seen (for orphan detection)
+            var processedSourceDocs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var doc in documentMap.Documents)
+            {
+                var docFullPath = Path.Combine(currentDir, doc.Path);
+                processedSourceDocs.Add(doc.Path);
+
+                // Compute hash
+                string docHash;
+                try
                 {
-                    if (_outputFormat == OutputFormat.Json)
+                    docHash = await FileHasher.ComputeFileHashAsync(docFullPath, ct);
+                }
+                catch
+                {
+                    documentsFailed++;
+                    failedDocuments.Add(doc.Path);
+                    continue;
+                }
+
+                // Find matching source in existing index
+                var existingSource = criteriaIndex.Sources
+                    .FirstOrDefault(s => string.Equals(s.SourceDoc, doc.Path, StringComparison.OrdinalIgnoreCase));
+
+                // Skip if hash matches and not forced
+                if (!force && existingSource is not null && existingSource.DocHash == docHash)
+                {
+                    documentsSkipped++;
+                    criteriaUnchanged += existingSource.CriteriaCount;
+                    continue;
+                }
+
+                // Read document content
+                string content;
+                try
+                {
+                    content = await File.ReadAllTextAsync(docFullPath, ct);
+                }
+                catch
+                {
+                    documentsFailed++;
+                    failedDocuments.Add(doc.Path);
+                    continue;
+                }
+
+                // Derive component from document filename
+                var component = Path.GetFileNameWithoutExtension(doc.Path)
+                    .Replace(' ', '-')
+                    .ToLowerInvariant();
+
+                // Extract criteria via AI
+                IReadOnlyList<AcceptanceCriterion> extracted;
+                try
+                {
+                    var extractTask = extractor.ExtractFromDocumentAsync(doc.Path, content, component, ct);
+                    var deadlineTask = Task.Delay(TimeSpan.FromMinutes(2), ct);
+                    var completed = await Task.WhenAny(extractTask, deadlineTask);
+
+                    if (completed == deadlineTask)
                     {
-                        JsonResultWriter.Write(new ErrorResult
-                        {
-                            Command = "extract-requirements",
-                            Status = "failed",
-                            Error = "Requirements extraction timed out after 2 minutes. Check your AI provider configuration and connectivity."
-                        });
+                        if (_verbosity >= VerbosityLevel.Normal)
+                            Console.Error.WriteLine($"  Timeout extracting from {doc.Path}, skipping.");
+                        documentsFailed++;
+                        failedDocuments.Add(doc.Path);
+                        continue;
+                    }
+
+                    extracted = await extractTask;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    if (_verbosity >= VerbosityLevel.Normal)
+                        Console.Error.WriteLine($"  Failed to extract from {doc.Path}: {ex.Message}");
+                    documentsFailed++;
+                    failedDocuments.Add(doc.Path);
+                    continue;
+                }
+
+                criteriaExtracted += extracted.Count;
+
+                // Read existing per-doc criteria file for ID comparison
+                var docBaseName = Path.GetFileNameWithoutExtension(doc.Path);
+                var criteriaFileName = $"{docBaseName}.criteria.yaml";
+                var criteriaFilePath = Path.Combine(criteriaDir, criteriaFileName);
+
+                var existingCriteria = await fileReader.ReadAsync(criteriaFilePath, ct);
+                var existingIdMap = existingCriteria
+                    .Where(c => !string.IsNullOrEmpty(c.Id))
+                    .ToDictionary(c => c.Text, c => c.Id, StringComparer.OrdinalIgnoreCase);
+
+                // Determine next available ID number for this component
+                var componentPrefix = $"AC-{component.ToUpperInvariant()}-";
+                var maxId = existingCriteria
+                    .Where(c => c.Id.StartsWith(componentPrefix, StringComparison.OrdinalIgnoreCase))
+                    .Select(c =>
+                    {
+                        var numPart = c.Id[componentPrefix.Length..];
+                        return int.TryParse(numPart, out var n) ? n : 0;
+                    })
+                    .DefaultIfEmpty(0)
+                    .Max();
+
+                var nextId = maxId + 1;
+
+                // Assign IDs to extracted criteria
+                var isNewDoc = existingSource is null;
+                var docNewCount = 0;
+                var docUpdatedCount = 0;
+
+                foreach (var criterion in extracted)
+                {
+                    if (existingIdMap.TryGetValue(criterion.Text, out var existingId))
+                    {
+                        criterion.Id = existingId;
+                        docUpdatedCount++;
                     }
                     else
                     {
-                        Console.Error.WriteLine("Requirements extraction timed out after 2 minutes. Check your AI provider configuration and connectivity.");
+                        criterion.Id = $"{componentPrefix}{nextId:D3}";
+                        nextId++;
+                        docNewCount++;
                     }
-                    return ExitCodes.Error;
+
+                    criterion.SourceDoc = doc.Path;
+                    criterion.SourceType = "document";
                 }
 
-                extracted = await extractTask;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                if (_outputFormat == OutputFormat.Json)
+                criteriaNew += docNewCount;
+                criteriaUpdated += docUpdatedCount;
+                documentsProcessed++;
+
+                if (!dryRun)
                 {
-                    JsonResultWriter.Write(new ErrorResult
+                    // Write per-doc criteria file
+                    await fileWriter.WriteAsync(criteriaFilePath, extracted, doc.Path, docHash, ct);
+
+                    // Update or add source in index
+                    if (existingSource is not null)
                     {
-                        Command = "extract-requirements",
-                        Status = "failed",
-                        Error = $"Requirements extraction failed: {ex.Message}"
+                        existingSource.DocHash = docHash;
+                        existingSource.CriteriaCount = extracted.Count;
+                        existingSource.LastExtracted = DateTime.UtcNow;
+                        existingSource.File = criteriaFileName;
+                    }
+                    else
+                    {
+                        criteriaIndex.Sources.Add(new CriteriaSource
+                        {
+                            File = criteriaFileName,
+                            SourceDoc = doc.Path,
+                            SourceType = "document",
+                            DocHash = docHash,
+                            CriteriaCount = extracted.Count,
+                            LastExtracted = DateTime.UtcNow
+                        });
+                    }
+                }
+
+                // Collect entries for result reporting
+                foreach (var c in extracted)
+                {
+                    allNewCriteria.Add(new CriterionEntry
+                    {
+                        Id = c.Id,
+                        Text = c.Text,
+                        Rfc2119 = c.Rfc2119,
+                        Source = c.SourceDoc,
+                        SourceType = c.SourceType,
+                        Component = c.Component,
+                        Priority = c.Priority
                     });
                 }
-                else
+
+                if (_verbosity >= VerbosityLevel.Normal)
                 {
-                    Console.Error.WriteLine($"Requirements extraction failed: {ex.Message}");
-                    if (_verbosity >= VerbosityLevel.Detailed)
-                        Console.Error.WriteLine(ex.StackTrace);
+                    Console.Error.WriteLine($"  {doc.Path}: {extracted.Count} criteria ({docNewCount} new, {docUpdatedCount} updated)");
                 }
-                return ExitCodes.Error;
             }
 
-            if (extracted.Count == 0)
+            // Detect orphaned criteria: sources in index whose doc no longer exists
+            var orphanedSources = criteriaIndex.Sources
+                .Where(s => s.SourceType == "document"
+                    && s.SourceDoc is not null
+                    && !processedSourceDocs.Contains(s.SourceDoc))
+                .ToList();
+
+            var orphanedCount = orphanedSources.Sum(s => s.CriteriaCount);
+
+            if (!dryRun)
             {
-                if (_outputFormat == OutputFormat.Json)
+                // Remove orphaned sources from index
+                foreach (var orphan in orphanedSources)
                 {
-                    JsonResultWriter.Write(new ExtractRequirementsResult
-                    {
-                        Command = "extract-requirements",
-                        Status = "success",
-                        Message = "No requirements found in documentation.",
-                        ExtractedCount = 0,
-                        NewCount = 0,
-                        DuplicatesSkipped = 0,
-                        TotalInFile = existing.Count,
-                        RequirementsFile = Path.GetRelativePath(currentDir, reqsPath)
-                    });
+                    criteriaIndex.Sources.Remove(orphan);
                 }
-                else
-                {
-                    Console.WriteLine("No requirements found in documentation.");
-                }
-                return ExitCodes.Success;
+
+                // Write updated index
+                var indexWriter = new CriteriaIndexWriter();
+                await indexWriter.WriteAsync(criteriaIndexPath, criteriaIndex, ct);
             }
 
-            // Merge and write
-            var writer = new Spectra.Core.Parsing.RequirementsWriter();
-            var result = writer.DetectDuplicates(existing, extracted);
-
+            // Calculate totals
+            var totalCriteria = criteriaIndex.Sources.Sum(s => s.CriteriaCount);
             if (dryRun)
             {
-                var withIds = writer.AllocateIds(existing, result.Merged);
-
-                if (_outputFormat == OutputFormat.Json)
-                {
-                    JsonResultWriter.Write(new ExtractRequirementsResult
-                    {
-                        Command = "extract-requirements",
-                        Status = "success",
-                        Message = "Dry run — no files written.",
-                        ExtractedCount = extracted.Count,
-                        NewCount = result.Merged.Count,
-                        DuplicatesSkipped = result.SkippedCount,
-                        TotalInFile = existing.Count + result.Merged.Count,
-                        RequirementsFile = Path.GetRelativePath(currentDir, reqsPath),
-                        Requirements = withIds.Select(r => new RequirementEntry
-                        {
-                            Id = r.Id,
-                            Title = r.Title,
-                            Source = r.Source,
-                            Priority = r.Priority ?? "medium"
-                        }).ToList()
-                    });
-                }
-                else
-                {
-                    Console.WriteLine();
-                    Console.WriteLine($"Extracted {extracted.Count} requirement(s) (dry run — no files written):");
-                    Console.WriteLine();
-
-                    foreach (var req in withIds)
-                    {
-                        Console.WriteLine($"  {req.Id}  [{req.Priority}]  {req.Title}");
-                        Console.WriteLine($"          Source: {req.Source}");
-                    }
-
-                    if (result.Duplicates.Count > 0)
-                    {
-                        Console.WriteLine();
-                        Console.WriteLine($"  {result.Duplicates.Count} duplicate(s) would be skipped");
-                    }
-                }
-
-                return ExitCodes.Success;
+                // Estimate: unchanged + newly extracted - orphaned
+                totalCriteria = criteriaUnchanged + criteriaExtracted;
             }
-
-            var writeResult = await writer.MergeAndWriteAsync(reqsPath, extracted, ct);
 
             // Report results
             if (_outputFormat == OutputFormat.Json)
             {
-                JsonResultWriter.Write(new ExtractRequirementsResult
+                JsonResultWriter.Write(new ExtractCriteriaResult
                 {
-                    Command = "extract-requirements",
-                    Status = "success",
-                    ExtractedCount = extracted.Count,
-                    NewCount = writeResult.Merged.Count,
-                    DuplicatesSkipped = writeResult.SkippedCount,
-                    TotalInFile = writeResult.TotalInFile,
-                    RequirementsFile = Path.GetRelativePath(currentDir, reqsPath),
-                    Requirements = writeResult.Merged.Select(r => new RequirementEntry
-                    {
-                        Id = r.Id,
-                        Title = r.Title,
-                        Source = r.Source,
-                        Priority = r.Priority ?? "medium"
-                    }).ToList()
+                    Command = "extract-criteria",
+                    Status = documentsFailed == documentMap.Documents.Count ? "failed"
+                           : documentsFailed > 0 ? "partial"
+                           : "success",
+                    Message = dryRun ? "Dry run — no files written." : null,
+                    DocumentsProcessed = documentsProcessed,
+                    DocumentsSkipped = documentsSkipped,
+                    DocumentsFailed = documentsFailed,
+                    FailedDocuments = failedDocuments.Count > 0 ? failedDocuments : null,
+                    CriteriaExtracted = criteriaExtracted,
+                    CriteriaNew = criteriaNew,
+                    CriteriaUpdated = criteriaUpdated,
+                    CriteriaUnchanged = criteriaUnchanged,
+                    OrphanedCriteria = orphanedCount,
+                    TotalCriteria = totalCriteria,
+                    IndexFile = Path.GetRelativePath(currentDir, criteriaIndexPath),
+                    Criteria = allNewCriteria.Count > 0 ? allNewCriteria : null
                 });
             }
             else
             {
                 Console.WriteLine();
-                Console.WriteLine($"Requirements extraction complete:");
-                Console.WriteLine($"  New:        {writeResult.Merged.Count}");
-                Console.WriteLine($"  Duplicates: {writeResult.SkippedCount} (skipped)");
-                Console.WriteLine($"  Total:      {writeResult.TotalInFile}");
-                Console.WriteLine($"  File:       {Path.GetRelativePath(currentDir, reqsPath)}");
+                if (dryRun) Console.WriteLine("Dry run — no files written.");
+                Console.WriteLine($"Acceptance criteria extraction complete:");
+                Console.WriteLine($"  Documents processed: {documentsProcessed}");
+                Console.WriteLine($"  Documents skipped:   {documentsSkipped} (unchanged)");
+                if (documentsFailed > 0)
+                    Console.WriteLine($"  Documents failed:    {documentsFailed}");
+                Console.WriteLine($"  Criteria extracted:  {criteriaExtracted}");
+                Console.WriteLine($"  New criteria:        {criteriaNew}");
+                Console.WriteLine($"  Updated criteria:    {criteriaUpdated}");
+                Console.WriteLine($"  Unchanged criteria:  {criteriaUnchanged}");
+                if (orphanedCount > 0)
+                    Console.WriteLine($"  Orphaned criteria:   {orphanedCount} (removed)");
+                Console.WriteLine($"  Total criteria:      {totalCriteria}");
+                Console.WriteLine($"  Index file:          {Path.GetRelativePath(currentDir, criteriaIndexPath)}");
 
-                if (writeResult.Merged.Count > 0 && _verbosity >= VerbosityLevel.Normal)
+                if (allNewCriteria.Count > 0 && _verbosity >= VerbosityLevel.Normal)
                 {
                     Console.WriteLine();
-                    foreach (var req in writeResult.Merged)
+                    foreach (var c in allNewCriteria)
                     {
-                        Console.WriteLine($"  + {req.Id}  [{req.Priority}]  {req.Title}");
+                        Console.WriteLine($"  {(criteriaNew > 0 ? "+" : " ")} {c.Id}  [{c.Priority}]  {c.Text}");
+                    }
+                }
+
+                if (failedDocuments.Count > 0)
+                {
+                    Console.WriteLine();
+                    Console.Error.WriteLine("Failed documents:");
+                    foreach (var f in failedDocuments)
+                        Console.Error.WriteLine($"  - {f}");
+                }
+            }
+
+            // Exit codes: 0 all success, 2 some failed, 1 all failed
+            if (documentsFailed == documentMap.Documents.Count && documentMap.Documents.Count > 0)
+                return ExitCodes.Error;
+            if (documentsFailed > 0)
+                return ExitCodes.ValidationError;
+            return ExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine("\nOperation cancelled.");
+            return ExitCodes.Cancelled;
+        }
+        catch (Exception ex)
+        {
+            if (_outputFormat == OutputFormat.Json)
+            {
+                JsonResultWriter.Write(new ErrorResult
+                {
+                    Command = "extract-criteria",
+                    Status = "failed",
+                    Error = ex.Message
+                });
+            }
+            else
+            {
+                Console.Error.WriteLine($"Error: {ex.Message}");
+                if (_verbosity >= VerbosityLevel.Detailed)
+                    Console.Error.WriteLine(ex.StackTrace);
+            }
+            return ExitCodes.Error;
+        }
+    }
+
+    /// <summary>
+    /// Imports acceptance criteria from an external file (YAML, CSV, or JSON).
+    /// Supports merge/replace modes and optional AI-powered splitting of compound criteria.
+    /// </summary>
+    public async Task<int> RunImportCriteriaAsync(
+        string importPath,
+        bool replace,
+        bool skipSplitting,
+        bool dryRun,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var currentDir = Directory.GetCurrentDirectory();
+
+            // 1. Validate the import file exists
+            var fullImportPath = Path.IsPathRooted(importPath)
+                ? importPath
+                : Path.Combine(currentDir, importPath);
+
+            if (!File.Exists(fullImportPath))
+            {
+                if (_outputFormat == OutputFormat.Json)
+                {
+                    JsonResultWriter.Write(new ErrorResult
+                    {
+                        Command = "import-criteria",
+                        Status = "failed",
+                        Error = $"Import file not found: {importPath}"
+                    });
+                }
+                else
+                {
+                    Console.Error.WriteLine($"Error: Import file not found: {importPath}");
+                }
+                return ExitCodes.Error;
+            }
+
+            // Load config
+            var configPath = Path.Combine(currentDir, "spectra.config.json");
+            SpectraConfig? config = null;
+            if (File.Exists(configPath))
+            {
+                var configJson = await File.ReadAllTextAsync(configPath, ct);
+                config = JsonSerializer.Deserialize<SpectraConfig>(configJson, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            }
+
+            if (config is null)
+            {
+                if (_outputFormat == OutputFormat.Json)
+                {
+                    JsonResultWriter.Write(new ErrorResult
+                    {
+                        Command = "import-criteria",
+                        Status = "failed",
+                        Error = "No spectra.config.json found. Run 'spectra init' first."
+                    });
+                }
+                else
+                {
+                    Console.Error.WriteLine("No spectra.config.json found. Run 'spectra init' first.");
+                }
+                return ExitCodes.Error;
+            }
+
+            var criteriaDir = Path.Combine(currentDir, config.Coverage.CriteriaDir);
+            var criteriaIndexPath = Path.Combine(currentDir, config.Coverage.CriteriaFile);
+
+            if (_verbosity >= VerbosityLevel.Normal)
+            {
+                Console.Error.WriteLine($"Importing criteria from {importPath}...");
+            }
+
+            // 2. Detect format by extension
+            var ext = Path.GetExtension(fullImportPath).ToLowerInvariant();
+
+            // 3. Parse via the appropriate importer
+            IReadOnlyList<AcceptanceCriterion> imported;
+            switch (ext)
+            {
+                case ".yaml" or ".yml":
+                    var yamlReader = new CriteriaFileReader();
+                    imported = await yamlReader.ReadAsync(fullImportPath, ct);
+                    break;
+                case ".csv":
+                    var csvImporter = new CsvCriteriaImporter();
+                    imported = await csvImporter.ImportAsync(fullImportPath, "import", ct);
+                    break;
+                case ".json":
+                    var jsonImporter = new JsonCriteriaImporter();
+                    imported = await jsonImporter.ImportAsync(fullImportPath, "import", ct);
+                    break;
+                default:
+                    if (_outputFormat == OutputFormat.Json)
+                    {
+                        JsonResultWriter.Write(new ErrorResult
+                        {
+                            Command = "import-criteria",
+                            Status = "failed",
+                            Error = $"Unsupported file format: {ext}. Expected .yaml, .yml, .csv, or .json."
+                        });
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine($"Error: Unsupported file format: {ext}. Expected .yaml, .yml, .csv, or .json.");
+                    }
+                    return ExitCodes.Error;
+            }
+
+            var importedCount = imported.Count;
+
+            if (_verbosity >= VerbosityLevel.Normal)
+            {
+                Console.Error.WriteLine($"  Parsed {importedCount} criteria from {Path.GetFileName(fullImportPath)}.");
+            }
+
+            // 4. Split compound criteria if needed
+            var splitCount = 0;
+            var normalizedCount = 0;
+
+            if (!skipSplitting)
+            {
+                var criteriaToSplit = imported
+                    .Where(c => c.Text.Contains("\n- ") || c.Text.Contains("\n* ") ||
+                                c.Text.StartsWith("- ") || c.Text.StartsWith("* "))
+                    .ToList();
+
+                if (criteriaToSplit.Count > 0)
+                {
+                    var provider = config.Ai.Providers.FirstOrDefault(p => p.Enabled);
+                    if (provider is not null)
+                    {
+                        var extractor = new CriteriaExtractor(
+                            provider,
+                            _verbosity >= VerbosityLevel.Normal ? s => Console.Error.WriteLine(s) : null);
+
+                        var expandedList = new List<AcceptanceCriterion>();
+
+                        foreach (var criterion in imported)
+                        {
+                            if (criteriaToSplit.Contains(criterion))
+                            {
+                                try
+                                {
+                                    var splitResults = await extractor.SplitAndNormalizeAsync(
+                                        criterion.Text,
+                                        criterion.Source,
+                                        criterion.Component,
+                                        ct);
+
+                                    if (splitResults.Count > 0)
+                                    {
+                                        // Preserve source metadata on split results
+                                        foreach (var split in splitResults)
+                                        {
+                                            split.Source = criterion.Source;
+                                            split.SourceType = criterion.SourceType;
+                                            split.SourceDoc = criterion.SourceDoc;
+                                        }
+                                        expandedList.AddRange(splitResults);
+                                        splitCount += splitResults.Count;
+                                        normalizedCount++;
+                                    }
+                                    else
+                                    {
+                                        expandedList.Add(criterion);
+                                    }
+                                }
+                                catch (Exception ex) when (ex is not OperationCanceledException)
+                                {
+                                    if (_verbosity >= VerbosityLevel.Normal)
+                                        Console.Error.WriteLine($"  Failed to split criterion: {ex.Message}");
+                                    expandedList.Add(criterion);
+                                }
+                            }
+                            else
+                            {
+                                expandedList.Add(criterion);
+                            }
+                        }
+
+                        imported = expandedList;
+
+                        if (_verbosity >= VerbosityLevel.Normal && normalizedCount > 0)
+                        {
+                            Console.Error.WriteLine($"  Split {normalizedCount} compound criteria into {splitCount} atomic criteria.");
+                        }
+                    }
+                }
+            }
+
+            // 5. Assign IDs to criteria that don't have them
+            // Build a set of all existing IDs to avoid collisions
+            var indexReader = new CriteriaIndexReader();
+            var criteriaIndex = await indexReader.ReadAsync(criteriaIndexPath, ct);
+
+            var globalMaxId = 0;
+            var sourceMaxIds = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            // Scan existing criteria files for used IDs
+            foreach (var source in criteriaIndex.Sources)
+            {
+                var sourceFilePath = Path.Combine(criteriaDir, source.File);
+                if (Path.IsPathRooted(source.File))
+                    sourceFilePath = source.File;
+
+                var fileReader = new CriteriaFileReader();
+                var existingInFile = await fileReader.ReadAsync(sourceFilePath, ct);
+                foreach (var c in existingInFile)
+                {
+                    if (string.IsNullOrEmpty(c.Id)) continue;
+
+                    // Try parse AC-{KEY}-{N} pattern
+                    if (c.Id.StartsWith("AC-", StringComparison.OrdinalIgnoreCase) && c.Id.Length > 3)
+                    {
+                        var rest = c.Id[3..];
+                        var lastDash = rest.LastIndexOf('-');
+                        if (lastDash > 0 && int.TryParse(rest[(lastDash + 1)..], out var n))
+                        {
+                            var key = rest[..lastDash].ToUpperInvariant();
+                            if (sourceMaxIds.TryGetValue(key, out var current))
+                                sourceMaxIds[key] = Math.Max(current, n);
+                            else
+                                sourceMaxIds[key] = n;
+                        }
+                        else if (int.TryParse(rest, out var plainN))
+                        {
+                            globalMaxId = Math.Max(globalMaxId, plainN);
+                        }
+                    }
+                }
+            }
+
+            // Also scan the imported criteria for existing IDs
+            foreach (var c in imported)
+            {
+                if (!string.IsNullOrEmpty(c.Id) && c.Id.StartsWith("AC-", StringComparison.OrdinalIgnoreCase))
+                {
+                    var rest = c.Id[3..];
+                    var lastDash = rest.LastIndexOf('-');
+                    if (lastDash > 0 && int.TryParse(rest[(lastDash + 1)..], out var n))
+                    {
+                        var key = rest[..lastDash].ToUpperInvariant();
+                        if (sourceMaxIds.TryGetValue(key, out var current))
+                            sourceMaxIds[key] = Math.Max(current, n);
+                        else
+                            sourceMaxIds[key] = n;
+                    }
+                    else if (int.TryParse(rest, out var plainN))
+                    {
+                        globalMaxId = Math.Max(globalMaxId, plainN);
+                    }
+                }
+            }
+
+            // Assign IDs to criteria without them
+            foreach (var criterion in imported)
+            {
+                if (!string.IsNullOrEmpty(criterion.Id))
+                    continue;
+
+                if (!string.IsNullOrEmpty(criterion.Source))
+                {
+                    var sourceKey = criterion.Source
+                        .Replace(' ', '-')
+                        .ToUpperInvariant();
+                    if (!sourceMaxIds.TryGetValue(sourceKey, out var nextN))
+                        nextN = 0;
+                    nextN++;
+                    sourceMaxIds[sourceKey] = nextN;
+                    criterion.Id = $"AC-{sourceKey}-{nextN:D3}";
+                }
+                else
+                {
+                    globalMaxId++;
+                    criterion.Id = $"AC-{globalMaxId:D3}";
+                }
+            }
+
+            // 6. Determine output file path
+            var inputFileName = Path.GetFileNameWithoutExtension(fullImportPath);
+            var importedDir = Path.Combine(criteriaDir, "imported");
+            var outputFilePath = Path.Combine(importedDir, $"{inputFileName}.criteria.yaml");
+
+            // 7. Merge or replace
+            var fileReaderForTarget = new CriteriaFileReader();
+            var existingCriteria = await fileReaderForTarget.ReadAsync(outputFilePath, ct);
+
+            var merger = new CriteriaMerger();
+            CriteriaMerger.MergeResult mergeResult;
+
+            if (replace)
+            {
+                mergeResult = merger.Replace(existingCriteria, imported);
+            }
+            else
+            {
+                mergeResult = merger.Merge(existingCriteria, imported);
+            }
+
+            // 8. Write criteria file
+            if (!dryRun)
+            {
+                Directory.CreateDirectory(importedDir);
+
+                var fileWriter = new CriteriaFileWriter();
+                await fileWriter.WriteAsync(outputFilePath, mergeResult.Criteria, importPath, null, ct);
+            }
+
+            // 9. Update master CriteriaIndex
+            var relativeOutputFile = Path.GetRelativePath(
+                Path.Combine(currentDir, config.Coverage.CriteriaDir),
+                outputFilePath).Replace('\\', '/');
+
+            // Use the imported dir relative path as the file entry
+            var importedRelFile = $"imported/{inputFileName}.criteria.yaml";
+
+            var existingSource = criteriaIndex.Sources
+                .FirstOrDefault(s => string.Equals(s.File, importedRelFile, StringComparison.OrdinalIgnoreCase));
+
+            if (!dryRun)
+            {
+                if (existingSource is not null)
+                {
+                    existingSource.CriteriaCount = mergeResult.Criteria.Count;
+                    existingSource.ImportedAt = DateTime.UtcNow;
+                    existingSource.SourceType = "import";
+                }
+                else
+                {
+                    criteriaIndex.Sources.Add(new CriteriaSource
+                    {
+                        File = importedRelFile,
+                        SourceDoc = importPath,
+                        SourceType = "import",
+                        CriteriaCount = mergeResult.Criteria.Count,
+                        ImportedAt = DateTime.UtcNow
+                    });
+                }
+
+                var indexWriter = new CriteriaIndexWriter();
+                await indexWriter.WriteAsync(criteriaIndexPath, criteriaIndex, ct);
+            }
+
+            // Build source breakdown
+            var sourceBreakdown = imported
+                .GroupBy(c => c.SourceType ?? "unknown")
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            var totalCriteria = dryRun
+                ? criteriaIndex.Sources.Sum(s => s.CriteriaCount) + mergeResult.NewCount
+                : criteriaIndex.Sources.Sum(s => s.CriteriaCount);
+
+            var relativeOutputPath = Path.GetRelativePath(currentDir, outputFilePath);
+
+            // 11. Report results
+            if (_outputFormat == OutputFormat.Json)
+            {
+                JsonResultWriter.Write(new ImportCriteriaResult
+                {
+                    Command = "import-criteria",
+                    Status = "success",
+                    Message = dryRun ? "Dry run — no files written." : null,
+                    Imported = importedCount,
+                    Split = splitCount,
+                    Normalized = normalizedCount,
+                    Merged = mergeResult.MergedCount,
+                    New = mergeResult.NewCount,
+                    TotalCriteria = totalCriteria,
+                    File = relativeOutputPath,
+                    SourceBreakdown = sourceBreakdown.Count > 0 ? sourceBreakdown : null
+                });
+            }
+            else
+            {
+                Console.WriteLine();
+                if (dryRun) Console.WriteLine("Dry run — no files written.");
+                Console.WriteLine($"Criteria import complete:");
+                Console.WriteLine($"  Source file:       {importPath}");
+                Console.WriteLine($"  Imported:          {importedCount}");
+                if (normalizedCount > 0)
+                {
+                    Console.WriteLine($"  Compound split:    {normalizedCount} → {splitCount} criteria");
+                }
+                Console.WriteLine($"  Merged (updated):  {mergeResult.MergedCount}");
+                Console.WriteLine($"  New:               {mergeResult.NewCount}");
+                if (mergeResult.ReplacedCount > 0)
+                    Console.WriteLine($"  Replaced:          {mergeResult.ReplacedCount}");
+                Console.WriteLine($"  Total criteria:    {totalCriteria}");
+                Console.WriteLine($"  Output file:       {relativeOutputPath}");
+
+                if (sourceBreakdown.Count > 1)
+                {
+                    Console.WriteLine($"  Source breakdown:");
+                    foreach (var (sourceType, count) in sourceBreakdown.OrderByDescending(kv => kv.Value))
+                    {
+                        Console.WriteLine($"    {sourceType}: {count}");
                     }
                 }
             }
@@ -497,7 +1058,237 @@ public sealed class AnalyzeHandler
             {
                 JsonResultWriter.Write(new ErrorResult
                 {
-                    Command = "extract-requirements",
+                    Command = "import-criteria",
+                    Status = "failed",
+                    Error = ex.Message
+                });
+            }
+            else
+            {
+                Console.Error.WriteLine($"Error: {ex.Message}");
+                if (_verbosity >= VerbosityLevel.Detailed)
+                    Console.Error.WriteLine(ex.StackTrace);
+            }
+            return ExitCodes.Error;
+        }
+    }
+
+    /// <summary>
+    /// Lists all acceptance criteria with optional filters and coverage status.
+    /// </summary>
+    public async Task<int> RunListCriteriaAsync(
+        string? sourceType,
+        string? component,
+        string? priority,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var currentDir = Directory.GetCurrentDirectory();
+            var configPath = Path.Combine(currentDir, "spectra.config.json");
+
+            // Load config
+            SpectraConfig? config = null;
+            if (File.Exists(configPath))
+            {
+                var configJson = await File.ReadAllTextAsync(configPath, ct);
+                config = JsonSerializer.Deserialize<SpectraConfig>(configJson, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            }
+
+            if (config is null)
+            {
+                if (_outputFormat == OutputFormat.Json)
+                {
+                    JsonResultWriter.Write(new ErrorResult
+                    {
+                        Command = "list-criteria",
+                        Status = "failed",
+                        Error = "No spectra.config.json found. Run 'spectra init' first."
+                    });
+                }
+                else
+                {
+                    Console.Error.WriteLine("No spectra.config.json found. Run 'spectra init' first.");
+                }
+                return ExitCodes.Error;
+            }
+
+            // Read criteria index
+            var criteriaIndexPath = Path.Combine(currentDir, config.Coverage.CriteriaFile);
+            var criteriaDir = Path.Combine(currentDir, config.Coverage.CriteriaDir);
+            var indexReader = new CriteriaIndexReader();
+            var criteriaIndex = await indexReader.ReadAsync(criteriaIndexPath, ct);
+
+            // Read all criteria from all source files
+            var fileReader = new CriteriaFileReader();
+            var allCriteria = new List<AcceptanceCriterion>();
+
+            foreach (var source in criteriaIndex.Sources)
+            {
+                var sourceFilePath = Path.IsPathRooted(source.File)
+                    ? source.File
+                    : Path.Combine(criteriaDir, source.File);
+
+                var criteria = await fileReader.ReadAsync(sourceFilePath, ct);
+                allCriteria.AddRange(criteria);
+            }
+
+            // Apply filters (case-insensitive)
+            IEnumerable<AcceptanceCriterion> filtered = allCriteria;
+
+            if (!string.IsNullOrEmpty(sourceType))
+            {
+                filtered = filtered.Where(c =>
+                    string.Equals(c.SourceType, sourceType, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrEmpty(component))
+            {
+                filtered = filtered.Where(c =>
+                    string.Equals(c.Component, component, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrEmpty(priority))
+            {
+                filtered = filtered.Where(c =>
+                    string.Equals(c.Priority, priority, StringComparison.OrdinalIgnoreCase));
+            }
+
+            var filteredList = filtered.ToList();
+
+            // Load all tests to check coverage
+            var testsDir = Path.Combine(currentDir, config.Tests?.Dir ?? "tests");
+            var allTests = new List<TestCase>();
+
+            if (Directory.Exists(testsDir))
+            {
+                foreach (var suiteDir in Directory.GetDirectories(testsDir))
+                {
+                    var batchReader = new BatchReadTestsTool();
+                    var readResult = await batchReader.ExecuteAsync(suiteDir, ct: ct);
+
+                    if (readResult.Success && readResult.Tests is not null)
+                    {
+                        allTests.AddRange(readResult.Tests);
+                    }
+                }
+            }
+
+            // Build a map of criterion ID -> list of test IDs that cover it
+            var coverageMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var test in allTests)
+            {
+                // Check both criteria and requirements fields
+                var linkedIds = test.Criteria.Concat(test.Requirements);
+                foreach (var criterionId in linkedIds)
+                {
+                    if (!coverageMap.TryGetValue(criterionId, out var testList))
+                    {
+                        testList = [];
+                        coverageMap[criterionId] = testList;
+                    }
+                    testList.Add(test.Id);
+                }
+            }
+
+            // Build result entries
+            var entries = filteredList.Select(c =>
+            {
+                coverageMap.TryGetValue(c.Id, out var linkedTests);
+                var testIds = linkedTests ?? [];
+                // Also include linked_test_ids from the criterion itself
+                var allLinkedTests = testIds
+                    .Concat(c.LinkedTestIds ?? [])
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                return new ListCriterionEntry
+                {
+                    Id = c.Id,
+                    Text = c.Text,
+                    Rfc2119 = c.Rfc2119,
+                    SourceType = c.SourceType,
+                    SourceDoc = c.SourceDoc,
+                    Component = c.Component,
+                    Priority = c.Priority,
+                    LinkedTests = allLinkedTests,
+                    Covered = allLinkedTests.Count > 0
+                };
+            }).ToList();
+
+            var coveredCount = entries.Count(e => e.Covered);
+            var totalCount = entries.Count;
+            var coveragePct = totalCount > 0
+                ? Math.Round((decimal)coveredCount / totalCount * 100, 1)
+                : 0m;
+
+            if (_outputFormat == OutputFormat.Json)
+            {
+                JsonResultWriter.Write(new ListCriteriaResult
+                {
+                    Command = "list-criteria",
+                    Status = "success",
+                    Criteria = entries,
+                    Total = totalCount,
+                    Covered = coveredCount,
+                    CoveragePct = coveragePct
+                });
+            }
+            else
+            {
+                if (entries.Count == 0)
+                {
+                    Console.WriteLine("No criteria found matching the specified filters.");
+                    return ExitCodes.Success;
+                }
+
+                var table = new Table()
+                    .Border(TableBorder.Rounded)
+                    .AddColumn("ID")
+                    .AddColumn("Text")
+                    .AddColumn("Source Type")
+                    .AddColumn("Component")
+                    .AddColumn("Priority")
+                    .AddColumn("Covered");
+
+                foreach (var entry in entries)
+                {
+                    var truncatedText = entry.Text.Length > 60
+                        ? entry.Text[..57] + "..."
+                        : entry.Text;
+                    var coveredMark = entry.Covered ? "[green]✓[/]" : "[red]✗[/]";
+                    table.AddRow(
+                        Markup.Escape(entry.Id),
+                        Markup.Escape(truncatedText),
+                        Markup.Escape(entry.SourceType),
+                        Markup.Escape(entry.Component ?? "-"),
+                        Markup.Escape(entry.Priority),
+                        coveredMark);
+                }
+
+                AnsiConsole.Write(table);
+                Console.WriteLine();
+                Console.WriteLine($"Total: {totalCount}  Covered: {coveredCount}  Coverage: {coveragePct}%");
+            }
+
+            return ExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine("\nOperation cancelled.");
+            return ExitCodes.Cancelled;
+        }
+        catch (Exception ex)
+        {
+            if (_outputFormat == OutputFormat.Json)
+            {
+                JsonResultWriter.Write(new ErrorResult
+                {
+                    Command = "list-criteria",
                     Status = "failed",
                     Error = ex.Message
                 });

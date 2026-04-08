@@ -1,5 +1,5 @@
 ---
-name: SPECTRA Profile
+name: spectra-init-profile
 description: Creates or updates the generation profile that controls how AI generates test cases.
 tools: [{{READONLY_TOOLS}}]
 model: GPT-4o

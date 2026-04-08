@@ -18,21 +18,13 @@
   "ai": {
     "providers": [
       {
-        "name": "azure-anthropic",
-        "model": "claude-sonnet-4-5",
+        "name": "copilot",
+        "model": "gpt-4o",
         "enabled": true,
-        "priority": 1,
-        "api_key_env": "AZURE_ANTHROPIC_API_KEY",
-        "base_url": "https://angel-mdnhzlaw-swedencentral.services.ai.azure.com/"
+        "priority": 1
       }
     ],
-    "fallback_strategy": "auto",
-    "critic": {
-      "enabled": true,
-      "provider": "azure-anthropic",
-      "model": "claude-sonnet-4-5",
-      "api_key_env": "AZURE_ANTHROPIC_API_KEY"
-    }
+    "fallback_strategy": "auto"
   },
   "generation": {
     "default_count": 15,
@@ -78,7 +70,11 @@
   },
   "coverage": {
     "automation_dirs": [
-      "C:\\SourceCode\\Spectra\\test_app_automation"
+      "tests",
+      "test",
+      "spec",
+      "specs",
+      "e2e"
     ],
     "file_patterns": [
       "*.cs",
@@ -109,7 +105,15 @@
       ".py",
       ".ts"
     ],
-    "requirements_file": "docs/requirements/_requirements.yaml"
+    "requirements_file": "docs/requirements/_requirements.yaml",
+    "criteria_file": "docs/requirements/_criteria_index.yaml",
+    "criteria_dir": "docs/requirements",
+    "criteria_import": {
+      "default_source_type": "manual",
+      "auto_split": true,
+      "normalize_rfc2119": true,
+      "id_prefix": "AC"
+    }
   },
   "execution": {},
   "bug_tracking": {
@@ -124,5 +128,12 @@
     "validate_on_load": true,
     "include_in_validation": true
   },
-  "selections": {}
+  "selections": {
+    "smoke": {
+      "description": "Quick smoke test \u2014 high priority tests only",
+      "priorities": [
+        "high"
+      ]
+    }
+  }
 }

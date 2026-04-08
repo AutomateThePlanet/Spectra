@@ -713,10 +713,10 @@ public sealed class DataCollector
                 .ToList();
             var undocumentedTestCount = undocumentedTestIds.Count;
 
-            // ── Requirements coverage ──
+            // ── Acceptance criteria coverage ──
             var configPath = Path.Combine(_basePath, "spectra.config.json");
-            var reqDetails = new List<Core.Models.Coverage.RequirementCoverageDetail>();
-            var hasRequirementsFile = false;
+            var criteriaDetails = new List<Core.Models.Coverage.CriteriaCoverageDetail>();
+            var hasCriteriaFile = false;
 
             if (File.Exists(configPath))
             {
@@ -726,38 +726,38 @@ public sealed class DataCollector
                     var config = JsonSerializer.Deserialize<SpectraConfig>(configJson, s_jsonOptions);
                     if (config is not null)
                     {
-                        var reqFilePath = Path.Combine(_basePath, config.Coverage.RequirementsFile);
-                        var reqParser = new RequirementsParser();
-                        var requirements = await reqParser.ParseAsync(reqFilePath);
-                        hasRequirementsFile = File.Exists(reqFilePath) && requirements.Count > 0;
+                        var criteriaFilePath = Path.Combine(_basePath, config.Coverage.CriteriaFile);
+                        var criteriaParser = new AcceptanceCriteriaParser();
+                        var criteria = await criteriaParser.ParseAsync(criteriaFilePath);
+                        hasCriteriaFile = File.Exists(criteriaFilePath) && criteria.Count > 0;
 
-                        // Build requirement ID → covering test IDs
-                        var reqToTests = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+                        // Build criterion ID → covering test IDs
+                        var criterionToTests = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
                         foreach (var test in testEntries)
                         {
                             if (indexEntryLookup.TryGetValue(test.Id, out var idxEntry))
                             {
-                                foreach (var reqId in idxEntry.Requirements)
+                                foreach (var criterionId in idxEntry.Requirements)
                                 {
-                                    if (!reqToTests.TryGetValue(reqId, out var list))
+                                    if (!criterionToTests.TryGetValue(criterionId, out var list))
                                     {
                                         list = [];
-                                        reqToTests[reqId] = list;
+                                        criterionToTests[criterionId] = list;
                                     }
                                     list.Add(test.Id);
                                 }
                             }
                         }
 
-                        foreach (var req in requirements)
+                        foreach (var criterion in criteria)
                         {
-                            var testIds = reqToTests.TryGetValue(req.Id, out var ids)
+                            var testIds = criterionToTests.TryGetValue(criterion.Id, out var ids)
                                 ? ids.OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList()
                                 : [];
-                            reqDetails.Add(new Core.Models.Coverage.RequirementCoverageDetail
+                            criteriaDetails.Add(new Core.Models.Coverage.CriteriaCoverageDetail
                             {
-                                Id = req.Id,
-                                Title = req.Title ?? "",
+                                Id = criterion.Id,
+                                Text = criterion.Text,
                                 Tests = testIds,
                                 Covered = testIds.Count > 0
                             });
@@ -769,12 +769,12 @@ public sealed class DataCollector
                     // Config read failure is non-fatal for dashboard
                 }
             }
-            reqDetails.Sort((a, b) => string.Compare(a.Id, b.Id, StringComparison.OrdinalIgnoreCase));
+            criteriaDetails.Sort((a, b) => string.Compare(a.Id, b.Id, StringComparison.OrdinalIgnoreCase));
 
-            var reqCovered = reqDetails.Count(r => r.Covered);
-            var reqTotal = reqDetails.Count;
-            var reqPercentage = reqTotal > 0
-                ? Math.Round((reqCovered * 100m) / reqTotal, 2) : 0m;
+            var criteriaCovered = criteriaDetails.Count(r => r.Covered);
+            var criteriaTotal = criteriaDetails.Count;
+            var criteriaPercentage = criteriaTotal > 0
+                ? Math.Round((criteriaCovered * 100m) / criteriaTotal, 2) : 0m;
 
             // ── Automation coverage ──
             // Per-suite breakdown
@@ -830,13 +830,13 @@ public sealed class DataCollector
                     UndocumentedTestCount = undocumentedTestCount,
                     UndocumentedTestIds = undocumentedTestCount > 0 ? undocumentedTestIds : null
                 },
-                Requirements = new RequirementsSectionData
+                AcceptanceCriteria = new AcceptanceCriteriaSectionData
                 {
-                    Covered = reqCovered,
-                    Total = reqTotal,
-                    Percentage = reqPercentage,
-                    HasRequirementsFile = hasRequirementsFile,
-                    Details = reqDetails
+                    Covered = criteriaCovered,
+                    Total = criteriaTotal,
+                    Percentage = criteriaPercentage,
+                    HasCriteriaFile = hasCriteriaFile,
+                    Details = criteriaDetails
                 },
                 Automation = new AutomationSectionData
                 {

@@ -1,4 +1,5 @@
 using Spectra.Core.Models;
+using Spectra.Core.Models.Coverage;
 
 namespace Spectra.Core.Update;
 
@@ -29,8 +30,59 @@ public sealed class TestClassifier
         string? sourceContent,
         IReadOnlyList<TestCase> otherTests)
     {
+        return Classify(test, sourceContent, otherTests, null);
+    }
+
+    /// <summary>
+    /// Classifies a single test against its source documentation and acceptance criteria.
+    /// </summary>
+    public ClassificationResult Classify(
+        TestCase test,
+        string? sourceContent,
+        IReadOnlyList<TestCase> otherTests,
+        IReadOnlyList<AcceptanceCriterion>? criteria)
+    {
         ArgumentNullException.ThrowIfNull(test);
         ArgumentNullException.ThrowIfNull(otherTests);
+
+        // Check criteria-based classification first (if criteria data is available)
+        if (criteria is not null && test.Criteria.Count > 0)
+        {
+            var criteriaById = criteria.ToDictionary(c => c.Id, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var criterionId in test.Criteria)
+            {
+                if (!criteriaById.TryGetValue(criterionId, out var criterion))
+                {
+                    // Criterion ID no longer exists
+                    return new ClassificationResult
+                    {
+                        Test = test,
+                        Classification = UpdateClassification.Orphaned,
+                        Confidence = 1.0,
+                        Reason = $"Linked criterion {criterionId} no longer exists"
+                    };
+                }
+
+                // Check if criterion text has meaningfully changed
+                // We compare the criterion text against the test's scenario_from_doc or title
+                // to detect when the criterion was updated but the test was not
+                if (!string.IsNullOrEmpty(criterion.Text) && !string.IsNullOrEmpty(test.ScenarioFromDoc))
+                {
+                    var similarity = CalculateTextSimilarity(criterion.Text, test.ScenarioFromDoc);
+                    if (similarity < _outdatedThreshold)
+                    {
+                        return new ClassificationResult
+                        {
+                            Test = test,
+                            Classification = UpdateClassification.Outdated,
+                            Confidence = _outdatedThreshold - similarity,
+                            Reason = $"Linked criterion {criterionId} text changed"
+                        };
+                    }
+                }
+            }
+        }
 
         // Check for orphaned (no source content or source not found)
         if (string.IsNullOrWhiteSpace(sourceContent))
@@ -99,6 +151,17 @@ public sealed class TestClassifier
         IReadOnlyList<TestCase> tests,
         IReadOnlyDictionary<string, string> sourceContents)
     {
+        return ClassifyBatch(tests, sourceContents, null);
+    }
+
+    /// <summary>
+    /// Classifies multiple tests in batch with acceptance criteria awareness.
+    /// </summary>
+    public IReadOnlyList<ClassificationResult> ClassifyBatch(
+        IReadOnlyList<TestCase> tests,
+        IReadOnlyDictionary<string, string> sourceContents,
+        IReadOnlyList<AcceptanceCriterion>? criteria)
+    {
         ArgumentNullException.ThrowIfNull(tests);
         ArgumentNullException.ThrowIfNull(sourceContents);
 
@@ -118,7 +181,7 @@ public sealed class TestClassifier
             }
 
             var otherTests = tests.Where(t => t.Id != test.Id).ToList();
-            results.Add(Classify(test, sourceContent, otherTests));
+            results.Add(Classify(test, sourceContent, otherTests, criteria));
         }
 
         return results;
@@ -192,6 +255,27 @@ public sealed class TestClassifier
         }
 
         return total > 0 ? (double)matches / total : 0;
+    }
+
+    /// <summary>
+    /// Calculates word-overlap similarity between two text strings using Jaccard similarity.
+    /// </summary>
+    private static double CalculateTextSimilarity(string textA, string textB)
+    {
+        var aWords = new HashSet<string>(
+            textA.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Where(w => w.Length > 3));
+        var bWords = new HashSet<string>(
+            textB.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Where(w => w.Length > 3));
+
+        if (aWords.Count == 0 && bWords.Count == 0) return 1.0;
+        if (aWords.Count == 0 || bWords.Count == 0) return 0.0;
+
+        var intersection = aWords.Intersect(bWords).Count();
+        var union = aWords.Union(bWords).Count();
+
+        return union > 0 ? (double)intersection / union : 0;
     }
 
     /// <summary>

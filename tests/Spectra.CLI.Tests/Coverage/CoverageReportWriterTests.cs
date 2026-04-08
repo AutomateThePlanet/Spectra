@@ -49,7 +49,7 @@ public class CoverageReportWriterTests : IDisposable
         var json = _writer.FormatAsJson(report);
 
         Assert.Contains("\"documentation_coverage\"", json);
-        Assert.Contains("\"requirements_coverage\"", json);
+        Assert.Contains("\"acceptance_criteria_coverage\"", json);
         Assert.Contains("\"automation_coverage\"", json);
     }
 
@@ -72,8 +72,8 @@ public class CoverageReportWriterTests : IDisposable
 
         var json = _writer.FormatAsJson(report);
 
-        Assert.Contains("\"total_requirements\"", json);
-        Assert.Contains("\"has_requirements_file\"", json);
+        Assert.Contains("\"total_criteria\"", json);
+        Assert.Contains("\"has_criteria_file\"", json);
         Assert.Contains("REQ-001", json);
     }
 
@@ -140,7 +140,7 @@ public class CoverageReportWriterTests : IDisposable
 
         var markdown = _writer.FormatAsMarkdown(report);
 
-        Assert.Contains("## Requirements Coverage", markdown);
+        Assert.Contains("## Acceptance Criteria Coverage", markdown);
         Assert.Contains("REQ-001", markdown);
     }
 
@@ -197,7 +197,7 @@ public class CoverageReportWriterTests : IDisposable
 
         var markdown = _writer.FormatAsMarkdown(report);
 
-        Assert.Contains("No requirements file found", markdown);
+        Assert.Contains("No acceptance criteria file found", markdown);
     }
 
     [Fact]
@@ -328,7 +328,7 @@ public class CoverageReportWriterTests : IDisposable
         Assert.NotEmpty(text);
         Assert.Contains("UNIFIED COVERAGE REPORT", text);
         Assert.Contains("DOCUMENTATION COVERAGE", text);
-        Assert.Contains("REQUIREMENTS COVERAGE", text);
+        Assert.Contains("ACCEPTANCE CRITERIA COVERAGE", text);
         Assert.Contains("AUTOMATION COVERAGE", text);
     }
 
@@ -347,12 +347,12 @@ public class CoverageReportWriterTests : IDisposable
                 CoveredDocs = 1,
                 Percentage = 50m
             },
-            RequirementsCoverage = new RequirementsCoverage
+            AcceptanceCriteriaCoverage = new AcceptanceCriteriaCoverage
             {
-                TotalRequirements = 0,
-                CoveredRequirements = 0,
+                TotalCriteria = 0,
+                CoveredCriteria = 0,
                 Percentage = 0m,
-                HasRequirementsFile = false
+                HasCriteriaFile = false
             },
             AutomationCoverage = new AutomationCoverage
             {
@@ -390,12 +390,12 @@ public class CoverageReportWriterTests : IDisposable
                     }
                 ]
             },
-            RequirementsCoverage = new RequirementsCoverage
+            AcceptanceCriteriaCoverage = new AcceptanceCriteriaCoverage
             {
-                TotalRequirements = 0,
-                CoveredRequirements = 0,
+                TotalCriteria = 0,
+                CoveredCriteria = 0,
                 Percentage = 0m,
-                HasRequirementsFile = false
+                HasCriteriaFile = false
             },
             AutomationCoverage = new AutomationCoverage
             {
@@ -417,25 +417,25 @@ public class CoverageReportWriterTests : IDisposable
                 CoveredDocs = 1,
                 Percentage = 100m
             },
-            RequirementsCoverage = new RequirementsCoverage
+            AcceptanceCriteriaCoverage = new AcceptanceCriteriaCoverage
             {
-                TotalRequirements = 2,
-                CoveredRequirements = 1,
+                TotalCriteria = 2,
+                CoveredCriteria = 1,
                 Percentage = 50m,
-                HasRequirementsFile = true,
+                HasCriteriaFile = true,
                 Details =
                 [
-                    new RequirementCoverageDetail
+                    new CriteriaCoverageDetail
                     {
                         Id = "REQ-001",
-                        Title = "Login must work",
+                        Text = "Login must work",
                         Tests = ["TC-001"],
                         Covered = true
                     },
-                    new RequirementCoverageDetail
+                    new CriteriaCoverageDetail
                     {
                         Id = "REQ-002",
-                        Title = "Logout must work",
+                        Text = "Logout must work",
                         Tests = [],
                         Covered = false
                     }
@@ -461,12 +461,12 @@ public class CoverageReportWriterTests : IDisposable
                 CoveredDocs = 1,
                 Percentage = 100m
             },
-            RequirementsCoverage = new RequirementsCoverage
+            AcceptanceCriteriaCoverage = new AcceptanceCriteriaCoverage
             {
-                TotalRequirements = 0,
-                CoveredRequirements = 0,
+                TotalCriteria = 0,
+                CoveredCriteria = 0,
                 Percentage = 0m,
-                HasRequirementsFile = false
+                HasCriteriaFile = false
             },
             AutomationCoverage = new AutomationCoverage
             {
@@ -494,7 +494,7 @@ public class CoverageReportWriterTests : IDisposable
         {
             GeneratedAt = report.GeneratedAt,
             DocumentationCoverage = report.DocumentationCoverage,
-            RequirementsCoverage = report.RequirementsCoverage,
+            AcceptanceCriteriaCoverage = report.AcceptanceCriteriaCoverage,
             AutomationCoverage = new AutomationCoverage
             {
                 TotalTests = 10,
@@ -521,7 +521,7 @@ public class CoverageReportWriterTests : IDisposable
         {
             GeneratedAt = report.GeneratedAt,
             DocumentationCoverage = report.DocumentationCoverage,
-            RequirementsCoverage = report.RequirementsCoverage,
+            AcceptanceCriteriaCoverage = report.AcceptanceCriteriaCoverage,
             AutomationCoverage = new AutomationCoverage
             {
                 TotalTests = 10,
@@ -568,12 +568,12 @@ public class CoverageReportWriterTests : IDisposable
                     }
                 ]
             },
-            RequirementsCoverage = new RequirementsCoverage
+            AcceptanceCriteriaCoverage = new AcceptanceCriteriaCoverage
             {
-                TotalRequirements = 0,
-                CoveredRequirements = 0,
+                TotalCriteria = 0,
+                CoveredCriteria = 0,
                 Percentage = 0m,
-                HasRequirementsFile = false
+                HasCriteriaFile = false
             },
             AutomationCoverage = new AutomationCoverage
             {
@@ -591,7 +591,7 @@ public class CoverageReportWriterTests : IDisposable
         {
             GeneratedAt = report.GeneratedAt,
             DocumentationCoverage = report.DocumentationCoverage,
-            RequirementsCoverage = report.RequirementsCoverage,
+            AcceptanceCriteriaCoverage = report.AcceptanceCriteriaCoverage,
             AutomationCoverage = new AutomationCoverage
             {
                 TotalTests = 10,

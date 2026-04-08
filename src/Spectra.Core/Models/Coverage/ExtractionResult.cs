@@ -1,3 +1,4 @@
+#pragma warning disable CS0618 // Obsolete type usage — legacy model
 namespace Spectra.Core.Models.Coverage;
 
 /// <summary>

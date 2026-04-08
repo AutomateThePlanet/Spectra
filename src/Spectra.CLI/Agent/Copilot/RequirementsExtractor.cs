@@ -1,3 +1,4 @@
+#pragma warning disable CS0618 // Obsolete type usage — legacy extractor kept for backward compat
 using System.Text.Json;
 using GitHub.Copilot.SDK;
 using Spectra.Core.Models.Coverage;

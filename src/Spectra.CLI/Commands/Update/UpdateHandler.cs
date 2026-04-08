@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Spectra.CLI.Agent;
 using Spectra.CLI.Agent.Tools;
 using Spectra.CLI.Classification;
 using Spectra.CLI.Infrastructure;
@@ -9,6 +10,7 @@ using Spectra.CLI.Review;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
+using Spectra.Core.Models.Coverage;
 using Spectra.Core.Update;
 
 namespace Spectra.CLI.Commands.Update;
@@ -227,11 +229,25 @@ public sealed class UpdateHandler
 
         _progress.Success($"Loading documentation... {sourceContents.Count} files");
 
+        // Load acceptance criteria for the suite
+        IReadOnlyList<AcceptanceCriterion>? suiteCriteria = null;
+        try
+        {
+            var criteriaDir = Path.Combine(basePath, config.Coverage?.CriteriaDir ?? "docs/requirements");
+            var criteriaFile = Path.Combine(basePath, config.Coverage?.CriteriaFile ?? "docs/requirements/_criteria_index.yaml");
+            suiteCriteria = await GroundedPromptBuilder.LoadRelatedCriteriaAsync(
+                criteriaDir, criteriaFile, suite, ct);
+        }
+        catch
+        {
+            // Criteria loading is best-effort; continue without criteria
+        }
+
         // Classify tests using the classifier directly for better presentation
         var classifier = new TestClassifier();
         var classificationResults = await _progress.StatusAsync(
             "Classifying tests...",
-            () => Task.FromResult(classifier.ClassifyBatch(readResult.Tests, sourceContents)));
+            () => Task.FromResult(classifier.ClassifyBatch(readResult.Tests, sourceContents, suiteCriteria)));
 
         // Show classification summary
         _classificationPresenter.ShowSummary(classificationResults);
@@ -240,6 +256,27 @@ public sealed class UpdateHandler
         _classificationPresenter.ShowOutdated(classificationResults);
         _classificationPresenter.ShowOrphaned(classificationResults);
         _classificationPresenter.ShowRedundant(classificationResults);
+
+        // Check for unlinked acceptance criteria and show suggestion
+        if (suiteCriteria is not null && suiteCriteria.Count > 0 && _outputFormat == OutputFormat.Human)
+        {
+            var linkedCriteriaIds = readResult.Tests
+                .SelectMany(t => t.Criteria)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var unlinkedCriteria = suiteCriteria
+                .Where(c => !linkedCriteriaIds.Contains(c.Id))
+                .ToList();
+
+            if (unlinkedCriteria.Count > 0)
+            {
+                _progress.Warning(
+                    $"{unlinkedCriteria.Count} acceptance criteria for '{suite}' have no linked tests: " +
+                    string.Join(", ", unlinkedCriteria.Select(c => c.Id)));
+                _progress.Info(
+                    $"Run 'spectra ai generate {suite}' to generate tests covering these criteria.");
+            }
+        }
 
         // Convert to UpdateProposals for the reviewer
         var proposeTool = new BatchProposeUpdatesTool(classifier);

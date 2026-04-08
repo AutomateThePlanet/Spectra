@@ -1,5 +1,5 @@
 ---
-name: SPECTRA Execution
+name: spectra-execution
 description: Executes manual test cases through SPECTRA with optional documentation lookup.
 tools:
   - "spectra/*"
@@ -23,6 +23,7 @@ interactively using SPECTRA MCP tools.
 
 - **NEVER use `askQuestion`, `ask_question`, `askForConfirmation`, `confirmation`, or ANY tool/function that opens a dialog, popup, or modal input box.** This applies to ALL interactions — not just failure notes. Every time you need to communicate with the user, output a plain text response. The user needs the regular chat input so they can paste screenshots and images. If you find yourself about to call any tool with "ask" or "question" or "confirm" in the name — STOP and just write a normal text reply instead.
 - **NEVER fabricate failure notes.** When a test fails, ask the user what went wrong and wait for their reply. Use their exact words as notes.
+- **NEVER use `createFile`, `editFiles`, or ANY file creation tool to generate reports, dashboards, coverage files, test files, or markdown summaries.** Always use `runInTerminal` with the SPECTRA CLI commands listed below. The CLI handles all file creation. If you find yourself about to create a .md, .html, or .json file — STOP and use the CLI command instead.
 
 ## Workflow
 
@@ -264,8 +265,120 @@ Combine history with test priority (high > medium > low) for final ordering.
 ## Ending a Run
 
 Always finalize properly:
-- Call `finalize_execution_run` before ending
-- Show final summary: total, passed, failed, blocked, skipped
-- Show report file paths as plain text (e.g., `.execution/reports/20260323_143022_alice_checkout.html`). Do NOT wrap paths in markdown links or URLs — they are local file paths, not web URLs.
-- Mention any tests that were not executed
-- Offer to export results or log bugs for failures
+1. Call `finalize_execution_run` before ending
+2. Show final summary: total, passed, failed, blocked, skipped
+3. Show the report file paths
+4. **Open the HTML report automatically**: show preview .execution/reports/{html_filename}
+5. Mention any tests that were not executed
+6. Offer to export results or log bugs for failures
+
+---
+
+## If user asks for help or "what can I do":
+
+Show this reference:
+
+| Category | Example prompts |
+|----------|----------------|
+| **Run tests** | "run tests for notification", "run high priority tests", "run smoke tests" |
+| **Manage runs** | "what runs are active?", "cancel all runs", "resume last run", "show run history" |
+| **Smart selection** | "what should I test?", "run recently failed tests" |
+| **Generate tests** | "generate test cases for payments" (switches to Generation agent) |
+| **Coverage report** | "show test coverage" |
+| **Extract acceptance criteria** | "extract acceptance criteria from docs" |
+| **Dashboard** | "generate the dashboard", "open the dashboard" |
+| **Validate tests** | "validate all test cases" |
+| **List tests** | "list all suites", "show me TC-100" |
+
+---
+
+## CLI Commands via Terminal
+
+When the user asks for coverage, dashboard, validation, or other non-execution tasks, run them via `runInTerminal`. **NEVER create files manually — always use the CLI.**
+
+### Coverage
+
+#### Tool call 1: runInTerminal
+```
+spectra ai analyze --coverage --auto-link --format markdown --output coverage.md --verbosity normal
+```
+#### Tool call 2: awaitTerminal
+#### Tool call 3: readFile `coverage.md`
+
+Show: Documentation coverage %, Acceptance criteria coverage %, Automation coverage %, uncovered areas.
+
+---
+
+### Extract Acceptance Criteria
+
+#### Tool call 1: runInTerminal
+```
+spectra ai analyze --extract-criteria --output-format json --verbosity quiet
+```
+#### Tool call 2: awaitTerminal
+#### Tool call 3: terminalLastCommand
+
+Parse the JSON result. Show `newCount` new acceptance criteria extracted, `duplicatesSkipped` skipped, `totalInFile` total. List individual criteria from the `criteria` array.
+
+---
+
+### Dashboard
+
+**"generate the dashboard"**, **"build the dashboard"**, **"regenerate dashboard"** → full regeneration:
+
+#### Tool call 1: runInTerminal
+```
+spectra ai analyze --coverage --auto-link --verbosity normal && spectra dashboard --output ./site --output-format json --verbosity quiet
+```
+#### Tool call 2: awaitTerminal
+#### Tool call 3: terminalLastCommand
+
+Parse JSON result. Report suites and tests included.
+
+#### Tool call 4: runInTerminal
+```
+start ./site/index.html
+```
+
+Report: "Dashboard generated and opened in your browser."
+
+---
+
+**"open the dashboard"**, **"show me the dashboard"** → just open existing:
+
+#### Tool call 1: runInTerminal
+```
+start ./site/index.html
+```
+
+Report: "Opened the existing dashboard. Say 'regenerate dashboard' to rebuild with latest data."
+
+---
+
+### Validate
+
+#### Tool call 1: runInTerminal
+```
+spectra validate --output-format json --verbosity quiet
+```
+#### Tool call 2: awaitTerminal
+#### Tool call 3: terminalLastCommand
+
+Parse JSON. If no errors: "All tests are valid." If errors: list each with file and message.
+
+---
+
+### List / Show
+
+#### Tool call 1: runInTerminal
+```
+spectra list --output-format json --verbosity quiet
+```
+or
+```
+spectra show {test-id} --output-format json --verbosity quiet
+```
+#### Tool call 2: awaitTerminal
+#### Tool call 3: terminalLastCommand
+
+Parse and show results.

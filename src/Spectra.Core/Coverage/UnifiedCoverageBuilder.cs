@@ -12,14 +12,14 @@ public sealed class UnifiedCoverageBuilder
     /// </summary>
     public UnifiedCoverageReport Build(
         DocumentationCoverage docCoverage,
-        RequirementsCoverage reqCoverage,
+        AcceptanceCriteriaCoverage reqCoverage,
         AutomationCoverage autoCoverage)
     {
         return new UnifiedCoverageReport
         {
             GeneratedAt = DateTime.UtcNow,
             DocumentationCoverage = docCoverage,
-            RequirementsCoverage = reqCoverage,
+            AcceptanceCriteriaCoverage = reqCoverage,
             AutomationCoverage = autoCoverage
         };
     }

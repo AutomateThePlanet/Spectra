@@ -1,0 +1,1144 @@
+# Extracted from: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+# Doc hash: 887cbe04b4c36ca1428b1a04b379cbea3fc7ffb7c1ec964afae4e582443ec5d5
+# Generated at: 2026-04-07T11:49:06.6525607Z
+criteria:
+- id: AC-REPORTING-ANALYTICS-001
+  text: The system MUST display a KPI card showing the count of applications submitted in the last 24 hours with percentage change versus the previous day
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - kpi
+  - applications
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-002
+  text: The system MUST display a KPI card showing the count of applications in IN_PROCESSING status older than the SLA threshold
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - kpi
+  - sla
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-003
+  text: The system MUST display a KPI card showing the mean processing time from submission to completion in business days for the current month
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - kpi
+  - processing-time
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-004
+  text: The system MUST display a KPI card showing total payments received in the last 24 hours in BGN
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - kpi
+  - revenue
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-005
+  text: KPI cards MUST be color-coded green when the metric is within acceptable range
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - kpi
+  - visualization
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-006
+  text: KPI cards MUST be color-coded yellow when the metric is approaching the warning threshold
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - kpi
+  - visualization
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-007
+  text: KPI cards MUST be color-coded red when the metric has exceeded the critical threshold
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - kpi
+  - visualization
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-008
+  text: Warning thresholds for KPI cards MUST be configurable per KPI
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - kpi
+  - configuration
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-009
+  text: The system MUST display a donut chart showing application distribution across all statuses
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - charts
+  - visualization
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-010
+  text: Clicking a segment in the applications by status donut chart MUST filter the applications list below
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - charts
+  - interaction
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-011
+  text: The system MUST display a line chart showing daily application count for the last 30 days
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - charts
+  - visualization
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-012
+  text: The applications over time line chart MUST allow toggling between submitted, completed, and rejected applications
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - charts
+  - interaction
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-013
+  text: Hovering over the applications over time line chart MUST show exact count and date
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - charts
+  - interaction
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-014
+  text: The system MUST display a horizontal bar chart showing the top 10 services by application count in the selected period
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - charts
+  - visualization
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-015
+  text: The system MUST display a histogram showing processing time distribution in 1-day buckets
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - charts
+  - visualization
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-016
+  text: The processing time distribution histogram MUST display a red line showing the SLA target
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - charts
+  - sla
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-017
+  text: The system MUST display a stacked bar chart showing monthly revenue breakdown by payment method for the last 12 months
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - charts
+  - revenue
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-018
+  text: The revenue by payment method chart MUST include card, transfer, cash, and voucher payment methods
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - charts
+  - revenue
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-019
+  text: All dashboard components MUST respond to global date range filters
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - filters
+  - interaction
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-020
+  text: All dashboard components MUST respond to global service type filters with multi-select capability
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - filters
+  - interaction
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-021
+  text: All dashboard components MUST respond to global region filters with multi-select capability based on citizen's address
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - filters
+  - interaction
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-022
+  text: All dashboard components MUST respond to global clerk/processor filters with multi-select capability for managers
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - filters
+  - interaction
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-023
+  text: Date range filters MUST include presets for today, this week, this month, this quarter, this year, and custom range
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - filters
+  - ux
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-024
+  text: Dashboard filters MUST be preserved in the URL query string to enable bookmarking and sharing
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - dashboard
+  - filters
+  - ux
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-025
+  text: The Application Status Report MUST list all applications with current status, submission date, assigned processor, and SLA compliance
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - applications
+  - sla
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-026
+  text: The Application Status Report MUST be groupable by service type, status, region, and processor
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - applications
+  - grouping
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-027
+  text: The Application Status Report MUST be exportable as CSV, XLSX, and PDF formats
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - export
+  - formats
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-028
+  text: The Application Status Report export MUST support a maximum of 100,000 rows
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - export
+  - limits
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-029
+  text: The system MUST require users to narrow the date range when attempting to export more than 100,000 rows
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - export
+  - limits
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-030
+  text: The SLA Compliance Report MUST show total applications, percentage completed within SLA, average processing time, minimum processing time, and maximum processing time for each service type
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - sla
+  - metrics
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-031
+  text: Clicking a service in the SLA Compliance Report MUST display individual applications that missed SLA
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - sla
+  - drill-down
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-032
+  text: SLA thresholds MUST be configurable per service
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - sla
+  - configuration
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-033
+  text: The default SLA threshold MUST be 14 business days
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - sla
+  - configuration
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-034
+  text: Business days calculation MUST exclude Bulgarian public holidays
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - sla
+  - calendar
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-035
+  text: Bulgarian public holidays MUST be loaded from a configurable calendar
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - sla
+  - calendar
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-036
+  text: The Financial Report MUST display revenue by period with daily, weekly, and monthly options
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - financial
+  - revenue
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-037
+  text: The Financial Report MUST provide breakdown by service type and payment method
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - financial
+  - breakdown
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-038
+  text: The Financial Report MUST include a refund summary showing count, total amount, and average refund processing time
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - financial
+  - refunds
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-039
+  text: The Financial Report MUST provide reconciliation between system totals and bank statement import via CSV upload
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - financial
+  - reconciliation
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-040
+  text: Discrepancies in financial reconciliation MUST be highlighted and flagged for manual review
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - financial
+  - reconciliation
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-041
+  text: The User Activity Report MUST display login history, actions performed, and documents accessed for administrators
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - audit
+  - user-activity
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-042
+  text: The User Activity Report MUST be filterable by user, action type, and date range
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - audit
+  - filters
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-043
+  text: The User Activity Report MUST be exportable as CSV only
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - audit
+  - export
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-044
+  text: User Activity Report data MUST be retained for 2 years
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - audit
+  - retention
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-045
+  text: The Citizen Statistics Report MUST display new registrations per period
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - citizens
+  - statistics
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-046
+  text: The Citizen Statistics Report MUST display active versus inactive citizens where active is defined as at least one login in the last 90 days
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - citizens
+  - statistics
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-047
+  text: The Citizen Statistics Report MUST display registration completion rate comparing started versus completed wizard
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - citizens
+  - statistics
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-048
+  text: The Citizen Statistics Report MUST display demographics including age distribution and region distribution in anonymized form with no individual data
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - citizens
+  - privacy
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-049
+  text: Administrators MUST be able to configure scheduled report delivery
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - scheduling
+  - configuration
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-050
+  text: Scheduled reports MUST support daily frequency at 07:00
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - scheduling
+  - frequency
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-051
+  text: Scheduled reports MUST support weekly frequency on Monday at 07:00
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - scheduling
+  - frequency
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-052
+  text: Scheduled reports MUST support monthly frequency on the 1st of the month at 07:00
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - scheduling
+  - frequency
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-053
+  text: Scheduled reports MUST support quarterly frequency
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - scheduling
+  - frequency
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-054
+  text: Scheduled reports MUST be deliverable in PDF or XLSX format
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - scheduling
+  - formats
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-055
+  text: Scheduled reports MUST be deliverable via email to specified recipients
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - scheduling
+  - delivery
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-056
+  text: Scheduled reports MUST support up to 10 email addresses as recipients
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - scheduling
+  - delivery
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-057
+  text: Scheduled reports MUST support the same filters as interactive filters configured at schedule creation
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - scheduling
+  - filters
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-058
+  text: Reports larger than 25 MB MUST NOT be emailed directly
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - scheduling
+  - delivery
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-059
+  text: For reports larger than 25 MB, a download link MUST be sent that is valid for 7 days
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - scheduling
+  - delivery
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-060
+  text: Scheduled reports MUST run in a background queue
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - scheduling
+  - execution
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-061
+  text: If a scheduled report fails to generate, the system MUST retry once after 30 minutes
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - scheduling
+  - error-handling
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-062
+  text: If a scheduled report fails twice, an alert email MUST be sent to the system administrator
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - reports
+  - scheduling
+  - error-handling
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-063
+  text: Clerks MUST have access to dashboard showing own workload only
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - clerk
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-064
+  text: Clerks MUST have access to standard reports showing own applications only
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - clerk
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-065
+  text: Clerks MUST NOT have access to financial reports
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - clerk
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-066
+  text: Clerks MUST NOT have access to user activity reports
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - clerk
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-067
+  text: Clerks MUST NOT have access to scheduled reports
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - clerk
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-068
+  text: Managers MUST have access to department-wide dashboard
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - manager
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-069
+  text: Managers MUST have access to department-wide standard reports
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - manager
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-070
+  text: Managers MUST have access to department-wide financial reports
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - manager
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-071
+  text: Managers MUST have access to department-wide user activity reports
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - manager
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-072
+  text: Managers MUST be able to create scheduled reports
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - manager
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-073
+  text: Directors MUST have access to all regions in dashboard
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - director
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-074
+  text: Directors MUST have access to all standard reports
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - director
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-075
+  text: Directors MUST have access to all financial reports
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - director
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-076
+  text: Directors MUST have access to all user activity reports
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - director
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-077
+  text: Directors MUST be able to create scheduled reports
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - director
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-078
+  text: Auditors MUST have read-only access to all dashboard data
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - auditor
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-079
+  text: Auditors MUST have read-only access to all standard reports
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - auditor
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-080
+  text: Auditors MUST have read-only access to all financial reports
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - auditor
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-081
+  text: Auditors MUST have read-only access to all user activity reports
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - auditor
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-082
+  text: Auditors MUST NOT be able to create scheduled reports
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - auditor
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-083
+  text: System Administrators MUST have access to all dashboard data
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - admin
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-084
+  text: System Administrators MUST have access to all standard reports
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - admin
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-085
+  text: System Administrators MUST have access to all financial reports
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - admin
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-086
+  text: System Administrators MUST have access to all user activity reports
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - admin
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-087
+  text: System Administrators MUST be able to create and manage all scheduled reports
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - roles
+  - admin
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-088
+  text: Attempting to access a report beyond one's role MUST return HTTP 403
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - security
+  - http
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-089
+  text: Attempting to access a report beyond one's role MUST log the attempt
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - access-control
+  - security
+  - audit
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-090
+  text: The dashboard MUST load within 3 seconds for the default date range of current month
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - performance
+  - dashboard
+  - latency
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-091
+  text: Reports with up to 10,000 rows MUST generate within 10 seconds
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - performance
+  - reports
+  - latency
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-092
+  text: Reports with 10,000 to 100,000 rows MUST generate within 60 seconds
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - performance
+  - reports
+  - latency
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-093
+  text: Scheduled reports MAY take up to 5 minutes without triggering timeout
+  rfc2119: MAY
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: low
+  tags:
+  - performance
+  - reports
+  - timeout
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-094
+  text: All queries MUST use pre-aggregated materialized views
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - performance
+  - database
+  - optimization
+  linked_test_ids: []
+- id: AC-REPORTING-ANALYTICS-095
+  text: Materialized views MUST be refreshed every 15 minutes
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/reporting/reporting-analytics.md
+  component: reporting-analytics
+  priority: high
+  tags:
+  - performance
+  - database
+  - refresh
+  linked_test_ids: []

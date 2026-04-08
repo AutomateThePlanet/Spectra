@@ -97,36 +97,36 @@ public sealed class CoverageReportWriter
             sb.AppendLine();
         }
 
-        // Requirements Coverage
-        var req = report.RequirementsCoverage;
-        sb.AppendLine("## Requirements Coverage");
+        // Acceptance Criteria Coverage
+        var criteria = report.AcceptanceCriteriaCoverage;
+        sb.AppendLine("## Acceptance Criteria Coverage");
         sb.AppendLine();
 
-        if (!req.HasRequirementsFile && req.TotalRequirements == 0)
+        if (!criteria.HasCriteriaFile && criteria.TotalCriteria == 0)
         {
-            sb.AppendLine("No requirements file found. Create `docs/requirements/_requirements.yaml` to track requirements coverage.");
+            sb.AppendLine("No acceptance criteria file found. Create `docs/requirements/_criteria_index.yaml` to track acceptance criteria coverage.");
             sb.AppendLine();
         }
         else
         {
-            sb.AppendLine($"**{req.Percentage:F1}%** — {req.CoveredRequirements} of {req.TotalRequirements} requirements covered");
-            if (!req.HasRequirementsFile)
+            sb.AppendLine($"**{criteria.Percentage:F1}%** — {criteria.CoveredCriteria} of {criteria.TotalCriteria} acceptance criteria covered");
+            if (!criteria.HasCriteriaFile)
             {
                 sb.AppendLine();
-                sb.AppendLine("*Requirements discovered from test metadata (no `_requirements.yaml` file).*");
+                sb.AppendLine("*Acceptance criteria discovered from test metadata (no `_criteria_index.yaml` file).*");
             }
             sb.AppendLine();
 
-            if (req.Details.Count > 0)
+            if (criteria.Details.Count > 0)
             {
-                sb.AppendLine("| Requirement | Title | Tests | Covered |");
-                sb.AppendLine("|-------------|-------|-------|---------|");
-                foreach (var detail in req.Details)
+                sb.AppendLine("| Criterion | Text | Tests | Covered |");
+                sb.AppendLine("|-----------|------|-------|---------|");
+                foreach (var detail in criteria.Details)
                 {
-                    var title = detail.Title ?? "—";
+                    var text = detail.Text ?? "—";
                     var tests = detail.Tests.Count > 0 ? string.Join(", ", detail.Tests) : "(none)";
                     var status = detail.Covered ? "Yes" : "No";
-                    sb.AppendLine($"| {detail.Id} | {title} | {tests} | {status} |");
+                    sb.AppendLine($"| {detail.Id} | {text} | {tests} | {status} |");
                 }
                 sb.AppendLine();
             }
@@ -214,22 +214,22 @@ public sealed class CoverageReportWriter
         }
         sb.AppendLine();
 
-        var req = report.RequirementsCoverage;
-        sb.AppendLine("REQUIREMENTS COVERAGE");
+        var criteria = report.AcceptanceCriteriaCoverage;
+        sb.AppendLine("ACCEPTANCE CRITERIA COVERAGE");
         sb.AppendLine(new string('-', 30));
-        if (req.TotalRequirements > 0)
+        if (criteria.TotalCriteria > 0)
         {
-            sb.AppendLine($"  {req.Percentage:F1}% — {req.CoveredRequirements}/{req.TotalRequirements} requirements covered");
-            foreach (var detail in req.Details)
+            sb.AppendLine($"  {criteria.Percentage:F1}% — {criteria.CoveredCriteria}/{criteria.TotalCriteria} acceptance criteria covered");
+            foreach (var detail in criteria.Details)
             {
                 var mark = detail.Covered ? "+" : "-";
-                var title = detail.Title ?? detail.Id;
-                sb.AppendLine($"  [{mark}] {detail.Id}: {title}");
+                var text = detail.Text ?? detail.Id;
+                sb.AppendLine($"  [{mark}] {detail.Id}: {text}");
             }
         }
         else
         {
-            sb.AppendLine("  No requirements defined.");
+            sb.AppendLine("  No acceptance criteria defined.");
         }
         sb.AppendLine();
 

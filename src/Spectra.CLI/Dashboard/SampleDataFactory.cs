@@ -136,12 +136,12 @@ public static class SampleDataFactory
                     new DocumentationCoverageDetail { Doc = "docs/admin.md", TestCount = 0, Covered = false, TestIds = [] }
                 ]
             },
-            Requirements = new RequirementsSectionData
+            AcceptanceCriteria = new AcceptanceCriteriaSectionData
             {
                 Covered = 3,
                 Total = 6,
                 Percentage = 50.0m,
-                HasRequirementsFile = true
+                HasCriteriaFile = true
             },
             Automation = new AutomationSectionData
             {

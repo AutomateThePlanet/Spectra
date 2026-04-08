@@ -175,8 +175,8 @@ public sealed class AdvanceTestCaseTool : IMcpTool
             var nextAction = next is not null ? "get_test_case_details" : "finalize_execution_run";
 
             var instruction = next is not null
-                ? $"NEXT STEP: Call advance_test_case with status PASSED, FAILED, or BLOCKED for test {next.TestId} (\"{next.Title}\"). " +
-                  $"You can also call get_test_case_details first to review the full test steps. Progress: {progress}."
+                ? $"NEXT STEP: Call get_test_case_details for test {next.TestId} to get the full steps, preconditions, and expected result. " +
+                  $"You MUST present the full test details to the user before asking for a result. Progress: {progress}."
                 : "All tests have been executed. Call finalize_execution_run to complete the run and generate reports.";
 
             return JsonSerializer.Serialize(McpToolResponse<object>.Success(

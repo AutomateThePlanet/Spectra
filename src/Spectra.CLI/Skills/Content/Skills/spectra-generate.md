@@ -1,5 +1,5 @@
 ---
-name: SPECTRA Generate
+name: spectra-generate
 description: Generates test cases from documentation with AI verification and gap analysis.
 tools: [{{GENERATE_TOOLS}}]
 model: GPT-4o
@@ -8,27 +8,42 @@ disable-model-invocation: true
 
 # SPECTRA Test Generation
 
-You generate test cases by running CLI commands. Follow the exact tool sequence below.
+You generate test cases by running CLI commands. Follow the EXACT tool sequence below — no extra tool calls.
 
-**IMPORTANT: When showing progress, ONLY output the `message` field — one short line, nothing else. If the message is the same as last time, say nothing — just poll again silently.**
+**ALWAYS follow the full analyze → approve → generate flow. Never skip the analysis step.**
 
-**ALWAYS follow the full analyze → approve → generate flow, even if the user says "generate more tests" or "add more". Never skip the analysis step.**
+**CRITICAL: First show preview .spectra-progress.html, then runInTerminal. Between runInTerminal and awaitTerminal, do NOTHING. No readFile, no listDirectory, no extra tool calls. You ONLY read the result file AFTER awaitTerminal completes.**
+
+## CLI flags reference
+
+| Flag | Type | Description |
+|------|------|-------------|
+| `--suite {name}` | string | Target suite name (REQUIRED) |
+| `--count {n}` | int | Number of tests to generate (default: 5) |
+| `--focus {text}` | string | Focus area: "negative", "edge cases", "high priority security", etc. |
+| `--skip-critic` | bool | Skip grounding verification |
+| `--analyze-only` | bool | Only analyze, don't generate |
+| `--dry-run` | bool | Preview without writing |
+
+**There is NO `--priority`, `--type`, or `--category` flag.** Use `--focus` for ALL filtering by type, priority, or category. Examples:
+- "generate 15 negative tests" → `--focus "negative tests"` `--count 15`
+- "generate high priority edge cases" → `--focus "high priority edge cases"`
+- "generate security tests only" → `--focus "security tests"`
 
 ## When user asks to generate test cases:
 
-### Tool call 1: runInTerminal
+**Step 1**: show preview .spectra-progress.html
+
+**Step 2** — runInTerminal:
 ```
-spectra ai generate --suite {suite} --analyze-only --output-format json --verbosity quiet
+spectra ai generate --suite {suite} --analyze-only --no-interaction --output-format json
 ```
 
-### Tool call 2: awaitTerminal
+**Step 3** — awaitTerminal. Do NOTHING else until this completes. Do NOT type anything into the terminal.
 
-### Tool call 3: readFile `.spectra-result.json`
-
-**Check `status`:**
-- `"analyzing"` → output ONLY: the `message` field — then `awaitTerminal` + `readFile` again.
+**Step 4** — readFile `.spectra-result.json` — check `status`:
 - `"failed"` → tell user the `error`.
-- `"analyzed"` → respond with EXACTLY this format (fill in values from JSON):
+- `"analyzed"` → show this:
 
 **{analysis.already_covered}** tests already exist. I recommend generating **{analysis.recommended}** new test cases:
 
@@ -46,16 +61,18 @@ STOP. Wait for user.
 
 ## After user approves:
 
-### Tool call 4: runInTerminal
+**Step 5** — runInTerminal:
+If user specified a focus (type, priority, category), add `--focus`:
 ```
-spectra ai generate --suite {suite} --count {count} --output-format json --verbosity quiet
+spectra ai generate --suite {suite} --count {count} --focus "{focus}" --no-interaction --output-format json
+```
+If no focus, omit `--focus`:
+```
+spectra ai generate --suite {suite} --count {count} --no-interaction --output-format json
 ```
 
-### Tool call 5: awaitTerminal
+**Step 6** — awaitTerminal. Do NOTHING else until this completes. Do NOT type anything into the terminal.
 
-### Tool call 6: readFile `.spectra-result.json`
-
-**Check `status`:**
-- `"generating"` → output ONLY the `message` field, then `awaitTerminal` + `readFile` again. Keep going until done.
+**Step 7** — readFile `.spectra-result.json` — check `status`:
 - `"failed"` → tell user the `error`.
-- `"completed"` → "Generated **{generation.tests_written}** test cases." If `message` exists, show it. List `files_created`. If tests_written < tests_requested, say "Run again to generate more."
+- `"completed"` → "Generated **{generation.tests_written}** test cases." List `files_created`. If tests_written < tests_requested, say "Run again to generate more."

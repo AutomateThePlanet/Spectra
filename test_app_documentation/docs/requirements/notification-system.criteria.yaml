@@ -1,0 +1,818 @@
+# Extracted from: docs/spectra-test-docs/docs/notifications/notification-system.md
+# Doc hash: 0fa05480ad60fce5747a369b0b224eb9c868a93b064768df3dc023d12bfcddd7
+# Generated at: 2026-04-07T11:47:10.3276141Z
+criteria:
+- id: AC-NOTIFICATION-SYSTEM-001
+  text: Email sender MUST be no-reply@egovportal.bg
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - email
+  - configuration
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-002
+  text: HTML emails MUST include plain-text fallback
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - email
+  - accessibility
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-003
+  text: Email size including attachments MUST NOT exceed 25 MB
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - email
+  - limits
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-004
+  text: Email attachments MUST be only system-generated PDFs (receipts, certificates)
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - email
+  - security
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-005
+  text: Email attachments MUST NOT include citizen-uploaded documents
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - email
+  - security
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-006
+  text: All emails MUST include an unsubscribe link for optional notifications
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - email
+  - compliance
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-007
+  text: Mandatory notifications (password reset, application status) MUST NOT be unsubscribable
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - email
+  - compliance
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-008
+  text: SMS MUST NOT exceed 160 characters for Latin script
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - sms
+  - limits
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-009
+  text: SMS MUST NOT exceed 70 characters for Cyrillic script
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - sms
+  - limits
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-010
+  text: SMS exceeding length limit MUST be truncated with "..." and a link to the full notification
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - sms
+  - truncation
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-011
+  text: 'SMS delivery reports MUST be tracked with statuses: SENT, DELIVERED, FAILED, EXPIRED'
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - sms
+  - tracking
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-012
+  text: In-app notifications MUST be displayed in the notification bell icon in the portal header
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - in-app
+  - ui
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-013
+  text: Badge MUST show unread count with maximum displayed value of 99+
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - in-app
+  - ui
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-014
+  text: In-app notifications MUST be stored for 90 days before archiving
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - in-app
+  - retention
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-015
+  text: Clicking a notification MUST mark it as read and navigate to the relevant page
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - in-app
+  - interaction
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-016
+  text: In-app notifications MUST provide a "Mark all as read" button
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - in-app
+  - ui
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-017
+  text: In-app notifications MUST be delivered via WebSocket connection in real-time
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - in-app
+  - realtime
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-018
+  text: System MUST fall back to polling every 30 seconds when WebSocket is disconnected
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - in-app
+  - fallback
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-019
+  text: Push notification title MUST NOT exceed 50 characters
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - push
+  - limits
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-020
+  text: Push notification body MUST NOT exceed 200 characters
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - push
+  - limits
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-021
+  text: Push notifications MUST include a deep link to the relevant screen
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - push
+  - navigation
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-022
+  text: Push notifications MUST use Firebase Cloud Messaging (FCM) for Android
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - push
+  - platform
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-023
+  text: Push notifications MUST use Apple Push Notification Service (APNs) for iOS
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - push
+  - platform
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-024
+  text: Application submitted event MUST trigger Email and In-App notifications with Normal priority
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - triggers
+  - application
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-025
+  text: Application status change event MUST trigger Email, In-App, and Push notifications with Normal priority
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - triggers
+  - application
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-026
+  text: Payment received event MUST trigger Email, SMS, and In-App notifications with High priority
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - triggers
+  - payment
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-027
+  text: Payment failed event MUST trigger Email, SMS, and In-App notifications with High priority
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - triggers
+  - payment
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-028
+  text: Document ready event MUST trigger Email, In-App, and Push notifications with Normal priority
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - triggers
+  - document
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-029
+  text: Identity verification reminder MUST trigger Email and SMS notifications with Normal priority
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - triggers
+  - verification
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-030
+  text: Password reset event MUST trigger Email only with Critical priority
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - triggers
+  - security
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-031
+  text: Account locked event MUST trigger Email only with Critical priority
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - triggers
+  - security
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-032
+  text: Scheduled maintenance event MUST trigger Email, In-App, and Push notifications with Low priority
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - triggers
+  - maintenance
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-033
+  text: Application deadline approaching event MUST trigger Email, SMS, and In-App notifications with High priority
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - triggers
+  - deadline
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-034
+  text: Citizens MUST be able to configure Email preferences On/Off per notification category
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - preferences
+  - email
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-035
+  text: Mandatory notification categories MUST NOT be turned off
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - preferences
+  - compliance
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-036
+  text: Citizens MUST be able to configure SMS preferences On/Off globally
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - preferences
+  - sms
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-037
+  text: OTP verification codes MUST be sent via SMS even when SMS is globally disabled
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - preferences
+  - security
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-038
+  text: Citizens MUST be able to configure Push preferences On/Off globally with quiet hours
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - preferences
+  - push
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-039
+  text: In-App notifications MUST always be enabled and cannot be disabled
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - preferences
+  - in-app
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-040
+  text: New accounts MUST have all channels enabled by default with no quiet hours
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - preferences
+  - defaults
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-041
+  text: Preference changes MUST take effect immediately
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - preferences
+  - timing
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-042
+  text: Notifications queued before preference change MUST still be sent
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - preferences
+  - queuing
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-043
+  text: Templates MUST support Bulgarian (default) and English localization
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - templates
+  - localization
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-044
+  text: Template language MUST be determined by citizen's language preference
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - templates
+  - localization
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-045
+  text: Templates MUST support placeholders for citizen.firstName, application.referenceNumber, application.serviceName, application.status, payment.amount, system.portalUrl
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - templates
+  - placeholders
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-046
+  text: Templates MUST support conditional blocks
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - templates
+  - logic
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-047
+  text: Templates MUST support date formatting
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - templates
+  - formatting
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-048
+  text: Templates MUST be versioned
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - templates
+  - versioning
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-049
+  text: Template version used MUST be recorded with each sent notification for audit purposes
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - templates
+  - audit
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-050
+  text: Missing placeholder values MUST be replaced with empty string
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - templates
+  - error-handling
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-051
+  text: System MUST log a warning when placeholder value is missing
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - templates
+  - logging
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-052
+  text: Notification MUST still be sent when placeholder value is missing
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - templates
+  - error-handling
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-053
+  text: First retry MUST occur after 1 minute delay
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - retry
+  - timing
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-054
+  text: Second retry MUST occur after 5 minutes delay
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - retry
+  - timing
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-055
+  text: Third retry MUST occur after 30 minutes delay
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - retry
+  - timing
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-056
+  text: Fourth retry MUST occur after 2 hours delay
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - retry
+  - timing
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-057
+  text: Fifth retry MUST occur after 12 hours delay as final attempt
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - retry
+  - timing
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-058
+  text: Failed email after 5 retries MUST be marked as FAILED with no further retries
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - retry
+  - email
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-059
+  text: Citizen's email MUST be flagged for verification after 5 failed email retries
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - retry
+  - email
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-060
+  text: Failed SMS after 5 retries MUST be marked as FAILED
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - retry
+  - sms
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-061
+  text: Phone number MUST be flagged as invalid after 3 consecutive SMS failures
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - retry
+  - sms
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-062
+  text: Failed push after 5 retries MUST be marked as FAILED
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - retry
+  - push
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-063
+  text: Push token MUST be removed when HTTP 410 is received from FCM/APNs
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - retry
+  - push
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-064
+  text: System MUST enforce maximum 10 emails per hour per citizen
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - rate-limiting
+  - email
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-065
+  text: System MUST enforce maximum 5 SMS per hour per citizen
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - rate-limiting
+  - sms
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-066
+  text: System MUST enforce maximum 20 push notifications per hour per citizen
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - rate-limiting
+  - push
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-067
+  text: System MUST enforce maximum 50 in-app notifications per day per citizen
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - rate-limiting
+  - in-app
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-068
+  text: Non-critical notifications MUST be queued when rate limits are reached
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - rate-limiting
+  - queuing
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-069
+  text: Queued notifications MUST be delivered in the next available window
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - rate-limiting
+  - queuing
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-070
+  text: Critical notifications (password reset, account locked) MUST bypass rate limits
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - rate-limiting
+  - critical
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-071
+  text: Do Not Disturb mode MUST suppress all non-critical push and SMS notifications
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - dnd
+  - suppression
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-072
+  text: Email and in-app notifications MUST still be delivered during DND without sound/vibration on mobile
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - dnd
+  - delivery
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-073
+  text: DND MUST support scheduled periods (e.g., weekdays 22:00-08:00, weekends all day)
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - dnd
+  - scheduling
+  linked_test_ids: []
+- id: AC-NOTIFICATION-SYSTEM-074
+  text: Critical notifications MUST always bypass DND
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/notifications/notification-system.md
+  component: notification-system
+  priority: high
+  tags:
+  - dnd
+  - critical
+  linked_test_ids: []

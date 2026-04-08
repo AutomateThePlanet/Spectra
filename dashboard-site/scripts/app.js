@@ -907,7 +907,7 @@ function renderCoverage() {
     // Build a synthetic coverage_summary and render
     return renderThreeSectionCoverage({
         documentation: { covered: docsWithTests, total: totalDocs, percentage: parseFloat(docCoverage) },
-        requirements: { covered: 0, total: 0, percentage: 0 },
+        acceptance_criteria: { covered: 0, total: 0, percentage: 0 },
         automation: { covered: testsWithAutomation, total: totalTests, percentage: parseFloat(autoCoverage) }
     });
 }
@@ -924,7 +924,7 @@ function renderThreeSectionCoverage(summary) {
     // Coverage sections (progress bars + detail lists)
     html += '<div class="coverage-sections">';
     html += renderCoverageSection('Documentation Coverage', summary.documentation, 'documents', renderDocDetails);
-    html += renderCoverageSection('Requirements Coverage', summary.requirements, 'requirements', renderReqDetails);
+    html += renderCoverageSection('Acceptance Criteria Coverage', summary.acceptance_criteria, 'acceptance_criteria', renderCriteriaDetails);
     html += renderCoverageSection('Automation Coverage', summary.automation, 'tests', renderAutoDetails);
     html += '</div>';
 
@@ -946,12 +946,12 @@ function renderThreeSectionCoverage(summary) {
 }
 
 /**
- * Render 3 KPI metric cards for Documentation, Requirements, Automation.
+ * Render 3 KPI metric cards for Documentation, Acceptance Criteria, Automation.
  */
 function renderKPICards(summary) {
     const sections = [
         { key: 'documentation', label: 'Documentation', data: summary.documentation, target: 'documentation-coverage' },
-        { key: 'requirements', label: 'Requirements', data: summary.requirements, target: 'requirements-coverage' },
+        { key: 'acceptance_criteria', label: 'Acceptance Criteria', data: summary.acceptance_criteria, target: 'acceptance-criteria-coverage' },
         { key: 'automation', label: 'Automation', data: summary.automation, target: 'automation-coverage' }
     ];
 
@@ -1378,12 +1378,12 @@ function getEmptyState(label, sectionData, total, pct) {
         return null;
     }
 
-    if (label.startsWith('Requirements')) {
-        if (total === 0 && !sectionData.has_requirements_file) {
+    if (label.startsWith('Acceptance Criteria')) {
+        if (total === 0 && !sectionData.has_criteria_file) {
             return `<div class="coverage-empty-state">
                 <span class="empty-icon">&#9432;</span>
-                <div class="empty-text"><strong>No requirements tracked yet.</strong>
-                Add a <code>requirements</code> field to test YAML frontmatter, or create a <code>_requirements.yaml</code> file in your docs directory.</div>
+                <div class="empty-text"><strong>No acceptance criteria tracked yet.</strong>
+                Add a <code>requirements</code> field to test YAML frontmatter, or create a <code>_criteria_index.yaml</code> file in your docs directory.</div>
             </div>`;
         }
         return null;
@@ -1439,9 +1439,9 @@ function renderDocDetails(section) {
 }
 
 /**
- * Render requirements detail list items.
+ * Render acceptance criteria detail list items.
  */
-function renderReqDetails(section) {
+function renderCriteriaDetails(section) {
     let html = '';
     for (const d of section.details) {
         const icon = d.covered

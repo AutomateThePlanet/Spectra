@@ -1,0 +1,653 @@
+# Extracted from: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+# Doc hash: b48d4e68c7e8db3743dbb2b0be87d87bb3266b9c8bb077a0ccc27a234731ff69
+# Generated at: 2026-04-07T11:42:22.9712608Z
+criteria:
+- id: AC-APPLICATION-WORKFLOW-001
+  text: All required fields MUST be filled before transitioning from DRAFT to SUBMITTED
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - validation
+  - state-transition
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-002
+  text: Document attachments MUST be validated for format and size before transitioning from DRAFT to SUBMITTED
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - validation
+  - attachments
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-003
+  text: EGN MUST be cross-validated before transitioning from DRAFT to SUBMITTED
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - validation
+  - identity
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-004
+  text: System MUST automatically transition from SUBMITTED to AWAITING_PAYMENT if fee is greater than 0 BGN
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - payment
+  - state-transition
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-005
+  text: System MUST skip AWAITING_PAYMENT and transition directly to IN_PROCESSING if fee equals 0 BGN
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - payment
+  - state-transition
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-006
+  text: System MUST transition from AWAITING_PAYMENT to IN_PROCESSING when payment is confirmed via gateway callback
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - payment
+  - state-transition
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-007
+  text: System MUST cancel application if payment is not received within 7 calendar days for bank transfer
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - payment
+  - timeout
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-008
+  text: System MUST cancel application if payment is not received within 48 hours for voucher payment
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - payment
+  - timeout
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-009
+  text: Manager co-approval MUST be required for high-value services with fee greater than 100 BGN when transitioning from IN_PROCESSING to APPROVED
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - approval
+  - authorization
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-010
+  text: Clerk MUST provide a mandatory rejection reason with minimum 20 characters when transitioning from IN_PROCESSING to REJECTED
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - rejection
+  - validation
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-011
+  text: Citizen MUST be notified with the rejection reason when application is rejected
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - notification
+  - rejection
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-012
+  text: Specific fields or documents that need revision MUST be marked when transitioning to RETURNED_FOR_REVISION
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - revision
+  - validation
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-013
+  text: Citizen MUST receive notification with the list of requested changes when application is returned for revision
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - notification
+  - revision
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-014
+  text: Application MUST retain its original submission date for SLA purposes when resubmitted from RETURNED_FOR_REVISION
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - sla
+  - state-transition
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-015
+  text: System MUST automatically transition from APPROVED to DOCUMENT_GENERATION
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - document
+  - state-transition
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-016
+  text: System MUST automatically transition from DOCUMENT_GENERATION to COMPLETED after document is generated, signed with electronic seal, and stored
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - document
+  - state-transition
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-017
+  text: Citizen MUST be able to cancel application at any time before APPROVED state
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - cancellation
+  - authorization
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-018
+  text: Cancellation MUST NOT be possible after application reaches APPROVED state
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - cancellation
+  - authorization
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-019
+  text: System MUST trigger a refund process for cancelled applications that were paid
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - payment
+  - refund
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-020
+  text: System MUST identify the service type and determine the responsible department during auto-assignment
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - assignment
+  - routing
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-021
+  text: System MUST get the list of active clerks with applications.process permission during auto-assignment
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - assignment
+  - authorization
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-022
+  text: System MUST filter out clerks who are on leave or have active delegation during auto-assignment
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - assignment
+  - availability
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-023
+  text: System MUST sort clerks by current workload in ascending order during auto-assignment
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - assignment
+  - workload
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-024
+  text: System MUST assign application to the clerk with the lowest workload
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - assignment
+  - workload
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-025
+  text: System MUST use expertise-based tiebreaker when multiple clerks have equal workload, assigning to the clerk who most recently completed an application of the same service type
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - assignment
+  - expertise
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-026
+  text: System MUST place application in department queue and notify Manager if no clerks are available
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - assignment
+  - escalation
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-027
+  text: Reassignment reason MUST be required when Manager reassigns an application
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - assignment
+  - audit
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-028
+  text: Original clerk MUST be notified of the reassignment
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - assignment
+  - notification
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-029
+  text: Reassignment MUST reset the clerk's processing timer
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - assignment
+  - sla
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-030
+  text: Reassignment MUST NOT reset the overall SLA timer
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - assignment
+  - sla
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-031
+  text: Business days MUST be calculated as Monday through Friday, excluding Bulgarian public holidays
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - sla
+  - calendar
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-032
+  text: SLA clock MUST start when the application enters IN_PROCESSING state
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - sla
+  - timing
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-033
+  text: SLA clock MUST pause when the application is in RETURNED_FOR_REVISION state
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - sla
+  - timing
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-034
+  text: SLA clock MUST resume when the citizen resubmits the application
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - sla
+  - timing
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-035
+  text: SLA MUST be measured against the COMPLETED state
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - sla
+  - measurement
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-036
+  text: Expedited applications MUST have SLA equal to standard SLA divided by 2, rounded up
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - sla
+  - expedited
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-037
+  text: Application MUST be highlighted in yellow in the clerk's queue at warning threshold
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - sla
+  - notification
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-038
+  text: Manager MUST receive daily summary email of approaching SLAs at warning threshold
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - sla
+  - notification
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-039
+  text: Application MUST be highlighted in red on the SLA day
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - sla
+  - notification
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-040
+  text: Manager MUST receive immediate notification on the SLA day
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - sla
+  - notification
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-041
+  text: Director MUST be added to the notification on the SLA day
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - sla
+  - notification
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-042
+  text: Application MUST be flagged as SLA_BREACHED in metadata when SLA is exceeded
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - sla
+  - metadata
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-043
+  text: Application MUST be automatically escalated to Manager if still with a clerk when SLA is breached
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - sla
+  - escalation
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-044
+  text: SLA breach MUST be recorded in the SLA Compliance Report
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - sla
+  - reporting
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-045
+  text: SLA breach flag MUST NOT be removable once set
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - sla
+  - audit
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-046
+  text: System MUST notify Manager when application is unassigned for more than 4 hours
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - escalation
+  - notification
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-047
+  text: System MUST notify Manager and provide option to reassign when clerk has not opened application within 24 hours of assignment
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - escalation
+  - notification
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-048
+  text: System MUST notify Manager when SLA warning threshold is reached
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - escalation
+  - sla
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-049
+  text: System MUST escalate to Manager and notify Director when SLA is breached
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - escalation
+  - sla
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-050
+  text: System MUST escalate to Manager for review when application is returned for revision 3 times
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - escalation
+  - revision
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-051
+  text: System MUST escalate to Manager immediately when citizen complaint is filed about application
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - escalation
+  - complaint
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-052
+  text: Every state change MUST be recorded in application history
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - audit
+  - history
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-053
+  text: Citizen MUST receive filtered history view with no internal notes, only status changes and requests directed at them
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - history
+  - authorization
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-054
+  text: Maximum applications per batch operation MUST be 50
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - batch
+  - limits
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-055
+  text: Applications in different states MUST NOT be batch-operated together
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - batch
+  - validation
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-056
+  text: Each batch approval MUST generate a separate audit record
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: high
+  tags:
+  - batch
+  - audit
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-057
+  text: DRAFT state SHOULD save automatically
+  rfc2119: SHOULD
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: medium
+  tags:
+  - draft
+  - ux
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-058
+  text: Card payments SHOULD be immediate
+  rfc2119: SHOULD
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: medium
+  tags:
+  - payment
+  - performance
+  linked_test_ids: []
+- id: AC-APPLICATION-WORKFLOW-059
+  text: Warning threshold SHOULD default to 2 days before SLA breach
+  rfc2119: SHOULD
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/application-workflow/application-workflow.md
+  component: application-workflow
+  priority: medium
+  tags:
+  - sla
+  - configuration
+  linked_test_ids: []

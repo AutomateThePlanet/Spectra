@@ -91,6 +91,11 @@ public sealed class TestCase
     public IReadOnlyList<string> Requirements { get; init; } = [];
 
     /// <summary>
+    /// Acceptance criteria IDs this test verifies.
+    /// </summary>
+    public IReadOnlyList<string> Criteria { get; init; } = [];
+
+    /// <summary>
     /// Bug IDs or URLs linked to this test case.
     /// </summary>
     public IReadOnlyList<string> Bugs { get; init; } = [];

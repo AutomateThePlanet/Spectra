@@ -243,7 +243,7 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
         }
     }
 
-    private static string BuildFullPrompt(string userPrompt, int requestedCount)
+    internal static string BuildFullPrompt(string userPrompt, int requestedCount, string? criteriaContext = null)
     {
         var jsonExample = """
             [
@@ -259,7 +259,8 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 "test_data": "Test data if needed",
                 "source_refs": ["docs/file.md#Section-Name"],
                 "scenario_from_doc": "Quote or paraphrase the documented behavior",
-                "estimated_duration": "5m"
+                "estimated_duration": "5m",
+                "criteria": ["AC-ID-1", "AC-ID-2"]
               }
             ]
             """;
@@ -303,11 +304,13 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
 
             {userPrompt}
 
+            {(string.IsNullOrEmpty(criteriaContext) ? "" : $"\n## ACCEPTANCE CRITERIA\n\n{criteriaContext}\n")}
             IMPORTANT:
             1. Use the tools to read documentation and check for duplicates first
             2. Only generate tests that are grounded in the documentation
             3. Ensure unique test IDs using GetNextTestIds
             4. Your FINAL response must be ONLY the JSON array — no other text
+            5. If acceptance criteria are provided, include matching criterion IDs in the "criteria" array field
             """;
     }
 
@@ -512,6 +515,16 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
             if (element.TryGetProperty("scenario_from_doc", out var scenarioElement))
                 scenarioFromDoc = scenarioElement.GetString();
 
+            var criteria = new List<string>();
+            if (element.TryGetProperty("criteria", out var criteriaElement) && criteriaElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var criterionItem in criteriaElement.EnumerateArray())
+                {
+                    if (criterionItem.GetString() is string cr)
+                        criteria.Add(cr);
+                }
+            }
+
             return new TestCase
             {
                 Id = id,
@@ -526,6 +539,7 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 SourceRefs = sourceRefs,
                 ScenarioFromDoc = scenarioFromDoc,
                 EstimatedDuration = estimatedDuration,
+                Criteria = criteria,
                 FilePath = $"{id}.md"
             };
         }

@@ -1,5 +1,5 @@
 ---
-name: SPECTRA Validate
+name: spectra-validate
 description: Validates all test case files for correct format, unique IDs, and required fields.
 tools: [{{READONLY_TOOLS}}]
 model: GPT-4o

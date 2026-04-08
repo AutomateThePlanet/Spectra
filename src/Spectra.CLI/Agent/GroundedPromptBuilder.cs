@@ -1,5 +1,7 @@
 using System.Text;
 using Spectra.Core.Models;
+using Spectra.Core.Models.Coverage;
+using Spectra.Core.Parsing;
 
 namespace Spectra.CLI.Agent;
 
@@ -216,6 +218,160 @@ public static class GroundedPromptBuilder
         sb.AppendLine("5. Include scenario_from_doc with the specific doc content being tested");
         sb.AppendLine();
         sb.AppendLine("Generate the test cases as a JSON array:");
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Builds the user prompt with full document content, existing tests, and optional criteria context.
+    /// </summary>
+    public static string BuildUserPrompt(
+        string userRequest,
+        IReadOnlyList<SourceDocument> documents,
+        IReadOnlyList<TestCase> existingTests,
+        int requestedCount,
+        IReadOnlyList<AcceptanceCriterion>? criteria)
+    {
+        var sb = new StringBuilder();
+
+        sb.AppendLine("# TEST GENERATION REQUEST");
+        sb.AppendLine();
+        sb.AppendLine(userRequest);
+        sb.AppendLine();
+        sb.AppendLine($"Generate exactly {requestedCount} new test cases that are NOT duplicates of existing tests.");
+        sb.AppendLine();
+
+        // Add existing tests with full details for semantic comparison
+        if (existingTests.Count > 0)
+        {
+            sb.AppendLine("# EXISTING TESTS (do NOT duplicate these - check semantically, not just by title)");
+            sb.AppendLine();
+
+            foreach (var test in existingTests)
+            {
+                sb.AppendLine($"## {test.Id}: {test.Title}");
+                if (test.Steps.Count > 0)
+                {
+                    sb.AppendLine("Steps:");
+                    foreach (var step in test.Steps)
+                    {
+                        sb.AppendLine($"  - {step}");
+                    }
+                }
+                if (!string.IsNullOrWhiteSpace(test.ExpectedResult))
+                {
+                    sb.AppendLine($"Expected: {test.ExpectedResult}");
+                }
+                sb.AppendLine();
+            }
+        }
+
+        // Add full document content
+        sb.AppendLine("# SOURCE DOCUMENTATION");
+        sb.AppendLine();
+        sb.AppendLine("Read the following documentation carefully. Extract SPECIFIC testable scenarios");
+        sb.AppendLine("from each document. Only generate tests for behaviors explicitly described here.");
+        sb.AppendLine();
+
+        foreach (var doc in documents)
+        {
+            sb.AppendLine($"## Document: {doc.Path}");
+            if (doc.Sections.Count > 0)
+            {
+                sb.AppendLine($"Sections: {string.Join(", ", doc.Sections)}");
+            }
+            sb.AppendLine();
+            sb.AppendLine("```");
+            sb.AppendLine(doc.Content);
+            sb.AppendLine("```");
+            sb.AppendLine();
+        }
+
+        // Add criteria context if available
+        if (criteria is not null && criteria.Count > 0)
+        {
+            sb.AppendLine(FormatCriteriaContext(criteria));
+            sb.AppendLine();
+        }
+
+        sb.AppendLine("# INSTRUCTIONS");
+        sb.AppendLine();
+        sb.AppendLine("1. Read each document and identify specific testable scenarios");
+        sb.AppendLine("2. For each scenario, check if it's already covered by existing tests");
+        sb.AppendLine("3. Generate tests ONLY for scenarios not already covered");
+        sb.AppendLine("4. Include the exact document section in source_refs");
+        sb.AppendLine("5. Include scenario_from_doc with the specific doc content being tested");
+        if (criteria is not null && criteria.Count > 0)
+        {
+            sb.AppendLine("6. For tests that verify acceptance criteria, include the criterion IDs in the \"criteria\" field");
+        }
+        sb.AppendLine();
+        sb.AppendLine("Generate the test cases as a JSON array:");
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Loads acceptance criteria related to a specific suite by matching component name or source document.
+    /// </summary>
+    public static async Task<IReadOnlyList<AcceptanceCriterion>> LoadRelatedCriteriaAsync(
+        string criteriaDir,
+        string criteriaFile,
+        string suiteName,
+        CancellationToken ct)
+    {
+        var indexReader = new CriteriaIndexReader();
+        var index = await indexReader.ReadAsync(criteriaFile, ct);
+
+        if (index.Sources.Count == 0)
+            return [];
+
+        var fileReader = new CriteriaFileReader();
+        var allCriteria = new List<AcceptanceCriterion>();
+
+        foreach (var source in index.Sources)
+        {
+            var filePath = Path.IsPathRooted(source.File)
+                ? source.File
+                : Path.Combine(criteriaDir, source.File);
+
+            var criteria = await fileReader.ReadAsync(filePath, ct);
+            allCriteria.AddRange(criteria);
+        }
+
+        // Filter criteria where Component matches suiteName or SourceDoc contains the suite name
+        var suiteNameLower = suiteName.ToLowerInvariant();
+        var related = allCriteria
+            .Where(c =>
+                (!string.IsNullOrEmpty(c.Component) &&
+                 c.Component.Equals(suiteName, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(c.SourceDoc) &&
+                 c.SourceDoc.Contains(suiteName, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        return related;
+    }
+
+    /// <summary>
+    /// Formats acceptance criteria as prompt context for AI generation.
+    /// </summary>
+    public static string FormatCriteriaContext(IReadOnlyList<AcceptanceCriterion> criteria)
+    {
+        if (criteria.Count == 0)
+            return string.Empty;
+
+        var sb = new StringBuilder();
+        sb.AppendLine("## Related Acceptance Criteria");
+        sb.AppendLine();
+        sb.AppendLine("The following acceptance criteria should be addressed by generated tests. Include relevant criterion IDs in the test's \"criteria\" field.");
+        sb.AppendLine();
+
+        foreach (var criterion in criteria)
+        {
+            var rfc = criterion.Rfc2119 ?? "SHOULD";
+            var priority = criterion.Priority ?? "medium";
+            sb.AppendLine($"- {criterion.Id}: {criterion.Text} [{rfc}, {priority}]");
+        }
 
         return sb.ToString();
     }

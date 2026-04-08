@@ -1,5 +1,5 @@
 ---
-name: SPECTRA List
+name: spectra-list
 description: Lists test suites, shows test case details, and browses the test repository.
 tools: [{{READONLY_TOOLS}}]
 model: GPT-4o

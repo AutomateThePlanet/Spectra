@@ -13,8 +13,8 @@ public sealed class UnifiedCoverageReport
     [JsonPropertyName("documentation_coverage")]
     public required DocumentationCoverage DocumentationCoverage { get; init; }
 
-    [JsonPropertyName("requirements_coverage")]
-    public required RequirementsCoverage RequirementsCoverage { get; init; }
+    [JsonPropertyName("acceptance_criteria_coverage")]
+    public required AcceptanceCriteriaCoverage AcceptanceCriteriaCoverage { get; init; }
 
     [JsonPropertyName("automation_coverage")]
     public required AutomationCoverage AutomationCoverage { get; init; }

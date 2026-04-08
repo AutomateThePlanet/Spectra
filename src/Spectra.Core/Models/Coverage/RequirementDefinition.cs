@@ -5,6 +5,7 @@ namespace Spectra.Core.Models.Coverage;
 /// <summary>
 /// A requirement definition from _requirements.yaml.
 /// </summary>
+[Obsolete("Use AcceptanceCriterion instead. This type will be removed in a future release.")]
 public sealed class RequirementDefinition
 {
     [YamlMember(Alias = "id")]
@@ -23,6 +24,7 @@ public sealed class RequirementDefinition
 /// <summary>
 /// Root document for _requirements.yaml.
 /// </summary>
+[Obsolete("Use CriteriaDocument instead. This type will be removed in a future release.")]
 public sealed class RequirementsDocument
 {
     [YamlMember(Alias = "requirements")]

@@ -78,6 +78,15 @@ public sealed class TestFileWriter
             sb.AppendLine($"estimated_duration: {FormatDuration(duration)}");
         }
 
+        if (testCase.Criteria.Count > 0)
+        {
+            sb.AppendLine("criteria:");
+            foreach (var criterion in testCase.Criteria)
+            {
+                sb.AppendLine($"  - {criterion}");
+            }
+        }
+
         // Orphaned status fields
         if (!string.IsNullOrWhiteSpace(testCase.Status))
         {

@@ -131,11 +131,15 @@ public sealed class FinalizeExecutionRunTool : IMcpTool
                 }
             };
 
+            var instruction = $"NEXT STEP: Open the HTML report for the user. " +
+                $"Use: show preview .execution/reports/{htmlFile}";
+
             return JsonSerializer.Serialize(McpToolResponse<object>.Success(
                 data,
                 RunStatus.Completed,
                 $"{report.Summary.Total}/{report.Summary.Total}",
-                "start_execution_run"));
+                "openBrowserPage",
+                instruction));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("pending"))
         {

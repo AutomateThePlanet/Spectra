@@ -1,0 +1,480 @@
+# Extracted from: docs/spectra-test-docs/docs/user-management/user-management.md
+# Doc hash: 81798f0495e74b5261a2a2d9008c2ad87f5d8f4df3bf2dc58d9dce8f649f0267
+# Generated at: 2026-04-07T11:50:15.4156001Z
+criteria:
+- id: AC-USER-MANAGEMENT-001
+  text: System administrators MUST be able to create custom roles by combining granular permissions from defined categories
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - roles
+  - permissions
+  - admin
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-002
+  text: Custom roles MUST NOT exceed the permissions of the built-in Director role
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - roles
+  - permissions
+  - security
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-003
+  text: System MUST prevent creating a custom role with config.edit permission unless the creator is a System Admin
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - roles
+  - permissions
+  - security
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-004
+  text: "Permissions MUST be evaluated in order: user's explicit permissions, user's role permissions, then department-level restrictions"
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - permissions
+  - authorization
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-005
+  text: When a user has multiple roles, permissions MUST be additive (union of all role permissions)
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - permissions
+  - roles
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-006
+  text: A user MUST belong to exactly one department
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - department
+  - organization
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-007
+  text: Managers MUST see data for their department and all sub-departments
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - department
+  - permissions
+  - visibility
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-008
+  text: Directors MUST see data for the entire directorate (their department plus all descendants)
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - department
+  - permissions
+  - visibility
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-009
+  text: Cross-department data access MUST require explicit permission grant by a System Admin
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - department
+  - permissions
+  - security
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-010
+  text: Department hierarchy changes MUST NOT affect existing application assignments
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - department
+  - applications
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-011
+  text: Email field MUST be from an approved domain (@mrrb.government.bg or @sofia.bg)
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-creation
+  - validation
+  - email
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-012
+  text: User MUST NOT be able to login before their start date
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-creation
+  - authentication
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-013
+  text: System MUST send welcome email with temporary password upon user creation
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-creation
+  - email
+  - onboarding
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-014
+  text: User MUST change password and enroll MFA on first login
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-creation
+  - security
+  - authentication
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-015
+  text: Account MUST auto-deactivate on end date for temporary/contract employees
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-creation
+  - lifecycle
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-016
+  text: Role changes MUST take effect immediately upon save
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-modification
+  - roles
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-017
+  text: Active sessions MUST NOT be terminated when role changes occur
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-modification
+  - sessions
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-018
+  text: System MUST show warning when transferring user with active assignments
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-modification
+  - department
+  - assignments
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-019
+  text: Email changes MUST require re-verification of the new email address
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-modification
+  - email
+  - security
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-020
+  text: Deactivated accounts MUST NOT be able to log in
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-deactivation
+  - authentication
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-021
+  text: All active sessions MUST be terminated immediately when account is deactivated
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-deactivation
+  - sessions
+  - security
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-022
+  text: Application assignments MUST remain visible after deactivation with user shown as (Deactivated)
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-deactivation
+  - assignments
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-023
+  text: User data MUST be retained for audit purposes after deactivation
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-deactivation
+  - audit
+  - compliance
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-024
+  text: User MUST set new password and re-enroll MFA upon reactivation
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-deactivation
+  - security
+  - authentication
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-025
+  text: Accounts MUST NOT be deleted, only deactivated
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-deactivation
+  - audit
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-026
+  text: System MUST auto-deactivate accounts when end date is reached
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-deactivation
+  - lifecycle
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-027
+  text: System MUST auto-deactivate accounts after 90 consecutive days of no login
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-deactivation
+  - security
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-028
+  text: System MUST send warning emails at 7-day and 1-day before auto-deactivation due to inactivity
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-deactivation
+  - email
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-029
+  text: System MUST perform bulk deactivation when domain is removed from approved list
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - user-deactivation
+  - domain
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-030
+  text: Delegation MUST have a maximum duration of 30 days
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - delegation
+  - workflow
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-031
+  text: Delegate MUST receive all application assignments from delegator
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - delegation
+  - assignments
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-032
+  text: Delegate MUST NOT receive the delegator's role
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - delegation
+  - permissions
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-033
+  text: Unprocessed applications MUST return to original user's queue when delegation expires
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - delegation
+  - assignments
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-034
+  text: A user MUST have at most one active delegation at a time
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - delegation
+  - workflow
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-035
+  text: Managers MUST approve delegations for their department members
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - delegation
+  - approval
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-036
+  text: Bulk role changes MUST be applied immediately upon confirmation
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - bulk-operations
+  - roles
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-037
+  text: Bulk deactivation MUST terminate all sessions for affected users
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - bulk-operations
+  - deactivation
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-038
+  text: Bulk operations MUST be logged as a single audit event with list of affected users
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - bulk-operations
+  - audit
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-039
+  text: Confirmation dialog MUST show count and list first 10 users with show all option
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - bulk-operations
+  - ux
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-040
+  text: Bulk operations MUST NOT exceed 500 users per operation
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - bulk-operations
+  - limits
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-041
+  text: Built-in roles MUST NOT be modifiable
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: high
+  tags:
+  - roles
+  - security
+  linked_test_ids: []
+- id: AC-USER-MANAGEMENT-042
+  text: Delegation SHOULD be limited to users in the same department
+  rfc2119: SHOULD
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/user-management/user-management.md
+  component: user-management
+  priority: medium
+  tags:
+  - delegation
+  - department
+  linked_test_ids: []

@@ -77,6 +77,7 @@ public static class NextStepHints
     [
         "spectra ai generate           # Generate your first test suite",
         "spectra init-profile           # Configure generation preferences",
+        "spectra ai analyze --extract-criteria  # Extract acceptance criteria from docs",
         "",
         "ℹ  Optional: Create a Copilot Space with your product documentation",
         "   for inline help during test execution.",
@@ -117,6 +118,8 @@ public static class NextStepHints
         {
             hints.Add("spectra ai generate                        # Fill coverage gaps");
         }
+
+        hints.Add("spectra ai analyze --extract-criteria       # Extract acceptance criteria from docs");
 
         return hints;
     }

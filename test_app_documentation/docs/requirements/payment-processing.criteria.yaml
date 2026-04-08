@@ -1,0 +1,712 @@
+# Extracted from: docs/spectra-test-docs/docs/payments/payment-processing.md
+# Doc hash: 9ebdf8cda6ef647ffbce3e781884be90bde87a35d79b01458e3dfb7a5284c8db
+# Generated at: 2026-04-07T11:48:07.4025054Z
+criteria:
+- id: AC-PAYMENT-PROCESSING-001
+  text: All financial transactions MUST be immutable and fully audited
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - audit
+  - security
+  - transaction
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-002
+  text: When a fee changes, applications already submitted MUST retain their original fee
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - fee
+  - versioning
+  - business-rule
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-003
+  text: New applications MUST use the new fee from the moment of publication
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - fee
+  - versioning
+  - business-rule
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-004
+  text: Bank card payments MUST be processed through ePay.bg payment gateway
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - gateway
+  - integration
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-005
+  text: 3D Secure MUST be mandatory for all card transactions
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - security
+  - card
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-006
+  text: Card transactions MUST have a minimum transaction amount of 0.50 BGN
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - validation
+  - card
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-007
+  text: Card transactions MUST have a maximum single transaction amount of 10,000 BGN
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - validation
+  - card
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-008
+  text: The system MUST store only the last 4 digits of the card number and the transaction reference
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - security
+  - pci-compliance
+  - data-protection
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-009
+  text: The system MUST NOT store the full card number
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - security
+  - pci-compliance
+  - data-protection
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-010
+  text: The system MUST generate a unique payment reference in format PR-YYYYMMDD-XXXXXX for each bank transfer transaction
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - bank-transfer
+  - reference
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-011
+  text: Payment MUST be matched automatically when the bank transfer arrives with the correct reference
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - bank-transfer
+  - reconciliation
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-012
+  text: If the transfer amount does not match exactly, the payment MUST be flagged for manual review
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - bank-transfer
+  - validation
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-013
+  text: Bank transfers MUST be received within 7 calendar days or the application is cancelled
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - bank-transfer
+  - timeout
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-014
+  text: Partial payments via bank transfer MUST NOT be accepted
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - bank-transfer
+  - validation
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-015
+  text: The full amount MUST be paid in one bank transfer
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - bank-transfer
+  - validation
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-016
+  text: Cash payment MUST be available only for in-person services
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - cash
+  - business-rule
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-017
+  text: A receipt number from the fiscal device MUST be required for cash payments
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - cash
+  - compliance
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-018
+  text: Cash payments above 5,000 BGN MUST NOT be accepted
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - cash
+  - aml
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-019
+  text: The system MUST generate a payment code valid for 48 hours for ePay/EasyPay voucher payments
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - voucher
+  - expiration
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-020
+  text: The system MUST calculate the fee including base and extras if applicable
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - fee
+  - calculation
+  - business-rule
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-021
+  text: If a fee waiver applies, the fee MUST be automatically set to 0.00 BGN
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - fee
+  - waiver
+  - business-rule
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-022
+  text: The waiver reason MUST be logged when a fee waiver is applied
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - fee
+  - waiver
+  - audit
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-023
+  text: For bank transfer payments, payment reference MUST be displayed with bank details
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - bank-transfer
+  - ux
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-024
+  text: For bank transfer payments, email MUST be sent with payment reference and bank details
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - bank-transfer
+  - notification
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-025
+  text: For voucher payments, payment code MUST be displayed and emailed
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - voucher
+  - notification
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-026
+  text: Upon successful payment confirmation, payment status MUST change to PAID
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - status
+  - workflow
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-027
+  text: Upon successful payment confirmation, application status MUST change to IN_PROCESSING
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - status
+  - workflow
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-028
+  text: Upon successful payment confirmation, receipt MUST be generated as PDF
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - receipt
+  - document
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-029
+  text: Upon successful payment confirmation, receipt MUST be emailed to the citizen
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - receipt
+  - notification
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-030
+  text: Receipt MUST be available for download from the citizen's dashboard
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - payment
+  - receipt
+  - ux
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-031
+  text: Card payment refunds MUST be processed back to the original card
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - refund
+  - card
+  - business-rule
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-032
+  text: Bank transfer refunds MUST be processed to the citizen's bank account
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - refund
+  - bank-transfer
+  - business-rule
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-033
+  text: IBAN MUST be provided for bank transfer refunds
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - refund
+  - bank-transfer
+  - validation
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-034
+  text: Cash refunds MUST be available only in person at the government office
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - refund
+  - cash
+  - business-rule
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-035
+  text: For cash refunds, the citizen MUST present their ID and the original receipt
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - refund
+  - cash
+  - verification
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-036
+  text: Voucher payment refunds MUST be issued as a credit note valid for 12 months
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - refund
+  - voucher
+  - business-rule
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-037
+  text: The refund amount MUST NOT exceed the original payment amount
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - refund
+  - validation
+  - business-rule
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-038
+  text: If the fee was reduced between payment and refund, the original paid amount MUST be refunded
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - refund
+  - business-rule
+  - fee
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-039
+  text: Every payment MUST generate a receipt
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - receipt
+  - document
+  - compliance
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-040
+  text: Receipt MUST contain a unique, sequential receipt number per calendar year in format R-YYYY-NNNNNN
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - receipt
+  - numbering
+  - compliance
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-041
+  text: Receipt MUST contain date and time of payment
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - receipt
+  - content
+  - compliance
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-042
+  text: Receipt MUST contain citizen name and EGN masked with first 6 digits shown and last 4 replaced with asterisks
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - receipt
+  - privacy
+  - data-protection
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-043
+  text: Receipt MUST contain service name and application reference number
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - receipt
+  - content
+  - compliance
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-044
+  text: Receipt MUST contain fee breakdown including base fee, expedited surcharge, and waiver discount
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - receipt
+  - content
+  - compliance
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-045
+  text: Receipt MUST contain payment method details
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - receipt
+  - content
+  - compliance
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-046
+  text: Receipt MUST contain total amount paid
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - receipt
+  - content
+  - compliance
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-047
+  text: Receipt MUST contain digital signature of the system using qualified electronic seal
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - receipt
+  - security
+  - compliance
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-048
+  text: Receipts MUST be generated as PDF/A-2b for long-term archival
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - receipt
+  - format
+  - archival
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-049
+  text: Receipts MUST be stored for 10 years
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - receipt
+  - retention
+  - compliance
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-050
+  text: All amounts MUST be in Bulgarian Lev (BGN)
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - currency
+  - localization
+  - business-rule
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-051
+  text: The system MUST NOT support multi-currency
+  rfc2119: MUST NOT
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - currency
+  - business-rule
+  - scope
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-052
+  text: Input fields for amounts MUST accept exactly 2 decimal places
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - currency
+  - validation
+  - ux
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-053
+  text: 'Amounts MUST be displayed with the Bulgarian locale format: 1 234,56 лв.'
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - currency
+  - localization
+  - ux
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-054
+  text: If the ePay.bg gateway does not respond within 30 seconds, the transaction MUST be marked as PENDING
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - error-handling
+  - timeout
+  - gateway
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-055
+  text: If the callback is not received within 15 minutes, the system MUST query ePay.bg for status
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - error-handling
+  - timeout
+  - gateway
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-056
+  text: If ePay.bg confirms failure, the application MUST return to Awaiting Payment status
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - error-handling
+  - status
+  - workflow
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-057
+  text: The citizen MUST be able to retry payment up to 3 times for the same application
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - error-handling
+  - retry
+  - ux
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-058
+  text: After 3 failed payment attempts, the application MUST be locked for 1 hour
+  rfc2119: MUST
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: high
+  tags:
+  - error-handling
+  - security
+  - rate-limiting
+  linked_test_ids: []
+- id: AC-PAYMENT-PROCESSING-059
+  text: Partial refunds SHOULD be supported
+  rfc2119: SHOULD
+  source_type: document
+  source_doc: docs/spectra-test-docs/docs/payments/payment-processing.md
+  component: payment-processing
+  priority: medium
+  tags:
+  - refund
+  - business-rule
+  - flexibility
+  linked_test_ids: []
