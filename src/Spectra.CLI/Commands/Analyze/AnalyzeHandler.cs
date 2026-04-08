@@ -253,6 +253,7 @@ public sealed class AnalyzeHandler
     {
         var extractProgress = CreateExtractProgress();
         extractProgress.Reset();
+        extractProgress.Start("Initializing criteria extraction...");
         try
         {
             var currentDir = Directory.GetCurrentDirectory();
@@ -671,11 +672,13 @@ public sealed class AnalyzeHandler
         }
         catch (OperationCanceledException)
         {
+            extractProgress.Fail("Operation cancelled.");
             Console.WriteLine("\nOperation cancelled.");
             return ExitCodes.Cancelled;
         }
         catch (Exception ex)
         {
+            extractProgress.Fail(ex.Message);
             if (_outputFormat == OutputFormat.Json)
             {
                 JsonResultWriter.Write(new ErrorResult
@@ -1111,11 +1114,13 @@ public sealed class AnalyzeHandler
         }
         catch (OperationCanceledException)
         {
+            importProgress.Fail("Operation cancelled.");
             Console.WriteLine("\nOperation cancelled.");
             return ExitCodes.Cancelled;
         }
         catch (Exception ex)
         {
+            importProgress.Fail(ex.Message);
             if (_outputFormat == OutputFormat.Json)
             {
                 JsonResultWriter.Write(new ErrorResult
