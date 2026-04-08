@@ -57,7 +57,7 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void SkillContent_HasAllSkills()
     {
-        Assert.Equal(8, SkillContent.All.Count);
+        Assert.Equal(9, SkillContent.All.Count);
         Assert.True(SkillContent.All.ContainsKey("spectra-generate"));
         Assert.True(SkillContent.All.ContainsKey("spectra-coverage"));
         Assert.True(SkillContent.All.ContainsKey("spectra-dashboard"));
@@ -66,6 +66,7 @@ public class SkillsManifestTests : IDisposable
         Assert.True(SkillContent.All.ContainsKey("spectra-init-profile"));
         Assert.True(SkillContent.All.ContainsKey("spectra-help"));
         Assert.True(SkillContent.All.ContainsKey("spectra-criteria"));
+        Assert.True(SkillContent.All.ContainsKey("spectra-docs"));
     }
 
     [Fact]

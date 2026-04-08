@@ -195,11 +195,21 @@ Show which tests are UP_TO_DATE, OUTDATED, ORPHANED.
 
 ## Document index
 
+#### show preview
+```
+.spectra-progress.html
+```
+
 #### runInTerminal
 ```
-spectra docs index --force --verbosity normal
+spectra docs index --force --no-interaction --output-format json --verbosity quiet
 ```
-#### awaitTerminal
-#### terminalLastCommand
 
-Confirm index rebuilt and acceptance criteria extracted.
+#### awaitTerminal
+
+#### readFile
+```
+.spectra-result.json
+```
+
+Show: documents indexed, skipped, criteria extracted. Use `--skip-criteria` to skip extraction.

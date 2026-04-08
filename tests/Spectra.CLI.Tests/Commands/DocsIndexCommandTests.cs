@@ -19,9 +19,19 @@ public class DocsIndexCommandTests : IDisposable
 
     public void Dispose()
     {
-        if (Directory.Exists(_testDir))
+        try
         {
-            Directory.Delete(_testDir, recursive: true);
+            if (Directory.Exists(_testDir))
+            {
+                // Allow file handles to be fully released before cleanup
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                Directory.Delete(_testDir, recursive: true);
+            }
+        }
+        catch (IOException)
+        {
+            // Best-effort cleanup — temp directory may still be locked on Windows
         }
     }
 

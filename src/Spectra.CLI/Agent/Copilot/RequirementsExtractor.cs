@@ -44,7 +44,7 @@ public sealed class RequirementsExtractor
 
         var prompt = await BuildExtractionPromptAsync(documents, existingRequirements, ct);
 
-        _onStatus?.Invoke("Extracting requirements from documentation...");
+        _onStatus?.Invoke("Extracting acceptance criteria from documentation...");
 
         // Use Task.WhenAny as a hard timeout — the SDK doesn't always honor CancellationToken
         var sendTask = session.SendAndWaitAsync(
@@ -70,11 +70,11 @@ public sealed class RequirementsExtractor
         var results = ParseResponse(responseText);
         if (results.Count == 0)
         {
-            _onStatus?.Invoke("Warning: AI response could not be parsed into requirements.");
+            _onStatus?.Invoke("Warning: AI response could not be parsed into acceptance criteria.");
         }
         else
         {
-            _onStatus?.Invoke($"Extracted {results.Count} requirement(s) from AI response.");
+            _onStatus?.Invoke($"Extracted {results.Count} acceptance criteria from AI response.");
         }
 
         return results;

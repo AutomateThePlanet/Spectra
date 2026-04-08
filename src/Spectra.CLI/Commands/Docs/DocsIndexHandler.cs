@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Output;
@@ -17,13 +18,30 @@ public sealed class DocsIndexHandler
     private readonly VerbosityLevel _verbosity;
     private readonly bool _dryRun;
     private readonly OutputFormat _outputFormat;
+    private readonly bool _noInteraction;
+    private readonly bool _skipCriteria;
     private readonly ProgressReporter _progress;
 
-    public DocsIndexHandler(VerbosityLevel verbosity = VerbosityLevel.Normal, bool dryRun = false, OutputFormat outputFormat = OutputFormat.Human)
+    private static readonly JsonSerializerOptions ResultFileOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Converters = { new JsonStringEnumConverter() }
+    };
+
+    public DocsIndexHandler(
+        VerbosityLevel verbosity = VerbosityLevel.Normal,
+        bool dryRun = false,
+        OutputFormat outputFormat = OutputFormat.Human,
+        bool noInteraction = false,
+        bool skipCriteria = false)
     {
         _verbosity = verbosity;
         _dryRun = dryRun;
         _outputFormat = outputFormat;
+        _noInteraction = noInteraction;
+        _skipCriteria = skipCriteria;
         _progress = new ProgressReporter(outputFormat: outputFormat);
     }
 
@@ -32,10 +50,14 @@ public sealed class DocsIndexHandler
         var currentDir = Directory.GetCurrentDirectory();
         var configPath = Path.Combine(currentDir, "spectra.config.json");
 
+        // Delete stale result/progress files
+        DeleteResultFiles();
+
         // Load config
         if (!File.Exists(configPath))
         {
             _progress.Error("spectra.config.json not found. Run 'spectra init' first.");
+            WriteErrorResult("spectra.config.json not found");
             return ExitCodes.Error;
         }
 
@@ -43,6 +65,7 @@ public sealed class DocsIndexHandler
         if (config is null)
         {
             _progress.Error("Failed to load spectra.config.json");
+            WriteErrorResult("Failed to load spectra.config.json");
             return ExitCodes.Error;
         }
 
@@ -57,9 +80,16 @@ public sealed class DocsIndexHandler
             return ExitCodes.Success;
         }
 
+        // Phase 1: Scanning
+        WriteProgressResult("scanning", "Scanning for documentation files...", currentDir, indexPath);
+
         var index = await _progress.StatusAsync(
             force ? "Rebuilding documentation index..." : "Updating documentation index...",
             async () => await indexService.EnsureIndexAsync(currentDir, config.Source, force, ct));
+
+        // Phase 2: Indexing complete
+        WriteProgressResult("indexing", $"Indexed {index.TotalDocuments} documents", currentDir, indexPath,
+            documentsIndexed: index.TotalDocuments, documentsTotal: index.TotalDocuments);
 
         if (_outputFormat != OutputFormat.Json)
         {
@@ -68,19 +98,36 @@ public sealed class DocsIndexHandler
             _progress.Info($"Index written to: {Path.GetRelativePath(currentDir, indexPath)}");
         }
 
-        // Auto-extract requirements if AI provider is configured
-        await TryExtractRequirementsAsync(currentDir, config, ct);
+        // Phase 3: Auto-extract acceptance criteria (unless skipped)
+        int? criteriaExtracted = null;
+        string? criteriaFile = null;
+        if (!_skipCriteria)
+        {
+            WriteProgressResult("extracting-criteria", "Extracting acceptance criteria...", currentDir, indexPath,
+                documentsIndexed: index.TotalDocuments, documentsTotal: index.TotalDocuments);
+
+            (criteriaExtracted, criteriaFile) = await TryExtractCriteriaAsync(currentDir, config, ct);
+        }
+
+        // Phase 4: Completed — write final result
+        var result = new DocsIndexResult
+        {
+            Command = "docs-index",
+            Status = "completed",
+            Message = "Documentation index updated",
+            DocumentsIndexed = index.TotalDocuments,
+            DocumentsUpdated = index.TotalDocuments,
+            DocumentsTotal = index.TotalDocuments,
+            IndexPath = Path.GetRelativePath(currentDir, indexPath),
+            CriteriaExtracted = criteriaExtracted,
+            CriteriaFile = criteriaFile
+        };
+
+        WriteResultFile(result, isTerminal: true);
 
         if (_outputFormat == OutputFormat.Json)
         {
-            JsonResultWriter.Write(new DocsIndexResult
-            {
-                Command = "docs-index",
-                Status = "success",
-                DocumentsIndexed = index.TotalDocuments,
-                DocumentsUpdated = index.TotalDocuments,
-                IndexPath = Path.GetRelativePath(currentDir, indexPath)
-            });
+            JsonResultWriter.Write(result);
             return ExitCodes.Success;
         }
 
@@ -88,15 +135,16 @@ public sealed class DocsIndexHandler
         return ExitCodes.Success;
     }
 
-    private async Task TryExtractRequirementsAsync(string currentDir, SpectraConfig config, CancellationToken ct)
+    private async Task<(int? criteriaCount, string? criteriaFile)> TryExtractCriteriaAsync(
+        string currentDir, SpectraConfig config, CancellationToken ct)
     {
         var provider = config.Ai.Providers.FirstOrDefault(p => p.Enabled);
         if (provider is null)
-            return;
+            return (null, null);
 
         var reqsPath = Path.Combine(currentDir, config.Coverage.RequirementsFile);
 
-        // Ensure requirements directory exists
+        // Ensure criteria directory exists
         var reqsDir = Path.GetDirectoryName(reqsPath);
         if (!string.IsNullOrEmpty(reqsDir))
             Directory.CreateDirectory(reqsDir);
@@ -108,10 +156,10 @@ public sealed class DocsIndexHandler
         var documentMap = await docBuilder.BuildAsync(currentDir, ct);
 
         if (documentMap.Documents.Count == 0)
-            return;
+            return (0, null);
 
         if (_verbosity >= VerbosityLevel.Normal)
-            _progress.Info($"Extracting requirements from {documentMap.Documents.Count} document(s)...");
+            _progress.Info($"Extracting acceptance criteria from {documentMap.Documents.Count} document(s)...");
 
         try
         {
@@ -127,8 +175,8 @@ public sealed class DocsIndexHandler
 
             if (completed == deadlineTask)
             {
-                _progress.Warning("Requirements extraction timed out. Run 'spectra ai analyze --extract-requirements' separately.");
-                return;
+                _progress.Warning("Acceptance criteria extraction timed out. Run 'spectra ai analyze --extract-criteria' separately.");
+                return (0, null);
             }
 
             var extracted = await extractTask;
@@ -136,21 +184,23 @@ public sealed class DocsIndexHandler
             if (extracted.Count == 0)
             {
                 if (_verbosity >= VerbosityLevel.Normal)
-                    _progress.Info("No new requirements found in documentation.");
-                return;
+                    _progress.Info("No new acceptance criteria found in documentation.");
+                return (0, null);
             }
 
             if (_dryRun)
             {
-                _progress.Info($"Would extract {extracted.Count} requirement(s) (dry run).");
-                return;
+                _progress.Info($"Would extract {extracted.Count} acceptance criteria (dry run).");
+                return (extracted.Count, null);
             }
 
             var writer = new RequirementsWriter();
             var writeResult = await writer.MergeAndWriteAsync(reqsPath, extracted, ct);
 
-            _progress.Success($"Requirements extracted: {writeResult.Merged.Count} new, " +
+            _progress.Success($"Acceptance criteria extracted: {writeResult.Merged.Count} new, " +
                               $"{writeResult.SkippedCount} duplicates skipped, {writeResult.TotalInFile} total");
+
+            return (writeResult.TotalInFile, Path.GetRelativePath(currentDir, reqsPath));
         }
         catch (OperationCanceledException)
         {
@@ -158,9 +208,10 @@ public sealed class DocsIndexHandler
         }
         catch (Exception ex)
         {
-            _progress.Warning($"Requirements extraction failed: {ex.Message}");
+            _progress.Warning($"Acceptance criteria extraction failed: {ex.Message}");
             if (_verbosity >= VerbosityLevel.Detailed)
                 Console.Error.WriteLine(ex.StackTrace);
+            return (null, null);
         }
     }
 
@@ -177,6 +228,100 @@ public sealed class DocsIndexHandler
         catch (JsonException)
         {
             return null;
+        }
+    }
+
+    // ── Result/progress file helpers ──
+
+    private static string GetResultFilePath() =>
+        Path.Combine(Directory.GetCurrentDirectory(), ".spectra-result.json");
+
+    private static string GetProgressPagePath() =>
+        Path.Combine(Directory.GetCurrentDirectory(), ".spectra-progress.html");
+
+    private static void DeleteResultFiles()
+    {
+        try
+        {
+            var resultPath = GetResultFilePath();
+            if (File.Exists(resultPath))
+                File.Delete(resultPath);
+
+            var progressPath = GetProgressPagePath();
+            if (File.Exists(progressPath))
+                File.Delete(progressPath);
+        }
+        catch
+        {
+            // Non-critical
+        }
+    }
+
+    private static void FlushWriteFile(string path, string json)
+    {
+        using var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+        using var writer = new StreamWriter(fs);
+        writer.Write(json);
+        writer.Flush();
+        fs.Flush(true); // Force OS to flush to disk
+    }
+
+    private static void WriteResultFile(DocsIndexResult result, bool isTerminal)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(result, ResultFileOptions);
+            FlushWriteFile(GetResultFilePath(), json);
+            Progress.ProgressPageWriter.WriteProgressPage(GetProgressPagePath(), json, isTerminal);
+        }
+        catch
+        {
+            // Non-critical
+        }
+    }
+
+    private static void WriteProgressResult(string status, string message, string currentDir, string indexPath,
+        int documentsIndexed = 0, int documentsTotal = 0)
+    {
+        try
+        {
+            var result = new DocsIndexResult
+            {
+                Command = "docs-index",
+                Status = status,
+                Message = message,
+                DocumentsIndexed = documentsIndexed,
+                DocumentsTotal = documentsTotal,
+                IndexPath = Path.GetRelativePath(currentDir, indexPath)
+            };
+            var json = JsonSerializer.Serialize(result, ResultFileOptions);
+            FlushWriteFile(GetResultFilePath(), json);
+            Progress.ProgressPageWriter.WriteProgressPage(GetProgressPagePath(), json, isTerminal: false);
+        }
+        catch
+        {
+            // Non-critical
+        }
+    }
+
+    private static void WriteErrorResult(string error)
+    {
+        try
+        {
+            var result = new DocsIndexResult
+            {
+                Command = "docs-index",
+                Status = "failed",
+                Message = error,
+                IndexPath = ""
+            };
+            var json = JsonSerializer.Serialize(result, ResultFileOptions);
+            FlushWriteFile(GetResultFilePath(), json);
+            Progress.ProgressPageWriter.WriteProgressPage(GetProgressPagePath(), json, isTerminal: true);
+        }
+        catch
+        {
+            // Non-critical
         }
     }
 }

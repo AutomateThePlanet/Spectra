@@ -93,7 +93,7 @@ public class ProgressPageWriterTests : IDisposable
         ProgressPageWriter.WriteProgressPage(path, json, isTerminal: true);
 
         var content = File.ReadAllText(path);
-        Assert.Contains("Generation Complete", content, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Complete", content, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

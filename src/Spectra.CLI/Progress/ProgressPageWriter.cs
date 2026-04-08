@@ -175,9 +175,9 @@ public static class ProgressPageWriter
                         letter-spacing: 0.05em;
                         margin-bottom: 1rem;
                     }
-                    .status-badge.analyzing { background: var(--color-primary-light); color: var(--color-primary); }
+                    .status-badge.analyzing, .status-badge.scanning { background: var(--color-primary-light); color: var(--color-primary); }
                     .status-badge.analyzed { background: var(--color-passed-bg); color: var(--color-passed); }
-                    .status-badge.generating { background: var(--color-warning-bg); color: var(--color-warning); }
+                    .status-badge.generating, .status-badge.indexing, .status-badge.extracting-criteria { background: var(--color-warning-bg); color: var(--color-warning); }
                     .status-badge.completed { background: var(--color-passed-bg); color: var(--color-passed); }
                     .status-badge.failed { background: var(--color-failed-bg); color: var(--color-failed); }
                     .suite-name { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
@@ -331,7 +331,7 @@ public static class ProgressPageWriter
             <body>
                 <nav class="nav">
                     <span class="nav-logo">SPECTRA</span>
-                    <span class="nav-title">Test Generation Progress</span>
+                    <span class="nav-title">Progress</span>
                 </nav>
                 <div class="container" data-workspace="{{escapedRoot}}">
                     {{BuildBody(jsonData, isTerminal, workspaceRoot)}}
@@ -387,6 +387,24 @@ public static class ProgressPageWriter
                 }
             }
 
+            // Docs index summary cards
+            if (root.TryGetProperty("documents_total", out var dt2))
+            {
+                var docsTotal = dt2.GetInt32();
+                var docsIndexed = root.TryGetProperty("documents_indexed", out var di) ? di.GetInt32() : 0;
+                var docsSkipped = root.TryGetProperty("documents_skipped", out var ds) ? ds.GetInt32() : 0;
+                var criteriaExtracted = root.TryGetProperty("criteria_extracted", out var ce) ? ce.GetInt32() : (int?)null;
+
+                sb.Append("""<div class="summary-grid">""");
+                sb.Append($"""<div class="summary-card"><div class="summary-number">{docsTotal}</div><div class="summary-label">Documents Found</div></div>""");
+                sb.Append($"""<div class="summary-card"><div class="summary-number green">{docsIndexed}</div><div class="summary-label">Indexed</div></div>""");
+                if (docsSkipped > 0)
+                    sb.Append($"""<div class="summary-card"><div class="summary-number muted">{docsSkipped}</div><div class="summary-label">Skipped</div></div>""");
+                if (criteriaExtracted.HasValue)
+                    sb.Append($"""<div class="summary-card"><div class="summary-number">{criteriaExtracted.Value}</div><div class="summary-label">Criteria Extracted</div></div>""");
+                sb.Append("</div>");
+            }
+
             // Error section
             if (status == "failed" && !string.IsNullOrEmpty(error))
             {
@@ -429,14 +447,28 @@ public static class ProgressPageWriter
         }
     }
 
+    private static bool IsDocsIndexCommand(string status) =>
+        status is "scanning" or "indexing" or "extracting-criteria";
+
     private static string BuildStepper(string status)
     {
-        var phases = new[] { "analyzing", "analyzed", "generating", "completed" };
+        // Determine which phase set to use based on status
+        var isDocsIndex = IsDocsIndexCommand(status);
+        var phases = isDocsIndex
+            ? new[] { "scanning", "indexing", "extracting-criteria", "completed" }
+            : new[] { "analyzing", "analyzed", "generating", "completed" };
+
         var currentIdx = status switch
         {
+            // Generate phases
             "analyzing" => 0,
             "analyzed" => 1,
             "generating" => 2,
+            // Docs index phases
+            "scanning" => 0,
+            "indexing" => 1,
+            "extracting-criteria" => 2,
+            // Shared
             "completed" => 3,
             "failed" => -1,
             _ => -1
@@ -463,6 +495,9 @@ public static class ProgressPageWriter
                 "analyzing" => "Analyzing",
                 "analyzed" => "Analyzed",
                 "generating" => "Generating",
+                "scanning" => "Scanning",
+                "indexing" => "Indexing",
+                "extracting-criteria" => "Extracting Criteria",
                 "completed" => "Completed",
                 _ => phases[i]
             };
@@ -476,7 +511,7 @@ public static class ProgressPageWriter
 
     private static string BuildStatusCard(string status, string suite, string message, string timestamp)
     {
-        var spinnerHtml = status is "analyzing" or "generating"
+        var spinnerHtml = status is "analyzing" or "generating" or "scanning" or "indexing" or "extracting-criteria"
             ? """<span class="spinner"></span>"""
             : "";
 
@@ -485,7 +520,10 @@ public static class ProgressPageWriter
             "analyzing" => "Analyzing Documentation",
             "analyzed" => "Analysis Complete",
             "generating" => "Generating Tests",
-            "completed" => "Generation Complete",
+            "scanning" => "Scanning Documents",
+            "indexing" => "Indexing Documents",
+            "extracting-criteria" => "Extracting Acceptance Criteria",
+            "completed" => "Complete",
             "failed" => "Failed",
             _ => status
         };

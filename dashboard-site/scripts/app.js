@@ -1331,6 +1331,7 @@ function renderCoverageGaps(summary) {
  * Render a single coverage section with progress bar, empty state, and detail toggle.
  */
 function renderCoverageSection(label, sectionData, unit, renderDetailsFn) {
+    sectionData = sectionData || { covered: 0, total: 0, percentage: 0 };
     const pct = sectionData.percentage || 0;
     const colorClass = pct >= 80 ? 'coverage-green' : pct >= 50 ? 'coverage-yellow' : 'coverage-red';
     const covered = sectionData.covered || 0;
@@ -1383,7 +1384,7 @@ function getEmptyState(label, sectionData, total, pct) {
             return `<div class="coverage-empty-state">
                 <span class="empty-icon">&#9432;</span>
                 <div class="empty-text"><strong>No acceptance criteria tracked yet.</strong>
-                Add a <code>requirements</code> field to test YAML frontmatter, or create a <code>_criteria_index.yaml</code> file in your docs directory.</div>
+                Add a <code>criteria</code> field to test YAML frontmatter, or create a <code>_criteria_index.yaml</code> file in your docs directory.</div>
             </div>`;
         }
         return null;

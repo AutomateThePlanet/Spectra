@@ -15,4 +15,5 @@ public static class SkillContent
     public static string InitProfile => All["spectra-init-profile"];
     public static string Help => All["spectra-help"];
     public static string Criteria => All["spectra-criteria"];
+    public static string DocsIndex => All["spectra-docs"];
 }

@@ -652,7 +652,7 @@ public sealed class DataCollector
     {
         try
         {
-            // Build a lookup from test ID → index entry for requirements/automated_by
+            // Build a lookup from test ID → index entry for criteria/automated_by
             // Use first-wins for duplicate IDs across suites
             var indexEntryLookup = new Dictionary<string, TestIndexEntry>(StringComparer.OrdinalIgnoreCase);
             foreach (var entry in suiteIndexes.Values.SelectMany(idx => idx.Tests))
@@ -850,7 +850,12 @@ public sealed class DataCollector
         }
         catch
         {
-            return null;
+            return new CoverageSummaryData
+            {
+                Documentation = new DocumentationSectionData { Covered = 0, Total = 0, Percentage = 0, Details = [] },
+                AcceptanceCriteria = new AcceptanceCriteriaSectionData { Covered = 0, Total = 0, Percentage = 0, HasCriteriaFile = false, Details = [] },
+                Automation = new AutomationSectionData { Covered = 0, Total = 0, Percentage = 0, Details = [] }
+            };
         }
     }
 
