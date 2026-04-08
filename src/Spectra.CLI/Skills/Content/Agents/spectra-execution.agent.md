@@ -303,22 +303,13 @@ When the user asks for coverage, dashboard, validation, criteria extraction, doc
 
 ### Coverage
 
-#### show preview
-```
-.spectra-progress.html
-```
-
-#### runInTerminal
+**Step 1** — show preview `.spectra-progress.html`
+**Step 2** — runInTerminal:
 ```
 spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet
 ```
-
-#### awaitTerminal
-
-#### readFile
-```
-.spectra-result.json
-```
+**Step 3** — awaitTerminal. Wait for the command to finish.
+**Step 4** — readFile `.spectra-result.json`
 
 Show: Documentation coverage %, Acceptance criteria coverage %, Automation coverage %, uncovered areas.
 
@@ -326,23 +317,13 @@ Show: Documentation coverage %, Acceptance criteria coverage %, Automation cover
 
 ### Extract Acceptance Criteria
 
-#### show preview
-```
-.spectra-progress.html
-```
-
-#### runInTerminal
+**Step 1** — show preview `.spectra-progress.html`
+**Step 2** — runInTerminal:
 ```
 spectra ai analyze --extract-criteria --no-interaction --output-format json --verbosity quiet
 ```
-
-#### awaitTerminal
-Wait for the command to finish. This takes 1-5 minutes for large doc sets.
-
-#### readFile
-```
-.spectra-result.json
-```
+**Step 3** — awaitTerminal. Wait for the command to finish. This takes 1-5 minutes for large doc sets.
+**Step 4** — readFile `.spectra-result.json`
 
 Show: documents processed, criteria extracted, new/updated/unchanged counts.
 
@@ -354,27 +335,14 @@ Show: documents processed, criteria extracted, new/updated/unchanged counts.
 
 **"generate the dashboard"**, **"build the dashboard"**, **"regenerate dashboard"** → full regeneration:
 
-#### show preview
-```
-.spectra-progress.html
-```
-
-#### runInTerminal
+**Step 1** — show preview `.spectra-progress.html`
+**Step 2** — runInTerminal:
 ```
 spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet && spectra dashboard --output ./site --no-interaction --output-format json --verbosity quiet
 ```
-
-#### awaitTerminal
-
-#### readFile
-```
-.spectra-result.json
-```
-
-#### show preview
-```
-site/index.html
-```
+**Step 3** — awaitTerminal. Wait for the command to finish.
+**Step 4** — readFile `.spectra-result.json`
+**Step 5** — show preview site/index.html
 
 Report: "Dashboard generated." Show suite count and test count from result JSON.
 
@@ -390,22 +358,13 @@ Report: "Say 'regenerate dashboard' to rebuild with latest data."
 
 ### Document Index
 
-#### show preview
-```
-.spectra-progress.html
-```
-
-#### runInTerminal
+**Step 1** — show preview `.spectra-progress.html`
+**Step 2** — runInTerminal:
 ```
 spectra docs index --no-interaction --output-format json --verbosity quiet
 ```
-
-#### awaitTerminal
-
-#### readFile
-```
-.spectra-result.json
-```
+**Step 3** — awaitTerminal. Wait for the command to finish.
+**Step 4** — readFile `.spectra-result.json`
 
 Show: documents indexed, skipped, criteria extracted.
 
@@ -413,17 +372,12 @@ Show: documents indexed, skipped, criteria extracted.
 
 ### Validate
 
-#### runInTerminal
+**Step 1** — runInTerminal:
 ```
 spectra validate --no-interaction --output-format json --verbosity quiet
 ```
-
-#### awaitTerminal
-
-#### readFile
-```
-.spectra-result.json
-```
+**Step 2** — awaitTerminal. Wait for the command to finish.
+**Step 3** — readFile `.spectra-result.json`
 
 If no errors: "All tests are valid." If errors: list each with file and message.
 
@@ -431,7 +385,7 @@ If no errors: "All tests are valid." If errors: list each with file and message.
 
 ### List / Show
 
-#### runInTerminal
+**Step 1** — runInTerminal:
 ```
 spectra list --no-interaction --output-format json --verbosity quiet
 ```
@@ -439,12 +393,7 @@ or
 ```
 spectra show {test-id} --no-interaction --output-format json --verbosity quiet
 ```
-
-#### awaitTerminal
-
-#### readFile
-```
-.spectra-result.json
-```
+**Step 2** — awaitTerminal
+**Step 3** — readFile `.spectra-result.json` or terminalLastCommand
 
 Parse and show results.
