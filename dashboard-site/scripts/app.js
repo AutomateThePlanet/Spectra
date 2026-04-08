@@ -924,7 +924,7 @@ function renderThreeSectionCoverage(summary) {
     // Coverage sections (progress bars + detail lists)
     html += '<div class="coverage-sections">';
     html += renderCoverageSection('Documentation Coverage', summary.documentation, 'documents', renderDocDetails);
-    html += renderCoverageSection('Acceptance Criteria Coverage', summary.acceptance_criteria, 'acceptance_criteria', renderCriteriaDetails);
+    html += renderCoverageSection('Acceptance Criteria Coverage', summary.acceptance_criteria, 'criteria', renderCriteriaDetails);
     html += renderCoverageSection('Automation Coverage', summary.automation, 'tests', renderAutoDetails);
     html += '</div>';
 
@@ -1384,7 +1384,7 @@ function getEmptyState(label, sectionData, total, pct) {
             return `<div class="coverage-empty-state">
                 <span class="empty-icon">&#9432;</span>
                 <div class="empty-text"><strong>No acceptance criteria tracked yet.</strong>
-                Add a <code>criteria</code> field to test YAML frontmatter, or create a <code>_criteria_index.yaml</code> file in your docs directory.</div>
+                Add a <code>criteria</code> field to test YAML frontmatter, or run <code>spectra ai analyze --extract-criteria</code> to extract from documentation.</div>
             </div>`;
         }
         return null;

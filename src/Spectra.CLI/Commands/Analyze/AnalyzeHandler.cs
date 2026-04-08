@@ -75,6 +75,9 @@ public sealed class AnalyzeHandler
                 return ExitCodes.Error;
             }
 
+            // Migrate criteria folder from docs/requirements/ to docs/criteria/ if needed
+            await MigrateCriteriaFolderAsync(basePath, _verbosity);
+
             progress.Update("scanning-tests", "Scanning test suites...");
 
             if (_verbosity >= VerbosityLevel.Normal)
@@ -284,6 +287,9 @@ public sealed class AnalyzeHandler
                 return ExitCodes.Error;
             }
 
+            // Migrate criteria folder from docs/requirements/ to docs/criteria/ if needed
+            await MigrateCriteriaFolderAsync(currentDir, _verbosity);
+
             // Resolve criteria directory and index file paths
             var criteriaDir = Path.Combine(currentDir, config.Coverage.CriteriaDir);
             var criteriaIndexPath = Path.Combine(currentDir, config.Coverage.CriteriaFile);
@@ -379,6 +385,14 @@ public sealed class AnalyzeHandler
 
             foreach (var doc in documentMap.Documents)
             {
+                // Skip metadata and criteria files — they are not source documentation
+                var docFileName = Path.GetFileName(doc.Path);
+                if (ShouldSkipDocument(docFileName))
+                {
+                    documentsSkipped++;
+                    continue;
+                }
+
                 var docFullPath = Path.Combine(currentDir, doc.Path);
                 processedSourceDocs.Add(doc.Path);
 
@@ -750,6 +764,9 @@ public sealed class AnalyzeHandler
                 }
                 return ExitCodes.Error;
             }
+
+            // Migrate criteria folder from docs/requirements/ to docs/criteria/ if needed
+            await MigrateCriteriaFolderAsync(currentDir, _verbosity);
 
             var criteriaDir = Path.Combine(currentDir, config.Coverage.CriteriaDir);
             var criteriaIndexPath = Path.Combine(currentDir, config.Coverage.CriteriaFile);
@@ -1565,6 +1582,74 @@ public sealed class AnalyzeHandler
         if (_verbosity >= VerbosityLevel.Normal)
         {
             Console.WriteLine($"  Auto-linked {links.Count} tests to automation code ({updatedCount} files updated)");
+        }
+    }
+
+    /// <summary>
+    /// Returns true if the document should be skipped during criteria extraction.
+    /// Metadata files, criteria files, and index files are not source documentation.
+    /// </summary>
+    internal static bool ShouldSkipDocument(string fileName)
+    {
+        // Skip document index files — they are metadata, not source documentation
+        if (fileName.Equals("_index.md", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Equals("_index.yaml", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Equals("_index.json", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Skip criteria files themselves (avoid circular extraction)
+        if (fileName.EndsWith(".criteria.yaml", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Skip the criteria index
+        if (fileName.Equals("_criteria_index.yaml", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    }
+
+    /// <summary>
+    /// Migrates the criteria folder from docs/requirements/ to docs/criteria/ if needed.
+    /// Also cleans up _index.criteria.yaml if present.
+    /// </summary>
+    internal static async Task MigrateCriteriaFolderAsync(string basePath, VerbosityLevel verbosity)
+    {
+        var oldDir = Path.Combine(basePath, "docs", "requirements");
+        var newDir = Path.Combine(basePath, "docs", "criteria");
+
+        if (Directory.Exists(oldDir) && !Directory.Exists(newDir))
+        {
+            Directory.Move(oldDir, newDir);
+            if (verbosity >= VerbosityLevel.Normal)
+                Console.Error.WriteLine("Migrated criteria folder: docs/requirements/ → docs/criteria/");
+
+            // Update spectra.config.json if it references old paths
+            var configPath = Path.Combine(basePath, "spectra.config.json");
+            if (File.Exists(configPath))
+            {
+                var configText = await File.ReadAllTextAsync(configPath);
+                if (configText.Contains("docs/requirements"))
+                {
+                    configText = configText.Replace("docs/requirements", "docs/criteria");
+                    await File.WriteAllTextAsync(configPath, configText);
+                    if (verbosity >= VerbosityLevel.Normal)
+                        Console.Error.WriteLine("Updated spectra.config.json: docs/requirements → docs/criteria");
+                }
+            }
+        }
+        else if (Directory.Exists(oldDir) && Directory.Exists(newDir))
+        {
+            if (verbosity >= VerbosityLevel.Normal)
+                Console.Error.WriteLine("Warning: Both docs/requirements/ and docs/criteria/ exist. Skipping migration.");
+        }
+
+        // Clean up _index.criteria.yaml if present (should not exist)
+        var indexCriteriaYaml = Path.Combine(newDir, "_index.criteria.yaml");
+        if (File.Exists(indexCriteriaYaml))
+        {
+            File.Delete(indexCriteriaYaml);
+            if (verbosity >= VerbosityLevel.Normal)
+                Console.Error.WriteLine("Removed _index.criteria.yaml (metadata file should not be extracted)");
         }
     }
 }

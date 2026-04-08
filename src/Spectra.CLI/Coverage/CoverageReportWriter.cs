@@ -104,7 +104,7 @@ public sealed class CoverageReportWriter
 
         if (!criteria.HasCriteriaFile && criteria.TotalCriteria == 0)
         {
-            sb.AppendLine("No acceptance criteria file found. Create `docs/requirements/_criteria_index.yaml` to track acceptance criteria coverage.");
+            sb.AppendLine("No acceptance criteria file found. Run `spectra ai analyze --extract-criteria` to extract from documentation, or create `docs/criteria/_criteria_index.yaml` manually.");
             sb.AppendLine();
         }
         else

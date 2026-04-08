@@ -88,7 +88,7 @@ When no criteria file exists, SPECTRA discovers criteria from test frontmatter o
 
 ### Criteria File Format
 
-Create `docs/requirements/_criteria_index.yaml` (or use `spectra ai analyze --extract-criteria` to auto-generate):
+Create `docs/criteria/_criteria_index.yaml` (or use `spectra ai analyze --extract-criteria` to auto-generate):
 
 ```yaml
 criteria:
@@ -162,7 +162,7 @@ Full coverage settings in `spectra.config.json`:
     "automation_dirs": ["tests", "test", "spec", "e2e"],
     "scan_patterns": ["[TestCase(\"{id}\")]", "@pytest.mark.manual_test(\"{id}\")"],
     "file_extensions": [".cs", ".java", ".py", ".ts"],
-    "criteria_file": "docs/requirements/_criteria_index.yaml"
+    "criteria_file": "docs/criteria/_criteria_index.yaml"
   }
 }
 ```

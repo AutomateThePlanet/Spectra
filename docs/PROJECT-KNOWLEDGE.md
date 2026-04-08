@@ -129,7 +129,7 @@ spectra init --skip-skills      # Skip SKILL/agent file creation
 spectra init --no-interactive   # Non-interactive mode
 ```
 
-Creates: `spectra.config.json`, `tests/`, `docs/`, `docs/requirements/_criteria_index.yaml`, `templates/bug-report.md`, `.github/skills/` (9 SKILLs), `.github/agents/` (2 agents), `.vscode/mcp.json`, `.github/workflows/deploy-dashboard.yml`
+Creates: `spectra.config.json`, `tests/`, `docs/`, `docs/criteria/_criteria_index.yaml`, `templates/bug-report.md`, `.github/skills/` (9 SKILLs), `.github/agents/` (2 agents), `.vscode/mcp.json`, `.github/workflows/deploy-dashboard.yml`
 
 #### `spectra ai generate`
 
@@ -408,7 +408,7 @@ Generated in three formats: JSON, Markdown, HTML. Features: test titles from `_i
     "automation_dirs": [],
     "scan_patterns": ["**/*.cs", "**/*.ts", "**/*.js", "**/*.py"],
     "file_extensions": [".cs", ".ts", ".js", ".py"],
-    "criteria_file": "docs/requirements/_criteria_index.yaml"
+    "criteria_file": "docs/criteria/_criteria_index.yaml"
   },
   "execution": {
     "db_path": ".execution/spectra.db",

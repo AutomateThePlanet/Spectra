@@ -240,8 +240,8 @@ public sealed class UpdateHandler
         IReadOnlyList<AcceptanceCriterion>? suiteCriteria = null;
         try
         {
-            var criteriaDir = Path.Combine(basePath, config.Coverage?.CriteriaDir ?? "docs/requirements");
-            var criteriaFile = Path.Combine(basePath, config.Coverage?.CriteriaFile ?? "docs/requirements/_criteria_index.yaml");
+            var criteriaDir = Path.Combine(basePath, config.Coverage?.CriteriaDir ?? "docs/criteria");
+            var criteriaFile = Path.Combine(basePath, config.Coverage?.CriteriaFile ?? "docs/criteria/_criteria_index.yaml");
             suiteCriteria = await GroundedPromptBuilder.LoadRelatedCriteriaAsync(
                 criteriaDir, criteriaFile, suite, ct);
         }

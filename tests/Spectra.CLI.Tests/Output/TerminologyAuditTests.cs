@@ -6,14 +6,14 @@ public class TerminologyAuditTests
 {
     /// <summary>
     /// Ensures SKILL content uses "acceptance criteria" (not "requirements") in user-facing text.
-    /// Excludes: directory paths (docs/requirements/), hidden CLI alias (--extract-requirements).
+    /// Excludes: directory paths (docs/criteria/), hidden CLI alias (--extract-requirements).
     /// </summary>
     [Fact]
     public void SkillContent_DoesNotContain_OldRequirementTerminology()
     {
         var allowedExceptions = new[]
         {
-            "docs/requirements/",        // Directory path, not terminology
+            "docs/criteria/",            // Directory path, not terminology
             "--extract-requirements",     // Hidden backward-compat alias
         };
 

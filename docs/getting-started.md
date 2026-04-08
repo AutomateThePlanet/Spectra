@@ -38,7 +38,7 @@ my-project/
 ├── docs/                                        # Put your documentation here
 │   └── _index.md                                # Document index (auto-built if docs exist)
 ├── tests/                                       # Generated tests go here
-├── docs/requirements/
+├── docs/criteria/
 │   └── _criteria_index.yaml                     # Acceptance criteria index
 ├── .github/
 │   ├── agents/
@@ -71,8 +71,8 @@ docs/
 │   └── user-profile.md
 ├── api/
 │   └── endpoints.md
-└── requirements/
-    └── business-rules.md
+└── criteria/
+    └── _criteria_index.yaml
 ```
 
 ## Configure

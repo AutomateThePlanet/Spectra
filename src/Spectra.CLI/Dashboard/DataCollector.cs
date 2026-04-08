@@ -726,42 +726,34 @@ public sealed class DataCollector
                     var config = JsonSerializer.Deserialize<SpectraConfig>(configJson, s_jsonOptions);
                     if (config is not null)
                     {
+                        var criteriaDir = Path.Combine(_basePath, config.Coverage.CriteriaDir);
                         var criteriaFilePath = Path.Combine(_basePath, config.Coverage.CriteriaFile);
-                        var criteriaParser = new AcceptanceCriteriaParser();
-                        var criteria = await criteriaParser.ParseAsync(criteriaFilePath);
-                        hasCriteriaFile = File.Exists(criteriaFilePath) && criteria.Count > 0;
 
-                        // Build criterion ID → covering test IDs
-                        var criterionToTests = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+                        // Build TestCase list from test entries for the analyzer
+                        var testCases = new List<TestCase>();
                         foreach (var test in testEntries)
                         {
                             if (indexEntryLookup.TryGetValue(test.Id, out var idxEntry))
                             {
-                                foreach (var criterionId in idxEntry.Requirements)
+                                testCases.Add(new TestCase
                                 {
-                                    if (!criterionToTests.TryGetValue(criterionId, out var list))
-                                    {
-                                        list = [];
-                                        criterionToTests[criterionId] = list;
-                                    }
-                                    list.Add(test.Id);
-                                }
+                                    Id = test.Id,
+                                    Title = test.Title,
+                                    FilePath = string.Empty,
+                                    Priority = Priority.Medium,
+                                    ExpectedResult = string.Empty,
+                                    Requirements = idxEntry.Requirements,
+                                    Criteria = idxEntry.Criteria
+                                });
                             }
                         }
 
-                        foreach (var criterion in criteria)
-                        {
-                            var testIds = criterionToTests.TryGetValue(criterion.Id, out var ids)
-                                ? ids.OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList()
-                                : [];
-                            criteriaDetails.Add(new Core.Models.Coverage.CriteriaCoverageDetail
-                            {
-                                Id = criterion.Id,
-                                Text = criterion.Text,
-                                Tests = testIds,
-                                Covered = testIds.Count > 0
-                            });
-                        }
+                        // Use the proper analyzer that reads per-document .criteria.yaml files
+                        var analyzer = new AcceptanceCriteriaCoverageAnalyzer();
+                        var criteriaCoverage = await analyzer.AnalyzeAsync(criteriaFilePath, testCases);
+
+                        hasCriteriaFile = criteriaCoverage.HasCriteriaFile;
+                        criteriaDetails.AddRange(criteriaCoverage.Details);
                     }
                 }
                 catch

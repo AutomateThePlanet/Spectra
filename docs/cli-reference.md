@@ -38,7 +38,7 @@ Initialize a repository for SPECTRA.
 spectra init
 ```
 
-Creates `spectra.config.json`, `docs/`, `tests/`, `docs/requirements/_requirements.yaml`, `.github/skills/` (6 SKILL files), and `.github/agents/` (2 agent prompts).
+Creates `spectra.config.json`, `docs/`, `tests/`, `docs/criteria/_criteria_index.yaml`, `.github/skills/` (6 SKILL files), and `.github/agents/` (2 agent prompts).
 
 **Options:**
 

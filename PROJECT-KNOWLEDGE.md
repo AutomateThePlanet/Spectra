@@ -156,7 +156,7 @@ User is redirected to dashboard with welcome message
 docs/
 ├── feature1.md                          # Source documentation
 ├── feature2.md
-└── requirements/
+└── criteria/
     ├── _criteria_index.yaml             # Master index (auto-generated)
     ├── feature1.criteria.yaml           # Per-document criteria
     ├── feature2.criteria.yaml
@@ -275,8 +275,8 @@ Three-section unified coverage:
     "critic": { "provider": "azure-anthropic", "model": "claude-sonnet-4-5" }
   },
   "coverage": {
-    "criteria_file": "docs/requirements/_criteria_index.yaml",
-    "criteria_dir": "docs/requirements",
+    "criteria_file": "docs/criteria/_criteria_index.yaml",
+    "criteria_dir": "docs/criteria",
     "automation_dirs": ["tests"]
   }
 }

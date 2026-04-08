@@ -418,7 +418,7 @@ public sealed class InitHandler
             Path.Combine(_workingDirectory, DocsDir),
             Path.Combine(_workingDirectory, TestsDir),
             Path.Combine(_workingDirectory, ".github", "skills", "test-generation"),
-            Path.Combine(_workingDirectory, DocsDir, "requirements"),
+            Path.Combine(_workingDirectory, DocsDir, "criteria"),
             Path.Combine(_workingDirectory, TemplatesDir)
         };
 
@@ -437,7 +437,7 @@ public sealed class InitHandler
 
     private async Task CreateAcceptanceCriteriaTemplateAsync(CancellationToken ct)
     {
-        var criteriaIndexPath = Path.Combine(_workingDirectory, DocsDir, "requirements", "_criteria_index.yaml");
+        var criteriaIndexPath = Path.Combine(_workingDirectory, DocsDir, "criteria", "_criteria_index.yaml");
         if (!File.Exists(criteriaIndexPath))
         {
             const string indexTemplate = """
@@ -451,7 +451,7 @@ public sealed class InitHandler
             _logger.LogDebug("Created acceptance criteria index: {Path}", criteriaIndexPath);
         }
 
-        var samplePath = Path.Combine(_workingDirectory, DocsDir, "requirements", "sample.criteria.yaml");
+        var samplePath = Path.Combine(_workingDirectory, DocsDir, "criteria", "sample.criteria.yaml");
         if (!File.Exists(samplePath))
         {
             const string sampleTemplate = """

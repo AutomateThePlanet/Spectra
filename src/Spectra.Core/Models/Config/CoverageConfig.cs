@@ -100,13 +100,13 @@ public sealed class CoverageConfig
     /// Path to the criteria index YAML file.
     /// </summary>
     [JsonPropertyName("criteria_file")]
-    public string CriteriaFile { get; init; } = "docs/requirements/_criteria_index.yaml";
+    public string CriteriaFile { get; init; } = "docs/criteria/_criteria_index.yaml";
 
     /// <summary>
     /// Directory containing criteria files.
     /// </summary>
     [JsonPropertyName("criteria_dir")]
-    public string CriteriaDir { get; init; } = "docs/requirements";
+    public string CriteriaDir { get; init; } = "docs/criteria";
 
     /// <summary>
     /// Import configuration for criteria.

@@ -181,7 +181,9 @@ See [Coverage](coverage.md) for how these settings are used.
 | `automation_dirs` | string[] | `["tests", "test", "spec", "specs", "e2e"]` | Directories to scan for automation code |
 | `scan_patterns` | string[] | (framework defaults) | Templates where `{id}` is replaced with test ID regex |
 | `file_extensions` | string[] | `[".cs", ".java", ".py", ".ts"]` | File types to scan for test references |
-| `requirements_file` | string | `"docs/requirements/_requirements.yaml"` | Path to requirements YAML file |
+| `requirements_file` | string | `"docs/requirements/_requirements.yaml"` | Path to legacy requirements YAML file |
+| `criteria_file` | string | `"docs/criteria/_criteria_index.yaml"` | Path to acceptance criteria index |
+| `criteria_dir` | string | `"docs/criteria"` | Directory containing per-document `.criteria.yaml` files |
 | `file_patterns` | string[] | `["*.cs", "*.ts", "*.js", "*.py", "*.java"]` | Glob patterns for automation files (legacy) |
 | `attribute_patterns` | string[] | (framework defaults) | Regex patterns for test attributes (legacy, use `scan_patterns` instead) |
 | `test_id_pattern` | string | `"TC-\\d{3,}"` | Regex for matching test IDs |
