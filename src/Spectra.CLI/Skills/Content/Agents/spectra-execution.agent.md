@@ -297,16 +297,17 @@ Show this reference:
 
 ## CLI Commands via Terminal
 
-When the user asks for coverage, dashboard, validation, or other non-execution tasks, run them via `runInTerminal`. **NEVER create files manually — always use the CLI. NEVER use MCP tools for these — use the CLI commands below.**
+When the user asks for coverage, dashboard, validation, criteria extraction, docs indexing, or other non-execution tasks, run them via `runInTerminal`. **NEVER create files manually — always use the CLI. NEVER use MCP tools for these — use the CLI commands below. NEVER search the web for how to do these — the commands are listed below.**
 
 ### Coverage
 
-**Step 1** — runInTerminal:
+**Step 1** — show preview `.spectra-progress.html`
+**Step 2** — runInTerminal:
 ```
-spectra ai analyze --coverage --auto-link --format markdown --output coverage.md --no-interaction
+spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet
 ```
-**Step 2** — awaitTerminal. Wait for the command to finish.
-**Step 3** — readFile `coverage.md`
+**Step 3** — awaitTerminal. Wait for the command to finish.
+**Step 4** — readFile `.spectra-result.json`
 
 Show: Documentation coverage %, Acceptance criteria coverage %, Automation coverage %, uncovered areas.
 
@@ -314,12 +315,13 @@ Show: Documentation coverage %, Acceptance criteria coverage %, Automation cover
 
 ### Extract Acceptance Criteria
 
-**Step 1** — runInTerminal:
+**Step 1** — show preview `.spectra-progress.html`
+**Step 2** — runInTerminal:
 ```
-spectra ai analyze --extract-criteria --no-interaction
+spectra ai analyze --extract-criteria --no-interaction --output-format json --verbosity quiet
 ```
-**Step 2** — awaitTerminal. Wait for the command to finish. This takes 1-5 minutes for large doc sets.
-**Step 3** — readFile `.spectra-result.json`
+**Step 3** — awaitTerminal. Wait for the command to finish. This takes 1-5 minutes for large doc sets.
+**Step 4** — readFile `.spectra-result.json`
 
 Show: documents processed, criteria extracted, new/updated/unchanged counts.
 
@@ -327,18 +329,20 @@ Show: documents processed, criteria extracted, new/updated/unchanged counts.
 
 ### Dashboard
 
-**NEVER use MCP tools for dashboard — always use the CLI commands below.**
+**NEVER use MCP tools for dashboard — always use the CLI commands below. NEVER search the web — the commands are right here.**
 
 **"generate the dashboard"**, **"build the dashboard"**, **"regenerate dashboard"**:
 
-**Step 1** — runInTerminal:
+**Step 1** — show preview `.spectra-progress.html`
+**Step 2** — runInTerminal:
 ```
-spectra ai analyze --coverage --auto-link --no-interaction && spectra dashboard --output ./site --no-interaction
+spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet && spectra dashboard --output ./site --no-interaction --output-format json --verbosity quiet
 ```
-**Step 2** — awaitTerminal. Wait for the command to finish.
-**Step 3**: show preview site/index.html
+**Step 3** — awaitTerminal. Wait for the command to finish.
+**Step 4** — readFile `.spectra-result.json`
+**Step 5** — show preview site/index.html
 
-Report: "Dashboard generated."
+Report: "Dashboard generated." Show suite count and test count from result JSON.
 
 ---
 
@@ -348,14 +352,28 @@ show preview site/index.html
 
 ---
 
+### Document Index
+
+**Step 1** — show preview `.spectra-progress.html`
+**Step 2** — runInTerminal:
+```
+spectra docs index --no-interaction --output-format json --verbosity quiet
+```
+**Step 3** — awaitTerminal.
+**Step 4** — readFile `.spectra-result.json`
+
+Show: documents indexed, skipped, criteria extracted.
+
+---
+
 ### Validate
 
 **Step 1** — runInTerminal:
 ```
-spectra validate --no-interaction
+spectra validate --no-interaction --output-format json --verbosity quiet
 ```
 **Step 2** — awaitTerminal.
-**Step 3** — readFile or check terminal output.
+**Step 3** — readFile `.spectra-result.json`
 
 If no errors: "All tests are valid." If errors: list each with file and message.
 
@@ -363,15 +381,15 @@ If no errors: "All tests are valid." If errors: list each with file and message.
 
 ### List / Show
 
-#### Tool call 1: runInTerminal
+**Step 1** — runInTerminal:
 ```
-spectra list --output-format json --verbosity quiet
+spectra list --no-interaction --output-format json --verbosity quiet
 ```
 or
 ```
-spectra show {test-id} --output-format json --verbosity quiet
+spectra show {test-id} --no-interaction --output-format json --verbosity quiet
 ```
-#### Tool call 2: awaitTerminal
-#### Tool call 3: terminalLastCommand
+**Step 2** — awaitTerminal
+**Step 3** — readFile `.spectra-result.json` or terminalLastCommand
 
 Parse and show results.
