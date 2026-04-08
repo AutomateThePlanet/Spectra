@@ -98,18 +98,22 @@ Reports a summary of updated, unchanged, and skipped files.
 
 ### `spectra docs index`
 
-Build or incrementally update the documentation index (`docs/_index.md`), then automatically extract testable requirements.
+Build or incrementally update the documentation index (`docs/_index.md`), then automatically extract acceptance criteria.
 
 ```bash
-spectra docs index                # Incremental update + auto-extract requirements
-spectra docs index --force        # Full rebuild + auto-extract requirements
+spectra docs index                # Incremental update + auto-extract acceptance criteria
+spectra docs index --force        # Full rebuild + auto-extract acceptance criteria
+spectra docs index --skip-criteria  # Index only, skip criteria extraction
+spectra docs index --no-interaction --output-format json  # SKILL/CI mode
 ```
 
 The index contains per-document metadata (title, sections with summaries, key entities, word/token counts, content hashes). The AI agent reads this lightweight index (~1-2K tokens) instead of scanning all files.
 
 Content hashes enable incremental updates — only changed files are re-indexed. The index is also auto-refreshed before `spectra ai generate` runs.
 
-After indexing, requirements are automatically extracted from the documentation using the configured AI provider and merged into `_requirements.yaml`. If no provider is configured, the extraction step is skipped.
+After indexing, acceptance criteria are automatically extracted from the documentation using the configured AI provider and merged into `_criteria_index.yaml`. If no provider is configured, the extraction step is skipped. Use `--skip-criteria` to skip extraction entirely.
+
+In SKILL/CI mode, the command writes `.spectra-result.json` (structured result) and `.spectra-progress.html` (live progress page with auto-refresh).
 
 See [Document Index](document-index.md) for full details.
 

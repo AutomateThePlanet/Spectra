@@ -129,7 +129,7 @@ spectra init --skip-skills      # Skip SKILL/agent file creation
 spectra init --no-interactive   # Non-interactive mode
 ```
 
-Creates: `spectra.config.json`, `tests/`, `docs/`, `docs/requirements/_requirements.yaml`, `templates/bug-report.md`, `.github/skills/` (6 SKILLs), `.github/agents/` (2 agents), `.vscode/mcp.json`, `.github/workflows/deploy-dashboard.yml`
+Creates: `spectra.config.json`, `tests/`, `docs/`, `docs/requirements/_criteria_index.yaml`, `templates/bug-report.md`, `.github/skills/` (9 SKILLs), `.github/agents/` (2 agents), `.vscode/mcp.json`, `.github/workflows/deploy-dashboard.yml`
 
 #### `spectra ai generate`
 
@@ -181,15 +181,17 @@ Classifies tests as: UP_TO_DATE, OUTDATED, ORPHANED, REDUNDANT.
 
 #### `spectra ai analyze`
 
-Analyze test coverage and extract requirements.
+Analyze test coverage and extract acceptance criteria.
 
 ```bash
 spectra ai analyze --coverage                                        # Three-section report
 spectra ai analyze --coverage --auto-link                            # Write automated_by fields
 spectra ai analyze --coverage --format json --output coverage.json   # File output
 spectra ai analyze --coverage --output-format json                   # Stdout JSON
-spectra ai analyze --extract-requirements                            # Extract from docs
-spectra ai analyze --extract-requirements --dry-run                  # Preview only
+spectra ai analyze --extract-criteria                                # Extract from docs
+spectra ai analyze --extract-criteria --dry-run                      # Preview only
+spectra ai analyze --import-criteria ./criteria.csv                  # Import from external file
+spectra ai analyze --list-criteria                                   # List all criteria
 ```
 
 #### `spectra validate`
@@ -225,11 +227,13 @@ spectra index --suite checkout   # Specific suite
 
 #### `spectra docs index`
 
-Build or refresh the documentation index, then auto-extract requirements.
+Build or refresh the documentation index, then auto-extract acceptance criteria.
 
 ```bash
-spectra docs index          # Incremental update + auto-extract requirements
-spectra docs index --force  # Full rebuild + auto-extract requirements
+spectra docs index                # Incremental update + auto-extract acceptance criteria
+spectra docs index --force        # Full rebuild + auto-extract acceptance criteria
+spectra docs index --skip-criteria  # Index only, skip criteria extraction
+spectra docs index --no-interaction --output-format json  # SKILL/CI mode
 ```
 
 #### `spectra dashboard`
@@ -404,7 +408,7 @@ Generated in three formats: JSON, Markdown, HTML. Features: test titles from `_i
     "automation_dirs": [],
     "scan_patterns": ["**/*.cs", "**/*.ts", "**/*.js", "**/*.py"],
     "file_extensions": [".cs", ".ts", ".js", ".py"],
-    "requirements_file": "docs/requirements/_requirements.yaml"
+    "criteria_file": "docs/requirements/_criteria_index.yaml"
   },
   "execution": {
     "db_path": ".execution/spectra.db",
@@ -650,6 +654,9 @@ Test areas covered:
 | 020 | CLI Non-Interactive | Implemented |
 | 021 | Generation Session | Implemented |
 | 022 | Bundled SKILLs | Implemented |
+| 023 | Criteria Extraction Overhaul | Implemented |
+| 023 | Copilot Chat Integration | Implemented |
+| 024 | Docs Index SKILL & Coverage Fix | Implemented |
 
 ### Spec-Kit Drafts
 

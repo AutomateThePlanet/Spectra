@@ -39,7 +39,7 @@ my-project/
 │   └── _index.md                                # Document index (auto-built if docs exist)
 ├── tests/                                       # Generated tests go here
 ├── docs/requirements/
-│   └── _requirements.yaml                       # Requirements definition (commented template)
+│   └── _criteria_index.yaml                     # Acceptance criteria index
 ├── .github/
 │   ├── agents/
 │   │   ├── spectra-execution.agent.md           # Test execution agent (MCP)
@@ -50,7 +50,10 @@ my-project/
 │       ├── spectra-dashboard/SKILL.md           # Build dashboard via Copilot Chat
 │       ├── spectra-validate/SKILL.md            # Validate tests via Copilot Chat
 │       ├── spectra-list/SKILL.md                # Browse tests via Copilot Chat
-│       └── spectra-init-profile/SKILL.md        # Configure profile via Copilot Chat
+│       ├── spectra-init-profile/SKILL.md        # Configure profile via Copilot Chat
+│       ├── spectra-help/SKILL.md                # Help and command reference
+│       ├── spectra-criteria/SKILL.md            # Manage acceptance criteria
+│       └── spectra-docs/SKILL.md                # Index documentation via Copilot Chat
 └── templates/bug-report.md                      # Bug report template
 ```
 

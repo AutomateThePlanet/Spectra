@@ -1,6 +1,6 @@
 # Coverage Analysis
 
-Three-dimensional coverage analysis: Documentation, Requirements, and Automation.
+Three-dimensional coverage analysis: Documentation, Acceptance Criteria, and Automation.
 
 Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md) | [Test Format](test-format.md)
 
@@ -13,7 +13,7 @@ SPECTRA produces a unified coverage report with three sections:
 | Type | What it measures | Data source |
 |------|-----------------|-------------|
 | **Documentation** | Which docs have linked tests | `source_refs` field in test frontmatter matched against `docs/` |
-| **Requirements** | Which requirements are covered | `requirements` field in test frontmatter + `_requirements.yaml` |
+| **Acceptance Criteria** | Which criteria are covered | `criteria` field in test frontmatter + `_criteria_index.yaml` |
 | **Automation** | Which tests have automation code | `automated_by` field in test frontmatter + code scanning |
 
 ## Run Coverage Analysis
@@ -46,14 +46,14 @@ spectra ai analyze --coverage --verbosity detailed
       { "doc": "docs/admin.md", "test_count": 0, "covered": false, "test_ids": [] }
     ]
   },
-  "requirements_coverage": {
-    "total_requirements": 5,
-    "covered_requirements": 3,
+  "acceptance_criteria_coverage": {
+    "total": 5,
+    "covered": 3,
     "percentage": 60.00,
-    "has_requirements_file": true,
+    "has_criteria_file": true,
     "details": [
-      { "id": "REQ-042", "title": "Payment rejection", "tests": ["TC-134"], "covered": true },
-      { "id": "REQ-043", "title": "Expired card", "tests": [], "covered": false }
+      { "id": "AC-042", "title": "Payment rejection", "tests": ["TC-134"], "covered": true },
+      { "id": "AC-043", "title": "Expired card", "tests": [], "covered": false }
     ]
   },
   "automation_coverage": {
@@ -74,39 +74,39 @@ Measures which documentation files have at least one test referencing them via `
 
 For each doc in `docs/`, SPECTRA checks if any test file has it in its `source_refs` frontmatter field.
 
-## Requirements Coverage
+## Acceptance Criteria Coverage
 
-Measures which formal requirements are covered by tests.
+Measures which acceptance criteria are covered by tests.
 
-### With `_requirements.yaml`
+### With `_criteria_index.yaml`
 
-When a requirements file exists, SPECTRA cross-references the defined requirements with `requirements` fields in test frontmatter. This reveals which requirements have no tests.
+When a criteria index file exists, SPECTRA cross-references the defined criteria with `criteria` fields in test frontmatter. This reveals which criteria have no tests.
 
-### Without `_requirements.yaml`
+### Without `_criteria_index.yaml`
 
-When no requirements file exists, SPECTRA discovers requirements from test frontmatter only and reports them as a flat list. `has_requirements_file` is `false`.
+When no criteria file exists, SPECTRA discovers criteria from test frontmatter only and reports them as a flat list. `has_criteria_file` is `false`.
 
-### Requirements File Format
+### Criteria File Format
 
-Create `docs/requirements/_requirements.yaml`:
+Create `docs/requirements/_criteria_index.yaml` (or use `spectra ai analyze --extract-criteria` to auto-generate):
 
 ```yaml
-requirements:
-  - id: REQ-001
+criteria:
+  - id: AC-001
     title: "User can log in with valid credentials"
     source: docs/authentication.md
     priority: high
-  - id: REQ-002
+  - id: AC-002
     title: "System rejects invalid passwords"
     source: docs/authentication.md
     priority: high
-  - id: REQ-003
+  - id: AC-003
     title: "Admin panel access control"
     source: docs/admin.md
     priority: high
 ```
 
-The path to this file is configured via `coverage.requirements_file` in [spectra.config.json](configuration.md).
+The path to this file is configured via `coverage.criteria_file` in [spectra.config.json](configuration.md).
 
 ## Automation Coverage
 
@@ -162,7 +162,7 @@ Full coverage settings in `spectra.config.json`:
     "automation_dirs": ["tests", "test", "spec", "e2e"],
     "scan_patterns": ["[TestCase(\"{id}\")]", "@pytest.mark.manual_test(\"{id}\")"],
     "file_extensions": [".cs", ".java", ".py", ".ts"],
-    "requirements_file": "docs/requirements/_requirements.yaml"
+    "criteria_file": "docs/requirements/_criteria_index.yaml"
   }
 }
 ```
@@ -187,13 +187,13 @@ Three stacked cards — one per coverage type — with:
 - Percentage and fill bar (green >= 80%, yellow >= 50%, red < 50%)
 - "Show details" toggle that expands a per-item breakdown list
 - Documentation: each doc file with test count and covered/uncovered icon
-- Requirements: each requirement ID, title, linked test IDs
+- Acceptance Criteria: each criterion ID, title, linked test IDs
 - Automation: per-suite breakdown (suite name, automated/total, percentage)
 
 ### Empty State Guidance
 
 When coverage data is missing or unconfigured, cards show actionable messages:
-- **Requirements**: "No requirements tracked yet" with setup instructions
+- **Acceptance Criteria**: "No acceptance criteria tracked yet" with setup instructions
 - **Automation**: "No automation links detected" with `--auto-link` instructions
 - **Documentation**: "All documents have test coverage!" success message when at 100%
 

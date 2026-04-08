@@ -82,16 +82,16 @@ dashboard-site/               # Static dashboard template
 └── access-denied.html        # Auth error page
 
 tests/
-├── Spectra.Core.Tests/       # Unit tests (349 tests)
+├── Spectra.Core.Tests/       # Unit tests (462 tests)
 │   ├── Coverage/             # AutomationScanner, LinkReconciler, Calculator, DocCoverageAnalyzer, ReqCoverageAnalyzer, AutoLinkService tests
 │   ├── Index/                # DocumentIndexReader, DocumentIndexWriter tests
 │   └── Parsing/              # DocumentIndexExtractor, RequirementsParser, FrontmatterUpdater tests
-├── Spectra.CLI.Tests/        # Integration tests (329 tests)
+├── Spectra.CLI.Tests/        # Integration tests (466 tests)
 │   ├── Commands/             # DocsIndexCommand tests
 │   ├── Dashboard/            # DataCollector, Generator tests
 │   ├── Source/               # DocumentIndexService tests
 │   └── Coverage/             # CoverageReportWriter (unified), CoverageAnalysis tests
-├── Spectra.MCP.Tests/        # MCP server tests (306 tests)
+├── Spectra.MCP.Tests/        # MCP server tests (351 tests)
 │   ├── Tools/                # Individual tool tests
 │   ├── Integration/          # Full execution flow tests
 │   └── Reports/              # Report generation tests
@@ -146,9 +146,11 @@ spectra dashboard --dry-run                        # Preview without generating
 spectra dashboard --preview                        # Sample data + branding verification
 spectra dashboard --output ./site --output-format json  # JSON output for SKILL
 
-# Documentation Index (010-document-index)
-spectra docs index                               # Incremental update + auto-extract requirements
-spectra docs index --force                       # Full rebuild + auto-extract requirements
+# Documentation Index (010-document-index + 024-docs-skill-coverage-fix)
+spectra docs index                               # Incremental update + auto-extract acceptance criteria
+spectra docs index --force                       # Full rebuild + auto-extract acceptance criteria
+spectra docs index --skip-criteria               # Index only, skip criteria extraction
+spectra docs index --no-interaction --output-format json  # SKILL/CI mode (writes .spectra-result.json + .spectra-progress.html)
 
 # Coverage Analysis (003 + unified coverage overhaul)
 spectra ai analyze --coverage                                    # Unified three-section report (doc, req, auto)
@@ -197,6 +199,7 @@ spectra config list-automation-dirs                 # List dirs with existence s
 - **Tests:** xUnit with structured results (never throw on validation errors)
 
 ## Recent Changes
+- 024-docs-skill-coverage-fix: ✅ COMPLETE - Docs index SKILL integration, progress page, coverage fix & terminology rename. Added `.spectra-result.json` and `.spectra-progress.html` to `DocsIndexHandler` (same pattern as generate). New `--skip-criteria` flag skips auto-triggered acceptance criteria extraction. `--no-interaction` passthrough to criteria extraction (runs with defaults). Extended `DocsIndexResult` with new fields (skipped, new, total, criteria). Extended `ProgressPageWriter` for docs-index phases (scanning, indexing, extracting-criteria). New `spectra-docs` SKILL (9th bundled SKILL) with structured tool-call-sequence. Completed "requirements" → "acceptance criteria" rename in all remaining user-facing strings. `CriteriaIndexReader` auto-renames legacy `_requirements.yaml` to `.bak`. Dashboard coverage null-crash fix with zero-state defaults. Updated generation agent prompt for docs index progress-aware flow. Version 1.30.0. 1279 total tests passing.
 - 023-criteria-extraction-overhaul: ✅ COMPLETE - Acceptance criteria import & extraction overhaul. Renamed "requirements" to "acceptance criteria" across codebase (CLI, dashboard, reports, SKILLs, agents). Replaced single-prompt AI extraction (truncation-prone) with per-document iterative extraction producing individual `.criteria.yaml` files and `_criteria_index.yaml` master index. SHA-256 incremental extraction skips unchanged docs. Import from YAML/CSV/JSON with auto-column-detection for Jira/ADO exports, AI splitting of compound criteria, RFC 2119 normalization. `--merge` (default) and `--replace` modes. `--list-criteria` with `--source-type`, `--component`, `--priority` filters. Generation auto-loads related criteria as prompt context, produces `criteria` field in test frontmatter. Update flow detects criteria changes (OUTDATED/ORPHANED classification). Dashboard shows per-source-type coverage breakdown. New `spectra-criteria` SKILL (8th). `--extract-requirements` kept as hidden alias. New models: `AcceptanceCriterion`, `CriteriaIndex`, `CriteriaSource`, `AcceptanceCriteriaCoverage`. New services: `CriteriaExtractor`, `CriteriaIndexReader/Writer`, `CriteriaFileReader/Writer`, `CsvCriteriaImporter`, `JsonCriteriaImporter`, `CriteriaMerger`. Live progress HTML page (`.spectra-progress.html`) with auto-refresh for generation status. SKILL/agent names standardized to lowercase-hyphenated format. `browser/openBrowserPage` added to all tool lists. BehaviorAnalyzer retry on failure. MCP `finalize_execution_run` returns instruction to open HTML report. `--no-interaction` on all SKILL CLI commands. `--focus` flag for filtered generation. 38+ new tests, 1280+ total passing.
 - 023-copilot-chat-integration: ✅ COMPLETE - Full VS Code Copilot Chat integration for test generation and all CLI features. Added `--suite` option (flag alternative to positional arg) for LLM-friendly syntax. Added `--analyze-only` flag for two-step analyze→approve→generate flow. Automatic batch generation for large counts (batches of 30, writes per batch, index updates per batch). Live progress via `.spectra-result.json` with status lifecycle: analyzing→analyzed→generating→completed/failed. BehaviorAnalyzer timeout increased 30s→2min with proper error handling (was silently failing). 7 bundled SKILLs (generate, coverage, dashboard, validate, list, init-profile, help) with explicit tool-call-sequence format. Both agents (Generation, Execution) handle all SPECTRA commands with help reference. Progress messages from AI tool calls (scanning docs, reading docs, allocating IDs, verifying tests). Per-test verification progress. Critic verification per batch. Smart fallback count accounting for existing tests. Result file with `FileStream.Flush(true)` for Windows NTFS reliability. 1241 total passing.
 - 022-bundled-skills: ✅ COMPLETE - Bundled SKILL files and agent prompts for Copilot Chat integration. 6 SKILL files (generate, coverage, dashboard, validate, list, init-profile) and 2 agent prompts (execution, generation) created by `spectra init` in `.github/skills/` and `.github/agents/`. Each SKILL contains CLI commands with `--output-format json --verbosity quiet`, JSON parsing instructions, and example user requests. New `SkillContent`, `AgentContent` static classes with bundled content. New `SkillsManifest` with SHA-256 hash tracking for safe updates. New `spectra update-skills` command (updates unmodified files, skips user-customized). New `--skip-skills` flag on init. New `FileHasher` utility. 10 new tests, 1241 total passing.

@@ -25,7 +25,7 @@ User → VS Code Copilot Chat → MCP Server → Test Execution → Reports
 | Component | Purpose |
 |-----------|---------|
 | **dashboard-site/** | Static HTML/JS dashboard template with D3.js visualizations |
-| **SKILLs** (8 files) | VS Code Copilot Chat integration — each SKILL wraps CLI commands |
+| **SKILLs** (9 files) | VS Code Copilot Chat integration — each SKILL wraps CLI commands |
 | **Agents** (2 files) | Copilot Chat agent prompts for generation and execution workflows |
 
 ## Technology Stack
@@ -187,7 +187,7 @@ criteria:
 
 ## VS Code Copilot Chat Integration
 
-### 8 Bundled SKILLs
+### 9 Bundled SKILLs
 | SKILL | Purpose |
 |-------|---------|
 | `spectra-generate` | Test generation (analyze → approve → generate flow) |
@@ -198,6 +198,7 @@ criteria:
 | `spectra-init-profile` | Generation profile setup |
 | `spectra-help` | Command reference |
 | `spectra-criteria` | Criteria extraction, import, listing |
+| `spectra-docs` | Documentation indexing with progress page |
 
 ### 2 Agent Prompts
 | Agent | Purpose |
@@ -209,7 +210,7 @@ criteria:
 - **Name**: lowercase-hyphenated (e.g., `spectra-generate`)
 - **Tools**: Include `browser/openBrowserPage` for preview capability
 - **CLI flags**: Always include `--no-interaction` to prevent terminal prompts
-- **Progress**: Generation commands use `.spectra-progress.html` for live status
+- **Progress**: Generation and docs index commands use `.spectra-progress.html` for live status
 - **Steps**: Use `**Step N**` format (not `### Tool call N:`)
 - **Preview**: Use `show preview {file}` to open files in VS Code (not `start`)
 
@@ -296,6 +297,7 @@ Three-section unified coverage:
 
 | # | Feature | Key Changes |
 |---|---------|-------------|
+| 024 | Docs Index SKILL & Coverage Fix | 9th SKILL (spectra-docs), result/progress files, --skip-criteria, terminology fix |
 | 023 | Criteria Extraction Overhaul | Per-doc extraction, import, rename requirements→criteria, progress page |
 | 023 | Copilot Chat Integration | SKILLs, agents, result file polling, batch generation |
 | 022 | Bundled Skills | 8 SKILLs + 2 agents embedded as resources, hash-tracked updates |

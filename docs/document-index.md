@@ -16,7 +16,7 @@ The `spectra docs index` command builds a persistent `docs/_index.md` file — a
 2. **Extraction** — For each file, extracts: title, H2/H3 sections with 200-char summaries, key entities (code spans, capitalized phrases, API paths, quoted strings), word count, token estimate (`words × 1.3`), file size, SHA-256 content hash
 3. **Incremental Updates** — On subsequent runs, only re-indexes files whose content hash has changed. Unchanged entries are reused from the existing index.
 4. **Output** — Writes `docs/_index.md` in Markdown format with a hidden `<!-- SPECTRA_INDEX_CHECKSUMS {...} -->` comment for fast hash lookups
-5. **Requirements Extraction** — After indexing, automatically extracts testable requirements from the indexed documents using the configured AI provider and writes them to `_requirements.yaml`. If no AI provider is configured, this step is silently skipped.
+5. **Acceptance Criteria Extraction** — After indexing, automatically extracts testable acceptance criteria from the indexed documents using the configured AI provider and writes them to `_criteria_index.yaml`. Use `--skip-criteria` to skip this step. If no AI provider is configured, this step is silently skipped.
 
 ## Usage
 
@@ -32,11 +32,11 @@ spectra docs index --force
 
 The document index is automatically refreshed (incremental) before every `spectra ai generate` run. During `spectra init`, an initial full index build is performed if documentation files exist.
 
-## Requirements Extraction
+## Acceptance Criteria Extraction
 
-After building or updating the index, `spectra docs index` automatically extracts testable requirements from the documentation using the configured AI provider. Extracted requirements are merged into the `_requirements.yaml` file (configured via `coverage.requirements_file`), with duplicate detection to avoid re-extracting existing entries.
+After building or updating the index, `spectra docs index` automatically extracts testable acceptance criteria from the documentation using the configured AI provider. Extracted criteria are merged into `_criteria_index.yaml` (configured via `coverage.criteria_file`), with duplicate detection to avoid re-extracting existing entries.
 
-This removes the need to run `spectra ai analyze --extract-requirements` as a separate step — requirements stay in sync with the documentation index. The `--extract-requirements` flag on `spectra ai analyze` is still available for on-demand extraction.
+This removes the need to run `spectra ai analyze --extract-criteria` as a separate step — criteria stay in sync with the documentation index. Use `--skip-criteria` to skip this step. The `--extract-criteria` flag on `spectra ai analyze` is still available for on-demand extraction.
 
 If no AI provider is configured, the extraction step is skipped silently and the command completes with the index only.
 

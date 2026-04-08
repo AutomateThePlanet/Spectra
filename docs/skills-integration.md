@@ -8,7 +8,7 @@ Related: [CLI Reference](cli-reference.md) | [Getting Started](getting-started.m
 
 ## Overview
 
-SPECTRA ships 6 SKILL files and 2 agent prompts that enable Copilot Chat to invoke CLI commands through natural language. SKILLs translate what users say in chat into CLI commands with `--output-format json --verbosity quiet`, parse the JSON output, and present results conversationally.
+SPECTRA ships 9 SKILL files and 2 agent prompts that enable Copilot Chat to invoke CLI commands through natural language. SKILLs translate what users say in chat into CLI commands with `--output-format json --verbosity quiet`, parse the JSON output, and present results conversationally.
 
 ## Architecture
 
@@ -33,6 +33,9 @@ Created by `spectra init` in `.github/skills/`:
 | SPECTRA Validate | `spectra-validate/SKILL.md` | `spectra validate` |
 | SPECTRA List | `spectra-list/SKILL.md` | `spectra list` and `spectra show` |
 | SPECTRA Profile | `spectra-init-profile/SKILL.md` | `spectra init-profile` |
+| SPECTRA Help | `spectra-help/SKILL.md` | Help and command reference |
+| SPECTRA Criteria | `spectra-criteria/SKILL.md` | `spectra ai analyze --extract-criteria` and import |
+| SPECTRA Docs | `spectra-docs/SKILL.md` | `spectra docs index` with progress page |
 
 ## Agent Prompts
 
