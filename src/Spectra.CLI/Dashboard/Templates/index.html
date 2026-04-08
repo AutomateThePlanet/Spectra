@@ -3,16 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SPECTRA Dashboard</title>
+    <title>{{COMPANY_NAME}}</title>
+    {{FAVICON_LINK}}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles/main.css">
+    {{CUSTOM_CSS_LINK}}
+    {{BRANDING_STYLES}}
 </head>
 <body>
     <div id="app">
         <header class="header">
-            <h1>SPECTRA Dashboard</h1>
+            {{LOGO_IMG}}<h1>{{COMPANY_NAME}}</h1>
             <nav class="nav">
                 <button class="nav-btn active" data-view="suites">Suites</button>
                 <button class="nav-btn" data-view="tests">Tests</button>
@@ -81,6 +84,8 @@
         </div>
     </div>
     <div id="detail-panel-overlay" class="detail-panel-overlay" onclick="closeDetailPanel()"></div>
+
+    {{BRANDING_CONFIG}}
 
     <script id="dashboard-data" type="application/json">
     {{DASHBOARD_DATA}}

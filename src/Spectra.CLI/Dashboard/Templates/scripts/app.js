@@ -24,6 +24,7 @@ const allTests = [...data.tests];
  * Initialize the dashboard
  */
 document.addEventListener('DOMContentLoaded', () => {
+    applyBranding();
     setupNavigation();
     setupFilters();
     populateComponentFilter();
@@ -33,6 +34,22 @@ document.addEventListener('DOMContentLoaded', () => {
     updateGeneratedAt();
     render();
 });
+
+/**
+ * Apply branding configuration from embedded JSON
+ */
+function applyBranding() {
+    const el = document.getElementById('branding-config');
+    if (!el) return;
+    try {
+        const branding = JSON.parse(el.textContent);
+        if (branding.theme && branding.theme.toLowerCase() === 'dark') {
+            document.body.classList.add('dark');
+        }
+    } catch {
+        // Branding config is optional
+    }
+}
 
 /**
  * Set up navigation button handlers
@@ -890,7 +907,7 @@ function renderCoverage() {
     // Build a synthetic coverage_summary and render
     return renderThreeSectionCoverage({
         documentation: { covered: docsWithTests, total: totalDocs, percentage: parseFloat(docCoverage) },
-        requirements: { covered: 0, total: 0, percentage: 0 },
+        acceptance_criteria: { covered: 0, total: 0, percentage: 0 },
         automation: { covered: testsWithAutomation, total: totalTests, percentage: parseFloat(autoCoverage) }
     });
 }
@@ -907,9 +924,8 @@ function renderThreeSectionCoverage(summary) {
     // Coverage sections (progress bars + detail lists)
     html += '<div class="coverage-sections">';
     html += renderCoverageSection('Documentation Coverage', summary.documentation, 'documents', renderDocDetails);
-    html += renderCoverageSection('Requirements Coverage', summary.requirements, 'requirements', renderReqDetails);
+    html += renderCoverageSection('Acceptance Criteria Coverage', summary.acceptance_criteria, 'acceptance_criteria', renderCriteriaDetails);
     html += renderCoverageSection('Automation Coverage', summary.automation, 'tests', renderAutoDetails);
-    html += renderUndocumentedTestsSection(summary.documentation);
     html += '</div>';
 
     // Coverage tree (hierarchical collapsible)
@@ -930,12 +946,12 @@ function renderThreeSectionCoverage(summary) {
 }
 
 /**
- * Render 3 KPI metric cards for Documentation, Requirements, Automation.
+ * Render 3 KPI metric cards for Documentation, Acceptance Criteria, Automation.
  */
 function renderKPICards(summary) {
     const sections = [
         { key: 'documentation', label: 'Documentation', data: summary.documentation, target: 'documentation-coverage' },
-        { key: 'requirements', label: 'Requirements', data: summary.requirements, target: 'requirements-coverage' },
+        { key: 'acceptance_criteria', label: 'Acceptance Criteria', data: summary.acceptance_criteria, target: 'acceptance-criteria-coverage' },
         { key: 'automation', label: 'Automation', data: summary.automation, target: 'automation-coverage' }
     ];
 
@@ -1315,6 +1331,7 @@ function renderCoverageGaps(summary) {
  * Render a single coverage section with progress bar, empty state, and detail toggle.
  */
 function renderCoverageSection(label, sectionData, unit, renderDetailsFn) {
+    sectionData = sectionData || { covered: 0, total: 0, percentage: 0 };
     const pct = sectionData.percentage || 0;
     const colorClass = pct >= 80 ? 'coverage-green' : pct >= 50 ? 'coverage-yellow' : 'coverage-red';
     const covered = sectionData.covered || 0;
@@ -1362,12 +1379,12 @@ function getEmptyState(label, sectionData, total, pct) {
         return null;
     }
 
-    if (label.startsWith('Requirements')) {
-        if (total === 0 && !sectionData.has_requirements_file) {
+    if (label.startsWith('Acceptance Criteria')) {
+        if (total === 0 && !sectionData.has_criteria_file) {
             return `<div class="coverage-empty-state">
                 <span class="empty-icon">&#9432;</span>
-                <div class="empty-text"><strong>No requirements tracked yet.</strong>
-                Add a <code>requirements</code> field to test YAML frontmatter, or create a <code>_requirements.yaml</code> file in your docs directory.</div>
+                <div class="empty-text"><strong>No acceptance criteria tracked yet.</strong>
+                Add a <code>criteria</code> field to test YAML frontmatter, or create a <code>_criteria_index.yaml</code> file in your docs directory.</div>
             </div>`;
         }
         return null;
@@ -1423,9 +1440,9 @@ function renderDocDetails(section) {
 }
 
 /**
- * Render requirements detail list items.
+ * Render acceptance criteria detail list items.
  */
-function renderReqDetails(section) {
+function renderCriteriaDetails(section) {
     let html = '';
     for (const d of section.details) {
         const icon = d.covered
@@ -1467,63 +1484,19 @@ function renderAutoDetails(section) {
 }
 
 /**
- * Render undocumented tests section (tests with no documentation source).
- */
-function renderUndocumentedTestsSection(docSection) {
-    const count = docSection?.undocumented_test_count || 0;
-    if (count === 0) return '';
-
-    const ids = docSection.undocumented_test_ids || [];
-    const preview = ids.slice(0, 8).join(', ');
-    const more = ids.length > 8 ? `, +${ids.length - 8} more` : '';
-
-    return `
-        <div class="coverage-section" id="undocumented-tests-section" style="border-left: 3px solid var(--cov-orange);">
-            <div class="coverage-section-header">
-                <span class="coverage-section-label" style="color: var(--cov-orange);">
-                    Undocumented Tests
-                </span>
-                <span class="coverage-section-pct" style="color: var(--cov-orange);">${count}</span>
-            </div>
-            <span class="coverage-section-detail" title="Test created from user description \u2014 no documentation source">
-                ${count} test${count !== 1 ? 's' : ''} with no documentation source
-            </span>
-            <div style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
-                ${preview}${more}
-            </div>
-            <div style="margin-top: 0.5rem; padding: 0.5rem; background: var(--cov-orange-bg); border-radius: 6px; font-size: 0.85rem; color: #9a3412;">
-                \u26a0 These test cases have no documentation source. They may indicate documentation gaps.
-            </div>
-            <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; font-size: 0.85rem; cursor: pointer;">
-                <input type="checkbox" checked onchange="toggleUndocumentedTests(this.checked)" />
-                Show undocumented tests in coverage
-            </label>
-        </div>
-    `;
-}
-
-/** Toggle undocumented tests visibility in the coverage view. */
-function toggleUndocumentedTests(show) {
-    const section = document.getElementById('undocumented-tests-section');
-    if (section) {
-        section.style.display = show ? '' : 'none';
-    }
-}
-
-/**
  * Render donut chart showing test health distribution.
  */
 function renderDonutChart() {
     if (!allTests || allTests.length === 0) return '';
 
-    let automated = 0, manualOnly = 0, undocumented = 0, unlinked = 0;
+    let automated = 0, manualOnly = 0, unlinked = 0;
     for (const t of allTests) {
         if (t.has_automation || (t.automated_by && t.automated_by.length > 0)) {
             automated++;
-        } else if (!t.source_refs || t.source_refs.length === 0) {
-            undocumented++;
-        } else {
+        } else if (t.source_refs && t.source_refs.length > 0) {
             manualOnly++;
+        } else {
+            unlinked++;
         }
     }
 
@@ -1541,7 +1514,6 @@ function renderDonutChart() {
     const segments = [
         { count: automated, pct: (automated / total) * 100, color: 'var(--color-success)', label: 'Automated' },
         { count: manualOnly, pct: (manualOnly / total) * 100, color: 'var(--color-warning)', label: 'Manual Only' },
-        { count: undocumented, pct: (undocumented / total) * 100, color: 'var(--cov-orange)', label: 'Undocumented' },
         { count: unlinked, pct: (unlinked / total) * 100, color: 'var(--color-danger)', label: 'Unlinked' }
     ].filter(s => s.count > 0);
 
@@ -1561,7 +1533,7 @@ function renderDonutChart() {
     }
 
     const legendItems = segments.map(s => {
-        const dotClass = s.label === 'Automated' ? 'automated' : s.label === 'Manual Only' ? 'manual' : s.label === 'Undocumented' ? 'undocumented' : 'unlinked';
+        const dotClass = s.label === 'Automated' ? 'automated' : s.label === 'Manual Only' ? 'manual' : 'unlinked';
         return `<span class="donut-legend-item"><span class="donut-legend-dot ${dotClass}"></span>${s.label}: ${s.count} (${s.pct.toFixed(1)}%)</span>`;
     }).join('');
 
@@ -1732,6 +1704,7 @@ function escapeHtml(str) {
  * Screenshot lightbox
  */
 function openScreenshotLightbox(src) {
+    // Create lightbox overlay if it doesn't exist
     let lightbox = document.getElementById('screenshot-lightbox');
     if (!lightbox) {
         lightbox = document.createElement('div');
@@ -1745,6 +1718,7 @@ function openScreenshotLightbox(src) {
     lightbox.style.display = 'flex';
 }
 
+// Close lightbox on Escape key
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         const lb = document.getElementById('screenshot-lightbox');

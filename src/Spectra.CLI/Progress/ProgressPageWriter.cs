@@ -354,6 +354,7 @@ public static class ProgressPageWriter
             var root = doc.RootElement;
 
             var status = root.TryGetProperty("status", out var s) ? s.GetString() ?? "unknown" : "unknown";
+            var command = root.TryGetProperty("command", out var cmd) ? cmd.GetString() ?? "" : "";
             var suite = root.TryGetProperty("suite", out var su) ? su.GetString() ?? "" : "";
             var message = root.TryGetProperty("message", out var m) ? m.GetString() ?? "" : "";
             var error = root.TryGetProperty("error", out var e) ? e.GetString() ?? "" : "";
@@ -362,7 +363,7 @@ public static class ProgressPageWriter
             var sb = new StringBuilder();
 
             // Phase stepper
-            sb.Append(BuildStepper(status));
+            sb.Append(BuildStepper(status, command));
 
             // Status card
             sb.Append(BuildStatusCard(status, suite, message, timestamp));
@@ -507,7 +508,21 @@ public static class ProgressPageWriter
         }
     }
 
-    private static (string[] phases, int currentIdx) ResolvePhases(string status)
+    private static string[] PhasesForCommand(string command)
+    {
+        return command switch
+        {
+            "generate" => ProgressPhases.Generate,
+            "update" => ProgressPhases.Update,
+            "docs-index" => ProgressPhases.DocsIndex,
+            "analyze-coverage" => ProgressPhases.Coverage,
+            "extract-criteria" => ProgressPhases.ExtractCriteria,
+            "dashboard" => ProgressPhases.Dashboard,
+            _ => ProgressPhases.Generate
+        };
+    }
+
+    private static (string[] phases, int currentIdx) ResolvePhases(string status, string command = "")
     {
         return status switch
         {
@@ -535,16 +550,16 @@ public static class ProgressPageWriter
             // Dashboard
             "collecting-data" => (ProgressPhases.Dashboard, 0),
             "generating-html" => (ProgressPhases.Dashboard, 1),
-            // Shared terminal
-            "completed" => (ProgressPhases.Generate, 3), // Index doesn't matter for completed
-            "failed" => (ProgressPhases.Generate, -1),
-            _ => (ProgressPhases.Generate, -1)
+            // Terminal states — use command field to determine correct phases
+            "completed" or "success" => (PhasesForCommand(command), PhasesForCommand(command).Length - 1),
+            "failed" or "partial" => (PhasesForCommand(command), -1),
+            _ => (PhasesForCommand(command), -1)
         };
     }
 
-    private static string BuildStepper(string status)
+    private static string BuildStepper(string status, string command = "")
     {
-        var (phases, currentIdx) = ResolvePhases(status);
+        var (phases, currentIdx) = ResolvePhases(status, command);
 
         var sb = new StringBuilder();
         sb.Append("""<div class="stepper">""");
