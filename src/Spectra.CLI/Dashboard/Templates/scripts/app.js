@@ -924,7 +924,7 @@ function renderThreeSectionCoverage(summary) {
     // Coverage sections (progress bars + detail lists)
     html += '<div class="coverage-sections">';
     html += renderCoverageSection('Documentation Coverage', summary.documentation, 'documents', renderDocDetails);
-    html += renderCoverageSection('Acceptance Criteria Coverage', summary.acceptance_criteria, 'acceptance_criteria', renderCriteriaDetails);
+    html += renderCoverageSection('Acceptance Criteria Coverage', summary.acceptance_criteria, 'criteria', renderCriteriaDetails);
     html += renderCoverageSection('Automation Coverage', summary.automation, 'tests', renderAutoDetails);
     html += '</div>';
 
@@ -1354,7 +1354,15 @@ function renderCoverageSection(label, sectionData, unit, renderDetailsFn) {
         html += emptyHtml;
     } else if (sectionData.details && sectionData.details.length > 0) {
         // Expandable detail list
-        html += `<button class="coverage-toggle-btn" onclick="toggleCoverageDetails('${sectionId}')">Show details</button>`;
+        const detailCount = sectionData.details.length;
+        html += `<button class="coverage-toggle-btn" onclick="toggleCoverageDetails('${sectionId}')">Show details (${detailCount})</button>`;
+        // Add search filter for large lists
+        if (detailCount > 20) {
+            html += `<div class="coverage-detail-filter collapsed" id="filter-${sectionId}">
+                <input type="text" placeholder="Filter by ID or text..." oninput="filterCoverageDetails('${sectionId}', this.value)" />
+                <span class="filter-count" id="filter-count-${sectionId}">${detailCount} items</span>
+            </div>`;
+        }
         html += `<ul class="coverage-detail-list collapsed" id="details-${sectionId}">`;
         html += renderDetailsFn(sectionData);
         html += '</ul>';
@@ -1384,7 +1392,7 @@ function getEmptyState(label, sectionData, total, pct) {
             return `<div class="coverage-empty-state">
                 <span class="empty-icon">&#9432;</span>
                 <div class="empty-text"><strong>No acceptance criteria tracked yet.</strong>
-                Add a <code>criteria</code> field to test YAML frontmatter, or create a <code>_criteria_index.yaml</code> file in your docs directory.</div>
+                Add a <code>criteria</code> field to test YAML frontmatter, or run <code>spectra ai analyze --extract-criteria</code> to extract from documentation.</div>
             </div>`;
         }
         return null;
@@ -1409,15 +1417,44 @@ function getEmptyState(label, sectionData, total, pct) {
  */
 function toggleCoverageDetails(sectionId) {
     const list = document.getElementById('details-' + sectionId);
-    const btn = list?.previousElementSibling;
-    if (!list || !btn) return;
+    const filter = document.getElementById('filter-' + sectionId);
+    if (!list) return;
+
+    // Find the toggle button — it's the sibling before the filter (if present) or the list
+    const btn = (filter || list).previousElementSibling;
+    const count = list.children.length;
 
     if (list.classList.contains('collapsed')) {
         list.classList.remove('collapsed');
-        btn.textContent = 'Hide details';
+        if (filter) filter.classList.remove('collapsed');
+        if (btn) btn.textContent = 'Hide details';
     } else {
         list.classList.add('collapsed');
-        btn.textContent = 'Show details';
+        if (filter) filter.classList.add('collapsed');
+        if (btn) btn.textContent = `Show details (${count})`;
+    }
+}
+
+/**
+ * Filter coverage detail list items by search text.
+ */
+function filterCoverageDetails(sectionId, query) {
+    const list = document.getElementById('details-' + sectionId);
+    const countEl = document.getElementById('filter-count-' + sectionId);
+    if (!list) return;
+
+    const q = query.toLowerCase().trim();
+    let visible = 0;
+
+    for (const li of list.children) {
+        const text = li.textContent.toLowerCase();
+        const show = !q || text.includes(q);
+        li.style.display = show ? '' : 'none';
+        if (show) visible++;
+    }
+
+    if (countEl) {
+        countEl.textContent = q ? `${visible} of ${list.children.length}` : `${list.children.length} items`;
     }
 }
 
@@ -1449,8 +1486,12 @@ function renderCriteriaDetails(section) {
             ? '<span class="detail-icon coverage-green">&#10003;</span>'
             : '<span class="detail-icon coverage-red">&#10007;</span>';
         const testList = d.tests && d.tests.length > 0 ? d.tests.join(', ') : 'none';
-        html += `<li>
-            <span class="detail-name" title="${escapeHtml(d.title || d.id)}">${escapeHtml(d.id)}: ${escapeHtml(d.title || '')}</span>
+        const titleText = d.title || d.text || '';
+        const displayName = titleText
+            ? `<strong>${escapeHtml(d.id)}</strong> ${escapeHtml(titleText)}`
+            : `<strong>${escapeHtml(d.id)}</strong>`;
+        html += `<li title="${escapeHtml(titleText)}">
+            <span class="detail-name">${displayName}</span>
             <span class="detail-meta">${testList}</span>
             ${icon}
         </li>`;
