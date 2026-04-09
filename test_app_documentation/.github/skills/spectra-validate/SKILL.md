@@ -10,16 +10,16 @@ disable-model-invocation: true
 
 You validate test cases by running a CLI command. Follow these steps:
 
-### Tool call 1: runInTerminal
+**Step 1** — runInTerminal:
 ```
-spectra validate --output-format json --verbosity quiet
+spectra validate --no-interaction --output-format json --verbosity quiet
 ```
 
-### Tool call 2: awaitTerminal
+**Step 2** — awaitTerminal
 
-### Tool call 3: terminalLastCommand
-Parse the JSON output.
+**Step 3** — readFile `.spectra-result.json`
+Parse the JSON result.
 
-### Your response:
+**Your response**:
 - If `status` is "success": "All **{totalFiles}** tests are valid."
 - If `status` is "failed": list each error from `errors` array with `file` and `message`. Suggest fixes.

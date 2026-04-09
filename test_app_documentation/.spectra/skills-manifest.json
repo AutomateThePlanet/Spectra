@@ -1,16 +1,16 @@
 {
   "version": "1.0",
   "files": {
-    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\skills\\spectra-coverage\\SKILL.md": "dafacb904f87598b74281262b2d7e16a1b11450500b56568a8c3069fa19ddbbe",
-    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\skills\\spectra-criteria\\SKILL.md": "96d7df128daaec8ed3344b3fd22062f05e30d83a95002e892d4634c6b1fb2dc4",
-    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\skills\\spectra-dashboard\\SKILL.md": "9b0e013d6a5b732743e73eb988c214895e5495ae3473c1a5379a540fb4a73ab4",
-    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\skills\\spectra-generate\\SKILL.md": "209f4aa449faca9279c267242f734e13f8abb65885158b78c59d73f0302f86a9",
-    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\skills\\spectra-help\\SKILL.md": "205aa56079b1e4a46c0d04a10b0858b2bd09438b3279be09a98dfe6414c746ed",
-    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\skills\\spectra-init-profile\\SKILL.md": "3375be41316eada097b4cd33575d42251bcadfb4b0f86e1819f35305bae30bcb",
-    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\skills\\spectra-list\\SKILL.md": "2a433d179da532dda698416a098d70fd3cdad6d3f26b177db213692f9123cc18",
-    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\skills\\spectra-validate\\SKILL.md": "86dec56537603eb6d9baa68c3cf80a05e115dedbdbd5cee81c38b3c1d2a2d9bb",
-    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\agents\\spectra-execution.agent.md": "e70c39a84a86f4ac15077da546d6bb489b0c04b8c8d3c98e957fcfa4395ca9b5",
-    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\agents\\spectra-generation.agent.md": "e3449161cfd05b6942cd3e31912a2dcd2cefd7ff97606b67113288d823adde58",
-    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\skills\\spectra-docs\\SKILL.md": "412cf12fcb92f20317a1ff214e2165f2f474794cdd72f4b4e5735b01418f5e36"
+    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\skills\\spectra-coverage\\SKILL.md": "ad9da99fefa020ed176283beb1638c8979e8b8bd03b93dbee0ab4d238396a468",
+    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\skills\\spectra-criteria\\SKILL.md": "a61491239c751cef961fd86054030bf7f2105e02ca5a3168fb4c9d3098403942",
+    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\skills\\spectra-dashboard\\SKILL.md": "71fadc5c476957b7cdd6416110cbcde30dbe61ae77b87d6f9ec3ba5e5635ef71",
+    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\skills\\spectra-docs\\SKILL.md": "ec8aa442b6b640e1c44d51c67772139fe51dbaf7f9a317221f29c257e714a9f0",
+    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\skills\\spectra-generate\\SKILL.md": "76026b5fec273ff374f86b2240a92553e1fba0c0e54dab8cb8bc90a702346f01",
+    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\skills\\spectra-help\\SKILL.md": "1963fd0520ee568c457d63731365888bb4cf5bd90eb1387b0abf9c60c97489df",
+    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\skills\\spectra-init-profile\\SKILL.md": "9baca225e8839480c7a747a91949c5d4678422d174b6f9975cd81df240fa8c79",
+    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\skills\\spectra-list\\SKILL.md": "5b471ac7e80097ebada8ac2e1032ee6017e60173f0e872e37380b51677007b95",
+    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\skills\\spectra-validate\\SKILL.md": "694abf6b45044e89d5d96304a11e65add0a32f7ea15e7042ebe6642bc74bae03",
+    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\agents\\spectra-execution.agent.md": "91e3479cf796c52d7c9b938a3ddb81d4e76c02910adcd107cb419f3cc8b5726a",
+    "C:\\SourceCode\\Spectra\\test_app_documentation\\.github\\agents\\spectra-generation.agent.md": "6fef120f8b65234a9f9313cb2df5226acf28babebccb7b5306d2567e2d778c06"
   }
 }

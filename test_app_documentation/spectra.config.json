@@ -106,8 +106,8 @@
       ".ts"
     ],
     "requirements_file": "docs/requirements/_requirements.yaml",
-    "criteria_file": "docs/requirements/_criteria_index.yaml",
-    "criteria_dir": "docs/requirements",
+    "criteria_file": "docs/criteria/_criteria_index.yaml",
+    "criteria_dir": "docs/criteria",
     "criteria_import": {
       "default_source_type": "manual",
       "auto_split": true,

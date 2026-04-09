@@ -12,17 +12,22 @@ You help users manage acceptance criteria in SPECTRA. Run CLI commands via runIn
 
 ## Extract acceptance criteria from documentation
 
-**Step 1** — runInTerminal:
+**Step 1** — Open the live progress page:
 ```
-spectra ai analyze --extract-criteria --no-interaction
+show preview .spectra-progress.html
+```
+
+**Step 2** — runInTerminal:
+```
+spectra ai analyze --extract-criteria --no-interaction --output-format json --verbosity quiet
 ```
 For full re-extraction (ignore cache), add `--force`.
 
-**Step 2** — awaitTerminal. Wait for the command to finish. This takes 1-5 minutes for large doc sets. Do NOT type anything into the terminal.
+**Step 3** — awaitTerminal. Wait for the command to finish. This takes 1-5 minutes for large doc sets. Do NOT type anything into the terminal.
 
-**Step 3** — readFile `.spectra-result.json`
+**Step 4** — readFile `.spectra-result.json`
 
-Show: documents processed, criteria extracted, new/updated/unchanged counts. Suggest next steps: "Run coverage analysis?" or "Generate tests for uncovered criteria?"
+**Step 5** — Show: documents processed, criteria extracted, new/updated/unchanged counts. Suggest next steps: "Run coverage analysis?" or "Generate tests for uncovered criteria?"
 
 ---
 
@@ -30,7 +35,7 @@ Show: documents processed, criteria extracted, new/updated/unchanged counts. Sug
 
 **Step 1** — runInTerminal:
 ```
-spectra ai analyze --import-criteria {path} --no-interaction
+spectra ai analyze --import-criteria {path} --no-interaction --output-format json --verbosity quiet
 ```
 
 Supported formats: YAML (.yaml/.yml), CSV (.csv), JSON (.json).
@@ -40,7 +45,7 @@ Auto-detects format by extension. Use `--skip-splitting` to disable AI splitting
 
 **Step 3** — readFile `.spectra-result.json`
 
-Show: imported count, split count, merge results. Suggest: "List imported criteria?" or "Run coverage analysis?"
+**Step 4** — Show: imported count, split count, merge results. Suggest: "List imported criteria?" or "Run coverage analysis?"
 
 ---
 
@@ -48,13 +53,13 @@ Show: imported count, split count, merge results. Suggest: "List imported criter
 
 **Step 1** — runInTerminal:
 ```
-spectra ai analyze --list-criteria --output-format json --no-interaction
+spectra ai analyze --list-criteria --no-interaction --output-format json --verbosity quiet
 ```
 
 Filter options: `--source-type`, `--component`, `--priority`
 
 **Step 2** — awaitTerminal.
 
-**Step 3** — terminalLastCommand
+**Step 3** — readFile `.spectra-result.json`
 
-Show criteria grouped by component with coverage status. Suggest: "Generate tests for uncovered criteria?"
+**Step 4** — Show criteria grouped by component with coverage status. Suggest: "Generate tests for uncovered criteria?"

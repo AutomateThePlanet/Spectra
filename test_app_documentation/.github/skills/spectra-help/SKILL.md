@@ -45,7 +45,22 @@ When the user asks for help, what they can do, or what commands are available, r
 | Find uncovered areas | "what areas don't have tests?" |
 | Check specific area | "show coverage for payments" |
 | Find untested acceptance criteria | "which acceptance criteria aren't tested?" |
-| Extract acceptance criteria from docs | "extract acceptance criteria" |
+
+## Acceptance Criteria
+
+| What you want | What to type |
+|--------------|-------------|
+| Extract from docs | "extract acceptance criteria" |
+| Import from file | "import criteria from jira-export.csv" |
+| List all criteria | "list acceptance criteria" |
+| Filter by component | "show criteria for payments" |
+
+## Documentation Index
+
+| What you want | What to type |
+|--------------|-------------|
+| Index documentation | "index the docs" |
+| Full reindex | "reindex all documentation" |
 
 ## Dashboard
 

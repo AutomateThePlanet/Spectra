@@ -12,16 +12,23 @@ You manage the dashboard by running CLI commands via runInTerminal. **NEVER use 
 
 ## "generate the dashboard", "build the dashboard", "regenerate dashboard"
 
-**Step 1** — runInTerminal:
+**Step 1** — Open the live progress page:
 ```
-spectra ai analyze --coverage --auto-link --no-interaction && spectra dashboard --output ./site --no-interaction
+show preview .spectra-progress.html
 ```
 
-**Step 2** — awaitTerminal. Wait for the command to finish.
+**Step 2** — runInTerminal:
+```
+spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet && spectra dashboard --output ./site --no-interaction --output-format json --verbosity quiet
+```
 
-**Step 3** — show preview site/index.html
+**Step 3** — awaitTerminal. Wait for the command to finish. Between runInTerminal and awaitTerminal, do NOTHING. No readFile, no listDirectory, no extra tool calls.
 
-Report: "Dashboard generated." Show suite count and test count if visible in terminal output.
+**Step 4** — readFile `.spectra-result.json`
+
+**Step 5** — show preview site/index.html
+
+Report: "Dashboard generated." Show suite count and test count from the result JSON.
 
 ---
 
