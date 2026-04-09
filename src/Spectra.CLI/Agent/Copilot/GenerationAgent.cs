@@ -305,13 +305,13 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
 
             {userPrompt}
 
-            {(string.IsNullOrEmpty(criteriaContext) ? "" : $"\n## ACCEPTANCE CRITERIA\n\n{criteriaContext}\n")}
+            {(string.IsNullOrEmpty(criteriaContext) ? "" : $"\n## ACCEPTANCE CRITERIA — MANDATORY\n\nYou MUST map each test case to matching acceptance criteria below. Every test MUST have at least one criterion ID in its \"criteria\" array. If a test doesn't match any criterion, use the closest related one.\n\n{criteriaContext}\n")}
             IMPORTANT:
             1. Use the tools to read documentation and check for duplicates first
             2. Only generate tests that are grounded in the documentation
             3. Ensure unique test IDs using GetNextTestIds
             4. Your FINAL response must be ONLY the JSON array — no other text
-            5. If acceptance criteria are provided, include matching criterion IDs in the "criteria" array field
+            5. MANDATORY: For each test, populate the "criteria" array with IDs of acceptance criteria it verifies (e.g. ["AC-REPORTING-001", "AC-REPORTING-003"]). Never leave criteria empty when acceptance criteria are provided above.
             """;
     }
 

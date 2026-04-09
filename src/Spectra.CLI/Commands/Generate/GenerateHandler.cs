@@ -1445,6 +1445,7 @@ public sealed class GenerateHandler
             Steps = test.Steps,
             ExpectedResult = test.ExpectedResult,
             TestData = test.TestData,
+            Criteria = test.Criteria,
             FilePath = Path.GetRelativePath(testsPath, filePath),
             Grounding = test.Grounding
         };
@@ -1729,6 +1730,7 @@ public sealed class GenerateHandler
                 Steps = test.Steps,
                 ExpectedResult = test.ExpectedResult,
                 TestData = test.TestData,
+                Criteria = test.Criteria,
                 FilePath = Path.GetRelativePath(testsPath, filePath),
                 Grounding = test.Grounding
             };
@@ -1758,6 +1760,7 @@ public sealed class GenerateHandler
             Steps = test.Steps,
             ExpectedResult = test.ExpectedResult,
             TestData = test.TestData,
+            Criteria = test.Criteria,
             FilePath = Path.GetRelativePath(testsPath, filePath),
             Grounding = grounding
         };
@@ -1961,20 +1964,40 @@ public sealed class GenerateHandler
         if (allCriteria.Count == 0)
             return null;
 
-        // Filter: criteria from documents matching suite name, or criteria with matching component
+        // Filter: criteria matching suite name (exact or partial match on component, source doc, or file name)
         var relevant = allCriteria.Where(c =>
-            // Match by source document name (e.g., suite "checkout" matches "checkout.criteria.yaml")
-            (c.SourceDoc != null && Path.GetFileNameWithoutExtension(c.SourceDoc)
-                .Equals(suiteName, StringComparison.OrdinalIgnoreCase)) ||
-            // Match by component field
+            // Exact match by component
             (c.Component != null && c.Component.Equals(suiteName, StringComparison.OrdinalIgnoreCase)) ||
-            // Match by criteria file name (e.g., "checkout.criteria.yaml" for suite "checkout")
-            criteriaFiles.Any(f => Path.GetFileName(f)
-                .StartsWith(suiteName + ".", StringComparison.OrdinalIgnoreCase) &&
-                allCriteria.IndexOf(c) >= 0)
+            // Component contains suite name (e.g., suite "reporting" matches component "reporting-analytics")
+            (c.Component != null && c.Component.Contains(suiteName, StringComparison.OrdinalIgnoreCase)) ||
+            // Suite contains component (e.g., suite "reporting-analytics" matches component "reporting")
+            (c.Component != null && suiteName.Contains(c.Component, StringComparison.OrdinalIgnoreCase)) ||
+            // Source doc file name contains suite name
+            (c.SourceDoc != null && Path.GetFileNameWithoutExtension(c.SourceDoc)
+                .Contains(suiteName, StringComparison.OrdinalIgnoreCase))
         ).ToList();
 
-        // If no suite-specific criteria found, use all criteria (better than none)
+        // Also include criteria from files whose name starts with the suite name
+        if (relevant.Count == 0)
+        {
+            var matchingFiles = criteriaFiles.Where(f =>
+                Path.GetFileNameWithoutExtension(f).Replace(".criteria", "")
+                    .Contains(suiteName, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            if (matchingFiles.Count > 0)
+            {
+                var matchingFileSet = new HashSet<string>(matchingFiles, StringComparer.OrdinalIgnoreCase);
+                // Reload only from matching files
+                relevant = new List<AcceptanceCriterion>();
+                foreach (var file in matchingFiles)
+                {
+                    var fileCriteria = await reader.ReadAsync(file, ct);
+                    relevant.AddRange(fileCriteria);
+                }
+            }
+        }
+
+        // Last resort: use all criteria (better than none, but may be noisy)
         if (relevant.Count == 0)
             relevant = allCriteria;
 

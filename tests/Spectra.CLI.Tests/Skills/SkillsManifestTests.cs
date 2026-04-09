@@ -104,8 +104,11 @@ public class SkillsManifestTests : IDisposable
     }
 
     [Fact]
-    public void Agents_DoNotContain_DuplicatedCliBlocks()
+    public void Agents_DoNotContain_DuplicatedCliCodeBlocks()
     {
+        // Agents may reference CLI commands in delegation tables (inline `code`),
+        // but must NOT contain fenced code blocks with full CLI instructions —
+        // those belong in SKILLs only.
         var cliBlockMarkers = new[]
         {
             "spectra ai analyze --coverage",
@@ -118,9 +121,14 @@ public class SkillsManifestTests : IDisposable
 
         foreach (var agent in AgentContent.All.Values)
         {
-            foreach (var marker in cliBlockMarkers)
+            // Extract fenced code blocks (```...```)
+            var codeBlocks = System.Text.RegularExpressions.Regex.Matches(agent, @"```[\s\S]*?```");
+            foreach (System.Text.RegularExpressions.Match block in codeBlocks)
             {
-                Assert.DoesNotContain(marker, agent);
+                foreach (var marker in cliBlockMarkers)
+                {
+                    Assert.DoesNotContain(marker, block.Value);
+                }
             }
         }
     }

@@ -46,15 +46,26 @@ public sealed class ProgressManager
     public string ResultPath => _resultPath;
     public string ProgressPath => _progressPath;
 
-    /// <summary>Delete stale files from previous runs.</summary>
+    /// <summary>
+    /// Reset stale files from previous runs.
+    /// Writes a "starting" placeholder HTML so the browser shows a loading state
+    /// (with auto-refresh enabled) instead of the previous run's completed state.
+    /// </summary>
     public void Reset()
     {
         try
         {
             if (File.Exists(_resultPath))
                 File.Delete(_resultPath);
-            if (File.Exists(_progressPath))
-                File.Delete(_progressPath);
+
+            var placeholder = new CommandResult
+            {
+                Command = _command,
+                Status = "starting",
+                Message = "Initializing..."
+            };
+            var json = JsonSerializer.Serialize(placeholder, ResultFileOptions);
+            ProgressPageWriter.WriteProgressPage(_progressPath, json, isTerminal: false, _title);
         }
         catch
         {

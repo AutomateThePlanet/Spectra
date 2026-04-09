@@ -1,7 +1,7 @@
 ---
 name: spectra-criteria
 description: Extract, import, and browse acceptance criteria for test coverage analysis.
-tools: [execute/runInTerminal, execute/awaitTerminal, execute/getTerminalOutput, read/readFile, read/terminalLastCommand, read/problems, search/listDirectory, search/textSearch, browser/openBrowserPage]
+tools: [execute/runInTerminal, execute/awaitTerminal, read/readFile, read/problems, search/listDirectory, search/textSearch, browser/openBrowserPage]
 model: GPT-4o
 disable-model-invocation: true
 ---
@@ -14,7 +14,7 @@ You help users manage acceptance criteria in SPECTRA. Run CLI commands via runIn
 
 **Step 1** — Open the live progress page:
 ```
-show preview .spectra-progress.html
+show preview .spectra-progress.html?nocache=1
 ```
 
 **Step 2** — runInTerminal:
@@ -23,7 +23,7 @@ spectra ai analyze --extract-criteria --no-interaction --output-format json --ve
 ```
 For full re-extraction (ignore cache), add `--force`.
 
-**Step 3** — awaitTerminal. Wait for the command to finish. This takes 1-5 minutes for large doc sets. Do NOT type anything into the terminal.
+**Step 3** — awaitTerminal. The progress page auto-refreshes — the user can watch live. Between runInTerminal and awaitTerminal, do NOTHING. No readFile, no listDirectory, no checking terminal output, no status messages.
 
 **Step 4** — readFile `.spectra-result.json`
 

@@ -1,3 +1,5 @@
+#pragma warning disable CS0618 // Obsolete type usage — testing the legacy RequirementsWriter
+
 using Spectra.Core.Models.Coverage;
 using Spectra.Core.Parsing;
 

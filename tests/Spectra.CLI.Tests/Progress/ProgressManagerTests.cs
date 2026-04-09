@@ -34,7 +34,7 @@ public class ProgressManagerTests : IDisposable
     }
 
     [Fact]
-    public void Reset_DeletesExistingFiles()
+    public void Reset_DeletesResultAndWritesPlaceholderHtml()
     {
         File.WriteAllText(_resultPath, "stale");
         File.WriteAllText(_progressPath, "stale");
@@ -43,7 +43,10 @@ public class ProgressManagerTests : IDisposable
         pm.Reset();
 
         Assert.False(File.Exists(_resultPath));
-        Assert.False(File.Exists(_progressPath));
+        Assert.True(File.Exists(_progressPath));
+        var html = File.ReadAllText(_progressPath);
+        Assert.Contains("Initializing", html);
+        Assert.Contains("setInterval", html);
     }
 
     [Fact]
@@ -239,7 +242,6 @@ public class ProgressManagerTests : IDisposable
         pm.Update("phase-1", "In progress...");
 
         var html = File.ReadAllText(_progressPath);
-        Assert.Contains("var isTerminal = false;", html);
         Assert.Contains("setInterval", html);
     }
 

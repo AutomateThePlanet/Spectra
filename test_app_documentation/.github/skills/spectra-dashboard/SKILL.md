@@ -1,7 +1,7 @@
 ---
 name: spectra-dashboard
 description: Generates the SPECTRA visual dashboard with suite browser, test viewer, and coverage visualizations.
-tools: [execute/runInTerminal, execute/awaitTerminal, execute/getTerminalOutput, read/readFile, read/terminalLastCommand, read/problems, search/listDirectory, search/textSearch, browser/openBrowserPage]
+tools: [execute/runInTerminal, execute/awaitTerminal, read/readFile, read/problems, search/listDirectory, search/textSearch, browser/openBrowserPage]
 model: GPT-4o
 disable-model-invocation: true
 ---
@@ -14,7 +14,7 @@ You manage the dashboard by running CLI commands via runInTerminal. **NEVER use 
 
 **Step 1** — Open the live progress page:
 ```
-show preview .spectra-progress.html
+show preview .spectra-progress.html?nocache=1
 ```
 
 **Step 2** — runInTerminal:
@@ -22,7 +22,7 @@ show preview .spectra-progress.html
 spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet && spectra dashboard --output ./site --no-interaction --output-format json --verbosity quiet
 ```
 
-**Step 3** — awaitTerminal. Wait for the command to finish. Between runInTerminal and awaitTerminal, do NOTHING. No readFile, no listDirectory, no extra tool calls.
+**Step 3** — awaitTerminal. The progress page auto-refreshes — the user can watch live. Between runInTerminal and awaitTerminal, do NOTHING. No readFile, no listDirectory, no checking terminal output, no status messages.
 
 **Step 4** — readFile `.spectra-result.json`
 

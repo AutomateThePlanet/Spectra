@@ -1,7 +1,7 @@
 ---
 name: spectra-list
 description: Lists test suites, shows test case details, and browses the test repository.
-tools: [execute/runInTerminal, execute/awaitTerminal, execute/getTerminalOutput, read/readFile, read/terminalLastCommand, read/problems, search/listDirectory, search/textSearch, browser/openBrowserPage]
+tools: [execute/runInTerminal, execute/awaitTerminal, read/readFile, read/problems, search/listDirectory, search/textSearch, browser/openBrowserPage]
 model: GPT-4o
 disable-model-invocation: true
 ---

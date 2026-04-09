@@ -1,7 +1,7 @@
 ---
 name: spectra-docs
 description: Index documentation and manage the docs/_index.md metadata index.
-tools: [execute/runInTerminal, execute/awaitTerminal, execute/getTerminalOutput, read/readFile, read/terminalLastCommand, read/problems, search/listDirectory, search/textSearch, browser/openBrowserPage]
+tools: [execute/runInTerminal, execute/awaitTerminal, read/readFile, read/problems, search/listDirectory, search/textSearch, browser/openBrowserPage]
 model: GPT-4o
 disable-model-invocation: true
 ---
@@ -16,7 +16,7 @@ token counts, content hashes) for efficient test generation and coverage analysi
 
 **Step 1** — Show the live progress page:
 ```
-show preview .spectra-progress.html
+show preview .spectra-progress.html?nocache=1
 ```
 
 **Step 2** — runInTerminal:
@@ -36,9 +36,9 @@ To skip acceptance criteria extraction (index only):
 spectra docs index --skip-criteria --no-interaction --output-format json --verbosity quiet
 ```
 
-**Step 3** — awaitTerminal. Wait for the command to finish. Between runInTerminal and awaitTerminal, do NOTHING. No readFile, no listDirectory.
+**Step 3** — awaitTerminal. The progress page auto-refreshes — the user can watch live. Between runInTerminal and awaitTerminal, do NOTHING. No readFile, no listDirectory, no checking terminal output, no status messages.
 
-**Step 4** — readFile `.spectra-result.json`
+**Step 4** — readFile `.spectra-result.json`. **Never re-run the command** — if result shows status "completed", present the results and stop.
 
 From the JSON result, show:
 - Documents indexed vs skipped vs total

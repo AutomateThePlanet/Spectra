@@ -1,7 +1,7 @@
 ---
 name: spectra-validate
 description: Validates all test case files for correct format, unique IDs, and required fields.
-tools: [execute/runInTerminal, execute/awaitTerminal, execute/getTerminalOutput, read/readFile, read/terminalLastCommand, read/problems, search/listDirectory, search/textSearch, browser/openBrowserPage]
+tools: [execute/runInTerminal, execute/awaitTerminal, read/readFile, read/problems, search/listDirectory, search/textSearch, browser/openBrowserPage]
 model: GPT-4o
 disable-model-invocation: true
 ---
