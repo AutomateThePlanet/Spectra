@@ -17,16 +17,20 @@ You manage the dashboard by running CLI commands via runInTerminal. **NEVER use 
 show preview .spectra-progress.html?nocache=1
 ```
 
-**Step 2** — runInTerminal:
+**Step 2** — runInTerminal (deletes old site folder first, then regenerates):
 ```
-spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet && spectra dashboard --output ./site --no-interaction --output-format json --verbosity quiet
+rm -rf site && spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet && spectra dashboard --output ./site --no-interaction --output-format json --verbosity quiet
 ```
+On Windows use: `if exist site rmdir /s /q site && spectra ai analyze ...`
 
 **Step 3** — awaitTerminal. The progress page auto-refreshes — the user can watch live. Between runInTerminal and awaitTerminal, do NOTHING. No readFile, no listDirectory, no checking terminal output, no status messages.
 
 **Step 4** — readFile `.spectra-result.json`
 
-**Step 5** — show preview site/index.html
+**Step 5** — ALWAYS open the dashboard after generation:
+```
+show preview site/index.html?nocache=1
+```
 
 Report: "Dashboard generated." Show suite count and test count from the result JSON.
 
