@@ -228,6 +228,69 @@ public class DocumentationCoverageAnalyzerTests
         Assert.Equal("TC-001", result.UndocumentedTestIds[0]);
     }
 
+    [Fact]
+    public void Analyze_ManualTestsOnly_DocStillCovered()
+    {
+        // Document coverage is about test existence, NOT automation status
+        var docMap = new DocumentMap
+        {
+            TotalSizeKb = 5,
+            Documents =
+            [
+                new DocumentEntry { Path = "docs/payments.md", Title = "Payments", SizeKb = 5, Headings = ["Payments"], Preview = "" }
+            ]
+        };
+
+        var tests = new List<TestCase>
+        {
+            // Test has no automated_by — purely manual
+            CreateTestCase("TC-001", ["docs/payments.md"])
+        };
+
+        var result = _analyzer.Analyze(docMap, tests);
+
+        Assert.Equal(1, result.CoveredDocs);
+        Assert.Equal(100m, result.Percentage);
+    }
+
+    [Fact]
+    public void Analyze_AutomatedAndManualTests_BothCoverDocs()
+    {
+        var docMap = new DocumentMap
+        {
+            TotalSizeKb = 10,
+            Documents =
+            [
+                new DocumentEntry { Path = "docs/auth.md", Title = "Auth", SizeKb = 5, Headings = ["Auth"], Preview = "" },
+                new DocumentEntry { Path = "docs/billing.md", Title = "Billing", SizeKb = 5, Headings = ["Billing"], Preview = "" }
+            ]
+        };
+
+        var tests = new List<TestCase>
+        {
+            new()
+            {
+                Id = "TC-001", FilePath = "TC-001.md", Priority = Priority.Medium,
+                Title = "Manual test", ExpectedResult = "Expected",
+                SourceRefs = ["docs/auth.md"],
+                AutomatedBy = [] // No automation
+            },
+            new()
+            {
+                Id = "TC-002", FilePath = "TC-002.md", Priority = Priority.Medium,
+                Title = "Automated test", ExpectedResult = "Expected",
+                SourceRefs = ["docs/billing.md"],
+                AutomatedBy = ["LoginTests.cs"]
+            }
+        };
+
+        var result = _analyzer.Analyze(docMap, tests);
+
+        // Both documents should be covered regardless of automation
+        Assert.Equal(2, result.CoveredDocs);
+        Assert.Equal(100m, result.Percentage);
+    }
+
     private static TestCase CreateTestCase(string id, IReadOnlyList<string> sourceRefs) => new()
     {
         Id = id,

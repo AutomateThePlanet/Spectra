@@ -167,6 +167,65 @@ public class AcceptanceCriteriaCoverageAnalyzerTests : IDisposable
         Assert.Equal(1, result.CoveredCriteria);
     }
 
+    [Fact]
+    public async Task AnalyzeFromDirectory_CoveragePercentage_CalculatedCorrectly()
+    {
+        // Arrange: 5 criteria, 2 covered
+        await WriteCriteriaIndexAsync(new[] { "checkout.criteria.yaml" });
+        await WriteCriteriaFileAsync("checkout.criteria.yaml", new[]
+        {
+            ("AC-001", "Criterion 1"),
+            ("AC-002", "Criterion 2"),
+            ("AC-003", "Criterion 3"),
+            ("AC-004", "Criterion 4"),
+            ("AC-005", "Criterion 5")
+        });
+
+        var tests = new List<TestCase>
+        {
+            CreateTestCase("TC-001", criteria: ["AC-001"]),
+            CreateTestCase("TC-002", criteria: ["AC-003"])
+        };
+
+        var indexPath = Path.Combine(_tempDir, "_criteria_index.yaml");
+
+        // Act
+        var result = await _analyzer.AnalyzeFromDirectoryAsync(_tempDir, indexPath, tests, default);
+
+        // Assert
+        Assert.Equal(5, result.TotalCriteria);
+        Assert.Equal(2, result.CoveredCriteria);
+        Assert.Equal(40m, result.Percentage);
+    }
+
+    [Fact]
+    public async Task AnalyzeFromDirectory_BothFieldsCombined()
+    {
+        // Tests using both criteria: [] and legacy requirements: [] should both count
+        await WriteCriteriaIndexAsync(new[] { "checkout.criteria.yaml" });
+        await WriteCriteriaFileAsync("checkout.criteria.yaml", new[]
+        {
+            ("AC-001", "Criterion via criteria field"),
+            ("AC-002", "Criterion via requirements field"),
+            ("AC-003", "Uncovered criterion")
+        });
+
+        var tests = new List<TestCase>
+        {
+            CreateTestCase("TC-001", criteria: ["AC-001"]),
+            CreateTestCase("TC-002", requirements: ["AC-002"])
+        };
+
+        var indexPath = Path.Combine(_tempDir, "_criteria_index.yaml");
+
+        // Act
+        var result = await _analyzer.AnalyzeFromDirectoryAsync(_tempDir, indexPath, tests, default);
+
+        // Assert
+        Assert.Equal(3, result.TotalCriteria);
+        Assert.Equal(2, result.CoveredCriteria);
+    }
+
     private async Task WriteCriteriaIndexAsync(string[] sourceFiles)
     {
         var sources = string.Join("\n", sourceFiles.Select(f =>

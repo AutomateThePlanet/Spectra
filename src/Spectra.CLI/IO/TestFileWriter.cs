@@ -86,6 +86,10 @@ public sealed class TestFileWriter
                 sb.AppendLine($"  - {criterion}");
             }
         }
+        else
+        {
+            sb.AppendLine("criteria: []");
+        }
 
         // Orphaned status fields
         if (!string.IsNullOrWhiteSpace(testCase.Status))

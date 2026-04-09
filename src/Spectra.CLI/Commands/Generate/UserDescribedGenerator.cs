@@ -62,6 +62,7 @@ public sealed class UserDescribedGenerator
             [],
             [],
             1,
+            criteriaContext: null,
             ct);
 
         if (!result.IsSuccess || result.Tests.Count == 0)

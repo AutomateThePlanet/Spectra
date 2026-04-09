@@ -70,6 +70,7 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
         IReadOnlyList<SourceDocument> documents,
         IReadOnlyList<TestCase> existingTests,
         int requestedCount,
+        string? criteriaContext = null,
         CancellationToken ct = default)
     {
         try
@@ -132,7 +133,7 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
             });
 
             // Build the combined prompt with system instructions and user request
-            var fullPrompt = BuildFullPrompt(prompt, requestedCount);
+            var fullPrompt = BuildFullPrompt(prompt, requestedCount, criteriaContext);
 
             // Send and wait for the complete response
             _onStatus?.Invoke("Starting AI generation...");

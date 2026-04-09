@@ -19,6 +19,7 @@ using Spectre.Console;
 using Spectra.CLI.Results;
 using Spectra.CLI.Session;
 using Spectra.CLI.Validation;
+using Spectra.Core.Models.Coverage;
 using Spectra.Core.Parsing;
 using Spectra.Core.Profile;
 using ProfilePriority = Spectra.Core.Models.Profile.Priority;
@@ -498,6 +499,9 @@ public sealed class GenerateHandler
             return ExitCodes.Error;
         }
 
+        // Load criteria context for the suite
+        var criteriaContext = await LoadCriteriaContextAsync(currentDir, suite, config, ct);
+
         // --- Batch generation loop ---
         var generatorModel = agent.ProviderName;
         var writer = new TestFileWriter();
@@ -528,7 +532,7 @@ public sealed class GenerateHandler
             await _progress.StatusAsync($"Generating batch {batchNum}...", async () =>
             {
                 batchResult = await agent.GenerateTestsAsync(
-                    prompt, documents, mutableExistingTests, batchRequestCount, ct);
+                    prompt, documents, mutableExistingTests, batchRequestCount, criteriaContext, ct);
             });
 
             // Handle batch failure — keep tests from prior batches
@@ -1013,12 +1017,15 @@ public sealed class GenerateHandler
                 return ExitCodes.Error;
             }
 
+            // Load criteria context for the suite
+            var criteriaContext = await LoadCriteriaContextAsync(currentDir, suiteName, config, ct);
+
             // Generate tests
             var prompt = BuildPrompt(suiteName, effectiveCount, allExistingIds, effectiveProfile, focus);
             GenerationResult result = null!;
             await _progress.StatusAsync("Generating tests...", async () =>
             {
-                result = await agent.GenerateTestsAsync(prompt, documents, existingTests, effectiveCount, ct);
+                result = await agent.GenerateTestsAsync(prompt, documents, existingTests, effectiveCount, criteriaContext, ct);
             });
 
             if (!result.IsSuccess)
@@ -1924,5 +1931,65 @@ public sealed class GenerateHandler
         {
             Console.WriteLine($"  - {reason}");
         }
+    }
+
+    /// <summary>
+    /// Loads acceptance criteria relevant to the target suite from .criteria.yaml files.
+    /// Matches by document name and by component field.
+    /// </summary>
+    private static async Task<string?> LoadCriteriaContextAsync(
+        string basePath,
+        string suiteName,
+        SpectraConfig config,
+        CancellationToken ct)
+    {
+        var criteriaDir = Path.Combine(basePath, config.Coverage?.CriteriaDir ?? "docs/criteria");
+        if (!Directory.Exists(criteriaDir))
+            return null;
+
+        var reader = new CriteriaFileReader();
+        var allCriteria = new List<AcceptanceCriterion>();
+
+        // Load criteria from all .criteria.yaml files in the criteria directory
+        var criteriaFiles = Directory.GetFiles(criteriaDir, "*.criteria.yaml", SearchOption.AllDirectories);
+        foreach (var file in criteriaFiles)
+        {
+            var criteria = await reader.ReadAsync(file, ct);
+            allCriteria.AddRange(criteria);
+        }
+
+        if (allCriteria.Count == 0)
+            return null;
+
+        // Filter: criteria from documents matching suite name, or criteria with matching component
+        var relevant = allCriteria.Where(c =>
+            // Match by source document name (e.g., suite "checkout" matches "checkout.criteria.yaml")
+            (c.SourceDoc != null && Path.GetFileNameWithoutExtension(c.SourceDoc)
+                .Equals(suiteName, StringComparison.OrdinalIgnoreCase)) ||
+            // Match by component field
+            (c.Component != null && c.Component.Equals(suiteName, StringComparison.OrdinalIgnoreCase)) ||
+            // Match by criteria file name (e.g., "checkout.criteria.yaml" for suite "checkout")
+            criteriaFiles.Any(f => Path.GetFileName(f)
+                .StartsWith(suiteName + ".", StringComparison.OrdinalIgnoreCase) &&
+                allCriteria.IndexOf(c) >= 0)
+        ).ToList();
+
+        // If no suite-specific criteria found, use all criteria (better than none)
+        if (relevant.Count == 0)
+            relevant = allCriteria;
+
+        // Format as context string
+        var sb = new System.Text.StringBuilder();
+        foreach (var criterion in relevant)
+        {
+            sb.Append($"- **{criterion.Id}**");
+            if (!string.IsNullOrEmpty(criterion.Rfc2119))
+                sb.Append($" [{criterion.Rfc2119}]");
+            sb.AppendLine($" {criterion.Text}");
+            if (!string.IsNullOrEmpty(criterion.Component))
+                sb.AppendLine($"  Component: {criterion.Component}");
+        }
+
+        return sb.Length > 0 ? sb.ToString() : null;
     }
 }

@@ -22,6 +22,7 @@ public interface IAgentRuntime
         IReadOnlyList<SourceDocument> documents,
         IReadOnlyList<TestCase> existingTests,
         int requestedCount,
+        string? criteriaContext = null,
         CancellationToken ct = default);
 
     /// <summary>

@@ -262,11 +262,11 @@ The CLI generates a self-contained `.spectra-progress.html` during test generati
 
 ## Coverage System
 
-Three-section unified coverage:
+Three-section unified coverage with distinct semantics:
 
-1. **Documentation Coverage**: Which docs have linked tests
-2. **Acceptance Criteria Coverage**: Which criteria are tested (with per-source-type breakdown)
-3. **Automation Coverage**: Which tests have `automated_by` links to code
+1. **Documentation Coverage**: Which docs have test cases (via `source_refs` or suite name match). "Covered" = at least 1 test references the document. Automation status is irrelevant.
+2. **Acceptance Criteria Coverage**: Which criteria are tested (via `criteria: []` or legacy `requirements: []` in test frontmatter, with per-source-type breakdown). Generation pipeline loads criteria and passes to AI prompt so generated tests include `criteria: [AC-XXX]`.
+3. **Automation Coverage**: Which tests have `automated_by: []` links resolving to existing files in `automation_dirs`.
 
 ## Config Schema (`spectra.config.json`)
 
@@ -301,6 +301,7 @@ Three-section unified coverage:
 
 | # | Feature | Key Changes |
 |---|---------|-------------|
+| 028 | Coverage & Criteria Pipeline | Fixed criteria propagation in parser, wired criteria into generation pipeline, always write criteria: [] |
 | 027 | SKILL/Agent Deduplication | Agents delegate to SKILLs, execution ~120 lines, generation ~81 lines, SKILL consistency fixes |
 | 024 | Docs Index SKILL & Coverage Fix | 9th SKILL (spectra-docs), result/progress files, --skip-criteria, terminology fix |
 | 023 | Criteria Extraction Overhaul | Per-doc extraction, import, rename requirements→criteria, progress page |
