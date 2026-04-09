@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Spectra.CLI.Agent;
 using Spectra.CLI.Agent.Tools;
@@ -206,6 +207,7 @@ public sealed class UpdateHandler
         bool deleteOrphaned,
         CancellationToken ct)
     {
+        var sw = Stopwatch.StartNew();
         _progressManager.Update("classifying", $"Analyzing changes in {suite} suite...");
 
         // Read existing tests
@@ -409,11 +411,19 @@ public sealed class UpdateHandler
             orphanedCount,
             reviewResult.ToDelete.Count);
 
+        sw.Stop();
+
+        var flaggedProposals = proposals
+            .Where(p => p.Classification is UpdateClassification.Orphaned or UpdateClassification.Redundant)
+            .ToList();
+
         var updateResult = new Results.UpdateResult
         {
             Command = "update",
             Status = "completed",
+            Success = true,
             Suite = suite,
+            TotalTests = proposals.Count,
             TestsUpdated = reviewResult.ToUpdate.Count,
             TestsRemoved = orphanedCount + reviewResult.ToDelete.Count,
             TestsUnchanged = proposals.Count(p => p.Classification == UpdateClassification.UpToDate),
@@ -423,7 +433,18 @@ public sealed class UpdateHandler
                 Outdated = proposals.Count(p => p.Classification == UpdateClassification.Outdated),
                 Orphaned = proposals.Count(p => p.Classification == UpdateClassification.Orphaned),
                 Redundant = proposals.Count(p => p.Classification == UpdateClassification.Redundant)
-            }
+            },
+            TestsFlagged = flaggedProposals.Count,
+            FlaggedTests = flaggedProposals.Count > 0
+                ? flaggedProposals.Select(p => new Results.FlaggedTestEntry
+                {
+                    Id = p.OriginalTest.Id,
+                    Title = p.OriginalTest.Title,
+                    Classification = p.Classification.ToString().ToUpperInvariant(),
+                    Reason = p.Reason
+                }).ToList()
+                : null,
+            Duration = sw.Elapsed.ToString(@"hh\:mm\:ss")
         };
         _progressManager.Complete(updateResult);
 

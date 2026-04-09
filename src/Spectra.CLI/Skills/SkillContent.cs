@@ -8,6 +8,7 @@ public static class SkillContent
     public static readonly Dictionary<string, string> All = SkillResourceLoader.GetAllSkills();
 
     public static string Generate => All["spectra-generate"];
+    public static string Update => All["spectra-update"];
     public static string Coverage => All["spectra-coverage"];
     public static string Dashboard => All["spectra-dashboard"];
     public static string Validate => All["spectra-validate"];
