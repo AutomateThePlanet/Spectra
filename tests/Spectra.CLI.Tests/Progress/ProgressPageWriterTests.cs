@@ -36,7 +36,7 @@ public class ProgressPageWriterTests : IDisposable
     }
 
     [Fact]
-    public void WriteProgressPage_ContainsMetaRefresh_WhenNotTerminal()
+    public void WriteProgressPage_ContainsAutoRefreshScript_WhenNotTerminal()
     {
         var path = CreateTempHtmlPath();
         var json = """{"status": "analyzing", "suite": "checkout"}""";
@@ -44,11 +44,12 @@ public class ProgressPageWriterTests : IDisposable
         ProgressPageWriter.WriteProgressPage(path, json, isTerminal: false);
 
         var content = File.ReadAllText(path);
-        Assert.Contains("""<meta http-equiv="refresh" content="2">""", content);
+        Assert.Contains("var isTerminal = false;", content);
+        Assert.Contains("setInterval", content);
     }
 
     [Fact]
-    public void WriteProgressPage_OmitsMetaRefresh_WhenTerminal()
+    public void WriteProgressPage_DisablesAutoRefresh_WhenTerminal()
     {
         var path = CreateTempHtmlPath();
         var json = """{"status": "completed", "suite": "checkout"}""";
@@ -56,7 +57,7 @@ public class ProgressPageWriterTests : IDisposable
         ProgressPageWriter.WriteProgressPage(path, json, isTerminal: true);
 
         var content = File.ReadAllText(path);
-        Assert.DoesNotContain("""http-equiv="refresh""", content);
+        Assert.Contains("var isTerminal = true;", content);
     }
 
     [Fact]

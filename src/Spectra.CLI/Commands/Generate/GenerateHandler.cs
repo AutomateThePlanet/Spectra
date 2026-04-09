@@ -295,29 +295,32 @@ public sealed class GenerateHandler
                 if (analysisResult.RecommendedCount == 0)
                 {
                     AnalysisPresenter.DisplayAllCovered(analysisResult.TotalBehaviors, _outputFormat);
+                    var allCoveredResult = new GenerateResult
+                    {
+                        Command = "generate",
+                        Status = "completed",
+                        Suite = suite,
+                        Message = "All behaviors already covered by existing tests",
+                        Analysis = new GenerateAnalysis
+                        {
+                            TotalBehaviors = analysisResult.TotalBehaviors,
+                            AlreadyCovered = analysisResult.AlreadyCovered,
+                            Recommended = 0,
+                            Breakdown = analysisResult.Breakdown?.ToDictionary(
+                                kvp => kvp.Key.ToString(), kvp => kvp.Value)
+                        },
+                        Generation = new GenerateGeneration
+                        {
+                            TestsGenerated = 0,
+                            TestsWritten = 0,
+                            TestsRejectedByCritic = 0
+                        },
+                        FilesCreated = []
+                    };
+                    WriteResultFile(allCoveredResult);
                     if (_outputFormat == OutputFormat.Json)
                     {
-                        JsonResultWriter.Write(new GenerateResult
-                        {
-                            Command = "generate",
-                            Status = "completed",
-                            Suite = suite,
-                            Analysis = new GenerateAnalysis
-                            {
-                                TotalBehaviors = analysisResult.TotalBehaviors,
-                                AlreadyCovered = analysisResult.AlreadyCovered,
-                                Recommended = 0,
-                                Breakdown = analysisResult.Breakdown?.ToDictionary(
-                                    kvp => kvp.Key.ToString(), kvp => kvp.Value)
-                            },
-                            Generation = new GenerateGeneration
-                            {
-                                TestsGenerated = 0,
-                                TestsWritten = 0,
-                                TestsRejectedByCritic = 0
-                            },
-                            FilesCreated = []
-                        });
+                        JsonResultWriter.Write(allCoveredResult);
                     }
                     return ExitCodes.Success;
                 }
@@ -428,13 +431,35 @@ public sealed class GenerateHandler
                 _results.ShowExistingTests(matchingTests, focus);
             }
 
-            if (gaps.Count == 0)
+            if (gaps.Count == 0 && !count.HasValue)
             {
+                // Only block generation when count was NOT explicitly requested.
+                // When --count is provided, the user explicitly wants N tests with this focus —
+                // the gap analyzer uses document-level source_refs which can't detect
+                // category-level gaps (e.g., "security" tests vs general tests).
                 _gapPresenter.ShowAllCovered(focus);
+                WriteResultFile(new GenerateResult
+                {
+                    Command = "generate",
+                    Status = "completed",
+                    Suite = suite,
+                    Message = $"No coverage gaps found for focus: {focus}",
+                    Generation = new GenerateGeneration
+                    {
+                        TestsRequested = effectiveCount,
+                        TestsGenerated = 0,
+                        TestsWritten = 0,
+                        TestsRejectedByCritic = 0
+                    },
+                    FilesCreated = []
+                });
                 return ExitCodes.Success;
             }
 
-            _gapPresenter.ShowUncoveredAreas(gaps);
+            if (gaps.Count > 0)
+            {
+                _gapPresenter.ShowUncoveredAreas(gaps);
+            }
         }
 
         // Check duplicates status message
@@ -479,6 +504,8 @@ public sealed class GenerateHandler
         var allWrittenTests = new List<TestCase>();
         var allFilesCreated = new List<string>();
         var allVerificationResults = new List<(TestCase Test, VerificationResult Result)>();
+        var allRejectedTests = new List<RejectedTest>();
+        var allVerifiedTests = new List<VerifiedTest>();
         var totalGenerated = 0;
         var totalRejected = 0;
         var mutableExistingTests = new List<TestCase>(existingTests);
@@ -537,11 +564,16 @@ public sealed class GenerateHandler
 
             if (ShouldVerify(config.Ai.Critic))
             {
-                UpdateProgress(suite, "generating",
+                UpdateProgress(suite, "verifying",
                     $"Verifying batch {batchNum} ({batchResult.Tests.Count} tests)...");
 
                 batchVerificationResults = await VerifyTestsAsync(
-                    batchResult.Tests, documentMap, config.Ai.Critic!, generatorModel, ct, suite);
+                    batchResult.Tests, documentMap, config.Ai.Critic!, generatorModel, ct, suite,
+                    onTestVerified: (test, result) =>
+                    {
+                        allVerifiedTests.Add(BuildVerifiedTest(test, result));
+                        WriteVerificationProgress(suite, allVerifiedTests);
+                    });
 
                 _verification.ShowSummary(batchVerificationResults);
                 allVerificationResults.AddRange(batchVerificationResults);
@@ -551,8 +583,10 @@ public sealed class GenerateHandler
                     .Select(r => r.Test)
                     .ToList();
 
-                totalRejected += batchVerificationResults
-                    .Count(r => r.Result.Verdict == VerificationVerdict.Hallucinated);
+                var batchRejected = batchVerificationResults
+                    .Where(r => r.Result.Verdict == VerificationVerdict.Hallucinated);
+                totalRejected += batchRejected.Count();
+                allRejectedTests.AddRange(batchRejected.Select(r => BuildRejectedTest(r.Test, r.Result)));
 
                 if (batchTestsToWrite.Count == 0)
                 {
@@ -693,6 +727,8 @@ public sealed class GenerateHandler
                     Hallucinated = totalRejected
                 } : null
             },
+            Verification = allVerifiedTests.Count > 0 ? allVerifiedTests : null,
+            RejectedTests = allRejectedTests.Count > 0 ? allRejectedTests : null,
             FilesCreated = allFilesCreated
         };
 
@@ -883,6 +919,20 @@ public sealed class GenerateHandler
                 {
                     AnalysisPresenter.DisplayAllCovered(analysisResult.TotalBehaviors, _outputFormat);
                     session.Complete();
+                    WriteResultFile(new GenerateResult
+                    {
+                        Command = "generate",
+                        Status = "completed",
+                        Suite = suiteName,
+                        Message = "All behaviors already covered by existing tests",
+                        Generation = new GenerateGeneration
+                        {
+                            TestsGenerated = 0,
+                            TestsWritten = 0,
+                            TestsRejectedByCritic = 0
+                        },
+                        FilesCreated = []
+                    });
                     return ExitCodes.Success;
                 }
 
@@ -933,6 +983,8 @@ public sealed class GenerateHandler
 
         // Interactive generation loop
         var allGeneratedTests = new List<TestCase>();
+        var allRejectedTests = new List<RejectedTest>();
+        var totalRejected = 0;
         var remainingGaps = gaps.ToList();
 
         while (!session.IsComplete)
@@ -976,6 +1028,7 @@ public sealed class GenerateHandler
                 {
                     Console.Error.WriteLine($"  {error}");
                 }
+                WriteErrorResultFile(string.Join("; ", result.Errors), suiteName);
                 return ExitCodes.Error;
             }
 
@@ -1010,12 +1063,22 @@ public sealed class GenerateHandler
 
                 if (ShouldVerify(config.Ai.Critic))
                 {
+                    UpdateProgress(suiteName, "verifying",
+                        $"Verifying {result.Tests.Count} tests...");
+
+                    var interactiveVerifiedTests = new List<VerifiedTest>();
                     verificationResults = await VerifyTestsAsync(
                         result.Tests,
                         documentMap,
                         config.Ai.Critic!,
                         generatorModel,
-                        ct);
+                        ct,
+                        suiteName,
+                        onTestVerified: (test, vr) =>
+                        {
+                            interactiveVerifiedTests.Add(BuildVerifiedTest(test, vr));
+                            WriteVerificationProgress(suiteName, interactiveVerifiedTests);
+                        });
 
                     // Show verification summary
                     _verification.ShowSummary(verificationResults);
@@ -1027,6 +1090,11 @@ public sealed class GenerateHandler
                         .Where(r => r.Result.Verdict != VerificationVerdict.Hallucinated)
                         .Select(r => r.Test)
                         .ToList();
+
+                    var rejected = verificationResults
+                        .Where(r => r.Result.Verdict == VerificationVerdict.Hallucinated);
+                    totalRejected += rejected.Count();
+                    allRejectedTests.AddRange(rejected.Select(r => BuildRejectedTest(r.Test, r.Result)));
 
                     if (testsToWrite.Count == 0)
                     {
@@ -1203,6 +1271,35 @@ public sealed class GenerateHandler
             AnalysisPresenter.DisplayGapNotification(
                 analysisResult, allGeneratedTests.Count, suiteName, outputFormat: _outputFormat);
         }
+
+        // Write final result file so progress page shows completion
+        WriteResultFile(new GenerateResult
+        {
+            Command = "generate",
+            Status = "completed",
+            Suite = suiteName,
+            Message = allGeneratedTests.Count == 0
+                ? $"No tests generated (requested: {effectiveCount})"
+                : null,
+            Analysis = analysisResult is not null ? new GenerateAnalysis
+            {
+                TotalBehaviors = analysisResult.TotalBehaviors,
+                AlreadyCovered = analysisResult.AlreadyCovered,
+                Recommended = analysisResult.RecommendedCount,
+                Breakdown = analysisResult.Breakdown?.ToDictionary(
+                    kvp => kvp.Key.ToString(), kvp => kvp.Value)
+            } : null,
+            Generation = new GenerateGeneration
+            {
+                TestsGenerated = allGeneratedTests.Count + totalRejected,
+                TestsWritten = allGeneratedTests.Count,
+                TestsRejectedByCritic = totalRejected
+            },
+            RejectedTests = allRejectedTests.Count > 0 ? allRejectedTests : null,
+            FilesCreated = allGeneratedTests
+                .Select(t => $"tests/{suiteName}/{t.Id}.md")
+                .ToList()
+        });
 
         NextStepHints.Print("generate", true, _verbosity, new HintContext { SuiteName = suiteName }, _outputFormat);
         return ExitCodes.Success;
@@ -1503,7 +1600,8 @@ public sealed class GenerateHandler
         CriticConfig criticConfig,
         string generatorModel,
         CancellationToken ct,
-        string? suite = null)
+        string? suite = null,
+        Action<TestCase, VerificationResult>? onTestVerified = null)
     {
         var results = new List<(TestCase Test, VerificationResult Result)>();
 
@@ -1570,7 +1668,7 @@ public sealed class GenerateHandler
 
             if (suite is not null)
             {
-                UpdateProgress(suite, "generating",
+                UpdateProgress(suite, "verifying",
                     $"Verifying test {i + 1}/{tests.Count}: {test.Id} ({critic.ModelName})...");
             }
 
@@ -1580,10 +1678,13 @@ public sealed class GenerateHandler
                 {
                     var result = await critic.VerifyTestAsync(test, sourceDocs, ct);
                     results.Add((test, result));
+                    onTestVerified?.Invoke(test, result);
                 }
                 catch (Exception ex)
                 {
-                    results.Add((test, VerificationResult.Unverified(critic.ModelName, ex.Message)));
+                    var unverified = VerificationResult.Unverified(critic.ModelName, ex.Message);
+                    results.Add((test, unverified));
+                    onTestVerified?.Invoke(test, unverified);
                 }
             });
         }
@@ -1655,6 +1756,39 @@ public sealed class GenerateHandler
         };
     }
 
+    private static VerifiedTest BuildVerifiedTest(TestCase test, VerificationResult result)
+    {
+        var reason = result.Findings
+            .Where(f => f.Status != FindingStatus.Grounded)
+            .Select(f => f.Reason ?? f.Claim)
+            .FirstOrDefault();
+
+        return new VerifiedTest
+        {
+            Id = test.Id,
+            Title = test.Title,
+            Verdict = result.Verdict.ToString().ToLowerInvariant(),
+            Score = result.Score,
+            Reason = reason
+        };
+    }
+
+    private static RejectedTest BuildRejectedTest(TestCase test, VerificationResult result)
+    {
+        var reason = result.Findings
+            .Where(f => f.Status == FindingStatus.Hallucinated)
+            .Select(f => f.Reason ?? f.Claim)
+            .FirstOrDefault();
+
+        return new RejectedTest
+        {
+            Id = test.Id,
+            Title = test.Title,
+            Verdict = result.Verdict.ToString().ToLowerInvariant(),
+            Reason = reason
+        };
+    }
+
     /// <summary>
     /// Checks if critic verification should be performed.
     /// </summary>
@@ -1709,6 +1843,31 @@ public sealed class GenerateHandler
     private static void UpdateProgress(string suite, string status, string message)
     {
         WriteInProgressResultFile(suite, status, message);
+    }
+
+    private static void WriteVerificationProgress(string suite, List<VerifiedTest> verifiedTests)
+    {
+        var grounded = verifiedTests.Count(v => v.Verdict == "grounded");
+        var partial = verifiedTests.Count(v => v.Verdict == "partial");
+        var hallucinated = verifiedTests.Count(v => v.Verdict == "hallucinated");
+        var message = $"Verified {verifiedTests.Count} tests: {grounded} grounded, {partial} partial, {hallucinated} hallucinated";
+
+        var result = new GenerateResult
+        {
+            Command = "generate",
+            Status = "verifying",
+            Suite = suite,
+            Message = message,
+            Generation = new GenerateGeneration
+            {
+                TestsGenerated = 0,
+                TestsWritten = 0,
+                TestsRejectedByCritic = hallucinated
+            },
+            Verification = verifiedTests,
+            FilesCreated = []
+        };
+        _progressManager.Update(result);
     }
 
     private static void WriteErrorResultFile(string error, string? suite = null)

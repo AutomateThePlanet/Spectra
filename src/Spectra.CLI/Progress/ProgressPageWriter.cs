@@ -48,7 +48,7 @@ public static class ProgressPageWriter
 
     private static string BuildHtml(string jsonData, bool isTerminal, string workspaceRoot, string? title = null)
     {
-        var refreshTag = isTerminal ? "" : """<meta http-equiv="refresh" content="2">""";
+        var refreshTag = ""; // Refresh handled by JavaScript below
         var escapedJson = HttpUtility.HtmlEncode(jsonData);
         var escapedRoot = HttpUtility.HtmlEncode(workspaceRoot.Replace('\\', '/'));
 
@@ -295,6 +295,99 @@ public static class ProgressPageWriter
                         color: var(--color-primary);
                     }
 
+                    /* Verification progress */
+                    .verification-section {
+                        background: var(--color-card);
+                        border-radius: 12px;
+                        padding: 1.5rem;
+                        border: 1px solid var(--color-border);
+                        margin-bottom: 1.5rem;
+                    }
+                    .verification-section h3 {
+                        font-size: 0.9rem;
+                        font-weight: 600;
+                        margin-bottom: 1rem;
+                    }
+                    .verification-item {
+                        font-size: 0.8rem;
+                        padding: 8px 12px;
+                        border-radius: 6px;
+                        margin-bottom: 4px;
+                        display: flex;
+                        flex-wrap: wrap;
+                        align-items: center;
+                        gap: 8px;
+                        border-left: 3px solid transparent;
+                    }
+                    .verdict-grounded { background: var(--color-passed-bg); border-left-color: var(--color-passed); }
+                    .verdict-partial { background: #fef9c3; border-left-color: #ca8a04; }
+                    .verdict-hallucinated { background: var(--color-failed-bg); border-left-color: var(--color-failed); }
+                    .verdict-icon { font-weight: 700; font-size: 0.9rem; }
+                    .verdict-grounded .verdict-icon { color: var(--color-passed); }
+                    .verdict-partial .verdict-icon { color: #ca8a04; }
+                    .verdict-hallucinated .verdict-icon { color: var(--color-failed); }
+                    .verdict-id {
+                        font-family: 'JetBrains Mono', monospace;
+                        font-weight: 600;
+                        color: var(--color-text);
+                    }
+                    .verdict-title { color: var(--color-text); flex: 1; min-width: 0; }
+                    .verdict-badge {
+                        font-size: 0.7rem;
+                        font-weight: 600;
+                        text-transform: uppercase;
+                        padding: 2px 8px;
+                        border-radius: 10px;
+                        letter-spacing: 0.03em;
+                    }
+                    .verdict-grounded .verdict-badge { background: var(--color-passed); color: white; }
+                    .verdict-partial .verdict-badge { background: #ca8a04; color: white; }
+                    .verdict-hallucinated .verdict-badge { background: var(--color-failed); color: white; }
+                    .verdict-reason {
+                        width: 100%;
+                        font-size: 0.75rem;
+                        color: var(--color-text-muted);
+                        font-style: italic;
+                        padding-left: 24px;
+                    }
+
+                    /* Rejected tests */
+                    .rejected-section {
+                        background: var(--color-card);
+                        border-radius: 12px;
+                        padding: 1.5rem;
+                        border: 1px solid var(--color-border);
+                        margin-bottom: 1.5rem;
+                    }
+                    .rejected-section h3 {
+                        font-size: 0.9rem;
+                        font-weight: 600;
+                        margin-bottom: 1rem;
+                        color: var(--color-failed);
+                    }
+                    .rejected-item {
+                        font-size: 0.8rem;
+                        padding: 8px 10px;
+                        background: var(--color-failed-bg);
+                        border-radius: 6px;
+                        margin-bottom: 4px;
+                        border-left: 3px solid var(--color-failed);
+                    }
+                    .rejected-id {
+                        font-family: 'JetBrains Mono', monospace;
+                        font-weight: 600;
+                        color: var(--color-failed);
+                    }
+                    .rejected-title {
+                        color: var(--color-text);
+                    }
+                    .rejected-reason {
+                        font-size: 0.75rem;
+                        color: var(--color-text-muted);
+                        margin-top: 4px;
+                        font-style: italic;
+                    }
+
                     /* Error */
                     .error-card {
                         background: var(--color-failed-bg);
@@ -378,8 +471,26 @@ public static class ProgressPageWriter
                     {{BuildBody(jsonData, isTerminal, workspaceRoot)}}
                 </div>
                 <script>
-                    // VS Code Live Preview auto-reloads when the file changes on disk.
-                    // No custom polling needed — the CLI rewrites this HTML on every progress update.
+                    // Auto-refresh: reload page every 1.5s while status is not terminal.
+                    // Uses JavaScript instead of <meta refresh> for reliable file:// support.
+                    (function() {
+                        var isTerminal = {{(isTerminal ? "true" : "false")}};
+                        if (!isTerminal) {
+                            setInterval(function() {
+                                window.location.reload();
+                            }, 1500);
+                        }
+                    })();
+
+                    // File links: open vscode:// URIs via JavaScript click handler
+                    // (browsers block direct <a href="vscode://..."> from file:// pages)
+                    document.addEventListener('click', function(e) {
+                        var link = e.target.closest('[data-vscode-uri]');
+                        if (link) {
+                            e.preventDefault();
+                            window.location.href = link.getAttribute('data-vscode-uri');
+                        }
+                    });
                 </script>
             </body>
             </html>
@@ -427,6 +538,12 @@ public static class ProgressPageWriter
                 {
                     sb.Append(BuildGenerationCards(requested, generated, written, rejected));
                 }
+            }
+
+            // Verification progress
+            if (root.TryGetProperty("verification", out var verification) && verification.GetArrayLength() > 0)
+            {
+                sb.Append(BuildVerificationSection(verification));
             }
 
             // Docs index summary cards
@@ -518,6 +635,12 @@ public static class ProgressPageWriter
                     """);
             }
 
+            // Rejected tests
+            if (root.TryGetProperty("rejected_tests", out var rejectedTests) && rejectedTests.GetArrayLength() > 0)
+            {
+                sb.Append(BuildRejectedTestsSection(rejectedTests));
+            }
+
             // Files created
             if (root.TryGetProperty("files_created", out var files) && files.GetArrayLength() > 0)
             {
@@ -531,7 +654,7 @@ public static class ProgressPageWriter
                     <div class="footer">
                         <span class="refresh-indicator">
                             <span class="refresh-dot"></span>
-                            Auto-refreshing every 2 seconds
+                            Auto-refreshing every 1.5 seconds
                         </span>
                     </div>
                     """);
@@ -759,9 +882,74 @@ public static class ProgressPageWriter
         {
             var relativePath = file.GetString() ?? "";
             var fullPath = Path.GetFullPath(Path.Combine(workspaceRoot, relativePath)).Replace('\\', '/');
-            var vscodeUri = $"vscode://file/{fullPath}";
+            var vscodeUri = $"vscode://file/{Uri.EscapeDataString(fullPath).Replace("%2F", "/")}";
 
-            sb.Append($"""<a class="file-item file-link" href="{Escape(vscodeUri)}" title="Open in VS Code"><span class="file-icon">📄</span>{Escape(relativePath)}</a>""");
+            sb.Append($"""<a class="file-item file-link" href="{Escape(vscodeUri)}" data-vscode-uri="{Escape(vscodeUri)}" title="Open in VS Code"><span class="file-icon">📄</span>{Escape(relativePath)}</a>""");
+        }
+
+        sb.Append("</div>");
+        return sb.ToString();
+    }
+
+    private static string BuildVerificationSection(System.Text.Json.JsonElement verification)
+    {
+        var sb = new StringBuilder();
+        sb.Append("""<div class="verification-section"><h3>Critic Verification</h3><div class="verification-list">""");
+
+        foreach (var test in verification.EnumerateArray())
+        {
+            var id = test.TryGetProperty("id", out var idProp) ? idProp.GetString() ?? "" : "";
+            var title = test.TryGetProperty("title", out var titleProp) ? titleProp.GetString() ?? "" : "";
+            var verdict = test.TryGetProperty("verdict", out var verdictProp) ? verdictProp.GetString() ?? "" : "";
+            var score = test.TryGetProperty("score", out var scoreProp) ? scoreProp.GetDouble() : 0;
+            var reason = test.TryGetProperty("reason", out var reasonProp) ? reasonProp.GetString() : null;
+
+            var verdictClass = verdict switch
+            {
+                "grounded" => "verdict-grounded",
+                "partial" => "verdict-partial",
+                "hallucinated" => "verdict-hallucinated",
+                _ => "verdict-unknown"
+            };
+
+            var verdictIcon = verdict switch
+            {
+                "grounded" => "&#x2713;",     // checkmark
+                "partial" => "&#x25CB;",       // circle
+                "hallucinated" => "&#x2717;",  // cross
+                _ => "?"
+            };
+
+            sb.Append($"""<div class="verification-item {verdictClass}">""");
+            sb.Append($"""<span class="verdict-icon">{verdictIcon}</span>""");
+            sb.Append($"""<span class="verdict-id">{Escape(id)}</span>""");
+            sb.Append($"""<span class="verdict-title">{Escape(title)}</span>""");
+            sb.Append($"""<span class="verdict-badge">{Escape(verdict)}</span>""");
+            if (!string.IsNullOrEmpty(reason))
+                sb.Append($"""<div class="verdict-reason">{Escape(reason)}</div>""");
+            sb.Append("</div>");
+        }
+
+        sb.Append("</div></div>");
+        return sb.ToString();
+    }
+
+    private static string BuildRejectedTestsSection(System.Text.Json.JsonElement rejected)
+    {
+        var sb = new StringBuilder();
+        sb.Append("""<div class="rejected-section"><h3>Rejected by Critic</h3>""");
+
+        foreach (var test in rejected.EnumerateArray())
+        {
+            var id = test.TryGetProperty("id", out var idProp) ? idProp.GetString() ?? "" : "";
+            var title = test.TryGetProperty("title", out var titleProp) ? titleProp.GetString() ?? "" : "";
+            var verdict = test.TryGetProperty("verdict", out var verdictProp) ? verdictProp.GetString() ?? "" : "";
+            var reason = test.TryGetProperty("reason", out var reasonProp) ? reasonProp.GetString() : null;
+
+            sb.Append($"""<div class="rejected-item"><span class="rejected-id">{Escape(id)}</span> <span class="rejected-title">{Escape(title)}</span>""");
+            if (!string.IsNullOrEmpty(reason))
+                sb.Append($"""<div class="rejected-reason">{Escape(reason)}</div>""");
+            sb.Append("</div>");
         }
 
         sb.Append("</div>");

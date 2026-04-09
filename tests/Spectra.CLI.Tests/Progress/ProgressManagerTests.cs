@@ -233,13 +233,14 @@ public class ProgressManagerTests : IDisposable
     }
 
     [Fact]
-    public void ProgressHtml_HasAutoRefreshTag_DuringExecution()
+    public void ProgressHtml_HasAutoRefreshScript_DuringExecution()
     {
         var pm = CreateManager();
         pm.Update("phase-1", "In progress...");
 
         var html = File.ReadAllText(_progressPath);
-        Assert.Contains("""<meta http-equiv="refresh" content="2">""", html);
+        Assert.Contains("var isTerminal = false;", html);
+        Assert.Contains("setInterval", html);
     }
 
     [Fact]

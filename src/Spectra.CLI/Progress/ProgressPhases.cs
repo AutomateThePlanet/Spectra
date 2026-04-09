@@ -6,7 +6,7 @@ namespace Spectra.CLI.Progress;
 public static class ProgressPhases
 {
     public static readonly string[] Generate =
-        ["analyzing", "analyzed", "generating", "completed"];
+        ["analyzing", "analyzed", "generating", "verifying", "completed"];
 
     public static readonly string[] Update =
         ["classifying", "updating", "verifying", "completed"];

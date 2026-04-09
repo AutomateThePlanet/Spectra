@@ -207,28 +207,28 @@ public sealed class GapAnalyzer
 
     private static bool MatchesFocus(DocumentEntry doc, string focusArea)
     {
-        var lowerFocus = focusArea.ToLowerInvariant();
+        // Split focus into individual terms (e.g., "security, high priority" → ["security", "high priority"])
+        var focusTerms = focusArea.ToLowerInvariant()
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(t => t.Length > 0)
+            .ToList();
 
-        // Check title, path, and preview for focus keywords
-        if (doc.Title.ToLowerInvariant().Contains(lowerFocus))
-        {
-            return true;
-        }
+        var docTitle = doc.Title.ToLowerInvariant();
+        var docPath = doc.Path.ToLowerInvariant();
+        var docPreview = doc.Preview.ToLowerInvariant();
 
-        if (doc.Path.ToLowerInvariant().Contains(lowerFocus))
+        foreach (var term in focusTerms)
         {
-            return true;
-        }
+            if (docTitle.Contains(term) || docPath.Contains(term) || docPreview.Contains(term))
+            {
+                return true;
+            }
 
-        if (doc.Preview.ToLowerInvariant().Contains(lowerFocus))
-        {
-            return true;
-        }
-
-        // Check headings
-        if (doc.Headings?.Any(h => h.ToLowerInvariant().Contains(lowerFocus)) == true)
-        {
-            return true;
+            // Check headings
+            if (doc.Headings?.Any(h => h.ToLowerInvariant().Contains(term)) == true)
+            {
+                return true;
+            }
         }
 
         return false;

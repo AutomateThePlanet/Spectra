@@ -25,6 +25,14 @@ public sealed class GenerateResult : CommandResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<DuplicateWarning>? DuplicateWarnings { get; init; }
 
+    [JsonPropertyName("verification")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<VerifiedTest>? Verification { get; init; }
+
+    [JsonPropertyName("rejected_tests")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<RejectedTest>? RejectedTests { get; init; }
+
     [JsonPropertyName("session")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SessionCounts? Session { get; init; }
@@ -104,6 +112,41 @@ public sealed class DuplicateWarning
 
     [JsonPropertyName("title")]
     public required string Title { get; init; }
+}
+
+public sealed class VerifiedTest
+{
+    [JsonPropertyName("id")]
+    public required string Id { get; init; }
+
+    [JsonPropertyName("title")]
+    public required string Title { get; init; }
+
+    [JsonPropertyName("verdict")]
+    public required string Verdict { get; init; }
+
+    [JsonPropertyName("score")]
+    public double Score { get; init; }
+
+    [JsonPropertyName("reason")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Reason { get; init; }
+}
+
+public sealed class RejectedTest
+{
+    [JsonPropertyName("id")]
+    public required string Id { get; init; }
+
+    [JsonPropertyName("title")]
+    public required string Title { get; init; }
+
+    [JsonPropertyName("verdict")]
+    public required string Verdict { get; init; }
+
+    [JsonPropertyName("reason")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Reason { get; init; }
 }
 
 public sealed class SessionCounts
