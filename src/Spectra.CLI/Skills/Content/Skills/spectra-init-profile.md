@@ -16,15 +16,15 @@ First ask the user what they want to configure:
 - Domain-specific needs
 - Default priority
 
-### Tool call 1: runInTerminal
+**Step 1** — runInTerminal:
 ```
-spectra init-profile --verbosity normal
+spectra init-profile --no-interaction --output-format json --verbosity quiet
 ```
 
-### Tool call 2: awaitTerminal
+**Step 2** — awaitTerminal
 
-### Tool call 3: terminalLastCommand
-Read the terminal output to confirm the profile was created/updated.
+**Step 3** — readFile `.spectra-result.json`
+Parse the JSON result.
 
-### Your response:
+**Your response**:
 Confirm what was configured and where the profile was saved.

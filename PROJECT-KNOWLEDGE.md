@@ -200,18 +200,22 @@ criteria:
 | `spectra-criteria` | Criteria extraction, import, listing |
 | `spectra-docs` | Documentation indexing with progress page |
 
-### 2 Agent Prompts
+### 2 Agent Prompts (Delegation Model)
 | Agent | Purpose |
 |-------|---------|
-| `spectra-generation` | Primary: test generation. Also handles all CLI commands. |
-| `spectra-execution` | Test execution via MCP tools. Also handles CLI commands. |
+| `spectra-generation` (~81 lines) | Primary: test generation and update. Delegates all other CLI tasks to corresponding SKILLs via delegation table. |
+| `spectra-execution` (~120 lines) | Test execution via MCP tools. Delegates all CLI tasks (dashboard, coverage, criteria, validate, list, docs index) to corresponding SKILLs via delegation table. |
+
+Agents are **routers**, not executors. Each CLI command has exactly one source of truth — its SKILL file. Agents reference SKILLs by name (e.g., "Follow the `spectra-dashboard` SKILL") instead of duplicating CLI instructions.
 
 ### SKILL Format Conventions
 - **Name**: lowercase-hyphenated (e.g., `spectra-generate`)
 - **Tools**: Include `browser/openBrowserPage` for preview capability
-- **CLI flags**: Always include `--no-interaction` to prevent terminal prompts
-- **Progress**: Generation and docs index commands use `.spectra-progress.html` for live status
+- **CLI flags**: Always include `--no-interaction --output-format json --verbosity quiet`
+- **Result reading**: Use `readFile .spectra-result.json` (not `terminalLastCommand`)
+- **Progress**: Long-running commands use `.spectra-progress.html` for live status
 - **Steps**: Use `**Step N**` format (not `### Tool call N:`)
+- **Wait instruction**: Include "Between runInTerminal and awaitTerminal, do NOTHING" for long-running commands
 - **Preview**: Use `show preview {file}` to open files in VS Code (not `start`)
 
 ### Generation Flow (SKILL/Agent)
@@ -297,6 +301,7 @@ Three-section unified coverage:
 
 | # | Feature | Key Changes |
 |---|---------|-------------|
+| 027 | SKILL/Agent Deduplication | Agents delegate to SKILLs, execution ~120 lines, generation ~81 lines, SKILL consistency fixes |
 | 024 | Docs Index SKILL & Coverage Fix | 9th SKILL (spectra-docs), result/progress files, --skip-criteria, terminology fix |
 | 023 | Criteria Extraction Overhaul | Per-doc extraction, import, rename requirements→criteria, progress page |
 | 023 | Copilot Chat Integration | SKILLs, agents, result file polling, batch generation |

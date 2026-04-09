@@ -25,8 +25,8 @@ public static class ProviderMapping
             // GitHub Models / Copilot - use default (null)
             "github-models" or "github-copilot" or "copilot" => null,
 
-            // Azure endpoints (OpenAI, Anthropic, or generic Azure AI)
-            "azure-openai" or "azure-anthropic" or "azure-ai" or "azure" =>
+            // Azure endpoints (OpenAI, DeepSeek, Anthropic, or generic Azure AI)
+            "azure-openai" or "azure-deepseek" or "azure-anthropic" or "azure-ai" or "azure" =>
                 CreateAzureProvider(config),
 
             // Direct Anthropic API
@@ -63,6 +63,7 @@ public static class ProviderMapping
         return providerName switch
         {
             "anthropic" or "azure-anthropic" => "claude-sonnet-4-5-20250514",
+            "azure-deepseek" => "DeepSeek-V3-0324",
             "openai" or "azure-openai" => "gpt-4o",
             "github-models" or "github-copilot" or "copilot" => "gpt-4o",
             _ => "gpt-4o"
@@ -226,6 +227,7 @@ public static class ProviderMapping
             "openai" => "OPENAI_API_KEY",
             "anthropic" => "ANTHROPIC_API_KEY",
             "azure-openai" => "AZURE_OPENAI_API_KEY",
+            "azure-deepseek" => "AZURE_DEEPSEEK_API_KEY",
             "azure-anthropic" or "azure-ai" or "azure" => "AZURE_API_KEY",
             "github-models" or "github-copilot" or "copilot" => "GITHUB_TOKEN",
             _ => "API_KEY"

@@ -22,7 +22,7 @@ show preview .spectra-progress.html
 spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet
 ```
 
-**Step 3** — awaitTerminal. Wait for the command to finish.
+**Step 3** — awaitTerminal. Wait for the command to finish. Between runInTerminal and awaitTerminal, do NOTHING. No readFile, no listDirectory, no extra tool calls.
 
 **Step 4** — readFile `.spectra-result.json`
 

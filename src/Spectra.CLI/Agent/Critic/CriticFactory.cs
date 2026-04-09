@@ -64,7 +64,7 @@ public static class CriticFactory
     /// Gets the list of supported critic providers.
     /// </summary>
     public static IReadOnlyList<string> SupportedProviders { get; } =
-        ["github-models", "openai", "azure-openai", "anthropic", "azure-anthropic", "google"];
+        ["github-models", "openai", "azure-openai", "azure-deepseek", "anthropic", "azure-anthropic", "google"];
 
     /// <summary>
     /// Tries to create a critic from configuration using the Copilot SDK.

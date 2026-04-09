@@ -88,10 +88,88 @@ public class SkillsManifestTests : IDisposable
     }
 
     [Fact]
+    public void ExecutionAgent_LineCount_Within200()
+    {
+        var content = AgentContent.ExecutionAgent;
+        var lineCount = content.Split('\n').Length;
+        Assert.True(lineCount <= 200, $"Execution agent is {lineCount} lines, expected ≤200");
+    }
+
+    [Fact]
+    public void GenerationAgent_LineCount_Within100()
+    {
+        var content = AgentContent.GenerationAgent;
+        var lineCount = content.Split('\n').Length;
+        Assert.True(lineCount <= 100, $"Generation agent is {lineCount} lines, expected ≤100");
+    }
+
+    [Fact]
+    public void Agents_DoNotContain_DuplicatedCliBlocks()
+    {
+        var cliBlockMarkers = new[]
+        {
+            "spectra ai analyze --coverage",
+            "spectra dashboard --output",
+            "spectra validate --no-interaction",
+            "spectra docs index",
+            "spectra ai analyze --extract-criteria",
+            "spectra ai analyze --list-criteria"
+        };
+
+        foreach (var agent in AgentContent.All.Values)
+        {
+            foreach (var marker in cliBlockMarkers)
+            {
+                Assert.DoesNotContain(marker, agent);
+            }
+        }
+    }
+
+    [Fact]
+    public void AllSkills_UseStepNFormat_NotToolCallN()
+    {
+        // Check that no SKILL uses "### Tool call N" heading format
+        foreach (var (name, content) in SkillContent.All)
+        {
+            if (name == "spectra-help") continue; // help has no steps
+            Assert.DoesNotMatch(@"###\s+Tool call \d", content);
+        }
+    }
+
+    [Fact]
+    public void AllSkills_DoNotUse_TerminalLastCommand()
+    {
+        // Check SKILL step instructions, not the YAML frontmatter tools list
+        foreach (var (name, content) in SkillContent.All)
+        {
+            // Split on "---" to get the body after frontmatter
+            var parts = content.Split("---", 3);
+            var body = parts.Length >= 3 ? parts[2] : content;
+            Assert.DoesNotContain("terminalLastCommand", body);
+        }
+    }
+
+    [Fact]
+    public void HelpSkill_CoversAllCommandCategories()
+    {
+        var content = SkillContent.Help;
+        var requiredCategories = new[]
+        {
+            "Generation", "Execution", "Coverage", "Dashboard",
+            "Validation", "List", "Acceptance Criteria", "Documentation Index"
+        };
+
+        foreach (var category in requiredCategories)
+        {
+            Assert.Contains(category, content, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
     public void AllSkills_WithCommands_IncludeNoInteractionFlag()
     {
         var skillsWithCommands = new[] { "spectra-generate", "spectra-coverage", "spectra-dashboard",
-            "spectra-validate", "spectra-criteria", "spectra-docs" };
+            "spectra-validate", "spectra-criteria", "spectra-docs", "spectra-list", "spectra-init-profile" };
 
         foreach (var skillName in skillsWithCommands)
         {
@@ -110,7 +188,7 @@ public class SkillsManifestTests : IDisposable
     public void AllSkills_WithCommands_IncludeOutputFormatJson()
     {
         var skillsWithCommands = new[] { "spectra-generate", "spectra-coverage", "spectra-dashboard",
-            "spectra-validate", "spectra-criteria", "spectra-docs" };
+            "spectra-validate", "spectra-criteria", "spectra-docs", "spectra-list", "spectra-init-profile" };
 
         foreach (var skillName in skillsWithCommands)
         {
@@ -128,7 +206,7 @@ public class SkillsManifestTests : IDisposable
     public void AllSkills_WithCommands_IncludeVerbosityQuiet()
     {
         var skillsWithCommands = new[] { "spectra-coverage", "spectra-dashboard",
-            "spectra-validate", "spectra-criteria", "spectra-docs" };
+            "spectra-validate", "spectra-criteria", "spectra-docs", "spectra-list", "spectra-init-profile" };
 
         foreach (var skillName in skillsWithCommands)
         {

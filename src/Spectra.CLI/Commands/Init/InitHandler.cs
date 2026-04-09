@@ -145,6 +145,7 @@ public sealed class InitHandler
             ["GitHub Models (GITHUB_TOKEN or gh CLI)"] = ("github-models", null, false),
             ["OpenAI (OPENAI_API_KEY)"] = ("openai", "OPENAI_API_KEY", false),
             ["Azure OpenAI (AZURE_OPENAI_API_KEY)"] = ("azure-openai", "AZURE_OPENAI_API_KEY", true),
+            ["Azure DeepSeek (AZURE_DEEPSEEK_API_KEY)"] = ("azure-deepseek", "AZURE_DEEPSEEK_API_KEY", true),
             ["Anthropic (ANTHROPIC_API_KEY)"] = ("anthropic", "ANTHROPIC_API_KEY", false),
             ["Azure Anthropic (AZURE_ANTHROPIC_API_KEY)"] = ("azure-anthropic", "AZURE_ANTHROPIC_API_KEY", true),
             ["Skip for now"] = (null!, null, false)
@@ -251,10 +252,18 @@ public sealed class InitHandler
 
     private static async Task<string?> PromptForAzureEndpointAsync(string provider, CancellationToken ct)
     {
-        var displayName = provider == "azure-openai" ? "Azure OpenAI" : "Azure Anthropic";
-        var exampleUrl = provider == "azure-openai"
-            ? "https://your-resource.openai.azure.com/"
-            : "https://your-resource.inference.ai.azure.com/";
+        var displayName = provider switch
+        {
+            "azure-openai" => "Azure OpenAI",
+            "azure-deepseek" => "Azure DeepSeek",
+            _ => "Azure Anthropic"
+        };
+        var exampleUrl = provider switch
+        {
+            "azure-openai" => "https://your-resource.openai.azure.com/",
+            "azure-deepseek" => "https://your-resource.services.ai.azure.com/",
+            _ => "https://your-resource.inference.ai.azure.com/"
+        };
 
         AnsiConsole.MarkupLine($"[cyan]{displayName}[/] requires your Azure endpoint URL.");
         AnsiConsole.MarkupLine($"[grey]Example: {exampleUrl}[/]");
@@ -372,6 +381,10 @@ public sealed class InitHandler
                 ("your-gpt4o-deployment", "GPT-4o (enter your deployment name)"),
                 ("your-gpt4-deployment", "GPT-4 (enter your deployment name)"),
                 ("your-gpt35-deployment", "GPT-3.5 Turbo (enter your deployment name)"),
+            },
+            "azure-deepseek" => new List<(string, string)>
+            {
+                ("your-deepseek-deployment", "DeepSeek V3 (enter your deployment name)"),
             },
             "azure-anthropic" => new List<(string, string)>
             {
@@ -846,6 +859,8 @@ public sealed class InitHandler
             ["google (Gemini Flash — fast and cheap, recommended)"] = ("google", "gemini-2.0-flash", "GOOGLE_API_KEY"),
             ["anthropic (Claude Haiku)"] = ("anthropic", "claude-haiku-4-5-20251001", "ANTHROPIC_API_KEY"),
             ["openai (GPT-4o-mini)"] = ("openai", "gpt-4o-mini", "OPENAI_API_KEY"),
+            ["azure-openai (GPT-4o)"] = ("azure-openai", "gpt-4o", "AZURE_OPENAI_API_KEY"),
+            ["azure-deepseek (DeepSeek V3)"] = ("azure-deepseek", "DeepSeek-V3-0324", "AZURE_DEEPSEEK_API_KEY"),
             ["Same as primary provider"] = ("same", "", "")
         };
 
@@ -900,6 +915,27 @@ public sealed class InitHandler
                     .PromptStyle("green"));
         }
 
+        // Azure critic providers need endpoint
+        string? criticBaseUrl = null;
+        if (provider.StartsWith("azure-") && provider != "same")
+        {
+            criticBaseUrl = await PromptForAzureEndpointAsync(provider, ct);
+
+            // For Azure critic, prompt for deployment name override
+            if (criticBaseUrl is not null)
+            {
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine("Enter your [cyan]deployment name[/] for the critic model (or press Enter to use default):");
+                var deploymentName = AnsiConsole.Prompt(
+                    new TextPrompt<string>("Deployment name:")
+                        .PromptStyle("green")
+                        .AllowEmpty());
+
+                if (!string.IsNullOrWhiteSpace(deploymentName))
+                    model = deploymentName;
+            }
+        }
+
         // Write critic config
         var cfgPath = Path.Combine(_workingDirectory, ConfigFileName);
         if (File.Exists(cfgPath))
@@ -909,13 +945,16 @@ public sealed class InitHandler
             if (root is not null)
             {
                 root["ai"] ??= new System.Text.Json.Nodes.JsonObject();
-                root["ai"]!["critic"] = new System.Text.Json.Nodes.JsonObject
+                var criticNode = new System.Text.Json.Nodes.JsonObject
                 {
                     ["enabled"] = true,
                     ["provider"] = provider,
                     ["model"] = model,
                     ["api_key_env"] = apiKeyEnv
                 };
+                if (criticBaseUrl is not null)
+                    criticNode["base_url"] = criticBaseUrl;
+                root["ai"]!["critic"] = criticNode;
 
                 var options = new JsonSerializerOptions { WriteIndented = true };
                 await File.WriteAllTextAsync(cfgPath, root.ToJsonString(options), ct);

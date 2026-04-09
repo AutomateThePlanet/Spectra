@@ -129,6 +129,7 @@ public sealed class CopilotCritic : ICriticRuntime
         return provider switch
         {
             "anthropic" or "azure-anthropic" => "claude-haiku-4-5-20250514",
+            "azure-deepseek" => "DeepSeek-V3-0324",
             "openai" or "azure-openai" => "gpt-4o-mini",
             "google" => "gemini-2.0-flash",
             _ => "gpt-4o-mini"

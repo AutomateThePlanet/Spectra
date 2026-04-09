@@ -24,6 +24,8 @@ show preview .spectra-progress.html
 spectra docs index --no-interaction --output-format json --verbosity quiet
 ```
 
+Incremental mode skips unchanged files (SHA-256 hash check). Use `--force` for a complete rebuild.
+
 For a full rebuild (ignore hashes, re-process all files):
 ```
 spectra docs index --force --no-interaction --output-format json --verbosity quiet

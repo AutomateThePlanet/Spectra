@@ -139,7 +139,7 @@ public static class AgentFactory
     /// Gets all available provider names supported by the Copilot SDK.
     /// </summary>
     public static IReadOnlyList<string> GetAvailableProviders() =>
-        ["github-models", "azure-openai", "azure-anthropic", "openai", "anthropic"];
+        ["github-models", "azure-openai", "azure-deepseek", "azure-anthropic", "openai", "anthropic"];
 
     /// <summary>
     /// Checks if Copilot SDK is available and configured.
