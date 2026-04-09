@@ -293,7 +293,9 @@ public sealed class DataCollector
 
                 try
                 {
-                    var testFilePath = Path.Combine(_testsPath, suite, test.File);
+                    // test.File may be "TC-100.md" or "suite\TC-100.md" — handle both
+                    var fileName = Path.GetFileName(test.File);
+                    var testFilePath = Path.Combine(_testsPath, suite, fileName);
                     if (File.Exists(testFilePath))
                     {
                         content = File.ReadAllText(testFilePath);
