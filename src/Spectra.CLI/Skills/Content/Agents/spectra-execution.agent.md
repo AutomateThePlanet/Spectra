@@ -110,6 +110,7 @@ For these tasks, read the named SKILL first, then follow its steps exactly via `
 
 | Task | SKILL | CLI command |
 |------|-------|-------------|
+| Update tests | `spectra-update` | `spectra ai update --suite {suite} --no-interaction --output-format json --verbosity quiet` |
 | Coverage analysis | `spectra-coverage` | `spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet` |
 | Dashboard | `spectra-dashboard` | `spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet && spectra dashboard --output ./site --no-interaction --output-format json --verbosity quiet` |
 | Extract criteria | `spectra-criteria` | `spectra ai analyze --extract-criteria --no-interaction --output-format json --verbosity quiet` |

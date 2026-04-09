@@ -86,7 +86,7 @@ Bundled SKILL files let you use SPECTRA through natural language in Copilot Chat
 Say "generate test cases for checkout" and the SKILL handles CLI invocation, JSON parsing, and result presentation.
 
 ```bash
-spectra init                  # Creates 6 SKILLs + 2 agent prompts
+spectra init                  # Creates 10 SKILLs + 2 agent prompts
 spectra update-skills         # Update SKILLs when CLI is upgraded
 ```
 

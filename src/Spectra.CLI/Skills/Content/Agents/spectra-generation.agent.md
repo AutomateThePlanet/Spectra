@@ -53,26 +53,13 @@ spectra ai generate --suite {suite} --count {count} [--focus "{focus}"] --no-int
 
 ---
 
-## Update tests
-
-**Step 1** — show preview `.spectra-progress.html?nocache=1`
-**Step 2** — runInTerminal:
-```
-spectra ai update --suite {suite} --no-interaction --output-format json --verbosity quiet
-```
-**Step 3** — awaitTerminal
-**Step 4** — readFile `.spectra-result.json`
-
-Show UP_TO_DATE, OUTDATED, ORPHANED counts from classification field.
-
----
-
 ## Other tasks (delegation)
 
 Read the named SKILL first, then follow its steps exactly. Do NOT invent CLI commands — the commands below are the ONLY valid forms.
 
 | Task | SKILL | CLI command |
 |------|-------|-------------|
+| Update tests | `spectra-update` | `spectra ai update --suite {suite} --no-interaction --output-format json --verbosity quiet` |
 | Coverage analysis | `spectra-coverage` | `spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet` |
 | Dashboard | `spectra-dashboard` | `spectra ai analyze --coverage --auto-link ... && spectra dashboard --output ./site ...` |
 | Extract criteria | `spectra-criteria` | `spectra ai analyze --extract-criteria --no-interaction --output-format json --verbosity quiet` |

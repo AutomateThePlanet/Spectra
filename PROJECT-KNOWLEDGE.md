@@ -25,7 +25,7 @@ User → VS Code Copilot Chat → MCP Server → Test Execution → Reports
 | Component | Purpose |
 |-----------|---------|
 | **dashboard-site/** | Static HTML/JS dashboard template with D3.js visualizations |
-| **SKILLs** (9 files) | VS Code Copilot Chat integration — each SKILL wraps CLI commands |
+| **SKILLs** (10 files) | VS Code Copilot Chat integration — each SKILL wraps CLI commands |
 | **Agents** (2 files) | Copilot Chat agent prompts for generation and execution workflows |
 
 ## Technology Stack
@@ -187,10 +187,11 @@ criteria:
 
 ## VS Code Copilot Chat Integration
 
-### 9 Bundled SKILLs
+### 10 Bundled SKILLs
 | SKILL | Purpose |
 |-------|---------|
 | `spectra-generate` | Test generation (analyze → approve → generate flow) |
+| `spectra-update` | Test updates (classify → review → apply changes) |
 | `spectra-coverage` | Coverage analysis |
 | `spectra-dashboard` | Dashboard generation and opening |
 | `spectra-validate` | Test validation |
@@ -203,8 +204,8 @@ criteria:
 ### 2 Agent Prompts (Delegation Model)
 | Agent | Purpose |
 |-------|---------|
-| `spectra-generation` (~81 lines) | Primary: test generation and update. Delegates all other CLI tasks to corresponding SKILLs via delegation table. |
-| `spectra-execution` (~120 lines) | Test execution via MCP tools. Delegates all CLI tasks (dashboard, coverage, criteria, validate, list, docs index) to corresponding SKILLs via delegation table. |
+| `spectra-generation` (~81 lines) | Primary: test generation and update. Delegates all other CLI tasks (update, dashboard, coverage, criteria, validate, list, docs index) to corresponding SKILLs via delegation table. |
+| `spectra-execution` (~120 lines) | Test execution via MCP tools. Delegates all CLI tasks (update, dashboard, coverage, criteria, validate, list, docs index) to corresponding SKILLs via delegation table. |
 
 Agents are **routers**, not executors. Each CLI command has exactly one source of truth — its SKILL file. Agents reference SKILLs by name (e.g., "Follow the `spectra-dashboard` SKILL") instead of duplicating CLI instructions.
 
@@ -301,6 +302,7 @@ Three-section unified coverage with distinct semantics:
 
 | # | Feature | Key Changes |
 |---|---------|-------------|
+| 029 | spectra-update SKILL (10th) | Agent delegation, documentation sync, version 1.35.0 |
 | 028 | Coverage & Criteria Pipeline | Fixed criteria propagation in parser, wired criteria into generation pipeline, always write criteria: [] |
 | 027 | SKILL/Agent Deduplication | Agents delegate to SKILLs, execution ~120 lines, generation ~81 lines, SKILL consistency fixes |
 | 024 | Docs Index SKILL & Coverage Fix | 9th SKILL (spectra-docs), result/progress files, --skip-criteria, terminology fix |

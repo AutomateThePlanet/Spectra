@@ -7,9 +7,15 @@ namespace Spectra.CLI.Results;
 /// </summary>
 public sealed class UpdateResult : CommandResult
 {
+    [JsonPropertyName("success")]
+    public bool Success { get; init; }
+
     [JsonPropertyName("suite")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Suite { get; init; }
+
+    [JsonPropertyName("totalTests")]
+    public int TotalTests { get; init; }
 
     [JsonPropertyName("testsUpdated")]
     public int TestsUpdated { get; init; }
@@ -24,6 +30,13 @@ public sealed class UpdateResult : CommandResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public UpdateClassificationCounts? Classification { get; init; }
 
+    [JsonPropertyName("testsFlagged")]
+    public int TestsFlagged { get; init; }
+
+    [JsonPropertyName("flaggedTests")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<FlaggedTestEntry>? FlaggedTests { get; init; }
+
     [JsonPropertyName("filesModified")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<string>? FilesModified { get; init; }
@@ -31,6 +44,10 @@ public sealed class UpdateResult : CommandResult
     [JsonPropertyName("filesDeleted")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<string>? FilesDeleted { get; init; }
+
+    [JsonPropertyName("duration")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Duration { get; init; }
 }
 
 public sealed class UpdateClassificationCounts
@@ -46,4 +63,19 @@ public sealed class UpdateClassificationCounts
 
     [JsonPropertyName("redundant")]
     public int Redundant { get; init; }
+}
+
+public sealed class FlaggedTestEntry
+{
+    [JsonPropertyName("id")]
+    public required string Id { get; init; }
+
+    [JsonPropertyName("title")]
+    public required string Title { get; init; }
+
+    [JsonPropertyName("classification")]
+    public required string Classification { get; init; }
+
+    [JsonPropertyName("reason")]
+    public required string Reason { get; init; }
 }

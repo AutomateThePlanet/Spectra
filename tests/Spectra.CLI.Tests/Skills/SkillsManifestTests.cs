@@ -57,8 +57,9 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void SkillContent_HasAllSkills()
     {
-        Assert.Equal(9, SkillContent.All.Count);
+        Assert.Equal(10, SkillContent.All.Count);
         Assert.True(SkillContent.All.ContainsKey("spectra-generate"));
+        Assert.True(SkillContent.All.ContainsKey("spectra-update"));
         Assert.True(SkillContent.All.ContainsKey("spectra-coverage"));
         Assert.True(SkillContent.All.ContainsKey("spectra-dashboard"));
         Assert.True(SkillContent.All.ContainsKey("spectra-validate"));
@@ -176,7 +177,7 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void AllSkills_WithCommands_IncludeNoInteractionFlag()
     {
-        var skillsWithCommands = new[] { "spectra-generate", "spectra-coverage", "spectra-dashboard",
+        var skillsWithCommands = new[] { "spectra-generate", "spectra-update", "spectra-coverage", "spectra-dashboard",
             "spectra-validate", "spectra-criteria", "spectra-docs", "spectra-list", "spectra-init-profile" };
 
         foreach (var skillName in skillsWithCommands)
@@ -195,7 +196,7 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void AllSkills_WithCommands_IncludeOutputFormatJson()
     {
-        var skillsWithCommands = new[] { "spectra-generate", "spectra-coverage", "spectra-dashboard",
+        var skillsWithCommands = new[] { "spectra-generate", "spectra-update", "spectra-coverage", "spectra-dashboard",
             "spectra-validate", "spectra-criteria", "spectra-docs", "spectra-list", "spectra-init-profile" };
 
         foreach (var skillName in skillsWithCommands)
@@ -213,7 +214,7 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void AllSkills_WithCommands_IncludeVerbosityQuiet()
     {
-        var skillsWithCommands = new[] { "spectra-coverage", "spectra-dashboard",
+        var skillsWithCommands = new[] { "spectra-update", "spectra-coverage", "spectra-dashboard",
             "spectra-validate", "spectra-criteria", "spectra-docs", "spectra-list", "spectra-init-profile" };
 
         foreach (var skillName in skillsWithCommands)
@@ -231,7 +232,7 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void LongRunningSkills_IncludeProgressPageStep()
     {
-        var longRunningSkills = new[] { "spectra-coverage", "spectra-dashboard", "spectra-docs" };
+        var longRunningSkills = new[] { "spectra-update", "spectra-coverage", "spectra-dashboard", "spectra-docs" };
 
         foreach (var skillName in longRunningSkills)
         {
@@ -243,13 +244,63 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void AllSkills_WithCommands_IncludeResultFileRead()
     {
-        var skillsWithResultFile = new[] { "spectra-generate", "spectra-coverage", "spectra-dashboard",
+        var skillsWithResultFile = new[] { "spectra-generate", "spectra-update", "spectra-coverage", "spectra-dashboard",
             "spectra-validate", "spectra-criteria", "spectra-docs" };
 
         foreach (var skillName in skillsWithResultFile)
         {
             var content = SkillContent.All[skillName];
             Assert.Contains(".spectra-result.json", content);
+        }
+    }
+
+    [Fact]
+    public void UpdateSkill_UsesStepFormat()
+    {
+        var content = SkillContent.Update;
+        Assert.Contains("**Step 1**", content);
+        Assert.Contains("**Step 2**", content);
+        Assert.DoesNotMatch(@"###\s+Tool call \d", content);
+    }
+
+    [Fact]
+    public void UpdateSkill_ContainsDoNothingInstruction()
+    {
+        var content = SkillContent.Update;
+        Assert.Contains("do NOTHING", content);
+    }
+
+    [Fact]
+    public void UpdateSkill_ToolsListContainsBrowserOpenBrowserPage()
+    {
+        var content = SkillContent.Update;
+        Assert.Contains("browser/openBrowserPage", content);
+    }
+
+    [Fact]
+    public void GenerationAgent_ContainsUpdateDelegation()
+    {
+        var content = AgentContent.GenerationAgent;
+        Assert.Contains("spectra-update", content);
+    }
+
+    [Fact]
+    public void ExecutionAgent_ContainsUpdateDelegation()
+    {
+        var content = AgentContent.ExecutionAgent;
+        Assert.Contains("spectra-update", content);
+    }
+
+    [Fact]
+    public void Agents_DoNotContain_UpdateCliCodeBlocks()
+    {
+        foreach (var agent in AgentContent.All.Values)
+        {
+            var codeBlocks = System.Text.RegularExpressions.Regex.Matches(agent, @"```[\s\S]*?```");
+            foreach (System.Text.RegularExpressions.Match block in codeBlocks)
+            {
+                Assert.DoesNotContain("spectra ai update", block.Value);
+            }
         }
     }
 }
