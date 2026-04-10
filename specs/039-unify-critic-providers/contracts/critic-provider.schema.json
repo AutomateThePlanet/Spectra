@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spectra.local/contracts/critic-provider.schema.json",
+  "title": "CriticConfig.provider field",
+  "description": "Schema for ai.critic.provider in spectra.config.json after spec 039. The five canonical names are accepted (case-insensitive). Legacy 'github' is a soft alias for 'github-models'. Legacy 'google' is rejected.",
+  "type": "string",
+  "anyOf": [
+    {
+      "enum": ["github-models", "azure-openai", "azure-anthropic", "openai", "anthropic"],
+      "description": "Canonical provider names — same set as the generator."
+    },
+    {
+      "const": "github",
+      "description": "Legacy alias — accepted, rewritten to 'github-models', stderr warning emitted."
+    }
+  ],
+  "not": {
+    "const": "google"
+  }
+}

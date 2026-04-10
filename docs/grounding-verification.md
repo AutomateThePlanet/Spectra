@@ -88,21 +88,29 @@ Configure the critic in `spectra.config.json`:
   "ai": {
     "critic": {
       "enabled": true,
-      "provider": "google",
-      "model": "gemini-2.0-flash",
+      "provider": "github-models",
+      "model": "gpt-4o-mini",
       "timeout_seconds": 30
     }
   }
 }
 ```
 
-Supported critic providers: `google`, `openai`, `anthropic`, `github`
+Supported critic providers (spec 039 — same set as the generator):
+`github-models`, `azure-openai`, `azure-anthropic`, `openai`, `anthropic`.
 
 Default API key environment variables:
-- Google: `GOOGLE_API_KEY`
-- OpenAI: `OPENAI_API_KEY`
-- Anthropic: `ANTHROPIC_API_KEY`
-- GitHub: `GITHUB_TOKEN`
+- `github-models`: `GITHUB_TOKEN`
+- `azure-openai`: `AZURE_OPENAI_API_KEY`
+- `azure-anthropic`: `AZURE_ANTHROPIC_API_KEY`
+- `openai`: `OPENAI_API_KEY`
+- `anthropic`: `ANTHROPIC_API_KEY`
+
+> **Legacy values**: `provider: "github"` is accepted as a soft alias for
+> `github-models` (with a one-line deprecation warning on stderr). The legacy
+> value `provider: "google"` is no longer supported — the Copilot SDK runtime
+> cannot route to Google. Update your config to one of the canonical five
+> providers above.
 
 ## Skip Verification
 
