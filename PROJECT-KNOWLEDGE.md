@@ -285,7 +285,10 @@ Three-section unified coverage with distinct semantics:
   "tests": { "dir": "tests/", "id_prefix": "TC", "id_start": 100 },
   "ai": {
     "providers": [{ "name": "azure-anthropic", "model": "claude-sonnet-4-5", "enabled": true }],
-    "critic": { "provider": "azure-anthropic", "model": "claude-sonnet-4-5" }
+    "critic": { "provider": "azure-anthropic", "model": "claude-sonnet-4-5" },
+    "generation_timeout_minutes": 5,
+    "generation_batch_size": 30,
+    "debug_log_enabled": true
   },
   "coverage": {
     "criteria_file": "docs/criteria/_criteria_index.yaml",
@@ -300,6 +303,14 @@ Three-section unified coverage with distinct semantics:
   }
 }
 ```
+
+> **Generation tuning (v1.41.0)**: `ai.generation_timeout_minutes` (default 5)
+> and `ai.generation_batch_size` (default 30) are the per-batch knobs for
+> `spectra ai generate`. Slower / reasoning models (DeepSeek-V3, large Azure
+> deployments) typically need 15–20 min and batches of 6–10.
+> `ai.debug_log_enabled` (default true) writes per-batch timing diagnostics to
+> `.spectra-debug.log` in the project root — inspect this file to dial the
+> tuning knobs to your model's actual throughput.
 
 > **Spec 039**: critic providers now use the same five names as the generator
 > (`github-models`, `azure-openai`, `azure-anthropic`, `openai`, `anthropic`).

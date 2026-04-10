@@ -196,6 +196,8 @@ Duplicate detection warns when a new test has >80% title similarity to an existi
 
 **Exit codes:** `0` = success, `1` = error, `3` = missing required args with `--no-interaction`.
 
+**Tuning for slow models** (v1.41.0+): generation runs in batches of `ai.generation_batch_size` tests (default 30), each subject to `ai.generation_timeout_minutes` (default 5). Slower / reasoning-class models (DeepSeek-V3, large Azure deployments, GPT-4 Turbo with long contexts) typically need `generation_timeout_minutes: 15–20` and `generation_batch_size: 6–10`. When `ai.debug_log_enabled` is true (the default), each batch writes a timestamped `BATCH START` / `BATCH OK` / `BATCH TIMEOUT` line to `.spectra-debug.log` in the project root with the model, provider, requested count, and elapsed seconds — inspect this file to dial the knobs precisely. See [Configuration → ai.generation_timeout_minutes](configuration.md) for the full reference, example configs, and the timeout error message format.
+
 ### `spectra ai update`
 
 Update existing tests when documentation changes. Classifies tests as UP_TO_DATE, OUTDATED, ORPHANED, or REDUNDANT.

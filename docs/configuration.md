@@ -107,6 +107,84 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 
 All providers are accessed through the GitHub Copilot SDK.
 
+### `ai.generation_timeout_minutes`, `ai.generation_batch_size`, `ai.debug_log_enabled`
+
+Per-batch tuning for `spectra ai generate` and an append-only diagnostic log.
+These knobs are needed for slower / reasoning-class models (DeepSeek-V3, large
+Azure Anthropic deployments, GPT-4 Turbo with long contexts) where the default
+5-minute / 30-tests-per-batch budget is too small.
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `generation_timeout_minutes` | int | `5` | Per-batch SDK call timeout. The timer measures the entire batch round-trip including all tool calls the AI makes. Slower models may need 10–20+ minutes. Minimum effective value is 1. |
+| `generation_batch_size` | int | `30` | Number of tests requested per AI call. Smaller batches reduce per-batch latency on slow models at the cost of more total round-trips. Pair with `generation_timeout_minutes`. Values ≤ 0 fall back to the default. |
+| `debug_log_enabled` | bool | `true` | When true, appends per-batch diagnostics to `.spectra-debug.log` in the project root. Best-effort writes; never blocks generation. Set to `false` to silence. |
+
+#### `.spectra-debug.log` format
+
+When `debug_log_enabled` is true, every batch writes one or more timestamped
+lines to `.spectra-debug.log`. Example session:
+
+```text
+2026-04-11T01:30:14.221Z [generate] BATCH START requested=8 model=DeepSeek-V3.2 provider=azure-openai timeout=20min
+2026-04-11T01:34:51.778Z [generate] BATCH OK   requested=8 elapsed=277.6s
+2026-04-11T01:34:53.014Z [generate] BATCH START requested=8 model=DeepSeek-V3.2 provider=azure-openai timeout=20min
+2026-04-11T01:39:10.004Z [generate] BATCH OK   requested=8 elapsed=257.0s
+2026-04-11T01:39:11.221Z [generate] BATCH START requested=8 model=DeepSeek-V3.2 provider=azure-openai timeout=20min
+2026-04-11T01:59:11.330Z [generate] BATCH TIMEOUT requested=8 model=DeepSeek-V3.2 configured_timeout=20min
+```
+
+Lines starting with `BATCH START` mark the beginning of an AI call (model,
+provider, batch size, configured timeout). `BATCH OK` marks success and
+records the elapsed wall time. `BATCH TIMEOUT` marks a timeout failure with
+the configured budget for cross-reference. Use this to dial
+`generation_timeout_minutes` and `generation_batch_size` precisely to your
+model's actual throughput.
+
+The file is **append-only** — it grows over time. Delete it when stale.
+
+In addition, the existing `.spectra-debug-response.txt` file (always written,
+not gated by this flag) contains the raw text of the most recent AI response
+for the current batch. Useful when the AI returns a malformed JSON array.
+
+#### Example: configuring for a slow / reasoning model
+
+```json
+{
+  "ai": {
+    "providers": [
+      { "name": "azure-openai", "model": "DeepSeek-V3.2", "enabled": true }
+    ],
+    "generation_timeout_minutes": 20,
+    "generation_batch_size": 8,
+    "debug_log_enabled": true
+  }
+}
+```
+
+With this config, `spectra ai generate --count 100` splits into 13 batches
+of 8 tests each, every batch has a 20-minute budget, and each batch's actual
+elapsed time is logged so you can re-tune later.
+
+#### Example: silencing the debug log on a fast model
+
+```json
+{
+  "ai": {
+    "providers": [{ "name": "github-models", "model": "gpt-4o", "enabled": true }],
+    "debug_log_enabled": false
+  }
+}
+```
+
+#### Timeout error message
+
+When a batch hits the configured budget, the generation result includes a
+multi-line error message that names the model, the batch size, the configured
+timeout, and three remediation paths (bump the timeout, shrink the batch, or
+reduce `--count`). The same message points at `.spectra-debug.log` for
+per-batch timing context.
+
 ### `ai.critic`
 
 Grounding verification configuration. See [Grounding Verification](grounding-verification.md).
