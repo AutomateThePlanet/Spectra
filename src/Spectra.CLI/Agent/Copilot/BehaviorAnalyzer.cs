@@ -169,6 +169,9 @@ public sealed class BehaviorAnalyzer
             var docText = FormatDocuments(documents);
             var values = new Dictionary<string, string>
             {
+                // Spec 038: gates the {{#if testimize_enabled}} block in
+                // behavior-analysis.md. Empty string is falsy.
+                ["testimize_enabled"] = (config?.Testimize.Enabled ?? false) ? "true" : "",
                 ["document_text"] = docText,
                 ["document_title"] = string.Join(", ", documents.Select(d => d.Title ?? d.Path)),
                 ["suite_name"] = "",

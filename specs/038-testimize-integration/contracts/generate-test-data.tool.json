@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spectra.local/contracts/generate-test-data.tool.json",
+  "title": "GenerateTestData (AIFunction tool)",
+  "description": "Schema for the GenerateTestData AI tool registered with the generation model when Testimize is enabled. The AI calls this tool when it identifies input fields with validation rules. SPECTRA forwards the call to the Testimize MCP server.",
+  "type": "object",
+  "properties": {
+    "name": { "const": "GenerateTestData" },
+    "description": {
+      "type": "string",
+      "description": "Must mention 'boundary values', 'equivalence classes', and 'pairwise' so the model knows when to call this tool (FR-018)."
+    },
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["text", "email", "phone", "password", "integer", "date", "url", "boolean", "single_select", "multi_select", "currency", "percentage", "time"]
+              },
+              "name": { "type": "string" },
+              "min": {},
+              "max": {},
+              "valid_values": { "type": "array", "items": {} },
+              "invalid_values": { "type": "array", "items": {} },
+              "error_messages": {
+                "type": "object",
+                "properties": {
+                  "required": { "type": "string" },
+                  "min": { "type": "string" },
+                  "max": { "type": "string" },
+                  "format": { "type": "string" }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": ["type", "name"]
+          }
+        },
+        "strategy": {
+          "type": "string",
+          "enum": ["Pairwise", "HybridArtificialBeeColony", "Combinatorial"],
+          "description": "Optional override of the configured default strategy."
+        },
+        "category": { "type": "string", "enum": ["Valid", "Validation"] }
+      },
+      "required": ["fields"]
+    }
+  },
+  "required": ["name", "description", "parameters"]
+}

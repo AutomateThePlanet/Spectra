@@ -76,6 +76,17 @@ ISTQB technique tag attached to each behavior (BVA, EP, DT, ST, EG, UC).
 - WRONG: "Test with special characters"
 - RIGHT: "Enter '√(−1)' in the calculator input and verify error handling"
 
+{{#if testimize_enabled}}
+## USING TESTIMIZE-GENERATED VALUES
+
+When Testimize data is available from the analysis phase:
+- Use the EXACT values from Testimize in test steps — do not round or simplify
+- Use the EXACT error messages from Testimize's expected_error field
+- Reference the value category (BoundaryValid, BoundaryInvalid, Invalid) in the test title
+- Example: "Enter username 'An' (BoundaryInvalid: 2 chars, below minimum 3)"
+- Each Testimize combination may become one test case, or related ones may be grouped
+{{/if}}
+
 ## OUTPUT FORMAT
 
 After using tools to gather information, your FINAL message must contain ONLY a JSON array of test cases.

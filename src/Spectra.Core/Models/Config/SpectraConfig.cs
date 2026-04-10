@@ -54,6 +54,9 @@ public sealed class SpectraConfig
     public IReadOnlyDictionary<string, SavedSelectionConfig> Selections { get; init; } =
         new Dictionary<string, SavedSelectionConfig>();
 
+    [JsonPropertyName("testimize")]
+    public TestimizeConfig Testimize { get; init; } = new();
+
     /// <summary>
     /// Creates a default configuration.
     /// </summary>

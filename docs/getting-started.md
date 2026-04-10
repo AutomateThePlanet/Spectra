@@ -15,6 +15,13 @@ Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md)
 > adopt the new templates by running `spectra prompts reset --all` — your
 > customized templates are preserved.
 
+> **New in spec 038 (optional)**: SPECTRA can integrate with
+> [Testimize.MCP.Server](testimize-integration.md) for *algorithmic* test
+> data optimization (BVA, EP, pairwise, ABC). Disabled by default. Install
+> with `dotnet tool install --global Testimize.MCP.Server`, set
+> `testimize.enabled` to `true` in `spectra.config.json`, then verify with
+> `spectra testimize check`. SPECTRA works fine without Testimize.
+
 ---
 
 ## Prerequisites
