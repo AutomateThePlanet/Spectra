@@ -19,7 +19,9 @@ $spectra-text:        #2a2f45;
 $spectra-code-bg:     #efe9d8;
 
 // --- Sidebar / Navigation ---
-$sidebar-color:               $spectra-navy;
+// Use the lighter navy that matches the dashboard banner background
+// so the banner sits flush in the sidebar with no visible seam.
+$sidebar-color:               $spectra-navy-light;
 $nav-width:                   17.5rem;
 $nav-link-color:              rgba(255, 255, 255, 0.92);
 $nav-child-link-color:        rgba(255, 255, 255, 0.78);

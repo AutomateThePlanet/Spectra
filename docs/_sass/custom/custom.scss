@@ -29,10 +29,11 @@
   }
 
   // The logo itself (Just the Docs renders it as a background image
-  // on .site-logo). Force it to display as a block-level image.
+  // on .site-logo). Force it to display as a block-level image and
+  // bleed full-width so the banner reads as a proper header.
   .site-logo {
     width: 100%;
-    height: 6rem;            // ~96px tall — readable but not huge
+    height: 9rem;
     background-size: contain;
     background-position: center center;
     background-repeat: no-repeat;
@@ -48,6 +49,6 @@
 // Larger sidebar logo on bigger screens
 @media (min-width: 50rem) {
   .side-bar .site-logo {
-    height: 7rem;
+    height: 11rem;
   }
 }
