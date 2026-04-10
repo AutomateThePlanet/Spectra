@@ -85,5 +85,15 @@
     "branch_prefix": "spectra/",
     "auto_commit": true,
     "auto_pr": false
+  },
+  "testimize": {
+    "enabled": false,
+    "_comment": "Optional integration with Testimize.MCP.Server for algorithmic test data optimization (BVA, EP, pairwise, ABC). Install with: dotnet tool install --global Testimize.MCP.Server",
+    "mode": "exploratory",
+    "strategy": "HybridArtificialBeeColony",
+    "mcp": {
+      "command": "testimize-mcp",
+      "args": ["--mcp"]
+    }
   }
 }

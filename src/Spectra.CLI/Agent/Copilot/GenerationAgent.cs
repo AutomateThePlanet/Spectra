@@ -95,6 +95,32 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 .Concat(testIndexTools.CreateFunctions())
                 .ToList();
 
+            // Spec 038: optional Testimize integration. Off by default. Failures
+            // are silent — log a status message and continue with AI-only tools.
+            // The client (and child process) is disposed in a `finally` further
+            // below so the process is always killed before this method returns.
+            Testimize.TestimizeMcpClient? testimizeClient = null;
+            if (_config.Testimize.Enabled)
+            {
+                testimizeClient = new Testimize.TestimizeMcpClient();
+                var started = await testimizeClient.StartAsync(_config.Testimize.Mcp, ct);
+                if (started && await testimizeClient.IsHealthyAsync(ct))
+                {
+                    tools.Add(Testimize.TestimizeTools.CreateGenerateTestDataTool(testimizeClient, _config.Testimize));
+                    tools.Add(Testimize.TestimizeTools.CreateAnalyzeFieldSpecTool());
+                    _onStatus?.Invoke("Testimize connected — using algorithmic test data optimization");
+                }
+                else
+                {
+                    _onStatus?.Invoke("Testimize not available — falling back to AI-generated test values. Install with: dotnet tool install --global Testimize.MCP.Server");
+                    await testimizeClient.DisposeAsync();
+                    testimizeClient = null;
+                }
+            }
+
+            try
+            {
+
             // Create session with tools
             _onStatus?.Invoke("Creating AI session...");
             await using var session = await service.CreateGenerationSessionAsync(
@@ -138,7 +164,11 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
             // The profile format (JSON schema sent to the AI) is resolved from
             // profiles/_default.yaml on disk if present, else the embedded default.
             var profileFormat = ProfileFormatLoader.LoadFormat(_basePath);
-            var fullPrompt = BuildFullPrompt(prompt, requestedCount, criteriaContext, profileFormat: profileFormat);
+            // Spec 038: pass a PromptTemplateLoader so the test-generation.md
+            // template's {{#if testimize_enabled}} block is rendered when the
+            // user has enabled and started Testimize.
+            var promptLoader = new PromptTemplateLoader(_basePath);
+            var fullPrompt = BuildFullPrompt(prompt, requestedCount, criteriaContext, templateLoader: promptLoader, profileFormat: profileFormat, testimizeEnabled: _config.Testimize.Enabled && testimizeClient is not null);
 
             // Send and wait for the complete response
             _onStatus?.Invoke("Starting AI generation...");
@@ -177,6 +207,15 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 Tests = tests,
                 TokenUsage = null
             };
+
+            }
+            finally
+            {
+                // Spec 038 (FR-015, SC-006): MCP child process must be killed in
+                // every exit path — success, exception, or cancellation.
+                if (testimizeClient is not null)
+                    await testimizeClient.DisposeAsync();
+            }
         }
         catch (TimeoutException)
         {
@@ -250,7 +289,7 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
     }
 
     internal static string BuildFullPrompt(string userPrompt, int requestedCount, string? criteriaContext = null,
-        PromptTemplateLoader? templateLoader = null, string? profileFormat = null)
+        PromptTemplateLoader? templateLoader = null, string? profileFormat = null, bool testimizeEnabled = false)
     {
         // The JSON output schema sent to the AI. Prefer the caller-supplied
         // profileFormat (resolved from profiles/_default.yaml on disk or the
@@ -264,6 +303,8 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
             var template = templateLoader.LoadTemplate("test-generation");
             var values = new Dictionary<string, string>
             {
+                // Spec 038: gates the {{#if testimize_enabled}} block in test-generation.md
+                ["testimize_enabled"] = testimizeEnabled ? "true" : "",
                 ["behaviors"] = userPrompt,
                 ["suite_name"] = "",
                 ["existing_tests"] = "",

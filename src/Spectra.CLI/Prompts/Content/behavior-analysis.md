@@ -99,6 +99,22 @@ Return ONLY a JSON object in this exact format (no other text):
 
 Count only DISTINCT testable behaviors — do not duplicate similar scenarios.
 
+{{#if testimize_enabled}}
+## ALGORITHMIC TEST DATA (Testimize Available)
+
+When you identify input fields with validation rules (ranges, patterns, required):
+1. Call the `AnalyzeFieldSpec` tool to extract field types and constraints
+2. Call the `GenerateTestData` tool with the extracted field specs
+3. Use the returned boundary values and equivalence classes as EXACT test data in your behaviors
+4. The returned combinations are mathematically optimal — do NOT add your own approximations
+
+Testimize produces better boundary values than manual selection because it uses:
+- 3-value BVA (min-1, min, min+1, max-1, max, max+1) instead of 2-value
+- Pre-configured invalid patterns per type (email, phone, URL — real-world defect patterns)
+- ABC algorithm fitness scoring that maximizes coverage with minimal test cases
+- Pairwise covering arrays for multi-field forms
+{{/if}}
+
 {{#if focus_areas}}
 Focus area: {{focus_areas}}
 Prioritize behaviors related to this focus, but still apply all techniques systematically.

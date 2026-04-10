@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spectra.local/contracts/testimize-check-result.schema.json",
+  "title": "TestimizeCheckResult",
+  "description": "JSON output of `spectra testimize check --output-format json`. Spec 038. The 'enabled', 'installed', 'healthy' fields are mandatory (FR-027).",
+  "type": "object",
+  "properties": {
+    "command": { "const": "testimize-check" },
+    "status": { "const": "completed" },
+    "enabled": { "type": "boolean" },
+    "installed": { "type": "boolean" },
+    "healthy": { "type": "boolean" },
+    "mode": { "type": "string" },
+    "strategy": { "type": "string" },
+    "settings_file": { "type": ["string", "null"] },
+    "settings_file_found": { "type": ["boolean", "null"] },
+    "version": { "type": ["string", "null"] },
+    "install_command": { "type": ["string", "null"], "description": "Populated only when installed=false." }
+  },
+  "required": ["command", "status", "enabled", "installed", "healthy"]
+}

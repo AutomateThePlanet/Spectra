@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spectra.local/contracts/testimize-config.schema.json",
+  "title": "TestimizeConfig",
+  "description": "The 'testimize' section of spectra.config.json. Added in spec 038. All fields are optional; missing 'testimize' key defaults to enabled=false.",
+  "type": "object",
+  "properties": {
+    "enabled": { "type": "boolean", "default": false },
+    "mode": { "type": "string", "enum": ["exploratory", "precise"], "default": "exploratory" },
+    "strategy": {
+      "type": "string",
+      "enum": ["Pairwise", "Combinatorial", "HybridArtificialBeeColony", "PairwiseOptimized", "CombinatorialOptimized"],
+      "default": "HybridArtificialBeeColony",
+      "description": "Unknown values fall back to the default at runtime, but the schema lists the canonical set."
+    },
+    "settings_file": { "type": ["string", "null"], "default": null },
+    "mcp": {
+      "type": "object",
+      "properties": {
+        "command": { "type": "string", "default": "testimize-mcp" },
+        "args": { "type": "array", "items": { "type": "string" }, "default": ["--mcp"] }
+      },
+      "additionalProperties": false
+    },
+    "abc_settings": {
+      "type": ["object", "null"],
+      "default": null,
+      "properties": {
+        "total_population_generations": { "type": "integer", "minimum": 1, "default": 100 },
+        "mutation_rate": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.6 },
+        "final_population_selection_ratio": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.5 },
+        "elite_selection_ratio": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.3 },
+        "allow_multiple_invalid_inputs": { "type": "boolean", "default": false },
+        "seed": { "type": ["integer", "null"], "default": null }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
