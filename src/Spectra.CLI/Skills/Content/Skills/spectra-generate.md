@@ -75,3 +75,42 @@ spectra ai generate --suite {suite} --count {count} [--focus "{focus}"] --no-int
 **Step 7** — readFile `.spectra-result.json` — check `status`:
 - `"failed"` → tell user the `error`.
 - `"completed"` → "Generated **{generation.tests_written}** test cases." List `files_created`. If tests_written < tests_requested, say "Run again to generate more."
+
+---
+
+## When the user wants to create a specific test case
+
+Use this flow when the user describes a concrete test scenario — a behavior they want captured as a test case. **Do NOT run analysis. Do NOT ask how many tests to generate. This always produces exactly 1 test.**
+
+**Step 1**: show preview .spectra-progress.html?nocache=1
+
+**Step 2** — runInTerminal:
+```
+spectra ai generate --suite {suite} --from-description "{description}" --context "{context}" --no-interaction --output-format json --verbosity quiet
+```
+
+- `{suite}` — target suite name (ask the user only if not obvious from context)
+- `{description}` — the user's test scenario description (verbatim)
+- `{context}` — optional additional context (page, module, flow); omit `--context` if not given
+
+**Step 3** — awaitTerminal. Do NOTHING between runInTerminal and awaitTerminal — no readFile, no listDirectory, no status messages.
+
+**Step 4** — readFile `.spectra-result.json`.
+
+**Step 5** — Present the result. From the JSON, show:
+- Test ID and title (from `files_created` or `generation`)
+- Suite it was added to
+- Grounding verdict (will be `manual`)
+- Any duplicate warnings
+
+---
+
+## How to choose between generation flows
+
+| User intent | Signal | Flow |
+|-------------|--------|------|
+| Explore a feature area | "Generate tests for...", "Test the... module", "Cover... error handling" | Main generation flow (with `--focus`) |
+| Create a specific test | "Add a test for...", "Create a test case where...", "I need a test that verifies..." | From-description flow |
+| Generate from previous suggestions | "Generate from suggestions", "Use the previous suggestions" | `--from-suggestions` flow |
+
+**Key rule**: If you can read the user's request as a single test case title, it's `--from-description`. If it's a topic to explore, it's `--focus`. Do NOT ask the user about count or scope to disambiguate — the topic-vs-scenario shape is the only signal you need.

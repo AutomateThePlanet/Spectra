@@ -78,6 +78,20 @@ spectra ai generate --suite {suite} --from-description "{text}" --context "{ctx}
 spectra ai generate --suite {suite} --auto-complete --output-format json --verbosity quiet
 ```
 
+### Intent Routing in Chat (spec 033)
+
+The `spectra-generate` SKILL contains a dedicated section for `--from-description` and an intent-routing table that the `spectra-generation` agent uses to choose between flows:
+
+| User intent | Signal | Flow |
+|-------------|--------|------|
+| Explore a feature area | "Generate tests for...", "Cover... module" | Main analyze → generate flow with `--focus` |
+| Create a specific test | "Add a test for...", "I need a test that verifies..." | `--from-description` (1 test, no analysis, no count question) |
+| Generate from suggestions | "Use the previous suggestions" | `--from-suggestions` |
+
+**Key rule**: if you can read the user's request as a single test case title, the agent routes to `--from-description`. If it's a topic to explore, the agent routes to `--focus`. The agent never asks the user for count or scope to disambiguate — the topic-vs-scenario shape is the only signal.
+
+When `--from-description` runs in a project that has documentation and acceptance criteria, the CLI best-effort loads matching docs (capped at 3 docs × 8000 chars) and matching `.criteria.yaml` entries as formatting context. The resulting test case has populated `source_refs` and `criteria` fields, but `grounding.verdict` stays `manual` — doc context is used for terminology alignment only, never for verification.
+
 ### Non-Interactive Mode
 
 For CI pipelines and automated workflows:

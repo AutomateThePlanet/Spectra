@@ -1413,11 +1413,44 @@ public sealed class GenerateHandler
         var generator = new UserDescribedGenerator();
         _progress.Loading("Creating test case from your description...");
 
+        // Best-effort: load matching documentation as formatting context (cap 3 docs × 8000 chars).
+        string? docContext = null;
+        IReadOnlyList<string> docPaths = [];
+        try
+        {
+            var docLoader = new SourceDocumentLoader(config.Source);
+            var allDocs = await docLoader.LoadAllAsync(currentDir, maxContentLengthPerDoc: 8000, ct: ct);
+            var matchingDocs = FilterDocsForSuite(allDocs, suite).Take(3).ToList();
+            if (matchingDocs.Count > 0)
+            {
+                docContext = FormatDocContext(matchingDocs);
+                docPaths = matchingDocs.Select(d => d.Path).ToList();
+            }
+        }
+        catch
+        {
+            // Best-effort: doc loading failures must not block from-description generation.
+        }
+
+        // Best-effort: load matching acceptance criteria as formatting context.
+        string? criteriaContext = null;
+        try
+        {
+            criteriaContext = await LoadCriteriaContextAsync(currentDir, suite, config, ct);
+        }
+        catch
+        {
+            // Best-effort: criteria loading failures must not block from-description generation.
+        }
+
         var test = await generator.GenerateAsync(
             description, context, suite, allExistingIds,
             config, currentDir, testsPath,
             status => _progress.Info($"  {status}"),
-            ct);
+            ct,
+            documentContext: docContext,
+            criteriaContext: criteriaContext,
+            sourceRefPaths: docPaths);
 
         if (test is null)
         {
@@ -2014,5 +2047,48 @@ public sealed class GenerateHandler
         }
 
         return sb.Length > 0 ? sb.ToString() : null;
+    }
+
+    /// <summary>
+    /// Filters loaded source documents to those most relevant to the target suite.
+    /// Match strategy: case-insensitive contains on filename, title, or any section heading.
+    /// Used by the from-description flow as best-effort context selection.
+    /// </summary>
+    private static IEnumerable<SourceDocument> FilterDocsForSuite(
+        IReadOnlyList<SourceDocument> docs,
+        string suite)
+    {
+        if (string.IsNullOrWhiteSpace(suite))
+            return [];
+
+        bool Matches(SourceDocument d)
+        {
+            var fileName = Path.GetFileNameWithoutExtension(d.Path);
+            if (fileName.Contains(suite, StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (d.Title.Contains(suite, StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (d.Sections.Any(s => s.Contains(suite, StringComparison.OrdinalIgnoreCase)))
+                return true;
+            return false;
+        }
+
+        return docs.Where(Matches);
+    }
+
+    /// <summary>
+    /// Formats a small set of source documents into a single context string for the AI prompt.
+    /// </summary>
+    private static string FormatDocContext(IReadOnlyList<SourceDocument> docs)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var doc in docs)
+        {
+            sb.AppendLine($"### {doc.Title} ({doc.Path})");
+            sb.AppendLine();
+            sb.AppendLine(doc.Content);
+            sb.AppendLine();
+        }
+        return sb.ToString();
     }
 }

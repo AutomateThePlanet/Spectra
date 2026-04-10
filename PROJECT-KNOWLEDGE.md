@@ -310,6 +310,7 @@ Three-section unified coverage with distinct semantics:
 
 | # | Feature | Key Changes |
 |---|---------|-------------|
+| 033 | From-Description Chat Flow | Dedicated `--from-description` SKILL section, agent intent routing (focus vs from-description vs from-suggestions), doc-aware manual tests with populated `source_refs` and `criteria` (verdict stays manual) |
 | 029 | spectra-update SKILL (10th) | Agent delegation, documentation sync, version 1.35.0 |
 | 028 | Coverage & Criteria Pipeline | Fixed criteria propagation in parser, wired criteria into generation pipeline, always write criteria: [] |
 | 027 | SKILL/Agent Deduplication | Agents delegate to SKILLs, execution ~120 lines, generation ~81 lines, SKILL consistency fixes |
