@@ -10,9 +10,15 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>spectra-mcp</ToolCommandName>
     <PackageId>Spectra.MCP</PackageId>
-    <Version>1.36.0</Version>
-    <Authors>Spectra</Authors>
-    <Description>Spectra MCP Server for test execution</Description>
+    <Authors>Anton Angelov</Authors>
+    <Company>Automate The Planet</Company>
+    <Description>MCP execution server for SPECTRA. Deterministic AI-orchestrated test execution with state machine, pause/resume, and multi-format reports.</Description>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/AutomateThePlanet/Spectra</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/AutomateThePlanet/Spectra</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>testing;mcp;test-execution;ai;qa;spectra;dotnet-tool</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageOutputPath>./nupkg</PackageOutputPath>
   </PropertyGroup>
 
@@ -23,6 +29,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Spectra.Core\Spectra.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 
 </Project>

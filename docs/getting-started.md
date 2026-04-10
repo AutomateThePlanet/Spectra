@@ -25,7 +25,7 @@ Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md)
 ## Install
 
 ```bash
-dotnet tool install -g spectra
+dotnet tool install -g Spectra.CLI
 ```
 
 ## Initialize a Repository

@@ -27,11 +27,21 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>spectra</ToolCommandName>
     <PackageId>Spectra.CLI</PackageId>
-    <Version>1.36.0</Version>
-    <Authors>Spectra</Authors>
-    <Description>AI-native test generation and management CLI</Description>
+    <Authors>Anton Angelov</Authors>
+    <Company>Automate The Planet</Company>
+    <Description>AI-native test generation CLI. Generate test cases from documentation with dual-model grounding verification, coverage analysis, and visual dashboards.</Description>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/AutomateThePlanet/Spectra</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/AutomateThePlanet/Spectra</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>testing;test-generation;ai;mcp;copilot;qa;test-automation;spectra;dotnet-tool</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageOutputPath>./nupkg</PackageOutputPath>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Agent\Resources\spectra-execution.agent.md" />

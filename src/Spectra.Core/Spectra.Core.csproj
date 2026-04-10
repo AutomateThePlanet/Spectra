@@ -6,11 +6,28 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <PackageId>Spectra.Core</PackageId>
+    <Authors>Anton Angelov</Authors>
+    <Company>Automate The Planet</Company>
+    <Description>Core library for SPECTRA — AI-native test generation framework. Shared models, parsing, validation, and coverage analysis.</Description>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/AutomateThePlanet/Spectra</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/AutomateThePlanet/Spectra</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>testing;test-generation;ai;mcp;qa;test-automation;spectra</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="CsvHelper" Version="33.1.0" />
     <PackageReference Include="Markdig" Version="1.1.2" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.5" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 
 </Project>

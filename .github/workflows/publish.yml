@@ -6,7 +6,6 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
   publish:
@@ -35,16 +34,19 @@ jobs:
         run: dotnet build --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test --configuration Release --no-restore
+        run: dotnet test --configuration Release --no-build
+
+      - name: Pack Spectra.Core
+        run: dotnet pack src/Spectra.Core/Spectra.Core.csproj --configuration Release --no-build --output ./nupkg -p:PackageVersion=${{ steps.version.outputs.VERSION }}
 
       - name: Pack Spectra.CLI
-        run: dotnet pack src/Spectra.CLI/Spectra.CLI.csproj --configuration Release --no-build --output ./nupkg /p:Version=${{ steps.version.outputs.VERSION }}
+        run: dotnet pack src/Spectra.CLI/Spectra.CLI.csproj --configuration Release --no-build --output ./nupkg -p:PackageVersion=${{ steps.version.outputs.VERSION }}
 
       - name: Pack Spectra.MCP
-        run: dotnet pack src/Spectra.MCP/Spectra.MCP.csproj --configuration Release --no-build --output ./nupkg /p:Version=${{ steps.version.outputs.VERSION }}
+        run: dotnet pack src/Spectra.MCP/Spectra.MCP.csproj --configuration Release --no-build --output ./nupkg -p:PackageVersion=${{ steps.version.outputs.VERSION }}
 
-      - name: Push to GitHub Packages
-        run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.GITHUB_TOKEN }} --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" --skip-duplicate
+      - name: Push to NuGet.org
+        run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
