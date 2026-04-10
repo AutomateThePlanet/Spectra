@@ -1,6 +1,5 @@
 using Spectra.CLI.Agent.Analysis;
 using Spectra.CLI.Interactive;
-using Spectra.Core.Models;
 
 namespace Spectra.CLI.Tests.Interactive;
 
@@ -12,12 +11,12 @@ public class CountSelectorTests
         var analysis = new BehaviorAnalysisResult
         {
             TotalBehaviors = 18,
-            Breakdown = new Dictionary<BehaviorCategory, int>
+            Breakdown = new Dictionary<string, int>
             {
-                [BehaviorCategory.HappyPath] = 8,
-                [BehaviorCategory.Negative] = 6,
-                [BehaviorCategory.EdgeCase] = 3,
-                [BehaviorCategory.Security] = 1
+                ["happy_path"] = 8,
+                ["negative"] = 6,
+                ["edge_case"] = 3,
+                ["security"] = 1
             },
             Behaviors = [],
             AlreadyCovered = 0,
@@ -38,7 +37,7 @@ public class CountSelectorTests
         Assert.Contains("happy paths only", options[1].Label);
         Assert.Equal(8, options[1].Count);
         Assert.NotNull(options[1].Categories);
-        Assert.Contains(BehaviorCategory.HappyPath, options[1].Categories!);
+        Assert.Contains("happy_path", options[1].Categories!);
 
         // Third option: Cumulative (happy + negative)
         Assert.Contains("happy paths + negative", options[2].Label);
@@ -57,9 +56,9 @@ public class CountSelectorTests
         var analysis = new BehaviorAnalysisResult
         {
             TotalBehaviors = 5,
-            Breakdown = new Dictionary<BehaviorCategory, int>
+            Breakdown = new Dictionary<string, int>
             {
-                [BehaviorCategory.HappyPath] = 5
+                ["happy_path"] = 5
             },
             Behaviors = [],
             AlreadyCovered = 0,
@@ -82,12 +81,12 @@ public class CountSelectorTests
         var analysis = new BehaviorAnalysisResult
         {
             TotalBehaviors = 18,
-            Breakdown = new Dictionary<BehaviorCategory, int>
+            Breakdown = new Dictionary<string, int>
             {
-                [BehaviorCategory.HappyPath] = 8,
-                [BehaviorCategory.Negative] = 6,
-                [BehaviorCategory.EdgeCase] = 3,
-                [BehaviorCategory.Security] = 1
+                ["happy_path"] = 8,
+                ["negative"] = 6,
+                ["edge_case"] = 3,
+                ["security"] = 1
             },
             Behaviors = [],
             AlreadyCovered = 10,
@@ -108,10 +107,10 @@ public class CountSelectorTests
         var analysis = new BehaviorAnalysisResult
         {
             TotalBehaviors = 10,
-            Breakdown = new Dictionary<BehaviorCategory, int>
+            Breakdown = new Dictionary<string, int>
             {
-                [BehaviorCategory.HappyPath] = 7,
-                [BehaviorCategory.Negative] = 3
+                ["happy_path"] = 7,
+                ["negative"] = 3
             },
             Behaviors = [],
             AlreadyCovered = 0,
@@ -134,11 +133,11 @@ public class CountSelectorTests
         var analysis = new BehaviorAnalysisResult
         {
             TotalBehaviors = 8,
-            Breakdown = new Dictionary<BehaviorCategory, int>
+            Breakdown = new Dictionary<string, int>
             {
-                [BehaviorCategory.HappyPath] = 8,
-                [BehaviorCategory.Negative] = 0,
-                [BehaviorCategory.EdgeCase] = 0
+                ["happy_path"] = 8,
+                ["negative"] = 0,
+                ["edge_case"] = 0
             },
             Behaviors = [],
             AlreadyCovered = 0,

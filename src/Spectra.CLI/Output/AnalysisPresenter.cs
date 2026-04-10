@@ -1,6 +1,5 @@
 using Spectra.CLI.Agent.Analysis;
 using Spectra.CLI.Infrastructure;
-using Spectra.Core.Models;
 using Spectre.Console;
 
 namespace Spectra.CLI.Output;
@@ -10,14 +9,22 @@ namespace Spectra.CLI.Output;
 /// </summary>
 public static class AnalysisPresenter
 {
-    private static readonly Dictionary<BehaviorCategory, string> CategoryLabels = new()
+    private static readonly Dictionary<string, string> CategoryLabels = new()
     {
-        [BehaviorCategory.HappyPath] = "happy path flows",
-        [BehaviorCategory.Negative] = "negative / error scenarios",
-        [BehaviorCategory.EdgeCase] = "edge cases / boundary conditions",
-        [BehaviorCategory.Security] = "security / permission checks",
-        [BehaviorCategory.Performance] = "performance / load scenarios"
+        ["happy_path"] = "happy path flows",
+        ["negative"] = "negative / error scenarios",
+        ["edge_case"] = "edge cases / boundary conditions",
+        ["boundary"] = "boundary conditions",
+        ["error_handling"] = "error handling",
+        ["security"] = "security / permission checks",
+        ["performance"] = "performance / load scenarios",
+        ["uncategorized"] = "uncategorized"
     };
+
+    private static string FormatCategoryLabel(string id) =>
+        CategoryLabels.TryGetValue(id, out var label)
+            ? label
+            : id.Replace('_', ' ').Replace('-', ' ');
 
     /// <summary>
     /// Displays the categorized behavior breakdown from analysis.
@@ -38,7 +45,7 @@ public static class AnalysisPresenter
         foreach (var (category, count) in result.Breakdown.OrderByDescending(kvp => kvp.Value))
         {
             if (count <= 0) continue;
-            var label = CategoryLabels.GetValueOrDefault(category, category.ToString());
+            var label = FormatCategoryLabel(category);
             AnsiConsole.MarkupLine($"    [grey]•[/] {count} {label}");
         }
 
@@ -62,7 +69,7 @@ public static class AnalysisPresenter
         BehaviorAnalysisResult analysis,
         int generatedCount,
         string suiteName,
-        IReadOnlyList<BehaviorCategory>? generatedCategories = null,
+        IReadOnlyList<string>? generatedCategories = null,
         OutputFormat outputFormat = OutputFormat.Human)
     {
         if (outputFormat == OutputFormat.Json) return;
@@ -81,7 +88,7 @@ public static class AnalysisPresenter
         foreach (var (category, count) in remainingByCategory.OrderByDescending(kvp => kvp.Value))
         {
             if (count <= 0) continue;
-            var label = CategoryLabels.GetValueOrDefault(category, category.ToString());
+            var label = FormatCategoryLabel(category);
             AnsiConsole.MarkupLine($"    [grey]•[/] {count} {label}");
         }
 

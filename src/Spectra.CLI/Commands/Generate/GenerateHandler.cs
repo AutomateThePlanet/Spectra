@@ -9,6 +9,7 @@ using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Interactive;
 using Spectra.CLI.IO;
 using Spectra.CLI.Output;
+using Spectra.CLI.Prompts;
 using Spectra.CLI.Source;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
@@ -281,11 +282,12 @@ public sealed class GenerateHandler
                 async () =>
                 {
                     var provider = config.Ai.Providers?.FirstOrDefault(p => p.Enabled);
+                    var loader = new PromptTemplateLoader(currentDir);
                     var analyzer = new BehaviorAnalyzer(provider, status =>
                     {
                         _progress.Info($"  {status}");
                         UpdateProgress(suite, progressStatus, status);
-                    });
+                    }, config, loader);
                     return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct);
                 });
 
@@ -308,7 +310,7 @@ public sealed class GenerateHandler
                             AlreadyCovered = analysisResult.AlreadyCovered,
                             Recommended = 0,
                             Breakdown = analysisResult.Breakdown?.ToDictionary(
-                                kvp => kvp.Key.ToString(), kvp => kvp.Value)
+                                kvp => kvp.Key, kvp => kvp.Value)
                         },
                         Generation = new GenerateGeneration
                         {
@@ -338,10 +340,11 @@ public sealed class GenerateHandler
                     async () =>
                     {
                         var provider = config.Ai.Providers?.FirstOrDefault(p => p.Enabled);
+                        var loader = new PromptTemplateLoader(currentDir);
                         var analyzer = new BehaviorAnalyzer(provider, status =>
                         {
                             UpdateProgress(suite, progressStatus, status);
-                        });
+                        }, config, loader);
                         return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct);
                     });
 
@@ -374,7 +377,7 @@ public sealed class GenerateHandler
                     AlreadyCovered = analysisResult.AlreadyCovered,
                     Recommended = analysisResult.RecommendedCount,
                     Breakdown = analysisResult.Breakdown?.ToDictionary(
-                        kvp => kvp.Key.ToString(), kvp => kvp.Value)
+                        kvp => kvp.Key, kvp => kvp.Value)
                 } : new GenerateAnalysis
                 {
                     TotalBehaviors = 0,
@@ -715,7 +718,7 @@ public sealed class GenerateHandler
                 AlreadyCovered = analysisResult.AlreadyCovered,
                 Recommended = analysisResult.RecommendedCount,
                 Breakdown = analysisResult.Breakdown?.ToDictionary(
-                    kvp => kvp.Key.ToString(), kvp => kvp.Value)
+                    kvp => kvp.Key, kvp => kvp.Value)
             } : null,
             Generation = new GenerateGeneration
             {
@@ -911,7 +914,8 @@ public sealed class GenerateHandler
                 async () =>
                 {
                     var provider = config.Ai.Providers?.FirstOrDefault(p => p.Enabled);
-                    var analyzer = new BehaviorAnalyzer(provider);
+                    var loader = new PromptTemplateLoader(currentDir);
+                    var analyzer = new BehaviorAnalyzer(provider, null, config, loader);
                     return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct);
                 });
 
@@ -1294,7 +1298,7 @@ public sealed class GenerateHandler
                 AlreadyCovered = analysisResult.AlreadyCovered,
                 Recommended = analysisResult.RecommendedCount,
                 Breakdown = analysisResult.Breakdown?.ToDictionary(
-                    kvp => kvp.Key.ToString(), kvp => kvp.Value)
+                    kvp => kvp.Key, kvp => kvp.Value)
             } : null,
             Generation = new GenerateGeneration
             {

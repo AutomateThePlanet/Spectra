@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Spectra.Core.Models;
 
 namespace Spectra.CLI.Agent.Analysis;
 
@@ -9,10 +8,11 @@ namespace Spectra.CLI.Agent.Analysis;
 public sealed record IdentifiedBehavior
 {
     /// <summary>
-    /// Which category this behavior belongs to.
+    /// Which category this behavior belongs to. Free-form string identifier
+    /// returned verbatim from the AI (e.g., "happy_path", "keyboard_interaction").
     /// </summary>
     [JsonPropertyName("category")]
-    public required string CategoryRaw { get; init; }
+    public required string Category { get; init; }
 
     /// <summary>
     /// Short description of the testable behavior (max 80 chars).
@@ -25,20 +25,4 @@ public sealed record IdentifiedBehavior
     /// </summary>
     [JsonPropertyName("source")]
     public required string Source { get; init; }
-
-    /// <summary>
-    /// Parsed category enum value.
-    /// </summary>
-    [JsonIgnore]
-    public BehaviorCategory Category => ParseCategory(CategoryRaw);
-
-    private static BehaviorCategory ParseCategory(string raw) => raw?.ToLowerInvariant() switch
-    {
-        "happy_path" or "happypath" => BehaviorCategory.HappyPath,
-        "negative" or "error" => BehaviorCategory.Negative,
-        "edge_case" or "edgecase" or "boundary" => BehaviorCategory.EdgeCase,
-        "security" or "permission" => BehaviorCategory.Security,
-        "performance" or "load" => BehaviorCategory.Performance,
-        _ => BehaviorCategory.HappyPath
-    };
 }

@@ -1,6 +1,5 @@
 using Spectra.CLI.Agent.Analysis;
 using Spectra.CLI.Session;
-using Spectra.Core.Models;
 
 namespace Spectra.CLI.Tests.Session;
 
@@ -11,10 +10,10 @@ public class SuggestionBuilderTests
     {
         var analysis = CreateAnalysis(totalBehaviors: 10, alreadyCovered: 2, breakdown: new()
         {
-            [BehaviorCategory.HappyPath] = 4,
-            [BehaviorCategory.Negative] = 3,
-            [BehaviorCategory.EdgeCase] = 2,
-            [BehaviorCategory.Security] = 1
+            ["happy_path"] = 4,
+            ["negative"] = 3,
+            ["edge_case"] = 2,
+            ["security"] = 1
         });
 
         var suggestions = SuggestionBuilder.Build(analysis, generatedCount: 3);
@@ -29,8 +28,8 @@ public class SuggestionBuilderTests
     {
         var analysis = CreateAnalysis(totalBehaviors: 5, alreadyCovered: 3, breakdown: new()
         {
-            [BehaviorCategory.HappyPath] = 3,
-            [BehaviorCategory.Negative] = 2
+            ["happy_path"] = 3,
+            ["negative"] = 2
         });
 
         var suggestions = SuggestionBuilder.Build(analysis, generatedCount: 2);
@@ -42,10 +41,10 @@ public class SuggestionBuilderTests
     {
         var analysis = CreateAnalysis(totalBehaviors: 20, alreadyCovered: 2, breakdown: new()
         {
-            [BehaviorCategory.HappyPath] = 8,
-            [BehaviorCategory.Negative] = 6,
-            [BehaviorCategory.EdgeCase] = 4,
-            [BehaviorCategory.Security] = 2
+            ["happy_path"] = 8,
+            ["negative"] = 6,
+            ["edge_case"] = 4,
+            ["security"] = 2
         });
 
         var suggestions = SuggestionBuilder.Build(analysis, generatedCount: 5);
@@ -67,7 +66,7 @@ public class SuggestionBuilderTests
     private static BehaviorAnalysisResult CreateAnalysis(
         int totalBehaviors,
         int alreadyCovered,
-        Dictionary<BehaviorCategory, int> breakdown)
+        Dictionary<string, int> breakdown)
     {
         return new BehaviorAnalysisResult
         {

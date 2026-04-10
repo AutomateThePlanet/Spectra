@@ -18,15 +18,23 @@ public sealed class BehaviorAnalyzer
 {
     private readonly SpectraProviderConfig? _provider;
     private readonly Action<string>? _onStatus;
+    private readonly SpectraConfig? _config;
+    private readonly PromptTemplateLoader? _templateLoader;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    public BehaviorAnalyzer(SpectraProviderConfig? provider, Action<string>? onStatus = null)
+    public BehaviorAnalyzer(
+        SpectraProviderConfig? provider,
+        Action<string>? onStatus = null,
+        SpectraConfig? config = null,
+        PromptTemplateLoader? templateLoader = null)
     {
         _provider = provider;
         _onStatus = onStatus;
+        _config = config;
+        _templateLoader = templateLoader;
     }
 
     /// <summary>
@@ -53,7 +61,7 @@ public sealed class BehaviorAnalyzer
                 tools: null,
                 ct);
 
-            var prompt = BuildAnalysisPrompt(documents, focusArea);
+            var prompt = BuildAnalysisPrompt(documents, focusArea, _config, _templateLoader);
 
             _onStatus?.Invoke($"Analyzing {documents.Count} documents for testable behaviors...");
 
@@ -108,9 +116,9 @@ public sealed class BehaviorAnalyzer
             // Compute dedup against existing tests
             var coveredCount = CountCoveredBehaviors(behaviors, existingTests);
 
-            // Build breakdown
+            // Build breakdown — bucket empty/null/whitespace categories under "uncategorized"
             var breakdown = behaviors
-                .GroupBy(b => b.Category)
+                .GroupBy(b => string.IsNullOrWhiteSpace(b.Category) ? "uncategorized" : b.Category)
                 .ToDictionary(g => g.Key, g => g.Count());
 
             var totalWords = documents.Sum(d =>
@@ -297,28 +305,20 @@ public sealed class BehaviorAnalyzer
     internal static List<IdentifiedBehavior> FilterByFocus(
         List<IdentifiedBehavior> behaviors, string focusArea)
     {
-        var lower = focusArea.ToLowerInvariant();
+        var tokens = focusArea.ToLowerInvariant()
+            .Split([' ', ',', ';'], StringSplitOptions.RemoveEmptyEntries);
+        if (tokens.Length == 0)
+            return behaviors;
 
-        // Map focus terms to categories
-        var matchingCategories = new List<BehaviorCategory>();
-        if (lower.Contains("happy") || lower.Contains("positive") || lower.Contains("success"))
-            matchingCategories.Add(BehaviorCategory.HappyPath);
-        if (lower.Contains("negative") || lower.Contains("error") || lower.Contains("fail"))
-            matchingCategories.Add(BehaviorCategory.Negative);
-        if (lower.Contains("edge") || lower.Contains("boundary") || lower.Contains("limit"))
-            matchingCategories.Add(BehaviorCategory.EdgeCase);
-        if (lower.Contains("sec") || lower.Contains("permission") || lower.Contains("auth"))
-            matchingCategories.Add(BehaviorCategory.Security);
-        if (lower.Contains("perf") || lower.Contains("load") || lower.Contains("timeout"))
-            matchingCategories.Add(BehaviorCategory.Performance);
-
-        if (matchingCategories.Count > 0)
+        var matches = behaviors.Where(b =>
         {
-            return behaviors.Where(b => matchingCategories.Contains(b.Category)).ToList();
-        }
+            var normalized = (b.Category ?? "").ToLowerInvariant()
+                .Replace('_', ' ').Replace('-', ' ');
+            return tokens.Any(t => normalized.Contains(t));
+        }).ToList();
 
         // No category match — return all (focus will be applied to generation prompt instead)
-        return behaviors;
+        return matches.Count > 0 ? matches : behaviors;
     }
 
     internal static int CountCoveredBehaviors(

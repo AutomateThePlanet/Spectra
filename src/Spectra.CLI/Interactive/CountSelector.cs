@@ -1,5 +1,4 @@
 using Spectra.CLI.Agent.Analysis;
-using Spectra.Core.Models;
 using Spectre.Console;
 
 namespace Spectra.CLI.Interactive;
@@ -13,7 +12,7 @@ public sealed record CountSelection
     public required int Count { get; init; }
 
     /// <summary>If user selected specific categories (null = all).</summary>
-    public IReadOnlyList<BehaviorCategory>? SelectedCategories { get; init; }
+    public IReadOnlyList<string>? SelectedCategories { get; init; }
 
     /// <summary>If user chose "describe what I want".</summary>
     public string? FreeTextDescription { get; init; }
@@ -24,14 +23,22 @@ public sealed record CountSelection
 /// </summary>
 public sealed class CountSelector
 {
-    private static readonly Dictionary<BehaviorCategory, string> CategoryLabels = new()
+    private static readonly Dictionary<string, string> CategoryLabels = new()
     {
-        [BehaviorCategory.HappyPath] = "happy paths",
-        [BehaviorCategory.Negative] = "negative scenarios",
-        [BehaviorCategory.EdgeCase] = "edge cases",
-        [BehaviorCategory.Security] = "security checks",
-        [BehaviorCategory.Performance] = "performance tests"
+        ["happy_path"] = "happy paths",
+        ["negative"] = "negative scenarios",
+        ["edge_case"] = "edge cases",
+        ["boundary"] = "boundary conditions",
+        ["error_handling"] = "error handling",
+        ["security"] = "security checks",
+        ["performance"] = "performance tests",
+        ["uncategorized"] = "uncategorized"
     };
+
+    private static string FormatCategoryLabel(string id) =>
+        CategoryLabels.TryGetValue(id, out var label)
+            ? label
+            : id.Replace('_', ' ').Replace('-', ' ');
 
     /// <summary>
     /// Presents a selection menu based on the analysis result and returns the user's choice.
@@ -103,7 +110,7 @@ public sealed class CountSelector
         {
             // Single largest category
             var first = orderedCategories[0];
-            var firstLabel = CategoryLabels.GetValueOrDefault(first.Key, first.Key.ToString());
+            var firstLabel = FormatCategoryLabel(first.Key);
             options.Add(new MenuOption
             {
                 Label = $"{first.Value} — {firstLabel} only",
@@ -115,7 +122,7 @@ public sealed class CountSelector
             if (orderedCategories.Count > 2)
             {
                 var second = orderedCategories[1];
-                var secondLabel = CategoryLabels.GetValueOrDefault(second.Key, second.Key.ToString());
+                var secondLabel = FormatCategoryLabel(second.Key);
                 var cumulativeCount = first.Value + second.Value;
                 options.Add(new MenuOption
                 {
@@ -149,7 +156,7 @@ public sealed class CountSelector
     {
         public required string Label { get; init; }
         public required int Count { get; init; }
-        public IReadOnlyList<BehaviorCategory>? Categories { get; init; }
+        public IReadOnlyList<string>? Categories { get; init; }
         public bool IsCustomNumber { get; init; }
         public bool IsFreeText { get; init; }
     }

@@ -1,5 +1,3 @@
-using Spectra.Core.Models;
-
 namespace Spectra.CLI.Agent.Analysis;
 
 /// <summary>
@@ -13,9 +11,10 @@ public sealed record BehaviorAnalysisResult
     public required int TotalBehaviors { get; init; }
 
     /// <summary>
-    /// Count per behavior category.
+    /// Count per behavior category. Keys are free-form category identifiers
+    /// returned by the AI (e.g., "happy_path", "keyboard_interaction").
     /// </summary>
-    public required IReadOnlyDictionary<BehaviorCategory, int> Breakdown { get; init; }
+    public required IReadOnlyDictionary<string, int> Breakdown { get; init; }
 
     /// <summary>
     /// Full list of identified behaviors.
@@ -45,13 +44,13 @@ public sealed record BehaviorAnalysisResult
     /// <summary>
     /// Gets the remaining (uncovered) behaviors by category.
     /// </summary>
-    public IReadOnlyDictionary<BehaviorCategory, int> GetRemainingByCategory(
-        IReadOnlyList<BehaviorCategory>? generatedCategories = null)
+    public IReadOnlyDictionary<string, int> GetRemainingByCategory(
+        IReadOnlyList<string>? generatedCategories = null)
     {
         if (generatedCategories is null || generatedCategories.Count == 0)
             return Breakdown;
 
-        var remaining = new Dictionary<BehaviorCategory, int>(Breakdown);
+        var remaining = new Dictionary<string, int>(Breakdown);
         foreach (var cat in generatedCategories)
         {
             if (remaining.ContainsKey(cat))
