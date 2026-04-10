@@ -114,11 +114,46 @@ Grounding verification configuration. See [Grounding Verification](grounding-ver
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `enabled` | bool | `false` | Enable dual-model verification |
-| `provider` | string | — | Critic provider (`google`, `openai`, `anthropic`, `github`) |
+| `provider` | string | `github-models` | Critic provider — same set as the generator: `github-models`, `azure-openai`, `azure-anthropic`, `openai`, `anthropic`. The legacy value `github` is still recognized as an alias for `github-models` (deprecation warning). |
 | `model` | string | — | Critic model identifier |
 | `api_key_env` | string | — | Environment variable for critic API key |
 | `base_url` | string | — | Custom API endpoint |
 | `timeout_seconds` | int | `30` | Critic request timeout |
+
+#### Example: Azure-only billing (generator + critic on the same account)
+
+```json
+{
+  "ai": {
+    "providers": [
+      { "name": "azure-openai", "model": "gpt-4.1-mini", "enabled": true }
+    ],
+    "critic": {
+      "enabled": true,
+      "provider": "azure-openai",
+      "model": "gpt-4o"
+    }
+  }
+}
+```
+
+#### Example: Cross-provider critic for independent verification
+
+```json
+{
+  "ai": {
+    "providers": [
+      { "name": "azure-openai", "model": "gpt-4.1-mini", "enabled": true }
+    ],
+    "critic": {
+      "enabled": true,
+      "provider": "anthropic",
+      "model": "claude-3-5-haiku-latest",
+      "api_key_env": "ANTHROPIC_API_KEY"
+    }
+  }
+}
+```
 
 ## `generation` — Test Generation Settings
 

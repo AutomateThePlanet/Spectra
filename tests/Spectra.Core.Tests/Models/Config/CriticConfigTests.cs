@@ -71,11 +71,17 @@ public class CriticConfigTests
     }
 
     [Theory]
-    [InlineData("google", "GOOGLE_API_KEY")]
+    // Spec 039: canonical providers
+    [InlineData("github-models", "GITHUB_TOKEN")]
+    [InlineData("azure-openai", "AZURE_OPENAI_API_KEY")]
+    [InlineData("azure-anthropic", "AZURE_ANTHROPIC_API_KEY")]
     [InlineData("openai", "OPENAI_API_KEY")]
     [InlineData("anthropic", "ANTHROPIC_API_KEY")]
+    // Legacy fallthroughs (preserved for read-side safety)
     [InlineData("github", "GITHUB_TOKEN")]
-    [InlineData("unknown", "OPENAI_API_KEY")]
+    [InlineData("google", "GOOGLE_API_KEY")]
+    // Unknown defaults to GITHUB_TOKEN (the default provider's key) post-039
+    [InlineData("unknown", "GITHUB_TOKEN")]
     public void CriticConfig_GetDefaultApiKeyEnv_ReturnsCorrectEnvVar(string provider, string expectedEnvVar)
     {
         var config = new CriticConfig { Provider = provider };

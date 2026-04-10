@@ -15,7 +15,11 @@ public sealed class CriticConfig
     public bool Enabled { get; init; } = false;
 
     /// <summary>
-    /// Provider name: "google", "openai", "anthropic", "github".
+    /// Provider name. Spec 039: the canonical set is identical to the
+    /// generator provider list — "github-models", "azure-openai",
+    /// "azure-anthropic", "openai", "anthropic". Legacy "github" is still
+    /// recognized as a soft alias for "github-models" (with a deprecation
+    /// warning); legacy "google" is rejected.
     /// </summary>
     [JsonPropertyName("provider")]
     public string? Provider { get; init; }
@@ -46,14 +50,20 @@ public sealed class CriticConfig
     public int TimeoutSeconds { get; init; } = 30;
 
     /// <summary>
-    /// Gets the effective model name for the provider.
+    /// Gets the effective model name for the provider. Spec 039: canonical
+    /// providers map to current per-provider defaults; legacy entries kept
+    /// for read-side safety in case any caller bypasses CriticFactory.
     /// </summary>
     public string GetEffectiveModel() => Model ?? Provider?.ToLowerInvariant() switch
     {
-        "google" => "gemini-2.0-flash",
+        "github-models" => "gpt-4o-mini",
+        "azure-openai" => "gpt-4o-mini",
+        "azure-anthropic" => "claude-3-5-haiku-latest",
         "openai" => "gpt-4o-mini",
         "anthropic" => "claude-3-5-haiku-latest",
+        // Legacy fallthroughs (alias-resolved by CriticFactory before reaching here)
         "github" => "gpt-4o-mini",
+        "google" => "gemini-2.0-flash",
         _ => "gpt-4o-mini"
     };
 
@@ -62,11 +72,15 @@ public sealed class CriticConfig
     /// </summary>
     public string GetDefaultApiKeyEnv() => Provider?.ToLowerInvariant() switch
     {
-        "google" => "GOOGLE_API_KEY",
+        "github-models" => "GITHUB_TOKEN",
+        "azure-openai" => "AZURE_OPENAI_API_KEY",
+        "azure-anthropic" => "AZURE_ANTHROPIC_API_KEY",
         "openai" => "OPENAI_API_KEY",
         "anthropic" => "ANTHROPIC_API_KEY",
+        // Legacy fallthroughs
         "github" => "GITHUB_TOKEN",
-        _ => "OPENAI_API_KEY"
+        "google" => "GOOGLE_API_KEY",
+        _ => "GITHUB_TOKEN"
     };
 
     /// <summary>

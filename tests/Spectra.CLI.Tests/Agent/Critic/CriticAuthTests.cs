@@ -55,7 +55,8 @@ public class CriticAuthTests
     [InlineData("github-models")]
     [InlineData("openai")]
     [InlineData("anthropic")]
-    [InlineData("google")]
+    [InlineData("azure-openai")]      // Spec 039: now in the canonical set
+    [InlineData("azure-anthropic")]   // Spec 039: now in the canonical set
     public void TryCreate_WithProvider_ReturnsSuccess(string provider)
     {
         var config = new CriticConfig

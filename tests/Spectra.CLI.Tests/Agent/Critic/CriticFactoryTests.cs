@@ -10,14 +10,17 @@ namespace Spectra.CLI.Tests.Agent.Critic;
 public class CriticFactoryTests
 {
     [Fact]
-    public void SupportedProviders_ContainsExpectedProviders()
+    public void SupportedProviders_ContainsCanonicalFiveAfterSpec039()
     {
+        // Spec 039: canonical critic provider set is the same as the generator set.
         Assert.Contains("github-models", CriticFactory.SupportedProviders);
         Assert.Contains("openai", CriticFactory.SupportedProviders);
         Assert.Contains("anthropic", CriticFactory.SupportedProviders);
-        Assert.Contains("google", CriticFactory.SupportedProviders);
         Assert.Contains("azure-openai", CriticFactory.SupportedProviders);
         Assert.Contains("azure-anthropic", CriticFactory.SupportedProviders);
+        Assert.Equal(5, CriticFactory.SupportedProviders.Count);
+        // 'google' is no longer canonical (handled as a hard-error alias)
+        Assert.DoesNotContain("google", CriticFactory.SupportedProviders);
     }
 
     [Fact]
@@ -73,10 +76,10 @@ public class CriticFactoryTests
     [Theory]
     [InlineData("openai")]
     [InlineData("anthropic")]
-    [InlineData("google")]
     [InlineData("azure-openai")]
     [InlineData("azure-anthropic")]
-    public void TryCreate_AnyProvider_CreatesCopilotCritic(string provider)
+    [InlineData("github-models")]
+    public void TryCreate_AnyCanonicalProvider_CreatesCopilotCritic(string provider)
     {
         var config = new CriticConfig
         {
@@ -86,7 +89,7 @@ public class CriticFactoryTests
 
         var result = CriticFactory.TryCreate(config);
 
-        // Copilot SDK handles all providers — factory just creates CopilotCritic
+        // Copilot SDK handles all canonical providers — factory just creates CopilotCritic
         Assert.True(result.Success);
         Assert.NotNull(result.Critic);
         Assert.Equal(provider, result.ProviderName);
@@ -96,9 +99,10 @@ public class CriticFactoryTests
     [InlineData("github-models", true)]
     [InlineData("openai", true)]
     [InlineData("anthropic", true)]
-    [InlineData("google", true)]
     [InlineData("azure-openai", true)]
     [InlineData("azure-anthropic", true)]
+    [InlineData("github", true)]      // Spec 039: legacy alias is still "supported" (soft-rewritten)
+    [InlineData("google", false)]     // Spec 039: hard-rejected
     [InlineData("unknown", false)]
     [InlineData("", false)]
     public void IsSupported_ReturnsCorrectResult(string provider, bool expected)
