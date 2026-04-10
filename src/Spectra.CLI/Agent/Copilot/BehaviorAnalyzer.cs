@@ -51,6 +51,15 @@ public sealed class BehaviorAnalyzer
         if (documents.Count == 0)
             return null;
 
+        // Spec post-038 fix: configurable analysis timeout (default 2 min).
+        // Slower / reasoning models routinely overshoot 2 minutes when scanning
+        // a multi-document suite. Read from ai.analysis_timeout_minutes.
+        var timeoutMinutes = Math.Max(1, _config?.Ai.AnalysisTimeoutMinutes ?? 2);
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var modelName = _provider?.Model ?? "?";
+        var providerName = _provider?.Name ?? "?";
+        DebugLog($"ANALYSIS START documents={documents.Count} model={modelName} provider={providerName} timeout={timeoutMinutes}min");
+
         try
         {
             _onStatus?.Invoke("Connecting to AI for behavior analysis...");
@@ -63,13 +72,13 @@ public sealed class BehaviorAnalyzer
 
             var prompt = BuildAnalysisPrompt(documents, focusArea, _config, _templateLoader);
 
-            _onStatus?.Invoke($"Analyzing {documents.Count} documents for testable behaviors...");
+            _onStatus?.Invoke($"Analyzing {documents.Count} documents (timeout {timeoutMinutes} min)...");
 
             // Schedule delayed message updates, cancelled when AI call completes
             using var timerCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var timerToken = timerCts.Token;
             _ = Task.Delay(5000, timerToken).ContinueWith(_ =>
-                _onStatus?.Invoke("AI is identifying testable behaviors — this may take up to a minute..."), TaskContinuationOptions.OnlyOnRanToCompletion);
+                _onStatus?.Invoke("AI is identifying testable behaviors — this may take a few minutes..."), TaskContinuationOptions.OnlyOnRanToCompletion);
             _ = Task.Delay(20000, timerToken).ContinueWith(_ =>
                 _onStatus?.Invoke("Still analyzing — categorizing behaviors by type (happy path, negative, edge case)..."), TaskContinuationOptions.OnlyOnRanToCompletion);
             _ = Task.Delay(40000, timerToken).ContinueWith(_ =>
@@ -77,7 +86,7 @@ public sealed class BehaviorAnalyzer
 
             var response = await session.SendAndWaitAsync(
                 new MessageOptions { Prompt = prompt },
-                timeout: TimeSpan.FromMinutes(2),
+                timeout: TimeSpan.FromMinutes(timeoutMinutes),
                 cancellationToken: ct);
 
             // Cancel delayed timers so they don't overwrite the final result
@@ -88,6 +97,7 @@ public sealed class BehaviorAnalyzer
             if (string.IsNullOrWhiteSpace(responseText))
             {
                 _onStatus?.Invoke("AI returned empty response for behavior analysis");
+                DebugLog($"ANALYSIS EMPTY response_chars=0 elapsed={sw.Elapsed.TotalSeconds:F1}s");
                 return null;
             }
 
@@ -95,6 +105,7 @@ public sealed class BehaviorAnalyzer
             if (behaviors is null || behaviors.Count == 0)
             {
                 _onStatus?.Invoke("Could not parse behaviors from AI response");
+                DebugLog($"ANALYSIS PARSE_FAIL response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s");
                 // Save debug response
                 try
                 {
@@ -105,6 +116,8 @@ public sealed class BehaviorAnalyzer
                 return null;
             }
 
+            sw.Stop();
+            DebugLog($"ANALYSIS OK behaviors={behaviors.Count} response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s");
             _onStatus?.Invoke($"Found {behaviors.Count} testable behaviors");
 
             // Apply focus filter if specified
@@ -144,13 +157,35 @@ public sealed class BehaviorAnalyzer
         }
         catch (TimeoutException)
         {
-            _onStatus?.Invoke("Behavior analysis timed out (2 min). Using default count.");
+            DebugLog($"ANALYSIS TIMEOUT model={modelName} configured_timeout={timeoutMinutes}min elapsed={sw.Elapsed.TotalSeconds:F1}s");
+            _onStatus?.Invoke($"Behavior analysis timed out after {timeoutMinutes} min (model: {modelName}). Bump ai.analysis_timeout_minutes in spectra.config.json. Using default count.");
             return null;
         }
         catch (Exception ex)
         {
+            DebugLog($"ANALYSIS ERROR exception={ex.GetType().Name} message=\"{ex.Message}\" elapsed={sw.Elapsed.TotalSeconds:F1}s");
             _onStatus?.Invoke($"Behavior analysis failed: {ex.Message}");
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Append a one-line timestamped diagnostic to <c>.spectra-debug.log</c>
+    /// in the project root. Best-effort; never throws. Gated by
+    /// <c>ai.debug_log_enabled</c> (default true).
+    /// </summary>
+    private void DebugLog(string message)
+    {
+        try
+        {
+            if (_config?.Ai.DebugLogEnabled == false) return;
+            var path = Path.Combine(Directory.GetCurrentDirectory(), ".spectra-debug.log");
+            var line = $"{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fffZ} [analyze]  {message}{Environment.NewLine}";
+            File.AppendAllText(path, line);
+        }
+        catch
+        {
+            // Diagnostics must never block analysis.
         }
     }
 

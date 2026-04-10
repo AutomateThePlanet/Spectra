@@ -286,6 +286,7 @@ Three-section unified coverage with distinct semantics:
   "ai": {
     "providers": [{ "name": "azure-anthropic", "model": "claude-sonnet-4-5", "enabled": true }],
     "critic": { "provider": "azure-anthropic", "model": "claude-sonnet-4-5" },
+    "analysis_timeout_minutes": 2,
     "generation_timeout_minutes": 5,
     "generation_batch_size": 30,
     "debug_log_enabled": true
@@ -304,13 +305,21 @@ Three-section unified coverage with distinct semantics:
 }
 ```
 
-> **Generation tuning (v1.41.0)**: `ai.generation_timeout_minutes` (default 5)
-> and `ai.generation_batch_size` (default 30) are the per-batch knobs for
-> `spectra ai generate`. Slower / reasoning models (DeepSeek-V3, large Azure
-> deployments) typically need 15–20 min and batches of 6–10.
-> `ai.debug_log_enabled` (default true) writes per-batch timing diagnostics to
-> `.spectra-debug.log` in the project root — inspect this file to dial the
-> tuning knobs to your model's actual throughput.
+> **Generation & analysis tuning (v1.42.0)**:
+> - `ai.analysis_timeout_minutes` (default 2) — behavior analysis timeout
+> - `ai.generation_timeout_minutes` (default 5) — per-batch generation timeout
+> - `ai.generation_batch_size` (default 30) — tests per AI call
+> - `ai.debug_log_enabled` (default true) — writes per-call timing diagnostics
+>   to `.spectra-debug.log` in the project root
+>
+> Slower / reasoning models (DeepSeek-V3, large Azure deployments) typically
+> need: analysis 5–10 min, generation 15–20 min, batches of 6–10.
+>
+> When behavior analysis fails (timeout, parse error, empty response), the
+> `.spectra-result.json` from `--analyze-only` now sets `status: "analysis_failed"`
+> and a `message` field explaining the cause + remediation. The `spectra-generate`
+> SKILL recognizes this and refuses to present the fallback default (15) as if
+> it were a real recommendation.
 
 > **Spec 039**: critic providers now use the same five names as the generator
 > (`github-models`, `azure-openai`, `azure-anthropic`, `openai`, `anthropic`).

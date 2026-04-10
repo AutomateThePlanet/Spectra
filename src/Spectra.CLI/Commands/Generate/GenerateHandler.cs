@@ -365,20 +365,31 @@ public sealed class GenerateHandler
             }
         }
 
-        // --analyze-only: stop after analysis, output recommendation
+        // --analyze-only: stop after analysis, output recommendation.
+        // v1.42.0 fix: when behavior analysis returned null (timeout or
+        // empty/parse-fail), the result MUST signal that the recommendation
+        // is a fallback, not a real analysis. The agent / SKILL relies on
+        // status + message to know whether to trust the count.
         if (analyzeOnly)
         {
+            var analysisFailed = analysisResult is null;
+            var generatorModelName = config.Ai.Providers?.FirstOrDefault(p => p.Enabled)?.Model ?? "?";
             var analyzeResult = new GenerateResult
             {
                 Command = "generate",
-                Status = "analyzed",
+                Status = analysisFailed ? "analysis_failed" : "analyzed",
                 Suite = suite,
+                Message = analysisFailed
+                    ? $"Behavior analysis did not return results (model: {generatorModelName}). Recommended count of {effectiveCount} is a fallback default — NOT a real analysis. Common cause: ai.analysis_timeout_minutes (default 2) is too low for a slow / reasoning model. Bump it to 5–10 minutes in spectra.config.json and re-run. See .spectra-debug.log for the actual elapsed time."
+                    : null,
                 Analysis = analysisResult is not null ? new GenerateAnalysis
                 {
                     TotalBehaviors = analysisResult.TotalBehaviors,
                     AlreadyCovered = analysisResult.AlreadyCovered,
                     Recommended = analysisResult.RecommendedCount,
                     Breakdown = analysisResult.Breakdown?.ToDictionary(
+                        kvp => kvp.Key, kvp => kvp.Value),
+                    TechniqueBreakdown = analysisResult.TechniqueBreakdown.ToDictionary(
                         kvp => kvp.Key, kvp => kvp.Value)
                 } : new GenerateAnalysis
                 {

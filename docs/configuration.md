@@ -116,9 +116,12 @@ Azure Anthropic deployments, GPT-4 Turbo with long contexts) where the default
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `generation_timeout_minutes` | int | `5` | Per-batch SDK call timeout. The timer measures the entire batch round-trip including all tool calls the AI makes. Slower models may need 10–20+ minutes. Minimum effective value is 1. |
+| `analysis_timeout_minutes` | int | `2` | Timeout for the **behavior analysis** SDK call (the analyze step that runs before generation). Slower models routinely overshoot 2 minutes when scanning a multi-document suite — bump to 5–10 minutes for those. The same timer applies to the retry attempt. |
+| `generation_timeout_minutes` | int | `5` | Per-batch **generation** SDK call timeout. The timer measures the entire batch round-trip including all tool calls the AI makes. Slower models may need 10–20+ minutes. Minimum effective value is 1. |
 | `generation_batch_size` | int | `30` | Number of tests requested per AI call. Smaller batches reduce per-batch latency on slow models at the cost of more total round-trips. Pair with `generation_timeout_minutes`. Values ≤ 0 fall back to the default. |
-| `debug_log_enabled` | bool | `true` | When true, appends per-batch diagnostics to `.spectra-debug.log` in the project root. Best-effort writes; never blocks generation. Set to `false` to silence. |
+| `debug_log_enabled` | bool | `true` | When true, appends per-batch diagnostics to `.spectra-debug.log` in the project root. Best-effort writes; never blocks analysis or generation. Set to `false` to silence. |
+
+**Why a separate analysis timeout?** Behavior analysis runs once before generation and tends to be a single big call (no tool-calling loop). With slow / reasoning models on multi-doc suites it often takes 3–7 minutes — well over the 2-minute default — and fails silently. The symptom is `behaviors_found: 0` with a `recommended` count that looks plausible but is actually a hardcoded fallback default. v1.42.0+ surfaces this clearly: when analysis fails, the result file's `status` is set to `"analysis_failed"` (not `"analyzed"`) and the `message` field explains the cause and remediation. The bundled `spectra-generate` SKILL recognizes the new status and stops the agent from confidently presenting fallback numbers as a real recommendation.
 
 #### `.spectra-debug.log` format
 
@@ -126,13 +129,21 @@ When `debug_log_enabled` is true, every batch writes one or more timestamped
 lines to `.spectra-debug.log`. Example session:
 
 ```text
-2026-04-11T01:30:14.221Z [generate] BATCH START requested=8 model=DeepSeek-V3.2 provider=azure-openai timeout=20min
-2026-04-11T01:34:51.778Z [generate] BATCH OK   requested=8 elapsed=277.6s
-2026-04-11T01:34:53.014Z [generate] BATCH START requested=8 model=DeepSeek-V3.2 provider=azure-openai timeout=20min
-2026-04-11T01:39:10.004Z [generate] BATCH OK   requested=8 elapsed=257.0s
-2026-04-11T01:39:11.221Z [generate] BATCH START requested=8 model=DeepSeek-V3.2 provider=azure-openai timeout=20min
-2026-04-11T01:59:11.330Z [generate] BATCH TIMEOUT requested=8 model=DeepSeek-V3.2 configured_timeout=20min
+2026-04-11T01:30:01.045Z [analyze]  ANALYSIS START documents=12 model=DeepSeek-V3.2 provider=azure-openai timeout=10min
+2026-04-11T01:33:47.219Z [analyze]  ANALYSIS OK behaviors=75 response_chars=18402 elapsed=226.2s
+2026-04-11T01:33:48.221Z [generate] BATCH START requested=8 model=DeepSeek-V3.2 provider=azure-openai timeout=20min
+2026-04-11T01:38:25.778Z [generate] BATCH OK   requested=8 elapsed=277.6s
+2026-04-11T01:38:27.014Z [generate] BATCH START requested=8 model=DeepSeek-V3.2 provider=azure-openai timeout=20min
+2026-04-11T01:42:44.004Z [generate] BATCH OK   requested=8 elapsed=257.0s
+2026-04-11T01:42:45.221Z [generate] BATCH START requested=8 model=DeepSeek-V3.2 provider=azure-openai timeout=20min
+2026-04-11T02:02:45.330Z [generate] BATCH TIMEOUT requested=8 model=DeepSeek-V3.2 configured_timeout=20min
 ```
+
+The `[analyze]` lines come from `BehaviorAnalyzer`; the `[generate]` lines come
+from `CopilotGenerationAgent`. `ANALYSIS OK` and `BATCH OK` record success and
+elapsed wall time. `ANALYSIS TIMEOUT`, `ANALYSIS PARSE_FAIL`, `ANALYSIS EMPTY`,
+`ANALYSIS ERROR`, and `BATCH TIMEOUT` record failures with the configured
+budget for cross-reference.
 
 Lines starting with `BATCH START` mark the beginning of an AI call (model,
 provider, batch size, configured timeout). `BATCH OK` marks success and
@@ -155,6 +166,7 @@ for the current batch. Useful when the AI returns a malformed JSON array.
     "providers": [
       { "name": "azure-openai", "model": "DeepSeek-V3.2", "enabled": true }
     ],
+    "analysis_timeout_minutes": 10,
     "generation_timeout_minutes": 20,
     "generation_batch_size": 8,
     "debug_log_enabled": true
@@ -162,9 +174,11 @@ for the current batch. Useful when the AI returns a malformed JSON array.
 }
 ```
 
-With this config, `spectra ai generate --count 100` splits into 13 batches
-of 8 tests each, every batch has a 20-minute budget, and each batch's actual
-elapsed time is logged so you can re-tune later.
+With this config, behavior analysis gets a 10-minute budget (DeepSeek typically
+finishes a multi-doc scan in 3–7 minutes), and `spectra ai generate --count 100`
+splits into 13 batches of 8 tests each, every batch with a 20-minute budget.
+Every analyze and generate call's actual elapsed time is logged so you can
+re-tune later.
 
 #### Example: silencing the debug log on a fast model
 

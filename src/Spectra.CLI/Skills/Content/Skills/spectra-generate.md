@@ -74,6 +74,7 @@ spectra ai generate --suite {suite} --analyze-only [--focus "{focus}"] --no-inte
 
 **Step 4** — readFile `.spectra-result.json` — check `status`:
 - `"failed"` → tell user the `error`.
+- `"analysis_failed"` → DO NOT show a recommendation. The recommended count is a fallback default, NOT a real analysis. Show the `message` field verbatim, and ask the user whether to bump `ai.analysis_timeout_minutes` in `spectra.config.json` and re-run, or proceed with the fallback count anyway. STOP and wait for the user to decide. Do NOT auto-proceed to generation.
 - `"analyzed"` → show this:
 
 **{analysis.already_covered}** tests already exist. I recommend generating **{analysis.recommended}** new test cases:

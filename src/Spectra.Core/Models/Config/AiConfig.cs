@@ -30,6 +30,16 @@ public sealed class AiConfig
     public int GenerationTimeoutMinutes { get; init; } = 5;
 
     /// <summary>
+    /// Timeout for the behavior analysis SDK call (the analyze step that
+    /// runs before generation), in minutes. Default 2. Slower / reasoning
+    /// models routinely overshoot 2 minutes when scanning a multi-document
+    /// suite — bump to 5–10 minutes for those. The same timer applies to
+    /// the retry attempt.
+    /// </summary>
+    [JsonPropertyName("analysis_timeout_minutes")]
+    public int AnalysisTimeoutMinutes { get; init; } = 2;
+
+    /// <summary>
     /// Number of tests requested per AI call. Default 30. Smaller batches
     /// reduce per-batch latency on slow models at the cost of more total
     /// round-trips. Pair with <see cref="GenerationTimeoutMinutes"/>.
