@@ -2,18 +2,17 @@
 // SPECTRA — additional overrides on top of the spectra color scheme
 // =============================================================
 
-// Sidebar header / logo area: give it a cream backdrop so the
-// SPECTRA banner (cream background) sits flush instead of looking
-// like a postage stamp on a navy wall. Make the logo full-width.
+// Sidebar header / logo area: the dashboard banner already has a navy
+// background, so let it sit flush on the navy sidebar — no backdrop,
+// no border, just a full-width banner that bleeds to the edges.
 
 .side-bar {
-  // Pull the logo flush to the top of the sidebar
   .site-header {
-    background-color: #f6f0e1; // matches banner cream
+    background-color: transparent;
     padding: 0;
     height: auto;
     min-height: 0;
-    border-bottom: 2px solid #0f1628;
+    border-bottom: none;
   }
 
   .site-title {
