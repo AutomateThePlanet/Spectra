@@ -1,5 +1,6 @@
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Output;
+using Spectra.CLI.Profile;
 using Spectra.CLI.Prompts;
 using Spectra.CLI.Skills;
 
@@ -61,6 +62,20 @@ public sealed class UpdateSkillsHandler
             var templatePath = Path.Combine(currentDir, relativePath);
             await ProcessFileAsync(templatePath, content, manifest, updated, unchanged, skipped, ct);
         }
+
+        // Process default profile (profiles/_default.yaml)
+        var defaultProfilePath = Path.Combine(currentDir, "profiles", "_default.yaml");
+        await ProcessFileAsync(
+            defaultProfilePath,
+            ProfileFormatLoader.LoadEmbeddedDefaultYaml(),
+            manifest, updated, unchanged, skipped, ct);
+
+        // Process customization guide (CUSTOMIZATION.md at project root)
+        var customizationPath = Path.Combine(currentDir, "CUSTOMIZATION.md");
+        await ProcessFileAsync(
+            customizationPath,
+            ProfileFormatLoader.LoadEmbeddedCustomizationGuide(),
+            manifest, updated, unchanged, skipped, ct);
 
         // Save updated manifest
         await manifestStore.SaveAsync(manifest, ct);

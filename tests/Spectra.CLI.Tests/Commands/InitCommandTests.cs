@@ -301,4 +301,49 @@ public class InitCommandTests : IDisposable
         var content = await File.ReadAllTextAsync(workflowPath);
         Assert.Equal("# Custom workflow", content);
     }
+
+    [Fact]
+    public async Task HandleAsync_CreatesDefaultProfileYaml()
+    {
+        var handler = new InitHandler(_logger, _testDir);
+
+        var exitCode = await handler.HandleAsync(force: false);
+
+        Assert.Equal(ExitCodes.Success, exitCode);
+        var profilePath = Path.Combine(_testDir, "profiles", "_default.yaml");
+        Assert.True(File.Exists(profilePath), "profiles/_default.yaml should exist");
+        var content = await File.ReadAllTextAsync(profilePath);
+        Assert.Contains("format:", content);
+        Assert.Contains("fields:", content);
+    }
+
+    [Fact]
+    public async Task HandleAsync_CreatesCustomizationGuide()
+    {
+        var handler = new InitHandler(_logger, _testDir);
+
+        var exitCode = await handler.HandleAsync(force: false);
+
+        Assert.Equal(ExitCodes.Success, exitCode);
+        var guidePath = Path.Combine(_testDir, "CUSTOMIZATION.md");
+        Assert.True(File.Exists(guidePath), "CUSTOMIZATION.md should exist at project root");
+        var content = await File.ReadAllTextAsync(guidePath);
+        Assert.Contains("# SPECTRA Customization Guide", content);
+        Assert.Contains("profiles/_default.yaml", content);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RegistersNewFilesInSkillsManifest()
+    {
+        var handler = new InitHandler(_logger, _testDir);
+
+        var exitCode = await handler.HandleAsync(force: false);
+
+        Assert.Equal(ExitCodes.Success, exitCode);
+        var manifestPath = Path.Combine(_testDir, ".spectra", "skills-manifest.json");
+        Assert.True(File.Exists(manifestPath), "skills-manifest.json should exist");
+        var manifestContent = await File.ReadAllTextAsync(manifestPath);
+        Assert.Contains("_default.yaml", manifestContent);
+        Assert.Contains("CUSTOMIZATION.md", manifestContent);
+    }
 }

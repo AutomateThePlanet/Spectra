@@ -3,6 +3,7 @@ using Spectra.CLI.Agent;
 using System.Text.Json;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Output;
+using Spectra.CLI.Profile;
 using Spectra.CLI.Source;
 using Spectra.Core.Config;
 using Spectra.Core.Models.Config;
@@ -78,6 +79,9 @@ public sealed class InitHandler
 
             // Create prompt templates
             await CreatePromptTemplatesAsync(force, ct);
+
+            // Create default profile and customization guide
+            await CreateDefaultProfileAndCustomizationAsync(force, ct);
 
             // Create dashboard deployment workflow
             await CreateDeployWorkflowAsync(ct);
@@ -585,6 +589,48 @@ public sealed class InitHandler
             manifest.Files[relativePath] = Infrastructure.FileHasher.ComputeHash(content);
             _logger.LogInformation("Created prompt template: {Path}", relativePath);
         }
+
+        await manifestStore.SaveAsync(manifest, ct);
+    }
+
+    private async Task CreateDefaultProfileAndCustomizationAsync(bool force, CancellationToken ct)
+    {
+        var manifestStore = new Skills.SkillsManifestStore(_workingDirectory);
+        var manifest = await manifestStore.LoadAsync(ct);
+
+        // profiles/_default.yaml
+        var profilesDir = Path.Combine(_workingDirectory, "profiles");
+        Directory.CreateDirectory(profilesDir);
+        var profilePath = Path.Combine(profilesDir, "_default.yaml");
+        var profileContent = ProfileFormatLoader.LoadEmbeddedDefaultYaml();
+        var profileRelative = Path.Combine("profiles", "_default.yaml");
+
+        if (!File.Exists(profilePath) || force)
+        {
+            await File.WriteAllTextAsync(profilePath, profileContent, ct);
+            _logger.LogInformation("Created default profile: {Path}", profileRelative);
+        }
+        else
+        {
+            _logger.LogDebug("Default profile already exists, skipping: {Path}", profilePath);
+        }
+        manifest.Files[profileRelative] = Infrastructure.FileHasher.ComputeHash(profileContent);
+
+        // CUSTOMIZATION.md (project root)
+        var customizationPath = Path.Combine(_workingDirectory, "CUSTOMIZATION.md");
+        var customizationContent = ProfileFormatLoader.LoadEmbeddedCustomizationGuide();
+        const string customizationRelative = "CUSTOMIZATION.md";
+
+        if (!File.Exists(customizationPath) || force)
+        {
+            await File.WriteAllTextAsync(customizationPath, customizationContent, ct);
+            _logger.LogInformation("Created customization guide: {Path}", customizationRelative);
+        }
+        else
+        {
+            _logger.LogDebug("Customization guide already exists, skipping: {Path}", customizationPath);
+        }
+        manifest.Files[customizationRelative] = Infrastructure.FileHasher.ComputeHash(customizationContent);
 
         await manifestStore.SaveAsync(manifest, ct);
     }

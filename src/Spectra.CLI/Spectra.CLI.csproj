@@ -38,6 +38,8 @@
     <EmbeddedResource Include="Agent\Resources\SKILL.md" />
     <EmbeddedResource Include="Skills\Content\Skills\*.md" />
     <EmbeddedResource Include="Skills\Content\Agents\*.md" />
+    <EmbeddedResource Include="Skills\Content\Profiles\*.yaml" />
+    <EmbeddedResource Include="Skills\Content\Docs\*.md" />
     <EmbeddedResource Include="Prompts\Content\*.md" />
     <EmbeddedResource Include="Templates\deploy-dashboard.yml" />
     <EmbeddedResource Include="Dashboard\Templates\index.html" />
