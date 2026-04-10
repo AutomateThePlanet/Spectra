@@ -111,4 +111,32 @@ public class ProfileFormatLoaderTests : IDisposable
         Assert.Contains("# SPECTRA Customization Guide", content);
         Assert.Contains("profiles/_default.yaml", content);
     }
+
+    [Fact]
+    public void LoadEmbeddedUsageGuide_IsNonEmptyMarkdown()
+    {
+        var content = ProfileFormatLoader.LoadEmbeddedUsageGuide();
+
+        Assert.False(string.IsNullOrWhiteSpace(content));
+        Assert.Contains("# SPECTRA Usage Guide", content);
+        Assert.Contains("Prerequisites", content);
+        Assert.Contains("Generating Test Cases", content);
+        Assert.Contains("Extracting Acceptance Criteria", content);
+        Assert.Contains("Coverage Analysis", content);
+        Assert.Contains("Generating Dashboard", content);
+        Assert.Contains("Validating Tests", content);
+        Assert.Contains("Updating Tests After Doc Changes", content);
+        Assert.Contains("Executing Tests via MCP", content);
+        Assert.Contains("Creating a Custom Profile", content);
+        Assert.Contains("Indexing Documentation", content);
+        Assert.Contains("Customizing SPECTRA", content);
+        Assert.Contains("Importing Criteria from External Tools", content);
+        Assert.Contains("Complete Pipeline", content);
+        Assert.Contains("Troubleshooting", content);
+
+        // Offline doc must NOT contain in-chat tool references
+        Assert.DoesNotContain("runInTerminal", content);
+        Assert.DoesNotContain("awaitTerminal", content);
+        Assert.DoesNotContain("browser/openBrowserPage", content);
+    }
 }

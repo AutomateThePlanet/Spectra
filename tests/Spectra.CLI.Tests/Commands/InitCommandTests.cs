@@ -346,4 +346,68 @@ public class InitCommandTests : IDisposable
         Assert.Contains("_default.yaml", manifestContent);
         Assert.Contains("CUSTOMIZATION.md", manifestContent);
     }
+
+    [Fact]
+    public async Task HandleAsync_CreatesQuickstartSkill()
+    {
+        var handler = new InitHandler(_logger, _testDir);
+
+        var exitCode = await handler.HandleAsync(force: false);
+
+        Assert.Equal(ExitCodes.Success, exitCode);
+        var quickstartPath = Path.Combine(_testDir, ".github", "skills", "spectra-quickstart", "SKILL.md");
+        Assert.True(File.Exists(quickstartPath), "spectra-quickstart SKILL.md should exist");
+        var content = await File.ReadAllTextAsync(quickstartPath);
+        Assert.Contains("name: spectra-quickstart", content);
+        Assert.Contains("# SPECTRA Quickstart Guide", content);
+
+        // Manifest should track it
+        var manifestPath = Path.Combine(_testDir, ".spectra", "skills-manifest.json");
+        var manifestContent = await File.ReadAllTextAsync(manifestPath);
+        Assert.Contains("spectra-quickstart", manifestContent);
+    }
+
+    [Fact]
+    public async Task HandleAsync_SkipSkills_DoesNotCreateQuickstartSkill()
+    {
+        var handler = new InitHandler(_logger, _testDir);
+
+        var exitCode = await handler.HandleAsync(force: false, skipSkills: true);
+
+        Assert.Equal(ExitCodes.Success, exitCode);
+        var quickstartPath = Path.Combine(_testDir, ".github", "skills", "spectra-quickstart", "SKILL.md");
+        Assert.False(File.Exists(quickstartPath), "spectra-quickstart SKILL.md should NOT exist when --skip-skills");
+    }
+
+    [Fact]
+    public async Task HandleAsync_CreatesUsageGuide()
+    {
+        var handler = new InitHandler(_logger, _testDir);
+
+        var exitCode = await handler.HandleAsync(force: false);
+
+        Assert.Equal(ExitCodes.Success, exitCode);
+        var usagePath = Path.Combine(_testDir, "USAGE.md");
+        Assert.True(File.Exists(usagePath), "USAGE.md should exist at project root");
+        var content = await File.ReadAllTextAsync(usagePath);
+        Assert.Contains("# SPECTRA Usage Guide", content);
+        Assert.Contains("Generating Test Cases", content);
+
+        // Manifest should track it
+        var manifestPath = Path.Combine(_testDir, ".spectra", "skills-manifest.json");
+        var manifestContent = await File.ReadAllTextAsync(manifestPath);
+        Assert.Contains("USAGE.md", manifestContent);
+    }
+
+    [Fact]
+    public async Task HandleAsync_SkipSkills_DoesNotCreateUsageGuide()
+    {
+        var handler = new InitHandler(_logger, _testDir);
+
+        var exitCode = await handler.HandleAsync(force: false, skipSkills: true);
+
+        Assert.Equal(ExitCodes.Success, exitCode);
+        var usagePath = Path.Combine(_testDir, "USAGE.md");
+        Assert.False(File.Exists(usagePath), "USAGE.md should NOT exist when --skip-skills");
+    }
 }

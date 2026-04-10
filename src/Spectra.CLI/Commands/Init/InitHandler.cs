@@ -75,6 +75,9 @@ public sealed class InitHandler
 
                 // Create bundled SKILL files
                 await CreateBundledSkillFilesAsync(force, ct);
+
+                // Create offline usage guide (USAGE.md)
+                await CreateUsageGuideAsync(force, ct);
             }
 
             // Create prompt templates
@@ -561,6 +564,29 @@ public sealed class InitHandler
 
         await manifestStore.SaveAsync(manifest, ct);
         _logger.LogDebug("Created skills manifest with {Count} entries", manifest.Files.Count);
+    }
+
+    private async Task CreateUsageGuideAsync(bool force, CancellationToken ct)
+    {
+        var manifestStore = new Skills.SkillsManifestStore(_workingDirectory);
+        var manifest = await manifestStore.LoadAsync(ct);
+
+        var usagePath = Path.Combine(_workingDirectory, "USAGE.md");
+        var usageContent = ProfileFormatLoader.LoadEmbeddedUsageGuide();
+        const string usageRelative = "USAGE.md";
+
+        if (!File.Exists(usagePath) || force)
+        {
+            await File.WriteAllTextAsync(usagePath, usageContent, ct);
+            _logger.LogInformation("Created usage guide: {Path}", usageRelative);
+        }
+        else
+        {
+            _logger.LogDebug("Usage guide already exists, skipping: {Path}", usagePath);
+        }
+        manifest.Files[usageRelative] = Infrastructure.FileHasher.ComputeHash(usageContent);
+
+        await manifestStore.SaveAsync(manifest, ct);
     }
 
     private async Task CreatePromptTemplatesAsync(bool force, CancellationToken ct)

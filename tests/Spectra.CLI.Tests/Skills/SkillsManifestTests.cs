@@ -57,7 +57,7 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void SkillContent_HasAllSkills()
     {
-        Assert.Equal(11, SkillContent.All.Count);
+        Assert.Equal(12, SkillContent.All.Count);
         Assert.True(SkillContent.All.ContainsKey("spectra-generate"));
         Assert.True(SkillContent.All.ContainsKey("spectra-update"));
         Assert.True(SkillContent.All.ContainsKey("spectra-coverage"));
@@ -69,6 +69,7 @@ public class SkillsManifestTests : IDisposable
         Assert.True(SkillContent.All.ContainsKey("spectra-criteria"));
         Assert.True(SkillContent.All.ContainsKey("spectra-docs"));
         Assert.True(SkillContent.All.ContainsKey("spectra-prompts"));
+        Assert.True(SkillContent.All.ContainsKey("spectra-quickstart"));
     }
 
     [Fact]
@@ -290,6 +291,37 @@ public class SkillsManifestTests : IDisposable
     {
         var content = AgentContent.ExecutionAgent;
         Assert.Contains("spectra-update", content);
+    }
+
+    [Fact]
+    public void QuickstartSkill_NotEmpty_AndContainsWorkflows()
+    {
+        var content = SkillContent.Quickstart;
+
+        Assert.False(string.IsNullOrWhiteSpace(content));
+        Assert.Contains("name: spectra-quickstart", content);
+        Assert.Contains("# SPECTRA Quickstart Guide", content);
+
+        // 12 workflow sections (Workflow 1..12)
+        var workflowCount = System.Text.RegularExpressions.Regex.Matches(content, @"^## Workflow \d+:", System.Text.RegularExpressions.RegexOptions.Multiline).Count;
+        Assert.Equal(12, workflowCount);
+
+        // Trigger phrases must be present
+        Assert.Contains("Help me get started", content);
+        Assert.Contains("Quickstart", content);
+        Assert.Contains("Tutorial", content);
+    }
+
+    [Fact]
+    public void GenerationAgent_References_QuickstartSkill()
+    {
+        Assert.Contains("spectra-quickstart", AgentContent.GenerationAgent);
+    }
+
+    [Fact]
+    public void ExecutionAgent_References_QuickstartSkill()
+    {
+        Assert.Contains("spectra-quickstart", AgentContent.ExecutionAgent);
     }
 
     [Fact]

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `spectra-quickstart` SKILL (12th bundled SKILL) — workflow-oriented onboarding for Copilot Chat. Triggered by phrases like "help me get started", "tutorial", "walk me through". Presents 12 SPECTRA workflows with example conversations.
+- `USAGE.md` — offline workflow reference written to the project root by `spectra init`. Mirrors the quickstart SKILL content in a format suitable for async onboarding, code review, and CI documentation. Hash-tracked by `update-skills` so customizations are preserved.
+- `ProfileFormatLoader.LoadEmbeddedUsageGuide()` for resolving the bundled `USAGE.md` content.
+- Generation and execution agent prompts now defer onboarding requests to the `spectra-quickstart` SKILL.
+
 ## [1.35.0] - 2026-04-10
 
 ### Added
