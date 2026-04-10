@@ -1,3 +1,9 @@
+---
+title: Configuration
+parent: User Guide
+nav_order: 2
+---
+
 # Configuration Reference
 
 Complete reference for `spectra.config.json`.

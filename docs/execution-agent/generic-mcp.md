@@ -1,3 +1,9 @@
+---
+title: Generic MCP
+parent: Execution Agents
+nav_order: 5
+---
+
 # Using SPECTRA MCP Server
 
 ## Overview

@@ -1,3 +1,9 @@
+---
+title: Copilot Spaces Setup
+parent: Deployment
+nav_order: 3
+---
+
 # Copilot Spaces Integration
 
 How to use GitHub Copilot Spaces for inline documentation lookup during test execution.

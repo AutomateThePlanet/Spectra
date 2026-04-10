@@ -1,3 +1,9 @@
+---
+title: Skills Integration
+parent: User Guide
+nav_order: 8
+---
+
 # Skills Integration
 
 How SPECTRA integrates with GitHub Copilot Chat through SKILL files.

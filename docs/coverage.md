@@ -1,3 +1,9 @@
+---
+title: Coverage Analysis
+parent: User Guide
+nav_order: 6
+---
+
 # Coverage Analysis
 
 Three-dimensional coverage analysis: Documentation, Acceptance Criteria, and Automation.

@@ -1,3 +1,9 @@
+---
+title: CLI vs Chat Generation
+parent: Architecture
+nav_order: 2
+---
+
 # CLI vs Chat+MCP Test Generation: Comprehensive Analysis
 
 A detailed comparison of Spectra's current CLI-based test generation pipeline (`spectra ai generate`) against a hypothetical Chat+MCP alternative where test generation is performed conversationally through the MCP server.

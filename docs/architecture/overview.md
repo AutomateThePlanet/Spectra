@@ -1,3 +1,9 @@
+---
+title: Overview
+parent: Architecture
+nav_order: 1
+---
+
 # Architecture Overview
 
 How SPECTRA's two subsystems work together.
