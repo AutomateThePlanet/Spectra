@@ -471,12 +471,36 @@ public static class ProgressPageWriter
                     {{BuildBody(jsonData, isTerminal, workspaceRoot)}}
                 </div>
                 <script>
-                    // Auto-refresh: always reload with cache-busting query parameter.
-                    // Runs even on terminal pages so that when a new run starts and
-                    // overwrites the file, a stale "Completed" page picks up the change.
-                    // Uses cache-busting query param because Chromium caches file:// URLs.
+                    // Restore scroll position if we just auto-reloaded.
+                    // sessionStorage is per-tab so two parallel runs in different
+                    // tabs don't fight each other.
                     (function() {
+                        try {
+                            var key = 'spectra-progress-scroll';
+                            var saved = sessionStorage.getItem(key);
+                            if (saved !== null) {
+                                window.scrollTo(0, parseInt(saved, 10) || 0);
+                            }
+                        } catch (e) { /* sessionStorage may be unavailable */ }
+                    })();
+
+                    // Auto-refresh policy:
+                    //   - In-progress pages: poll every 1.5s, saving scroll position
+                    //     before each reload so the user doesn't get bounced to top.
+                    //   - Terminal pages (completed/failed): stop polling entirely.
+                    //     The agent re-opens the page via Simple Browser when the next
+                    //     run begins, so a stale Completed view will refresh then —
+                    //     and meanwhile the user can scroll and read in peace.
+                    (function() {
+                        var isTerminal = {{(isTerminal ? "true" : "false")}};
+                        if (isTerminal) {
+                            try { sessionStorage.removeItem('spectra-progress-scroll'); } catch (e) {}
+                            return;
+                        }
                         setInterval(function() {
+                            try {
+                                sessionStorage.setItem('spectra-progress-scroll', String(window.scrollY));
+                            } catch (e) {}
                             var base = window.location.pathname;
                             window.location.replace(base + '?_=' + Date.now());
                         }, 1500);
@@ -647,15 +671,29 @@ public static class ProgressPageWriter
                 sb.Append(BuildFilesSection(files, workspaceRoot));
             }
 
-            // Footer — always show refresh indicator since auto-refresh is always on
-            sb.Append("""
-                <div class="footer">
-                    <span class="refresh-indicator">
-                        <span class="refresh-dot"></span>
-                        Auto-refreshing every 1.5 seconds
-                    </span>
-                </div>
-                """);
+            // Footer — show refresh indicator only on in-progress pages.
+            // Terminal pages stop polling so we say so explicitly.
+            if (isTerminal)
+            {
+                sb.Append("""
+                    <div class="footer">
+                        <span class="refresh-indicator">
+                            Live updates stopped — run complete. Scroll freely.
+                        </span>
+                    </div>
+                    """);
+            }
+            else
+            {
+                sb.Append("""
+                    <div class="footer">
+                        <span class="refresh-indicator">
+                            <span class="refresh-dot"></span>
+                            Auto-refreshing every 1.5 seconds
+                        </span>
+                    </div>
+                    """);
+            }
 
             return sb.ToString();
         }
