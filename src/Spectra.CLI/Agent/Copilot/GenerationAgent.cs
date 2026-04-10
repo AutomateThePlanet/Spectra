@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using GitHub.Copilot.SDK;
 using Microsoft.Extensions.AI;
 using Spectra.CLI.Agent.Tools;
+using Spectra.CLI.Profile;
 using Spectra.CLI.Prompts;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
@@ -133,8 +134,11 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 }
             });
 
-            // Build the combined prompt with system instructions and user request
-            var fullPrompt = BuildFullPrompt(prompt, requestedCount, criteriaContext);
+            // Build the combined prompt with system instructions and user request.
+            // The profile format (JSON schema sent to the AI) is resolved from
+            // profiles/_default.yaml on disk if present, else the embedded default.
+            var profileFormat = ProfileFormatLoader.LoadFormat(_basePath);
+            var fullPrompt = BuildFullPrompt(prompt, requestedCount, criteriaContext, profileFormat: profileFormat);
 
             // Send and wait for the complete response
             _onStatus?.Invoke("Starting AI generation...");
@@ -246,27 +250,14 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
     }
 
     internal static string BuildFullPrompt(string userPrompt, int requestedCount, string? criteriaContext = null,
-        PromptTemplateLoader? templateLoader = null)
+        PromptTemplateLoader? templateLoader = null, string? profileFormat = null)
     {
-        var jsonExample = """
-            [
-              {
-                "id": "TC-XXX",
-                "title": "Descriptive title based on documentation",
-                "priority": "high|medium|low",
-                "tags": ["tag1", "tag2"],
-                "component": "component-name",
-                "preconditions": "Setup requirements",
-                "steps": ["Step 1", "Step 2", "Step 3"],
-                "expected_result": "Specific outcome from documentation",
-                "test_data": "Test data if needed",
-                "source_refs": ["docs/file.md#Section-Name"],
-                "scenario_from_doc": "Quote or paraphrase the documented behavior",
-                "estimated_duration": "5m",
-                "criteria": ["AC-ID-1", "AC-ID-2"]
-              }
-            ]
-            """;
+        // The JSON output schema sent to the AI. Prefer the caller-supplied
+        // profileFormat (resolved from profiles/_default.yaml on disk or the
+        // embedded default by ProfileFormatLoader). When null (legacy callers
+        // and unit tests), fall back to the embedded default to keep behavior
+        // identical.
+        var jsonExample = profileFormat ?? ProfileFormatLoader.LoadFormat(Directory.GetCurrentDirectory());
 
         if (templateLoader is not null)
         {
