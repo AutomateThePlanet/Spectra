@@ -5,8 +5,8 @@ url: https://automatetheplanet.github.io
 baseurl: /Spectra
 
 # Branding
-logo: /assets/images/spectra-logo.svg
-favicon_ico: /assets/images/favicon.ico
+logo: /assets/images/spectra-logo.png
+favicon_ico: /assets/images/favicon.png
 
 # Color scheme (custom ATP brand)
 color_scheme: spectra
