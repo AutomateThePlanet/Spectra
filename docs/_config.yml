@@ -53,6 +53,13 @@ back_to_top_text: "Back to top"
 # Plugins
 plugins:
   - jekyll-seo-tag
+  - jekyll-relative-links
+
+# jekyll-relative-links: rewrite relative *.md links to their built
+# *.html counterparts so cross-doc references work on the deployed site.
+relative_links:
+  enabled: true
+  collections: true
 
 # Default layout for every page (Just the Docs sidebar + header)
 defaults:
