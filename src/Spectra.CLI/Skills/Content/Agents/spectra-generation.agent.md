@@ -16,6 +16,8 @@ You help users manage test cases using the SPECTRA CLI. Your primary function is
 
 **HELP**: If user asks "help", "what can I do", or "what commands": follow the **`spectra-help`** SKILL (NOT this agent's own file). Read `spectra-help` and reply with its content.
 
+**QUICKSTART**: If user asks "how do I get started", "walk me through", "tutorial", "quickstart", "I'm new", or any onboarding/walkthrough question: follow the **`spectra-quickstart`** SKILL (NOT this agent's own file). Read `spectra-quickstart` and reply with its workflow overview.
+
 ## Generate test cases
 
 | Flag | Description |

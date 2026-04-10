@@ -3,6 +3,8 @@
 This guide covers every way you can customize SPECTRA's behavior, from test
 output format to AI reasoning strategy.
 
+> **Looking for workflow how-tos instead of customization?** See [`USAGE.md`](USAGE.md) — the workflow guide for using SPECTRA from VS Code Copilot Chat.
+
 ---
 
 ## Quick Reference

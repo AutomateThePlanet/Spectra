@@ -134,6 +134,14 @@ spectra validate --output-format json --no-interaction
 
 See [Getting Started](docs/getting-started.md) for auth setup and detailed instructions.
 
+### Using SPECTRA from VS Code Copilot Chat
+
+After `spectra init`, the bundled `spectra-quickstart` SKILL turns Copilot Chat into a guided onboarding entry point. Open Copilot Chat in VS Code and ask:
+
+> "Help me get started"
+
+The assistant walks you through every workflow (test generation, criteria extraction, coverage, dashboard, execution, customization) with copyable example prompts. For an offline reference covering the same workflows, see the auto-generated [`USAGE.md`](USAGE.md) at your project root.
+
 ## Architecture
 
 ```

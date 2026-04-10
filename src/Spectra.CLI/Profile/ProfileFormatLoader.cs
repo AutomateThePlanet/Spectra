@@ -14,6 +14,7 @@ public static class ProfileFormatLoader
 {
     private const string EmbeddedProfileResource = "Spectra.CLI.Skills.Content.Profiles._default.yaml";
     private const string EmbeddedCustomizationResource = "Spectra.CLI.Skills.Content.Docs.CUSTOMIZATION.md";
+    private const string EmbeddedUsageResource = "Spectra.CLI.Skills.Content.Docs.USAGE.md";
     private const string DefaultProfileFile = "_default.yaml";
     private const string ProfilesDir = "profiles";
 
@@ -60,6 +61,15 @@ public static class ProfileFormatLoader
     public static string LoadEmbeddedCustomizationGuide()
     {
         return ReadEmbeddedResource(EmbeddedCustomizationResource);
+    }
+
+    /// <summary>
+    /// Returns the raw bytes of the embedded <c>USAGE.md</c>,
+    /// for use by <c>spectra init</c> and <c>spectra update-skills</c>.
+    /// </summary>
+    public static string LoadEmbeddedUsageGuide()
+    {
+        return ReadEmbeddedResource(EmbeddedUsageResource);
     }
 
     private static string LoadEmbeddedFormat()

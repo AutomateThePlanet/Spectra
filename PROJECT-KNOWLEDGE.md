@@ -25,7 +25,7 @@ User → VS Code Copilot Chat → MCP Server → Test Execution → Reports
 | Component | Purpose |
 |-----------|---------|
 | **dashboard-site/** | Static HTML/JS dashboard template with D3.js visualizations |
-| **SKILLs** (10 files) | VS Code Copilot Chat integration — each SKILL wraps CLI commands |
+| **SKILLs** (12 files) | VS Code Copilot Chat integration — each SKILL wraps CLI commands or guides users |
 | **Agents** (2 files) | Copilot Chat agent prompts for generation and execution workflows |
 
 ## Technology Stack
@@ -187,7 +187,7 @@ criteria:
 
 ## VS Code Copilot Chat Integration
 
-### 10 Bundled SKILLs
+### 12 Bundled SKILLs
 | SKILL | Purpose |
 |-------|---------|
 | `spectra-generate` | Test generation (analyze → approve → generate flow) |
@@ -197,9 +197,17 @@ criteria:
 | `spectra-validate` | Test validation |
 | `spectra-list` | Test listing and browsing |
 | `spectra-init-profile` | Generation profile setup |
-| `spectra-help` | Command reference |
+| `spectra-help` | Command reference (terse, flag-oriented) |
 | `spectra-criteria` | Criteria extraction, import, listing |
 | `spectra-docs` | Documentation indexing with progress page |
+| `spectra-prompts` | Prompt template management (list/show/reset/validate) |
+| `spectra-quickstart` | Workflow-oriented onboarding & walkthroughs (12 workflows with example conversations) |
+
+### Bundled Project-Root Docs
+- `CUSTOMIZATION.md` — configuration & customization reference (profiles, prompts, branding).
+- `USAGE.md` — workflow guide for Copilot Chat usage (offline mirror of `spectra-quickstart`).
+
+Both are written by `spectra init` and tracked by the SKILL manifest hash system so `spectra update-skills` refreshes unmodified copies and preserves user edits.
 
 ### 2 Agent Prompts (Delegation Model)
 | Agent | Purpose |
