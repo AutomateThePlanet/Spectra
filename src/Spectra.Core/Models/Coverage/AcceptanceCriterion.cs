@@ -39,6 +39,14 @@ public sealed class AcceptanceCriterion
 
     [YamlMember(Alias = "linked_test_ids")]
     public List<string> LinkedTestIds { get; set; } = [];
+
+    /// <summary>
+    /// Optional ISTQB test design technique hint that best applies when
+    /// generating tests for this criterion. One of "BVA", "EP", "DT", "ST",
+    /// or null for criteria without a clear hint.
+    /// </summary>
+    [YamlMember(Alias = "technique_hint")]
+    public string? TechniqueHint { get; set; }
 }
 
 /// <summary>

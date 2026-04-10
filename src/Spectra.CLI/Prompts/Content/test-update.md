@@ -34,6 +34,22 @@ do NOT rewrite from scratch. Do NOT change test IDs.
 {{criteria_changes}}
 {{/if}}
 
+## Technique Completeness Check
+
+Before classifying, assess whether the test applies appropriate ISTQB test
+design techniques to the current documentation:
+
+- If documentation added a NEW numeric range → flag OUTDATED if no BVA tests exist for that range
+- If documentation added NEW business rules with conditions → flag OUTDATED if no Decision Table coverage
+- If documentation added NEW workflow states → flag OUTDATED if no State Transition tests
+- If documentation changed boundary values (e.g., max changed from 100 to 200) → flag OUTDATED with specific boundary update needed
+- If the test uses generic values where boundaries are documented → propose update to use exact boundary values
+
+When proposing updates for OUTDATED tests:
+- Replace generic test values with boundary values from the current documentation
+- Add new steps for newly documented equivalence classes
+- Update expected results to match changed boundary conditions
+
 ## Process
 
 1. Compare original vs current source — what changed?

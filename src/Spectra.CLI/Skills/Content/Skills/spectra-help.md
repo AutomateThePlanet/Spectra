@@ -91,6 +91,19 @@ When the user asks for help, what they can do, or what commands are available, r
 | Update tests after doc changes | "update tests for notification" |
 | Preview changes | "show diff for notification tests" |
 
+## ISTQB Test Design Techniques
+
+SPECTRA's behavior analysis applies six ISTQB black-box techniques: Equivalence
+Partitioning (EP), Boundary Value Analysis (BVA), Decision Table (DT), State
+Transition (ST), Error Guessing (EG), and Use Case (UC). Analysis output now
+includes a `technique_breakdown` map alongside the category breakdown.
+
+| What you want | What to type |
+|--------------|-------------|
+| Get the latest technique-aware templates | run `spectra prompts reset --all` in the terminal |
+| Customize a technique prompt | edit `.spectra/prompts/behavior-analysis.md` directly |
+| Show a built-in template | run `spectra prompts show behavior-analysis` |
+
 ## CLI Commands (Terminal)
 
 ```bash

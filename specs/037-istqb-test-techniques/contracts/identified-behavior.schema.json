@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spectra.local/contracts/identified-behavior.schema.json",
+  "title": "IdentifiedBehavior",
+  "description": "A single testable behavior identified by AI-driven behavior analysis. The 'technique' field is new in spec 037 and is optional for backward compatibility with legacy AI responses.",
+  "type": "object",
+  "properties": {
+    "category": {
+      "type": "string",
+      "description": "One of the configured analysis categories (e.g., happy_path, boundary, negative). Free-form to allow custom categories."
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 80,
+      "description": "Short human-readable description of the behavior."
+    },
+    "source": {
+      "type": "string",
+      "description": "Path of the source document the behavior was derived from."
+    },
+    "technique": {
+      "type": "string",
+      "enum": ["EP", "BVA", "DT", "ST", "EG", "UC", ""],
+      "default": "",
+      "description": "ISTQB test design technique that produced this behavior. Empty string for legacy responses or behaviors without a clear technique mapping."
+    }
+  },
+  "required": ["category", "title", "source"]
+}

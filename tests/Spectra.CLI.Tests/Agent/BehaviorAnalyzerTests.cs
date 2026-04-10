@@ -352,12 +352,14 @@ public class BehaviorAnalyzerTests
 
         var prompt = BehaviorAnalyzer.BuildAnalysisPrompt(docs, null, config: null, templateLoader: null);
 
-        // Legacy fallback contains the 5 hardcoded category names verbatim
+        // Spec 037: legacy fallback now contains the ISTQB-enhanced category set
+        // (performance was dropped in favour of boundary + error_handling).
         Assert.Contains("happy_path", prompt);
         Assert.Contains("negative", prompt);
         Assert.Contains("edge_case", prompt);
         Assert.Contains("security", prompt);
-        Assert.Contains("performance", prompt);
+        Assert.Contains("boundary", prompt);
+        Assert.Contains("error_handling", prompt);
     }
 
     [Fact]

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spectra.local/contracts/acceptance-criterion.schema.json",
+  "title": "AcceptanceCriterion (technique_hint addition)",
+  "description": "Partial schema covering only the field added by spec 037. The full AcceptanceCriterion model has additional existing fields not enumerated here.",
+  "type": "object",
+  "properties": {
+    "technique_hint": {
+      "type": ["string", "null"],
+      "enum": ["BVA", "EP", "DT", "ST", null],
+      "default": null,
+      "description": "Optional ISTQB test design technique that best applies when generating tests for this criterion. Null for criteria without a clear hint or for legacy files predating spec 037."
+    }
+  },
+  "required": []
+}

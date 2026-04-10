@@ -121,6 +121,13 @@ public sealed class BehaviorAnalyzer
                 .GroupBy(b => string.IsNullOrWhiteSpace(b.Category) ? "uncategorized" : b.Category)
                 .ToDictionary(g => g.Key, g => g.Count());
 
+            // Build technique breakdown — exclude empty techniques so legacy AI
+            // responses produce an empty map rather than a "" → N entry.
+            var techniqueBreakdown = behaviors
+                .Where(b => !string.IsNullOrWhiteSpace(b.Technique))
+                .GroupBy(b => b.Technique.Trim().ToUpperInvariant())
+                .ToDictionary(g => g.Key, g => g.Count());
+
             var totalWords = documents.Sum(d =>
                 d.Content.Split([' ', '\n', '\r', '\t'], StringSplitOptions.RemoveEmptyEntries).Length);
 
@@ -128,6 +135,7 @@ public sealed class BehaviorAnalyzer
             {
                 TotalBehaviors = behaviors.Count,
                 Breakdown = breakdown,
+                TechniqueBreakdown = techniqueBreakdown,
                 Behaviors = behaviors,
                 AlreadyCovered = coveredCount,
                 DocumentsAnalyzed = documents.Count,
@@ -177,26 +185,39 @@ public sealed class BehaviorAnalyzer
             return PromptTemplateLoader.Resolve(template, values, listValues);
         }
 
-        // Legacy fallback (same as before)
+        // Legacy fallback (used when no PromptTemplateLoader is wired up).
+        // Mirrors the ISTQB-enhanced template in condensed form.
         var sb = new StringBuilder();
         sb.AppendLine("""
             Analyze the following documentation and identify all distinct testable behaviors.
-            Categorize each behavior into one of these categories:
 
+            Apply these test design techniques systematically:
+            - Equivalence Partitioning (EP): for every input, identify valid and invalid classes
+            - Boundary Value Analysis (BVA): for every range, test at min, max, min-1, max+1
+            - Decision Table (DT): for business rules with multiple conditions
+            - State Transition (ST): for workflows, test valid and invalid transitions
+            - Error Guessing (EG): common defects (null, overflow, special chars, divide-by-zero)
+            - Use Case (UC): main success + alternate + exception paths
+
+            Do NOT generate more than 40% of behaviors in any single category.
+
+            Categorize each behavior into one of these categories:
             - happy_path: Normal successful user flows
             - negative: Error handling, invalid inputs, failure scenarios
             - edge_case: Boundary conditions, unusual combinations, limits
+            - boundary: Values at exact limits (min, max, min-1, max+1)
+            - error_handling: System error responses, recovery, logging
             - security: Permission checks, access control, authentication
-            - performance: Load, timeout, concurrent access (if mentioned)
 
             For each behavior, provide:
             - category: one of the categories above
             - title: short description (max 80 chars)
             - source: which document it comes from
+            - technique: EP, BVA, DT, ST, EG, or UC
 
             Return ONLY a JSON object in this exact format (no other text):
 
-            {"behaviors": [{"category": "happy_path", "title": "...", "source": "..."}]}
+            {"behaviors": [{"category": "boundary", "title": "...", "source": "...", "technique": "BVA"}]}
 
             Count only DISTINCT testable behaviors — do not duplicate similar scenarios.
             """);

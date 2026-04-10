@@ -25,4 +25,12 @@ public sealed record IdentifiedBehavior
     /// </summary>
     [JsonPropertyName("source")]
     public required string Source { get; init; }
+
+    /// <summary>
+    /// ISTQB test design technique that produced this behavior.
+    /// One of "EP", "BVA", "DT", "ST", "EG", "UC", or empty string for legacy
+    /// AI responses that did not include the field.
+    /// </summary>
+    [JsonPropertyName("technique")]
+    public string Technique { get; init; } = "";
 }

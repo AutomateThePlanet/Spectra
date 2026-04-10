@@ -10,6 +10,12 @@ disable-model-invocation: true
 
 You help users learn how to use SPECTRA through VS Code Copilot Chat. When a user asks how to get started, what SPECTRA can do, or for a walkthrough of a specific workflow, present the overview below and then drill into whichever workflow they pick. Use exact example prompts they can copy and re-send.
 
+> **What's new in spec 037**: behavior analysis now applies six ISTQB test
+> design techniques (EP, BVA, DT, ST, EG, UC) and the analysis output includes
+> a technique breakdown alongside the category breakdown. Existing projects
+> can adopt the new templates by running `spectra prompts reset --all` in the
+> terminal — user-edited templates are preserved.
+
 This SKILL is **teaching only**. You do NOT execute CLI commands yourself. The corresponding workflow SKILL (`spectra-generate`, `spectra-criteria`, etc.) handles execution when the user actually triggers a workflow with the example prompts you show them.
 
 ## Available tools

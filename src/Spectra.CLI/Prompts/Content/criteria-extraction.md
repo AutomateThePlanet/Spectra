@@ -24,13 +24,34 @@ For each criterion:
 - source_section: The heading/section where this criterion was found
 - priority: "high" for MUST/SHALL/REQUIRED, "medium" for SHOULD/RECOMMENDED, "low" for MAY/OPTIONAL
 - tags: 1-3 relevant categorization tags
+- technique_hint: optional ISTQB test design technique that best applies (see "Technique Hints" below)
+
+## Technique Hints
+
+When extracting acceptance criteria, identify which ISTQB test design technique
+best applies. Set the optional `technique_hint` field on each criterion:
+
+- If the criterion mentions a numeric range, add `technique_hint: BVA`
+- If the criterion mentions multiple conditions with outcomes, add `technique_hint: DT`
+- If the criterion mentions a workflow or state change, add `technique_hint: ST`
+- If the criterion mentions valid/invalid input categories, add `technique_hint: EP`
+- If no technique clearly applies, omit the field (it is optional)
+
+Examples:
+
+- "Username must be 3-20 characters" → `technique_hint: BVA` (has numeric range)
+- "Discount applies if member AND order > $100" → `technique_hint: DT` (multiple conditions)
+- "Order status changes from Pending to Shipped when dispatched" → `technique_hint: ST` (state transition)
+
+These hints are informational — they help the generation prompt select
+appropriate techniques when covering this criterion.
 {{#if component}}
 The document belongs to the "{{component}}" component.
 {{/if}}
 
 Respond ONLY with a JSON array. No markdown, no explanation, no code fences. Example:
 [
-  {"text": "System MUST validate IBAN format before payment", "rfc2119": "MUST", "source_section": "Payment Validation", "priority": "high", "tags": ["payment", "validation"]},
+  {"text": "System MUST validate IBAN format before payment", "rfc2119": "MUST", "source_section": "Payment Validation", "priority": "high", "tags": ["payment", "validation"], "technique_hint": "EP"},
   {"text": "System SHOULD display inline error within 500ms", "rfc2119": "SHOULD", "source_section": "UX Requirements", "priority": "medium", "tags": ["ux", "performance"]}
 ]
 
