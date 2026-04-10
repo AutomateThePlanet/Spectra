@@ -1,13 +1,13 @@
 # Spectra Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-04-08
+Auto-generated from all feature plans. Last updated: 2026-04-10
 
 ## Active Technologies
 - C# 12, .NET 8+ + GitHub Copilot SDK (sole AI runtime for generation and verification)
 - System.CommandLine (CLI), Spectre.Console (terminal UX), System.Text.Json (serialization)
 - ASP.NET Core (MCP server), Microsoft.Data.Sqlite (state storage)
 - SQLite database (`.execution/spectra.db`) for execution state; file system for reports
-- File-based (tests/, docs/, spectra.config.json, _index.json, _index.md, profiles)
+- File-based (tests/, docs/, spectra.config.json, _index.json, _index.md, profiles, .spectra/prompts/)
 - CsvHelper (CSV import for acceptance criteria)
 - Dual-model verification: Generator (any provider) + Critic (any provider) via Copilot SDK
 - Document index (`docs/_index.md`) for pre-built documentation metadata with incremental updates
@@ -34,6 +34,7 @@ src/
 │   ├── Validation/           # Test validation, dedup, DuplicateDetector
 │   ├── Review/               # Interactive terminal UI
 │   ├── Interactive/          # Interactive mode components (selectors, session, UserDescriptionPrompt)
+│   ├── Prompts/              # Prompt template engine (PlaceholderResolver, PromptTemplateLoader, BuiltInTemplates)
 │   ├── Session/              # Generation session state, SessionStore, SuggestionBuilder
 │   ├── Skills/               # Bundled SKILL content, AgentContent, SkillsManifest
 │   ├── Results/              # Typed JSON result models per command (CommandResult, GenerateResult, etc.)
@@ -177,6 +178,15 @@ spectra ai analyze --list-criteria --component checkout          # Filter by com
 spectra ai analyze --list-criteria --priority high               # Filter by priority
 spectra ai analyze --list-criteria --output-format json          # JSON output
 
+# Prompt Template Management (030-prompt-templates)
+spectra prompts list                                 # List all templates with status
+spectra prompts list --output-format json            # JSON output for SKILL/CI
+spectra prompts show behavior-analysis               # Show template content
+spectra prompts show behavior-analysis --raw         # Show with unresolved placeholders
+spectra prompts validate behavior-analysis           # Check syntax and placeholders
+spectra prompts reset behavior-analysis              # Reset one template to default
+spectra prompts reset --all                          # Reset all templates
+
 # Validation with JSON output
 spectra validate --output-format json              # JSON errors for SKILL/CI
 
@@ -199,6 +209,7 @@ spectra config list-automation-dirs                 # List dirs with existence s
 - **Tests:** xUnit with structured results (never throw on validation errors)
 
 ## Recent Changes
+- 030-prompt-templates: ✅ COMPLETE - Customizable root prompt templates. Introduced `.spectra/prompts/` directory with 5 markdown templates (behavior-analysis, test-generation, criteria-extraction, critic-verification, test-update) controlling all AI operations. Templates use `{{placeholder}}`, `{{#if}}`, `{{#each}}` syntax with built-in defaults as embedded resources. New `PlaceholderResolver`, `PromptTemplateParser`, `PromptTemplateLoader`, `BuiltInTemplates` in `Spectra.CLI/Prompts/`. Replaced hardcoded prompts in `BehaviorAnalyzer`, `CopilotGenerationAgent`, `CriteriaExtractor`, `CriticPromptBuilder` with template-driven approach (legacy fallback preserved). New `analysis.categories` config section with 6 default categories (happy_path, negative, edge_case, boundary, error_handling, security). New `spectra prompts list/show/reset/validate` CLI commands with JSON output. New `spectra-prompts` SKILL (11th bundled SKILL). Init creates `.spectra/prompts/` with defaults. `update-skills` tracks template hashes for safe updates. 65+ new tests. 1417 total tests passing.
 - 029-spectra-update-skill: ✅ COMPLETE - Added spectra-update SKILL (10th bundled SKILL) for test update workflow via Copilot Chat. SKILL wraps `spectra ai update` with progress page, result file, classification breakdown (UP_TO_DATE, OUTDATED, ORPHANED, REDUNDANT). Agent delegation tables updated (both generation and execution agents delegate update requests to SKILL). Extended `UpdateResult` with `success`, `totalTests`, `testsFlagged`, `flaggedTests`, `duration` fields. Generation agent inline update section replaced with delegation row. 6 new tests (SKILL content, step format, do-NOTHING instruction, tools list, agent delegation). Documentation updated (SKILL count 9→10). Version 1.35.0.
 - 028-coverage-criteria-fix: ✅ COMPLETE - Coverage semantics fix & criteria-generation pipeline. Fixed `TestCaseParser` to propagate `Criteria` field from frontmatter to `TestCase` (was missing). Wired criteria loading into `GenerateHandler`: loads per-doc `.criteria.yaml` files matching suite name and component, formats as context string, passes to `CopilotGenerationAgent.BuildFullPrompt()` via new `criteriaContext` parameter on `GenerateTestsAsync()`. `TestFileWriter` now always writes `criteria: []` field (even when empty) for visibility. Audit confirmed coverage analyzers already correct: `DocumentationCoverageAnalyzer` checks test existence via `source_refs`, `AcceptanceCriteriaCoverageAnalyzer` reads both `criteria` and legacy `requirements` fields. 4 new regression tests. 1354 total tests passing.
 - 027-skill-agent-dedup: ✅ COMPLETE - SKILL/Agent prompt deduplication. Refactored both agents to delegate CLI tasks to authoritative SKILL files instead of duplicating instructions. Execution agent reduced from ~400 to 120 lines, generation agent from ~219 to 81 lines. Agents now contain delegation tables pointing to `spectra-*` SKILLs for dashboard, coverage, criteria, validate, list, and docs index tasks. Fixed SKILL inconsistencies: replaced "Tool call N" with "Step N" format in spectra-list, spectra-init-profile, spectra-validate; added `--no-interaction --output-format json --verbosity quiet` flags to spectra-list and spectra-init-profile; added "do NOTHING between runInTerminal and awaitTerminal" instruction to spectra-coverage and spectra-dashboard; added incremental vs force note to spectra-docs. Extended spectra-help SKILL with acceptance criteria and documentation index sections. Removed redundant "NEVER" warnings from execution agent (kept askQuestion and fabrication warnings). 6 new tests (agent line count limits, no CLI block duplication, step format consistency, no terminalLastCommand, help completeness). 1350 total tests passing.

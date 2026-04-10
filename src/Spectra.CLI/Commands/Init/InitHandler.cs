@@ -76,6 +76,9 @@ public sealed class InitHandler
                 await CreateBundledSkillFilesAsync(force, ct);
             }
 
+            // Create prompt templates
+            await CreatePromptTemplatesAsync(force, ct);
+
             // Create dashboard deployment workflow
             await CreateDeployWorkflowAsync(ct);
 
@@ -554,6 +557,36 @@ public sealed class InitHandler
 
         await manifestStore.SaveAsync(manifest, ct);
         _logger.LogDebug("Created skills manifest with {Count} entries", manifest.Files.Count);
+    }
+
+    private async Task CreatePromptTemplatesAsync(bool force, CancellationToken ct)
+    {
+        var promptsDir = Path.Combine(_workingDirectory, ".spectra", "prompts");
+        Directory.CreateDirectory(promptsDir);
+
+        // Load existing manifest to add template hashes
+        var manifestStore = new Skills.SkillsManifestStore(_workingDirectory);
+        var manifest = await manifestStore.LoadAsync(ct);
+
+        foreach (var templateId in CLI.Prompts.BuiltInTemplates.AllTemplateIds)
+        {
+            var content = CLI.Prompts.BuiltInTemplates.GetRawContent(templateId);
+            if (content is null) continue;
+
+            var filePath = Path.Combine(promptsDir, $"{templateId}.md");
+            if (File.Exists(filePath) && !force)
+            {
+                _logger.LogDebug("Prompt template already exists, skipping: {Path}", filePath);
+                continue;
+            }
+
+            await File.WriteAllTextAsync(filePath, content, ct);
+            var relativePath = Path.Combine(".spectra", "prompts", $"{templateId}.md");
+            manifest.Files[relativePath] = Infrastructure.FileHasher.ComputeHash(content);
+            _logger.LogInformation("Created prompt template: {Path}", relativePath);
+        }
+
+        await manifestStore.SaveAsync(manifest, ct);
     }
 
     private async Task CreateVsCodeMcpConfigAsync(CancellationToken ct)

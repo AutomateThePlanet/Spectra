@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Spectra.CLI.Prompts;
 using Spectra.Core.Models;
 
 namespace Spectra.CLI.Agent.Critic;
@@ -12,11 +13,30 @@ public sealed class CriticPromptBuilder
     private const int MaxDocumentChars = 8000;
     private const int MaxDocuments = 5;
 
+    private PromptTemplateLoader? _templateLoader;
+
+    /// <summary>
+    /// Sets the template loader for customizable prompts.
+    /// </summary>
+    public void SetTemplateLoader(PromptTemplateLoader? loader) => _templateLoader = loader;
+
     /// <summary>
     /// Builds the system prompt for the critic model.
     /// </summary>
     public string BuildSystemPrompt()
     {
+        if (_templateLoader is not null)
+        {
+            var template = _templateLoader.LoadTemplate("critic-verification");
+            var values = new Dictionary<string, string>
+            {
+                ["test_case"] = "",
+                ["source_document"] = "",
+                ["acceptance_criteria"] = ""
+            };
+            return PromptTemplateLoader.Resolve(template, values);
+        }
+
         return """
             You are a test case verification expert. Your job is to verify that test cases are grounded in source documentation.
 

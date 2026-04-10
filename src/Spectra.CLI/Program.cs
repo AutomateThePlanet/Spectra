@@ -9,6 +9,7 @@ using Spectra.CLI.Commands.Index;
 using Spectra.CLI.Commands.Init;
 using Spectra.CLI.Commands.List;
 using Spectra.CLI.Commands.Show;
+using Spectra.CLI.Commands.Prompts;
 using Spectra.CLI.Commands.UpdateSkills;
 using Spectra.CLI.Commands.Validate;
 using Spectra.CLI.Options;
@@ -53,6 +54,7 @@ public class Program
         rootCommand.AddCommand(new ProfileCommand());
         rootCommand.AddCommand(new AuthCommand());
         rootCommand.AddCommand(new UpdateSkillsCommand());
+        rootCommand.AddCommand(new PromptsCommand());
 
         return rootCommand;
     }

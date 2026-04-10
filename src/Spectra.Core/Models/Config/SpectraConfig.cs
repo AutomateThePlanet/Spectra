@@ -47,6 +47,9 @@ public sealed class SpectraConfig
     [JsonPropertyName("profile")]
     public ProfileConfig Profile { get; init; } = new();
 
+    [JsonPropertyName("analysis")]
+    public AnalysisConfig Analysis { get; init; } = new();
+
     [JsonPropertyName("selections")]
     public IReadOnlyDictionary<string, SavedSelectionConfig> Selections { get; init; } =
         new Dictionary<string, SavedSelectionConfig>();

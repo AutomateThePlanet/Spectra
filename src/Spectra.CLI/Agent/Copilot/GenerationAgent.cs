@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using GitHub.Copilot.SDK;
 using Microsoft.Extensions.AI;
 using Spectra.CLI.Agent.Tools;
+using Spectra.CLI.Prompts;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
@@ -244,7 +245,8 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
         }
     }
 
-    internal static string BuildFullPrompt(string userPrompt, int requestedCount, string? criteriaContext = null)
+    internal static string BuildFullPrompt(string userPrompt, int requestedCount, string? criteriaContext = null,
+        PromptTemplateLoader? templateLoader = null)
     {
         var jsonExample = """
             [
@@ -265,6 +267,23 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
               }
             ]
             """;
+
+        if (templateLoader is not null)
+        {
+            var template = templateLoader.LoadTemplate("test-generation");
+            var values = new Dictionary<string, string>
+            {
+                ["behaviors"] = userPrompt,
+                ["suite_name"] = "",
+                ["existing_tests"] = "",
+                ["acceptance_criteria"] = criteriaContext ?? "",
+                ["profile_format"] = jsonExample,
+                ["count"] = requestedCount.ToString(),
+                ["focus_areas"] = ""
+            };
+
+            return PromptTemplateLoader.Resolve(template, values);
+        }
 
         return $"""
             You are a test case generation expert that creates DOCUMENT-GROUNDED test cases.
