@@ -32,7 +32,7 @@ namespace Spectra.CLI.Commands.Generate;
 /// </summary>
 public sealed class GenerateHandler
 {
-    private const int BatchSize = 30;
+    private const int DefaultBatchSize = 30;
 
     private readonly VerbosityLevel _verbosity;
     private readonly bool _dryRun;
@@ -522,14 +522,22 @@ public sealed class GenerateHandler
         var batchErrors = new List<string>();
         var batchesCompleted = 0;
 
+        // Spec post-038 fix: batch size is configurable via ai.generation_batch_size.
+        // Slower / reasoning models benefit from smaller batches paired with a
+        // larger ai.generation_timeout_minutes setting.
+        var configuredBatchSize = config.Ai.GenerationBatchSize > 0
+            ? config.Ai.GenerationBatchSize
+            : DefaultBatchSize;
+        var totalBatches = (int)Math.Ceiling(effectiveCount / (double)configuredBatchSize);
+
         for (var batchNum = 1; totalGenerated < effectiveCount; batchNum++)
         {
             var remaining = effectiveCount - totalGenerated;
-            var batchRequestCount = Math.Min(remaining, BatchSize);
+            var batchRequestCount = Math.Min(remaining, configuredBatchSize);
 
             UpdateProgress(suite, "generating",
-                $"Generating batch {batchNum}: {allWrittenTests.Count}/{effectiveCount} tests complete...");
-            _progress.Info($"Batch {batchNum}: requesting {batchRequestCount} tests ({allWrittenTests.Count}/{effectiveCount} complete)");
+                $"Generating batch {batchNum}/{totalBatches}: {allWrittenTests.Count}/{effectiveCount} tests complete...");
+            _progress.Info($"Batch {batchNum}/{totalBatches}: requesting {batchRequestCount} tests ({allWrittenTests.Count}/{effectiveCount} complete)");
 
             var prompt = BuildPrompt(suite, batchRequestCount, mutableExistingIds, effectiveProfile, focus);
             GenerationResult batchResult = null!;

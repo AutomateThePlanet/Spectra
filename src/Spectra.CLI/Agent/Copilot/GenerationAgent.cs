@@ -170,15 +170,23 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
             var promptLoader = new PromptTemplateLoader(_basePath);
             var fullPrompt = BuildFullPrompt(prompt, requestedCount, criteriaContext, templateLoader: promptLoader, profileFormat: profileFormat, testimizeEnabled: _config.Testimize.Enabled && testimizeClient is not null);
 
-            // Send and wait for the complete response
-            _onStatus?.Invoke("Starting AI generation...");
+            // Send and wait for the complete response.
+            // The per-batch timeout is configurable via ai.generation_timeout_minutes.
+            // Slower / reasoning models may need 10–20+ minutes per batch.
+            var timeoutMinutes = Math.Max(1, _config.Ai.GenerationTimeoutMinutes);
+            var batchTimeout = TimeSpan.FromMinutes(timeoutMinutes);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            DebugLog($"BATCH START requested={requestedCount} model={_provider?.Model ?? "?"} provider={_provider?.Name ?? "?"} timeout={timeoutMinutes}min");
+            _onStatus?.Invoke($"Starting AI generation ({requestedCount} tests, timeout {timeoutMinutes} min)...");
             var response = await session.SendAndWaitAsync(
                 new MessageOptions { Prompt = fullPrompt },
-                timeout: TimeSpan.FromMinutes(5),
+                timeout: batchTimeout,
                 cancellationToken: ct);
 
             // Cancel delayed timers so they don't overwrite the final result
             await timerCts.CancelAsync();
+            sw.Stop();
+            DebugLog($"BATCH OK   requested={requestedCount} elapsed={sw.Elapsed.TotalSeconds:F1}s");
 
             var responseText = response?.Data?.Content ?? "";
 
@@ -219,10 +227,21 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
         }
         catch (TimeoutException)
         {
+            var configuredMinutes = Math.Max(1, _config.Ai.GenerationTimeoutMinutes);
+            DebugLog($"BATCH TIMEOUT requested={requestedCount} model={_provider?.Model ?? "?"} configured_timeout={configuredMinutes}min");
             return new GenerationResult
             {
                 Tests = [],
-                Errors = ["Generation timed out after 5 minutes. Try reducing --count."]
+                Errors = [
+                    $"Generation timed out after {configuredMinutes} minutes (model: {_provider?.Model ?? "?"}, batch size: {requestedCount}).",
+                    "Options to fix this:",
+                    "  1. Increase the per-batch timeout in spectra.config.json:",
+                    "       \"ai\": { \"generation_timeout_minutes\": 15 }",
+                    "  2. Reduce the batch size:",
+                    "       \"ai\": { \"generation_batch_size\": 10 }",
+                    "  3. Reduce --count or use a faster model.",
+                    "See .spectra-debug.log for per-batch timing details."
+                ]
             };
         }
         catch (Exception ex) when (ex.Message.Contains("copilot", StringComparison.OrdinalIgnoreCase)
@@ -266,6 +285,26 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 Tests = [],
                 Errors = [$"Generation error: {ex.Message}"]
             };
+        }
+    }
+
+    /// <summary>
+    /// Append a one-line timestamped diagnostic to <c>.spectra-debug.log</c>
+    /// in the project root. Best-effort; never throws. Gated by
+    /// <c>ai.debug_log_enabled</c> (default true).
+    /// </summary>
+    private void DebugLog(string message)
+    {
+        try
+        {
+            if (!_config.Ai.DebugLogEnabled) return;
+            var path = Path.Combine(_basePath, ".spectra-debug.log");
+            var line = $"{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fffZ} [generate] {message}{Environment.NewLine}";
+            File.AppendAllText(path, line);
+        }
+        catch
+        {
+            // Diagnostics must never block generation.
         }
     }
 
