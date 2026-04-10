@@ -1,3 +1,9 @@
+---
+title: Grounding Verification
+parent: User Guide
+nav_order: 5
+---
+
 # Grounding Verification
 
 Dual-model critic flow to detect hallucinated test cases.

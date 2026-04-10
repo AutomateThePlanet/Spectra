@@ -1,0 +1,68 @@
+title: SPECTRA
+description: AI-native test generation and execution framework
+theme: just-the-docs
+url: https://automatetheplanet.github.io
+baseurl: /Spectra
+
+# Branding
+logo: /assets/images/spectra-logo.svg
+favicon_ico: /assets/images/favicon.ico
+
+# Color scheme (custom ATP brand)
+color_scheme: spectra
+
+# Search
+search_enabled: true
+search:
+  heading_level: 3
+  previews: 2
+  preview_words_before: 3
+  preview_words_after: 3
+  tokenizer_separator: /[\s\-/]+/
+  rel_url: true
+  button: true
+
+# Navigation
+nav_sort: case_insensitive
+
+# Table of contents
+heading_anchors: true
+
+# Footer
+footer_content: 'SPECTRA is part of the <a href="https://www.automatetheplanet.com/">Automate The Planet</a> ecosystem. MIT Licensed.'
+
+# Aux links (top-right of every page)
+aux_links:
+  "GitHub":
+    - "https://github.com/AutomateThePlanet/Spectra"
+  "NuGet":
+    - "https://www.nuget.org/packages/Spectra.CLI"
+
+aux_links_new_tab: true
+
+# "Edit this page" link
+gh_edit_repository: https://github.com/AutomateThePlanet/Spectra
+gh_edit_branch: main
+gh_edit_source: docs
+gh_edit_view_mode: edit
+
+# Back to top link
+back_to_top: true
+back_to_top_text: "Back to top"
+
+# Plugins
+plugins:
+  - jekyll-seo-tag
+
+# Exclude machine-generated files & build artifacts from the site
+exclude:
+  - "criteria/"
+  - "_index.md"
+  - "_index.yaml"
+  - "_index.json"
+  - "**/*.criteria.yaml"
+  - "_criteria_index.yaml"
+  - "Gemfile"
+  - "Gemfile.lock"
+  - "vendor/"
+  - "node_modules/"

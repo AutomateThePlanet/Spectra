@@ -1,3 +1,9 @@
+---
+title: Copilot Chat
+parent: Execution Agents
+nav_order: 3
+---
+
 # Using SPECTRA Execution Agent with Copilot Chat
 
 ## Overview

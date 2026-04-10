@@ -1,3 +1,9 @@
+---
+title: Generation Profiles
+parent: User Guide
+nav_order: 4
+---
+
 # Generation Profiles
 
 Customize how AI generates test cases with repository-level and suite-level profiles.

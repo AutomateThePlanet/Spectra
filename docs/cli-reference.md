@@ -1,3 +1,9 @@
+---
+title: CLI Reference
+parent: User Guide
+nav_order: 1
+---
+
 # CLI Reference
 
 All SPECTRA CLI commands organized by function.

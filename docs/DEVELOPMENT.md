@@ -1,3 +1,8 @@
+---
+title: Development
+nav_order: 6
+---
+
 # Development Guide
 
 Building, testing, and running SPECTRA locally.

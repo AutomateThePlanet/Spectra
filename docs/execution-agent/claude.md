@@ -1,3 +1,9 @@
+---
+title: Claude
+parent: Execution Agents
+nav_order: 4
+---
+
 # Using SPECTRA Execution Agent with Claude
 
 ## Overview

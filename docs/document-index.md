@@ -1,3 +1,9 @@
+---
+title: Document Index
+parent: User Guide
+nav_order: 7
+---
+
 # Document Index
 
 Pre-built documentation index for efficient AI test generation.

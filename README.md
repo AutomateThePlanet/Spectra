@@ -10,6 +10,11 @@
   <a href="https://github.com/AutomateThePlanet/Spectra/actions/workflows/ci.yml"><img src="https://github.com/AutomateThePlanet/Spectra/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
   <a href="https://dotnet.microsoft.com/download"><img src="https://img.shields.io/badge/.NET-8.0+-purple" alt=".NET 8.0+"></a>
+  <a href="https://automatetheplanet.github.io/Spectra/"><img src="https://img.shields.io/badge/docs-online-00bcd4" alt="Documentation"></a>
+</p>
+
+<p align="center">
+  📖 <strong>Browse the full documentation at <a href="https://automatetheplanet.github.io/Spectra/">automatetheplanet.github.io/Spectra</a></strong>
 </p>
 
 <!-- Tagline -->

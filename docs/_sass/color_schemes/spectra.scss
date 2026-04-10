@@ -1,0 +1,50 @@
+// =============================================================
+// SPECTRA color scheme for Just the Docs
+// Matches Automate The Planet brand identity
+// =============================================================
+
+// --- ATP Brand Palette ---
+$spectra-teal:        #00bcd4;
+$spectra-teal-light:  #4dd0e1;
+$spectra-teal-dark:   #0097a7;
+$spectra-navy:        #16213e;
+$spectra-navy-light:  #1a2744;
+$spectra-dark:        #0f1628;
+$spectra-charcoal:    #1a1a2e;
+$spectra-slate:       #2c3e50;
+$spectra-ice:         #e8f4f8;
+$spectra-white:       #fafcfd;
+
+// --- Sidebar / Navigation ---
+$sidebar-color:               $spectra-navy;
+$nav-width:                   280px;
+$nav-child-link-color:        rgba(255, 255, 255, 0.75);
+$nav-link-color:              rgba(255, 255, 255, 0.9);
+
+// --- Body ---
+$body-background-color:       $spectra-white;
+$body-text-color:             #2d3748;
+$body-heading-color:          $spectra-navy;
+
+// --- Links ---
+$link-color:                  $spectra-teal-dark;
+
+// --- Search ---
+$search-background-color:     $spectra-ice;
+$search-result-preview-color: $body-text-color;
+
+// --- Code ---
+$code-background-color:       #f0f4f8;
+
+// --- Buttons ---
+$btn-primary-color:           $spectra-teal;
+
+// --- Header / Top bar ---
+$header-color:                $spectra-dark;
+$header-text-color:           #ffffff;
+
+// --- Borders ---
+$border-color:                #e2e8f0;
+
+// --- Active navigation item ---
+$nav-active-link-color:       $spectra-teal-light;

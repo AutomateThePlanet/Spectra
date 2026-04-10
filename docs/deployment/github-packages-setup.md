@@ -1,3 +1,9 @@
+---
+title: GitHub Packages Setup
+parent: Deployment
+nav_order: 2
+---
+
 # GitHub Packages Setup for Spectra CLI
 
 This guide explains how to configure cross-repo access to the Spectra CLI NuGet package hosted on GitHub Packages. This is needed when a project (e.g., Spectra_Demo) uses a GitHub Actions workflow to install Spectra CLI from the AutomateThePlanet/Spectra private feed.

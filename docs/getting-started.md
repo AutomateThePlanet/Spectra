@@ -1,3 +1,8 @@
+---
+title: Getting Started
+nav_order: 1
+---
+
 # Getting Started
 
 Install SPECTRA, authenticate, and generate your first test suite.

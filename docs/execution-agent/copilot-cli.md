@@ -1,3 +1,9 @@
+---
+title: Copilot CLI
+parent: Execution Agents
+nav_order: 2
+---
+
 # Using SPECTRA Execution Agent with Copilot CLI
 
 ## Overview
