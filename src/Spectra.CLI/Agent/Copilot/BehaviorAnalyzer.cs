@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using GitHub.Copilot.SDK;
 using Spectra.CLI.Agent.Analysis;
+using Spectra.CLI.Prompts;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Validation;
@@ -139,8 +140,36 @@ public sealed class BehaviorAnalyzer
 
     internal static string BuildAnalysisPrompt(
         IReadOnlyList<SourceDocument> documents,
-        string? focusArea)
+        string? focusArea,
+        SpectraConfig? config = null,
+        PromptTemplateLoader? templateLoader = null)
     {
+        // Try template-driven prompt
+        if (templateLoader is not null)
+        {
+            var template = templateLoader.LoadTemplate("behavior-analysis");
+            var categories = PromptTemplateLoader.GetCategories(config);
+
+            var docText = FormatDocuments(documents);
+            var values = new Dictionary<string, string>
+            {
+                ["document_text"] = docText,
+                ["document_title"] = string.Join(", ", documents.Select(d => d.Title ?? d.Path)),
+                ["suite_name"] = "",
+                ["existing_tests"] = "",
+                ["focus_areas"] = focusArea ?? "",
+                ["acceptance_criteria"] = ""
+            };
+
+            var listValues = new Dictionary<string, IReadOnlyList<IReadOnlyDictionary<string, string>>>
+            {
+                ["categories"] = PromptTemplateLoader.FormatCategoriesForTemplate(categories)
+            };
+
+            return PromptTemplateLoader.Resolve(template, values, listValues);
+        }
+
+        // Legacy fallback (same as before)
         var sb = new StringBuilder();
         sb.AppendLine("""
             Analyze the following documentation and identify all distinct testable behaviors.
@@ -170,22 +199,27 @@ public sealed class BehaviorAnalyzer
         }
 
         sb.AppendLine("\nDocumentation:");
+        sb.Append(FormatDocuments(documents));
+
+        return sb.ToString();
+    }
+
+    private static string FormatDocuments(IReadOnlyList<SourceDocument> documents)
+    {
+        var sb = new StringBuilder();
         foreach (var doc in documents)
         {
             sb.AppendLine($"\n### {doc.Title} ({doc.Path})");
-            // Use document summaries: sections + first 200 chars per section
             if (doc.Sections.Count > 0)
             {
                 sb.AppendLine($"Sections: {string.Join(", ", doc.Sections)}");
             }
 
-            // Truncate content to ~200 chars per section or 2000 chars total
             var preview = doc.Content.Length > 2000
                 ? doc.Content[..2000] + "..."
                 : doc.Content;
             sb.AppendLine(preview);
         }
-
         return sb.ToString();
     }
 

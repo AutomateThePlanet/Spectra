@@ -1,5 +1,6 @@
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Output;
+using Spectra.CLI.Prompts;
 using Spectra.CLI.Skills;
 
 namespace Spectra.CLI.Commands.UpdateSkills;
@@ -48,6 +49,17 @@ public sealed class UpdateSkillsHandler
         {
             var agentPath = Path.Combine(currentDir, ".github", "agents", name);
             await ProcessFileAsync(agentPath, content, manifest, updated, unchanged, skipped, ct);
+        }
+
+        // Process prompt templates
+        foreach (var templateId in BuiltInTemplates.AllTemplateIds)
+        {
+            var content = BuiltInTemplates.GetRawContent(templateId);
+            if (content is null) continue;
+
+            var relativePath = Path.Combine(".spectra", "prompts", $"{templateId}.md");
+            var templatePath = Path.Combine(currentDir, relativePath);
+            await ProcessFileAsync(templatePath, content, manifest, updated, unchanged, skipped, ct);
         }
 
         // Save updated manifest

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using GitHub.Copilot.SDK;
+using Spectra.CLI.Prompts;
 using Spectra.Core.Models.Coverage;
 using SpectraProviderConfig = Spectra.Core.Models.Config.ProviderConfig;
 
@@ -80,8 +81,22 @@ public sealed class CriteriaExtractor
         return ParseResponse(responseText, sourceKey, component);
     }
 
-    private static string BuildExtractionPrompt(string docPath, string content, string? component)
+    internal static string BuildExtractionPrompt(string docPath, string content, string? component,
+        PromptTemplateLoader? templateLoader = null)
     {
+        if (templateLoader is not null)
+        {
+            var template = templateLoader.LoadTemplate("criteria-extraction");
+            var values = new Dictionary<string, string>
+            {
+                ["document_text"] = content,
+                ["document_title"] = docPath,
+                ["existing_criteria"] = "",
+                ["component"] = component ?? ""
+            };
+            return PromptTemplateLoader.Resolve(template, values);
+        }
+
         var componentHint = component is not null
             ? $"\nThe document belongs to the \"{component}\" component."
             : "";

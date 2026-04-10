@@ -27,7 +27,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>spectra</ToolCommandName>
     <PackageId>Spectra.CLI</PackageId>
-    <Version>1.34.6</Version>
+    <Version>1.36.0</Version>
     <Authors>Spectra</Authors>
     <Description>AI-native test generation and management CLI</Description>
     <PackageOutputPath>./nupkg</PackageOutputPath>
@@ -38,6 +38,7 @@
     <EmbeddedResource Include="Agent\Resources\SKILL.md" />
     <EmbeddedResource Include="Skills\Content\Skills\*.md" />
     <EmbeddedResource Include="Skills\Content\Agents\*.md" />
+    <EmbeddedResource Include="Prompts\Content\*.md" />
     <EmbeddedResource Include="Templates\deploy-dashboard.yml" />
     <EmbeddedResource Include="Dashboard\Templates\index.html" />
     <EmbeddedResource Include="Dashboard\Templates\scripts\app.js" />
