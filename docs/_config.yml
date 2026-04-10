@@ -54,6 +54,13 @@ back_to_top_text: "Back to top"
 plugins:
   - jekyll-seo-tag
 
+# Default layout for every page (Just the Docs sidebar + header)
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+
 # Exclude machine-generated files & build artifacts from the site
 exclude:
   - "criteria/"

@@ -1,50 +1,51 @@
 // =============================================================
 // SPECTRA color scheme for Just the Docs
-// Matches Automate The Planet brand identity
+// Matches Automate The Planet "SPECTRA" banner — cream background,
+// dark navy text/sidebar, teal accents.
 // =============================================================
 
-// --- ATP Brand Palette ---
-$spectra-teal:        #00bcd4;
-$spectra-teal-light:  #4dd0e1;
-$spectra-teal-dark:   #0097a7;
-$spectra-navy:        #16213e;
+// --- ATP / SPECTRA Brand Palette ---
+$spectra-cream:       #f6f0e1;  // banner background
+$spectra-cream-soft:  #fbf7ec;  // slightly lighter for content area
+$spectra-cream-deep:  #ede4cf;  // borders / dividers
+$spectra-navy:        #16213e;  // primary headings, sidebar
 $spectra-navy-light:  #1a2744;
-$spectra-dark:        #0f1628;
-$spectra-charcoal:    #1a1a2e;
-$spectra-slate:       #2c3e50;
-$spectra-ice:         #e8f4f8;
-$spectra-white:       #fafcfd;
+$spectra-navy-deep:   #0f1628;  // header bar
+$spectra-teal:        #00bcd4;  // accent / buttons
+$spectra-teal-light:  #4dd0e1;
+$spectra-teal-dark:   #0097a7;  // links
+$spectra-orange:      #e8743a;  // logo accent (warm)
+$spectra-text:        #2a2f45;
+$spectra-code-bg:     #efe9d8;
 
 // --- Sidebar / Navigation ---
 $sidebar-color:               $spectra-navy;
 $nav-width:                   17.5rem;
-$nav-child-link-color:        rgba(255, 255, 255, 0.75);
-$nav-link-color:              rgba(255, 255, 255, 0.9);
+$nav-link-color:              rgba(255, 255, 255, 0.92);
+$nav-child-link-color:        rgba(255, 255, 255, 0.78);
+$nav-active-link-color:       $spectra-teal-light;
 
-// --- Body ---
-$body-background-color:       $spectra-white;
-$body-text-color:             #2d3748;
+// --- Body / Content area ---
+$body-background-color:       $spectra-cream-soft;
+$body-text-color:             $spectra-text;
 $body-heading-color:          $spectra-navy;
 
 // --- Links ---
 $link-color:                  $spectra-teal-dark;
 
 // --- Search ---
-$search-background-color:     $spectra-ice;
-$search-result-preview-color: $body-text-color;
+$search-background-color:     $spectra-cream;
+$search-result-preview-color: $spectra-text;
 
 // --- Code ---
-$code-background-color:       #f0f4f8;
+$code-background-color:       $spectra-code-bg;
 
 // --- Buttons ---
 $btn-primary-color:           $spectra-teal;
 
 // --- Header / Top bar ---
-$header-color:                $spectra-dark;
+$header-color:                $spectra-navy-deep;
 $header-text-color:           #ffffff;
 
 // --- Borders ---
-$border-color:                #e2e8f0;
-
-// --- Active navigation item ---
-$nav-active-link-color:       $spectra-teal-light;
+$border-color:                $spectra-cream-deep;
