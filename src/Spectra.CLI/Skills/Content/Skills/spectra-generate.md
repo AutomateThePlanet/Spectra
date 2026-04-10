@@ -12,6 +12,28 @@ You generate test cases by running CLI commands. Follow the EXACT tool sequence 
 
 **ALWAYS follow the full analyze → approve → generate flow. Never skip the analysis step.**
 
+## MANDATORY: Analyze first, every time
+
+If the user is asking you to **generate, create, add, write, or build test cases for an area, feature, module, suite, page, or topic** — you **MUST** start with the analysis step (`--analyze-only`), present the recommendation, and **STOP and wait for the user to approve** before generating anything.
+
+**These trigger phrases ALL require the analyze-first flow:**
+- "create test cases for {X}"
+- "generate test cases for {X}"
+- "generate tests for {X}"
+- "add tests to {X}"
+- "test the {X} module"
+- "I need tests for {X}"
+- "cover {X} with tests"
+- "write tests for {X}"
+
+**Forbidden behaviors when the user names an area:**
+- Do NOT call `spectra ai generate` without `--analyze-only` on the first call.
+- Do NOT invent a `--count` value. There is no default — if the user didn't say a number, you DO NOT pass `--count` at all on the analyze call.
+- Do NOT skip Steps 1–4 below.
+- Do NOT ask the user how many tests they want — the analyze step will recommend a number.
+
+The ONLY time you skip analysis is when the user describes a single concrete scenario (see "When the user wants to create a specific test case" further down).
+
 **CRITICAL: First open `.spectra-progress.html` in Simple Browser — it auto-refreshes so the user can watch progress live. Then runInTerminal. Between runInTerminal and awaitTerminal, do NOTHING — no readFile, no listDirectory, no checking terminal output, no status messages. The progress page already shows live status. You ONLY read `.spectra-result.json` AFTER awaitTerminal returns.**
 
 ## CLI flags reference
@@ -19,7 +41,7 @@ You generate test cases by running CLI commands. Follow the EXACT tool sequence 
 | Flag | Type | Description |
 |------|------|-------------|
 | `--suite {name}` | string | Target suite name (REQUIRED) |
-| `--count {n}` | int | Number of tests to generate (default: 5) |
+| `--count {n}` | int | Number of tests to generate. NEVER invent a value — use ONLY a number the user explicitly stated, or the `recommended` field returned by the analyze step. |
 | `--focus {text}` | string | Focus area: "negative", "edge cases", "high priority security", etc. |
 | `--skip-critic` | bool | Skip grounding verification |
 | `--analyze-only` | bool | Only analyze, don't generate |
@@ -35,6 +57,11 @@ You generate test cases by running CLI commands. Follow the EXACT tool sequence 
 ## When user asks to generate test cases:
 
 **Determine focus**: Extract the user's full intent into a `--focus` value. Include ALL qualifiers (type + topic). If no focus, omit `--focus`.
+
+**Determine count for the LATER generate step**:
+- If the user said an explicit number ("generate 10 tests", "give me 3"), use that.
+- Otherwise leave `count` blank for now — Step 4 will give you `analysis.recommended` to use in Step 5.
+- NEVER fall back to "5". There is no default.
 
 **Step 1**: show preview .spectra-progress.html?nocache=1
 
