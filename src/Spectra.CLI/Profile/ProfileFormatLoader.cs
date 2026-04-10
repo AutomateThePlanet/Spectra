@@ -55,21 +55,55 @@ public static class ProfileFormatLoader
     }
 
     /// <summary>
-    /// Returns the raw bytes of the embedded <c>CUSTOMIZATION.md</c>,
-    /// for use by <c>spectra init</c> and <c>spectra update-skills</c>.
+    /// Returns the embedded <c>CUSTOMIZATION.md</c> with any Jekyll YAML
+    /// frontmatter stripped (the source file lives in <c>docs/</c> and carries
+    /// frontmatter for the docs site, but user projects shouldn't see it).
     /// </summary>
     public static string LoadEmbeddedCustomizationGuide()
     {
-        return ReadEmbeddedResource(EmbeddedCustomizationResource);
+        return StripFrontmatter(ReadEmbeddedResource(EmbeddedCustomizationResource));
     }
 
     /// <summary>
-    /// Returns the raw bytes of the embedded <c>USAGE.md</c>,
-    /// for use by <c>spectra init</c> and <c>spectra update-skills</c>.
+    /// Returns the embedded <c>USAGE.md</c> with any Jekyll YAML frontmatter
+    /// stripped. See <see cref="LoadEmbeddedCustomizationGuide"/> for the why.
     /// </summary>
     public static string LoadEmbeddedUsageGuide()
     {
-        return ReadEmbeddedResource(EmbeddedUsageResource);
+        return StripFrontmatter(ReadEmbeddedResource(EmbeddedUsageResource));
+    }
+
+    /// <summary>
+    /// Removes a leading Jekyll YAML frontmatter block (delimited by <c>---</c>
+    /// on its own line at the very top, terminated by another <c>---</c> line)
+    /// if present. Returns the input unchanged if no frontmatter is detected.
+    /// </summary>
+    private static string StripFrontmatter(string content)
+    {
+        if (string.IsNullOrEmpty(content)) return content;
+
+        // Detect a leading "---\n" or "---\r\n" delimiter.
+        ReadOnlySpan<char> span = content.AsSpan();
+        if (!span.StartsWith("---\n".AsSpan()) && !span.StartsWith("---\r\n".AsSpan()))
+        {
+            return content;
+        }
+
+        // Find the closing "---" delimiter on its own line.
+        const string closing = "\n---";
+        var closingIdx = content.IndexOf(closing, 3, StringComparison.Ordinal);
+        if (closingIdx < 0) return content;
+
+        // Skip past the closing "---" and the trailing newline (if any).
+        var bodyStart = closingIdx + closing.Length;
+        if (bodyStart < content.Length && content[bodyStart] == '\r') bodyStart++;
+        if (bodyStart < content.Length && content[bodyStart] == '\n') bodyStart++;
+
+        // Skip a single blank line if it follows the frontmatter.
+        if (bodyStart < content.Length && content[bodyStart] == '\r') bodyStart++;
+        if (bodyStart < content.Length && content[bodyStart] == '\n') bodyStart++;
+
+        return content.Substring(bodyStart);
     }
 
     private static string LoadEmbeddedFormat()

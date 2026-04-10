@@ -39,7 +39,16 @@
     <EmbeddedResource Include="Skills\Content\Skills\*.md" />
     <EmbeddedResource Include="Skills\Content\Agents\*.md" />
     <EmbeddedResource Include="Skills\Content\Profiles\*.yaml" />
-    <EmbeddedResource Include="Skills\Content\Docs\*.md" />
+    <!-- Customization & Usage guides live in the top-level docs/ folder
+         (so they ship with the docs site) but are still embedded here
+         under the original logical names so ProfileFormatLoader can read
+         them with no code changes. -->
+    <EmbeddedResource Include="..\..\docs\customization.md" Link="Skills\Content\Docs\CUSTOMIZATION.md">
+      <LogicalName>Spectra.CLI.Skills.Content.Docs.CUSTOMIZATION.md</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\..\docs\usage.md" Link="Skills\Content\Docs\USAGE.md">
+      <LogicalName>Spectra.CLI.Skills.Content.Docs.USAGE.md</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="Prompts\Content\*.md" />
     <EmbeddedResource Include="Templates\deploy-dashboard.yml" />
     <EmbeddedResource Include="Dashboard\Templates\index.html" />

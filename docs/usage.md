@@ -1,3 +1,9 @@
+---
+title: Usage (Copilot Chat)
+parent: User Guide
+nav_order: 9
+---
+
 # SPECTRA Usage Guide — VS Code Copilot Chat
 
 This guide shows how to use SPECTRA through VS Code Copilot Chat. Every workflow below shows what to say and what to expect. For configuration and customization details, see `CUSTOMIZATION.md`.

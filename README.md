@@ -208,6 +208,8 @@ SPECTRA is part of the [Automate The Planet](https://www.automatetheplanet.com/)
 | [Grounding Verification](docs/grounding-verification.md) | Dual-model critic for hallucination detection |
 | [Document Index](docs/document-index.md) | Pre-built doc index for efficient generation |
 | [Skills Integration](docs/skills-integration.md) | Copilot Chat SKILLs and agent prompts |
+| [Usage (Copilot Chat)](docs/usage.md) | Workflow-by-workflow guide for driving SPECTRA via Copilot Chat |
+| [Customization](docs/customization.md) | Every customization knob — config, profiles, prompts, palettes |
 | [Execution Agent](docs/execution-agent/overview.md) | MCP tools and AI-driven test execution |
 | [Architecture](docs/architecture/overview.md) | System design and key decisions |
 | [Development Guide](docs/DEVELOPMENT.md) | Building, testing, and running locally |

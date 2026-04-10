@@ -1,3 +1,9 @@
+---
+title: Customization
+parent: User Guide
+nav_order: 10
+---
+
 # SPECTRA Customization Guide
 
 This guide covers every way you can customize SPECTRA's behavior, from test
