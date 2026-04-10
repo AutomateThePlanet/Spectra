@@ -1,0 +1,54 @@
+// =============================================================
+// SPECTRA — additional overrides on top of the spectra color scheme
+// =============================================================
+
+// Sidebar header / logo area: give it a cream backdrop so the
+// SPECTRA banner (cream background) sits flush instead of looking
+// like a postage stamp on a navy wall. Make the logo full-width.
+
+.side-bar {
+  // Pull the logo flush to the top of the sidebar
+  .site-header {
+    background-color: #f6f0e1; // matches banner cream
+    padding: 0;
+    height: auto;
+    min-height: 0;
+    border-bottom: 2px solid #0f1628;
+  }
+
+  .site-title {
+    display: block;
+    padding: 0;
+    width: 100%;
+    height: auto;
+    line-height: 0;
+
+    &:hover {
+      background-image: none;
+      background-color: transparent;
+    }
+  }
+
+  // The logo itself (Just the Docs renders it as a background image
+  // on .site-logo). Force it to display as a block-level image.
+  .site-logo {
+    width: 100%;
+    height: 6rem;            // ~96px tall — readable but not huge
+    background-size: contain;
+    background-position: center center;
+    background-repeat: no-repeat;
+    margin: 0;
+  }
+
+  // Hide the duplicate text title (logo already says "SPECTRA")
+  .site-title.lh-tight {
+    display: block;
+  }
+}
+
+// Larger sidebar logo on bigger screens
+@media (min-width: 50rem) {
+  .side-bar .site-logo {
+    height: 7rem;
+  }
+}
