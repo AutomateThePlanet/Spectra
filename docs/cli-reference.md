@@ -129,7 +129,12 @@ See [Document Index](document-index.md) for full details.
 
 ### `spectra ai generate`
 
-Generate test cases from documentation. Supports multiple modes.
+Generate test cases from documentation using systematic ISTQB test design
+techniques (Equivalence Partitioning, Boundary Value Analysis, Decision
+Table, State Transition, Error Guessing, Use Case). The analysis output
+includes both a category breakdown (`happy_path`, `boundary`, `negative`, …)
+and a technique breakdown (`BVA`, `EP`, `DT`, `ST`, `EG`, `UC`) — see spec
+037. Supports multiple modes.
 
 **Interactive Session** — four-phase guided session:
 
@@ -280,6 +285,30 @@ spectra profile show --suite tests/checkout
 ```
 
 See [Generation Profiles](generation-profiles.md) for details.
+
+---
+
+## Testimize Commands (Optional)
+
+### `spectra testimize check`
+
+Reports the status of the optional Testimize integration (spec 038): whether
+it is enabled in config, whether the `Testimize.MCP.Server` global tool is
+installed, whether the server passes a health probe, the configured mode and
+strategy, and whether the optional `testimizeSettings.json` is present.
+
+```bash
+spectra testimize check
+spectra testimize check --output-format json
+```
+
+When Testimize is disabled (the default), the command does NOT start the MCP
+process — it just reports `enabled: false`. When enabled but not installed,
+the output includes a one-line `dotnet tool install --global Testimize.MCP.Server`
+instruction. JSON output always contains the fields `enabled`, `installed`,
+`healthy`, plus `mode`, `strategy`, and (when not installed) `install_command`.
+
+See [Testimize Integration](testimize-integration.md) for the full guide.
 
 ---
 

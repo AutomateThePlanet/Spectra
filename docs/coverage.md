@@ -22,6 +22,18 @@ SPECTRA produces a unified coverage report with three sections:
 | **Acceptance Criteria** | Which criteria are covered | `criteria` field in test frontmatter + `_criteria_index.yaml` |
 | **Automation** | Which tests have automation code | `automated_by` field in test frontmatter + code scanning |
 
+> **Spec 037 — boundary coverage from ISTQB techniques**: Test generation now
+> applies six ISTQB test design techniques systematically (EP, BVA, DT, ST, EG,
+> UC). Suites generated after spec 037 typically have 50%+ more tests in the
+> `boundary` and `negative` categories than pre-037 suites on the same docs.
+> The analysis output exposes this via a `technique_breakdown` map alongside
+> the existing category `breakdown`.
+>
+> **Spec 038 — algorithmic precision (optional)**: When the optional
+> [Testimize integration](testimize-integration.md) is enabled, the AI replaces
+> approximated boundary values with mathematically optimal ones from
+> Testimize's BVA / EP / pairwise / ABC algorithms. Disabled by default.
+
 ## Run Coverage Analysis
 
 ```bash

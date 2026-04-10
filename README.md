@@ -61,6 +61,8 @@ SPECTRA reads your product documentation, generates comprehensive test suites, a
 Generate test cases from product documentation through an iterative session.
 The AI analyzes your docs, identifies testable behaviors, generates structured test cases, suggests additional tests for uncovered areas, and lets you describe undocumented behaviors — all in one continuous flow.
 
+Behavior analysis applies six **ISTQB test design techniques** systematically (Equivalence Partitioning, Boundary Value Analysis, Decision Table, State Transition, Error Guessing, Use Case) so the produced suites have meaningful boundary and negative coverage instead of happy-path-only scenarios. Analysis output exposes both a category breakdown and a per-technique breakdown.
+
 ```bash
 spectra ai generate                    # Interactive session
 spectra ai generate checkout           # Direct mode
@@ -195,6 +197,14 @@ SPECTRA is part of the [Automate The Planet](https://www.automatetheplanet.com/)
 
 **BELLATRIX** automates test execution. **Testimize** optimizes test case selection. **SPECTRA** generates and maintains the test cases themselves — closing the loop between documentation and quality assurance.
 
+> **Optional Testimize integration**: SPECTRA can call the
+> [Testimize.MCP.Server](https://github.com/AutomateThePlanet/Testimize) global
+> tool to replace AI-approximated boundary values with mathematically optimal
+> ones (BVA / EP / pairwise / ABC). Disabled by default; enable with
+> `dotnet tool install --global Testimize.MCP.Server` and set
+> `testimize.enabled` to `true` in `spectra.config.json`. See
+> [Testimize Integration](docs/testimize-integration.md).
+
 ## Documentation
 
 | Guide | Description |
@@ -210,6 +220,7 @@ SPECTRA is part of the [Automate The Planet](https://www.automatetheplanet.com/)
 | [Skills Integration](docs/skills-integration.md) | Copilot Chat SKILLs and agent prompts |
 | [Usage (Copilot Chat)](docs/usage.md) | Workflow-by-workflow guide for driving SPECTRA via Copilot Chat |
 | [Customization](docs/customization.md) | Every customization knob — config, profiles, prompts, palettes |
+| [Testimize Integration](docs/testimize-integration.md) | Optional algorithmic test data optimization (BVA / EP / pairwise / ABC) |
 | [Execution Agent](docs/execution-agent/overview.md) | MCP tools and AI-driven test execution |
 | [Architecture](docs/architecture/overview.md) | System design and key decisions |
 | [Development Guide](docs/DEVELOPMENT.md) | Building, testing, and running locally |

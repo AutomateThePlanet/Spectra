@@ -67,6 +67,34 @@ spectra <command> --output-format json --verbosity quiet
 - `--output-format json`: Structured JSON on stdout (no colors, spinners, or ANSI codes)
 - `--verbosity quiet`: Only the final result (no progress indicators)
 
+#### Analysis JSON includes a `technique_breakdown` (spec 037)
+
+The `analysis` subobject in `.spectra-result.json` from `spectra ai generate
+--analyze-only` exposes both the existing category `breakdown` and a new
+`technique_breakdown` map. Keys are short ISTQB codes (`BVA`, `EP`, `DT`,
+`ST`, `EG`, `UC`); values are counts. Always present (`{}` when empty)
+so SKILL parsers can rely on the field existing.
+
+```json
+{
+  "analysis": {
+    "total_behaviors": 141,
+    "breakdown": { "happy_path": 42, "boundary": 38, "negative": 24, "edge_case": 18 },
+    "technique_breakdown": { "BVA": 38, "EP": 24, "UC": 32, "EG": 15, "DT": 18, "ST": 14 }
+  }
+}
+```
+
+The `spectra-generate` SKILL renders both breakdowns to the user when
+presenting the analyze recommendation.
+
+#### `spectra testimize check` JSON (spec 038)
+
+When the optional Testimize integration is in use, `spectra testimize check
+--output-format json` returns a `TestimizeCheckResult` object with the
+required fields `enabled`, `installed`, `healthy` plus `mode`, `strategy`,
+and (when not installed) `install_command`. See [Testimize Integration](testimize-integration.md).
+
 ### Generation Session in SKILLs
 
 The generate SKILL supports the full session flow:

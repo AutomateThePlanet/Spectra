@@ -291,9 +291,22 @@ Three-section unified coverage with distinct semantics:
     "criteria_file": "docs/criteria/_criteria_index.yaml",
     "criteria_dir": "docs/criteria",
     "automation_dirs": ["tests"]
+  },
+  "testimize": {
+    "enabled": false,
+    "mode": "exploratory",
+    "strategy": "HybridArtificialBeeColony",
+    "mcp": { "command": "testimize-mcp", "args": ["--mcp"] }
   }
 }
 ```
+
+> **Spec 039**: critic providers now use the same five names as the generator
+> (`github-models`, `azure-openai`, `azure-anthropic`, `openai`, `anthropic`).
+> Legacy `github` is a soft alias; legacy `google` is rejected.
+>
+> **Spec 038**: optional `testimize` section enables external Testimize MCP
+> integration for algorithmic test data optimization (off by default).
 
 ## Code Conventions
 
@@ -310,6 +323,9 @@ Three-section unified coverage with distinct semantics:
 
 | # | Feature | Key Changes |
 |---|---------|-------------|
+| 039 | Unified Critic Provider List | Critic provider validation now matches the generator provider list (`github-models`, `azure-openai`, `azure-anthropic`, `openai`, `anthropic`). Legacy `github` is a soft alias with deprecation warning; legacy `google` is hard-rejected. New `ResolveProvider` helper in `CriticFactory`. Enables Azure-only billing setups. |
+| 038 | Testimize Integration | Optional MCP integration with the external `Testimize.MCP.Server` global tool for algorithmic test data optimization (BVA, EP, pairwise, ABC). New `testimize` config section (disabled by default), `TestimizeMcpClient` (process lifecycle, JSON-RPC, 30s/5s timeouts, idempotent disposal), two new conditionally-registered AI tools (`GenerateTestData`, `AnalyzeFieldSpec`), `{{#if testimize_enabled}}` blocks in behavior-analysis and test-generation templates, new `spectra testimize check` CLI command, full graceful degradation. No NuGet dependency. |
+| 037 | ISTQB Test Design Techniques | All five built-in prompt templates rewritten to teach the AI six ISTQB techniques (EP, BVA, DT, ST, EG, UC). New `IdentifiedBehavior.Technique` field, `BehaviorAnalysisResult.TechniqueBreakdown` map, `AcceptanceCriterion.TechniqueHint` field. Analysis output includes `technique_breakdown` alongside `breakdown`. Terminal and progress page render a Technique Breakdown section in fixed display order. Distribution guideline caps any single category at 40%. Existing user-edited templates preserved; opt in via `spectra prompts reset --all`. |
 | 033 | From-Description Chat Flow | Dedicated `--from-description` SKILL section, agent intent routing (focus vs from-description vs from-suggestions), doc-aware manual tests with populated `source_refs` and `criteria` (verdict stays manual) |
 | 029 | spectra-update SKILL (10th) | Agent delegation, documentation sync, version 1.35.0 |
 | 028 | Coverage & Criteria Pipeline | Fixed criteria propagation in parser, wired criteria into generation pipeline, always write criteria: [] |
@@ -332,11 +348,12 @@ Three-section unified coverage with distinct semantics:
 | 008 | Grounding Verification | Dual-model critic, grounded/partial/hallucinated verdicts |
 | 006 | Conversational Generation | Direct/interactive modes, test updates, classification |
 
-## Test Counts (as of 2026-04-08)
+## Test Counts (as of 2026-04-11)
 
 | Project | Tests |
 |---------|-------|
-| Spectra.Core.Tests | 462 |
-| Spectra.CLI.Tests | 466 |
+| Spectra.Core.Tests | 491 |
+| Spectra.CLI.Tests | 709 |
 | Spectra.MCP.Tests | 351 |
+| **Total** | **1551** |
 | **Total** | **1279** |
