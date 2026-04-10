@@ -179,6 +179,8 @@ Session state is stored in `.spectra/session.json` and expires after 1 hour.
 
 User-described tests are marked with `grounding.verdict: manual` and `source: user-described`.
 
+When a project has documentation in `docs/` and acceptance criteria in `docs/criteria/`, `--from-description` runs in **doc-aware mode**: it best-effort loads matching docs (capped at 3 docs × 8000 chars) and matching `.criteria.yaml` entries as formatting context, then populates the new test's `source_refs` (with the doc paths used) and `criteria` fields (with any IDs the AI matches to your description). The grounding verdict stays `manual` — doc context is used for terminology and navigation alignment only, never for verification. If no docs or criteria exist, the flow is identical to the no-context behavior.
+
 Duplicate detection warns when a new test has >80% title similarity to an existing test.
 
 **Exit codes:** `0` = success, `1` = error, `3` = missing required args with `--no-interaction`.

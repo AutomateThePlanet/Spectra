@@ -99,11 +99,13 @@ public class SkillsManifestTests : IDisposable
     }
 
     [Fact]
-    public void GenerationAgent_LineCount_Within100()
+    public void GenerationAgent_LineCount_Within140()
     {
+        // Spec 033 added the Test Creation Intent Routing section (~40 lines).
+        // The limit was raised from 100 → 140 to accommodate the routing rules.
         var content = AgentContent.GenerationAgent;
         var lineCount = content.Split('\n').Length;
-        Assert.True(lineCount <= 100, $"Generation agent is {lineCount} lines, expected ≤100");
+        Assert.True(lineCount <= 140, $"Generation agent is {lineCount} lines, expected ≤140");
     }
 
     [Fact]

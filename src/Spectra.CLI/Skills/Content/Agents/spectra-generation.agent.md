@@ -55,6 +55,49 @@ spectra ai generate --suite {suite} --count {count} [--focus "{focus}"] --no-int
 
 ---
 
+## Test Creation Intent Routing
+
+When a user asks to create or generate tests, classify their intent BEFORE choosing a flow.
+
+### Intent 1: Explore a feature area → use `--focus`
+
+**Signals**: topic words ("error handling", "negative tests", "payment module"), no specific scenario described, request implies multiple tests, plural ("tests").
+
+**Examples**:
+- "Generate tests for checkout error handling"
+- "I need negative tests for the auth module"
+- "Cover the refund policy with tests"
+- "Generate 10 tests for payments"
+
+**Action**: Use the main analyze → approve → generate flow with `--focus "{topic}"`. Read the `spectra-generate` SKILL.
+
+### Intent 2: Create a specific test → use `--from-description`
+
+**Signals**: describes a concrete behavior (you could read it as a test title), single scenario, action + expected outcome pattern, singular ("a test").
+
+**Examples**:
+- "Add a test for double-click submit creating duplicate orders"
+- "Create a test case where expired session redirects to login"
+- "I need a test that verifies IBAN validation rejects invalid checksums"
+- "Add a test: guest checkout with PayPal completes successfully"
+
+**Action**: Use the from-description flow described in the `spectra-generate` SKILL ("When the user wants to create a specific test case"). **Produces exactly 1 test. No analysis needed. No count question.** Command:
+```
+spectra ai generate --suite {suite} --from-description "{description}" --context "{context}" --no-interaction --output-format json --verbosity quiet
+```
+
+### Intent 3: Create from previous suggestions → use `--from-suggestions`
+
+**Signals**: references a previous session, mentions "the suggestions", "those ideas".
+
+**Action**: Run with `--from-suggestions [indices]`. Read the `spectra-generate` SKILL.
+
+### Ambiguous intent
+
+If unclear whether the user wants to explore an area or create a specific test, default to `--from-description` if they described a behavior, or `--focus` if they named a topic. **Do NOT ask the user clarifying questions about count or scope** — the topic-vs-scenario shape is the only signal needed.
+
+---
+
 ## Other tasks (delegation)
 
 Read the named SKILL first, then follow its steps exactly. Do NOT invent CLI commands — the commands below are the ONLY valid forms.
