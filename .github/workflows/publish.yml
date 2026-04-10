@@ -37,13 +37,13 @@ jobs:
         run: dotnet test --configuration Release --no-build
 
       - name: Pack Spectra.Core
-        run: dotnet pack src/Spectra.Core/Spectra.Core.csproj --configuration Release --no-build --output ./nupkg -p:PackageVersion=${{ steps.version.outputs.VERSION }}
+        run: dotnet pack src/Spectra.Core/Spectra.Core.csproj --configuration Release --no-build --output ./nupkg -p:PackageVersion=${{ steps.version.outputs.VERSION }} -p:Version=${{ steps.version.outputs.VERSION }}
 
       - name: Pack Spectra.CLI
-        run: dotnet pack src/Spectra.CLI/Spectra.CLI.csproj --configuration Release --no-build --output ./nupkg -p:PackageVersion=${{ steps.version.outputs.VERSION }}
+        run: dotnet pack src/Spectra.CLI/Spectra.CLI.csproj --configuration Release --no-build --output ./nupkg -p:PackageVersion=${{ steps.version.outputs.VERSION }} -p:Version=${{ steps.version.outputs.VERSION }}
 
       - name: Pack Spectra.MCP
-        run: dotnet pack src/Spectra.MCP/Spectra.MCP.csproj --configuration Release --no-build --output ./nupkg -p:PackageVersion=${{ steps.version.outputs.VERSION }}
+        run: dotnet pack src/Spectra.MCP/Spectra.MCP.csproj --configuration Release --no-build --output ./nupkg -p:PackageVersion=${{ steps.version.outputs.VERSION }} -p:Version=${{ steps.version.outputs.VERSION }}
 
       - name: Push to NuGet.org
         run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
