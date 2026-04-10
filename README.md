@@ -8,7 +8,7 @@
   <a href="https://www.nuget.org/packages/Spectra.CLI"><img src="https://img.shields.io/nuget/v/Spectra.CLI?label=CLI&color=blue" alt="NuGet CLI"></a>
   <a href="https://www.nuget.org/packages/Spectra.MCP"><img src="https://img.shields.io/nuget/v/Spectra.MCP?label=MCP&color=blue" alt="NuGet MCP"></a>
   <a href="https://github.com/AutomateThePlanet/Spectra/actions/workflows/ci.yml"><img src="https://github.com/AutomateThePlanet/Spectra/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License: Apache 2.0"></a>
   <a href="https://dotnet.microsoft.com/download"><img src="https://img.shields.io/badge/.NET-8.0+-purple" alt=".NET 8.0+"></a>
   <a href="https://automatetheplanet.github.io/Spectra/"><img src="https://img.shields.io/badge/docs-online-00bcd4" alt="Documentation"></a>
 </p>
@@ -24,6 +24,19 @@
 </p>
 
 ---
+
+## What does SPECTRA mean?
+
+The name evokes the **visible spectrum** — SPECTRA covers the full spectrum of test activities, from documentation analysis through generation, verification, execution, coverage, and reporting. Nothing in the workflow is left dark.
+
+It also reads as a backronym:
+
+> **S**pec-driven · **P**rotocol for · **E**xecutable · **C**overage, · **T**esting, · **R**easoning · and · **A**utomation
+
+In practice it's a single product with two halves that can be used independently:
+
+1. An **AI test-generation CLI** that turns product documentation into versioned Markdown test cases.
+2. An **MCP execution engine** that drives those tests through any AI orchestrator with a deterministic state machine.
 
 ## Why SPECTRA?
 
@@ -216,4 +229,20 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for build inst
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+Licensed under the **Apache License, Version 2.0**. See [LICENSE](LICENSE) for the full text.
+
+```
+Copyright 2024-2026 Automate The Planet Ltd.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
