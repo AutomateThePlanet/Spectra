@@ -9,6 +9,12 @@ Install SPECTRA, authenticate, and generate your first test suite.
 
 Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md)
 
+> **New in spec 037**: behavior analysis applies six ISTQB test design
+> techniques (EP, BVA, DT, ST, EG, UC) and the analysis output now includes a
+> technique breakdown alongside the category breakdown. Existing projects can
+> adopt the new templates by running `spectra prompts reset --all` — your
+> customized templates are preserved.
+
 ---
 
 ## Prerequisites

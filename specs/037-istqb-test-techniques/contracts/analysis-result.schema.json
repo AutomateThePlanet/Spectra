@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spectra.local/contracts/analysis-result.schema.json",
+  "title": "AnalysisSection",
+  "description": "The 'analysis' subobject inside .spectra-result.json. Spec 037 adds the 'technique_breakdown' field; all other fields are unchanged.",
+  "type": "object",
+  "properties": {
+    "total_behaviors": { "type": "integer", "minimum": 0 },
+    "already_covered": { "type": "integer", "minimum": 0 },
+    "recommended": { "type": "integer", "minimum": 0 },
+    "breakdown": {
+      "type": "object",
+      "description": "Counts of identified behaviors grouped by category. Keys are configured category names; values are counts.",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "technique_breakdown": {
+      "type": "object",
+      "description": "NEW in spec 037. Counts of identified behaviors grouped by ISTQB technique short code. Empty object when no behaviors carry a technique tag.",
+      "properties": {
+        "BVA": { "type": "integer", "minimum": 0 },
+        "EP":  { "type": "integer", "minimum": 0 },
+        "DT":  { "type": "integer", "minimum": 0 },
+        "ST":  { "type": "integer", "minimum": 0 },
+        "EG":  { "type": "integer", "minimum": 0 },
+        "UC":  { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    }
+  },
+  "required": ["total_behaviors", "already_covered", "recommended", "breakdown", "technique_breakdown"]
+}

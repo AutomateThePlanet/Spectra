@@ -883,6 +883,42 @@ public static class ProgressPageWriter
             sb.Append("</div>");
         }
 
+        // Technique breakdown (ISTQB) — rendered beneath category breakdown.
+        // Suppressed when the map is empty (e.g. legacy AI responses).
+        if (analysis.TryGetProperty("technique_breakdown", out var techBreakdown)
+            && techBreakdown.ValueKind == System.Text.Json.JsonValueKind.Object
+            && techBreakdown.EnumerateObject().Any())
+        {
+            sb.Append("""<div class="breakdown"><h3>Technique Breakdown</h3>""");
+            // Render in fixed display order BVA, EP, DT, ST, EG, UC; unknowns last.
+            string[] order = ["BVA", "EP", "DT", "ST", "EG", "UC"];
+            var labels = new Dictionary<string, string>
+            {
+                ["BVA"] = "Boundary Value Analysis",
+                ["EP"] = "Equivalence Partitioning",
+                ["DT"] = "Decision Table",
+                ["ST"] = "State Transition",
+                ["EG"] = "Error Guessing",
+                ["UC"] = "Use Case",
+            };
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var code in order)
+            {
+                if (techBreakdown.TryGetProperty(code, out var v) && v.ValueKind == System.Text.Json.JsonValueKind.Number)
+                {
+                    sb.Append($"""<div class="breakdown-row"><span>{Escape(labels[code])}</span><span class="breakdown-count">{v.GetInt32()}</span></div>""");
+                    seen.Add(code);
+                }
+            }
+            foreach (var prop in techBreakdown.EnumerateObject())
+            {
+                if (seen.Contains(prop.Name)) continue;
+                if (prop.Value.ValueKind != System.Text.Json.JsonValueKind.Number) continue;
+                sb.Append($"""<div class="breakdown-row"><span>{Escape(prop.Name)}</span><span class="breakdown-count">{prop.Value.GetInt32()}</span></div>""");
+            }
+            sb.Append("</div>");
+        }
+
         return sb.ToString();
     }
 

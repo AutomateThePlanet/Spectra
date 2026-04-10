@@ -110,11 +110,12 @@ public sealed class CriteriaExtractor
             - source_section: The heading/section where this criterion was found
             - priority: "high" for MUST/SHALL/REQUIRED, "medium" for SHOULD/RECOMMENDED, "low" for MAY/OPTIONAL
             - tags: 1-3 relevant categorization tags
+            - technique_hint (optional): "BVA" if the criterion mentions a numeric range, "DT" if multiple conditions with outcomes, "ST" if a workflow/state change, "EP" if valid/invalid input categories. Omit if no technique clearly applies.
             {{componentHint}}
 
             Respond ONLY with a JSON array. No markdown, no explanation, no code fences. Example:
             [
-              {"text": "System MUST validate IBAN format before payment", "rfc2119": "MUST", "source_section": "Payment Validation", "priority": "high", "tags": ["payment", "validation"]},
+              {"text": "System MUST validate IBAN format before payment", "rfc2119": "MUST", "source_section": "Payment Validation", "priority": "high", "tags": ["payment", "validation"], "technique_hint": "EP"},
               {"text": "System SHOULD display inline error within 500ms", "rfc2119": "SHOULD", "source_section": "UX Requirements", "priority": "medium", "tags": ["ux", "performance"]}
             ]
 
@@ -175,7 +176,8 @@ public sealed class CriteriaExtractor
                     SourceSection = i.SourceSection?.Trim(),
                     Component = component,
                     Priority = NormalizePriority(i.Priority),
-                    Tags = i.Tags?.Where(t => !string.IsNullOrWhiteSpace(t)).ToList() ?? []
+                    Tags = i.Tags?.Where(t => !string.IsNullOrWhiteSpace(t)).ToList() ?? [],
+                    TechniqueHint = NormalizeTechniqueHint(i.TechniqueHint)
                 })
                 .ToList();
         }
@@ -193,6 +195,22 @@ public sealed class CriteriaExtractor
             _ => "medium"
         };
 
+    /// <summary>
+    /// Normalizes ISTQB technique hint codes to canonical uppercase form.
+    /// Returns null for empty/whitespace input or unrecognized values so the
+    /// YAML serializer omits the field rather than writing junk.
+    /// </summary>
+    private static string? NormalizeTechniqueHint(string? hint)
+    {
+        if (string.IsNullOrWhiteSpace(hint)) return null;
+        var upper = hint.Trim().ToUpperInvariant();
+        return upper switch
+        {
+            "BVA" or "EP" or "DT" or "ST" or "EG" or "UC" => upper,
+            _ => null
+        };
+    }
+
     private sealed class ExtractedCriterion
     {
         public string? Text { get; set; }
@@ -200,5 +218,8 @@ public sealed class CriteriaExtractor
         public string? SourceSection { get; set; }
         public string? Priority { get; set; }
         public List<string>? Tags { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("technique_hint")]
+        public string? TechniqueHint { get; set; }
     }
 }

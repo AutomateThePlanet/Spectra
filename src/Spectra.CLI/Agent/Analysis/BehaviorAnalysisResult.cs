@@ -17,6 +17,14 @@ public sealed record BehaviorAnalysisResult
     public required IReadOnlyDictionary<string, int> Breakdown { get; init; }
 
     /// <summary>
+    /// Count per ISTQB test design technique. Keys are short codes returned
+    /// by the AI ("EP", "BVA", "DT", "ST", "EG", "UC"). Behaviors with an
+    /// empty technique are excluded so the map is empty for legacy responses.
+    /// </summary>
+    public IReadOnlyDictionary<string, int> TechniqueBreakdown { get; init; }
+        = new Dictionary<string, int>();
+
+    /// <summary>
     /// Full list of identified behaviors.
     /// </summary>
     public required IReadOnlyList<IdentifiedBehavior> Behaviors { get; init; }

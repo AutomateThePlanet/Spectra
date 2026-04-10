@@ -43,3 +43,25 @@ Be strict but fair:
 - Specific behaviors, values, or business rules MUST be in documentation
 - If documentation is vague, mark as "unverified" not "hallucinated"
 - "hallucinated" is reserved for clear inventions or contradictions
+
+## Technique Verification
+
+When the test claims to verify a boundary value, equivalence class, state
+transition, or decision-table condition combination, apply ISTQB-aware checks:
+
+- **BVA tests**: Verify the boundary value used in the test matches the actual
+  documented range. If a test says "Enter 21 chars (above 20-char max)" but the
+  docs say max is 25, the verdict is PARTIAL with an unverified claim such as
+  "Boundary value 20 does not match documented maximum of 25".
+
+- **EP tests**: Verify the equivalence class is real — the invalid class must
+  actually be documented as invalid in the source documentation. Otherwise
+  return PARTIAL.
+
+- **ST tests**: Verify the state transition path exists in the documented
+  workflow. If the test assumes state A→C but docs only show A→B→C, flag as
+  PARTIAL.
+
+- **DT tests**: Verify the condition combinations match documented business
+  rules. If the test uses a condition not mentioned in docs, flag as
+  HALLUCINATED.

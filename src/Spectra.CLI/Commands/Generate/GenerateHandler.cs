@@ -310,6 +310,8 @@ public sealed class GenerateHandler
                             AlreadyCovered = analysisResult.AlreadyCovered,
                             Recommended = 0,
                             Breakdown = analysisResult.Breakdown?.ToDictionary(
+                                kvp => kvp.Key, kvp => kvp.Value),
+                            TechniqueBreakdown = analysisResult.TechniqueBreakdown.ToDictionary(
                                 kvp => kvp.Key, kvp => kvp.Value)
                         },
                         Generation = new GenerateGeneration
@@ -718,6 +720,8 @@ public sealed class GenerateHandler
                 AlreadyCovered = analysisResult.AlreadyCovered,
                 Recommended = analysisResult.RecommendedCount,
                 Breakdown = analysisResult.Breakdown?.ToDictionary(
+                    kvp => kvp.Key, kvp => kvp.Value),
+                TechniqueBreakdown = analysisResult.TechniqueBreakdown.ToDictionary(
                     kvp => kvp.Key, kvp => kvp.Value)
             } : null,
             Generation = new GenerateGeneration
@@ -1298,6 +1302,8 @@ public sealed class GenerateHandler
                 AlreadyCovered = analysisResult.AlreadyCovered,
                 Recommended = analysisResult.RecommendedCount,
                 Breakdown = analysisResult.Breakdown?.ToDictionary(
+                    kvp => kvp.Key, kvp => kvp.Value),
+                TechniqueBreakdown = analysisResult.TechniqueBreakdown.ToDictionary(
                     kvp => kvp.Key, kvp => kvp.Value)
             } : null,
             Generation = new GenerateGeneration
@@ -1626,6 +1632,12 @@ public sealed class GenerateHandler
             - Include at least {minNegative} negative/error scenario test(s)
             - Default priority is {defaultPriority} unless the scenario clearly warrants different priority
             - Include clear steps and expected results for each test
+            - Apply ISTQB test design techniques systematically: use exact
+              boundary values for BVA scenarios, name equivalence classes for
+              EP scenarios, state all condition values for DT scenarios, and
+              state starting/action/resulting state for ST scenarios. See the
+              "TEST DESIGN TECHNIQUE RULES" section of your generation
+              instructions for examples.
 
             For each test, provide:
             - id: unique identifier
@@ -2048,6 +2060,8 @@ public sealed class GenerateHandler
             sb.AppendLine($" {criterion.Text}");
             if (!string.IsNullOrEmpty(criterion.Component))
                 sb.AppendLine($"  Component: {criterion.Component}");
+            if (!string.IsNullOrEmpty(criterion.TechniqueHint))
+                sb.AppendLine($"  Technique hint: {criterion.TechniqueHint}");
         }
 
         return sb.Length > 0 ? sb.ToString() : null;

@@ -78,11 +78,18 @@ spectra ai generate --suite {suite} --analyze-only [--focus "{focus}"] --no-inte
 
 **{analysis.already_covered}** tests already exist. I recommend generating **{analysis.recommended}** new test cases:
 
-- Happy Path: {breakdown.HappyPath}
-- Negative: {breakdown.Negative}
-- Edge Case: {breakdown.EdgeCase}
-- Security: {breakdown.Security}
-- Performance: {breakdown.Performance}
+Category breakdown (read keys directly from `analysis.breakdown`, e.g. `happy_path`, `boundary`, `negative`, `edge_case`, `security`, `error_handling`, plus any custom categories):
+
+- {category}: {count} (one bullet per non-zero entry in `analysis.breakdown`)
+
+ISTQB technique breakdown (read from `analysis.technique_breakdown` — keys are `BVA`, `EP`, `DT`, `ST`, `EG`, `UC`; show only non-zero entries; the section may be empty for legacy responses):
+
+- BVA (Boundary Value Analysis): {count}
+- EP (Equivalence Partitioning): {count}
+- DT (Decision Table): {count}
+- ST (State Transition): {count}
+- EG (Error Guessing): {count}
+- UC (Use Case): {count}
 
 Shall I proceed?
 

@@ -41,6 +41,41 @@ Follow this exact workflow for test generation:
 5. **GET TEST IDs**: Call GetNextTestIds to allocate unique IDs for new tests.
 6. **GENERATE TESTS**: Return tests as a JSON array.
 
+## TEST DESIGN TECHNIQUE RULES
+
+When writing test steps and expected results, apply these rules based on the
+ISTQB technique tag attached to each behavior (BVA, EP, DT, ST, EG, UC).
+
+### For BVA-tagged behaviors
+
+- Use EXACT boundary values in steps, not generic descriptions
+- WRONG: "Enter a very long username"
+- RIGHT: "Enter a username with exactly 21 characters (one above the 20-char maximum)"
+
+### For EP-tagged behaviors
+
+- Name the equivalence class explicitly
+- WRONG: "Enter invalid input"
+- RIGHT: "Enter a negative number (-5) which is outside the valid range 0-999"
+
+### For DT-tagged behaviors
+
+- State all condition values explicitly in preconditions
+- WRONG: "Test discount calculation"
+- RIGHT: "User is a member (condition 1: true), order total is $50 (condition 2: below $100 threshold)"
+
+### For ST-tagged behaviors
+
+- State the starting state, the action, and the expected resulting state
+- WRONG: "Verify order processing"
+- RIGHT: "Starting in 'Payment Pending' state, click 'Cancel Order'. Verify state changes to 'Cancelled' and refund is initiated"
+
+### For EG-tagged behaviors
+
+- Describe the specific error scenario concretely
+- WRONG: "Test with special characters"
+- RIGHT: "Enter '√(−1)' in the calculator input and verify error handling"
+
 ## OUTPUT FORMAT
 
 After using tools to gather information, your FINAL message must contain ONLY a JSON array of test cases.

@@ -21,10 +21,26 @@ public static class AnalysisPresenter
         ["uncategorized"] = "uncategorized"
     };
 
+    private static readonly Dictionary<string, string> TechniqueLabels = new()
+    {
+        ["BVA"] = "Boundary Value Analysis",
+        ["EP"] = "Equivalence Partitioning",
+        ["DT"] = "Decision Table",
+        ["ST"] = "State Transition",
+        ["EG"] = "Error Guessing",
+        ["UC"] = "Use Case"
+    };
+
+    /// <summary>Fixed display order for technique breakdown rendering.</summary>
+    private static readonly string[] TechniqueDisplayOrder = ["BVA", "EP", "DT", "ST", "EG", "UC"];
+
     private static string FormatCategoryLabel(string id) =>
         CategoryLabels.TryGetValue(id, out var label)
             ? label
             : id.Replace('_', ' ').Replace('-', ' ');
+
+    private static string FormatTechniqueLabel(string code) =>
+        TechniqueLabels.TryGetValue(code, out var label) ? label : code;
 
     /// <summary>
     /// Displays the categorized behavior breakdown from analysis.
@@ -47,6 +63,28 @@ public static class AnalysisPresenter
             if (count <= 0) continue;
             var label = FormatCategoryLabel(category);
             AnsiConsole.MarkupLine($"    [grey]•[/] {count} {label}");
+        }
+
+        if (result.TechniqueBreakdown.Count > 0)
+        {
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("  [bold]Technique Breakdown[/]");
+            // Render known techniques in fixed order, then any unknown ones alphabetically.
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var code in TechniqueDisplayOrder)
+            {
+                if (result.TechniqueBreakdown.TryGetValue(code, out var count) && count > 0)
+                {
+                    AnsiConsole.MarkupLine($"    [grey]•[/] {count} {FormatTechniqueLabel(code)}");
+                    seen.Add(code);
+                }
+            }
+            foreach (var (code, count) in result.TechniqueBreakdown
+                         .Where(kvp => !seen.Contains(kvp.Key) && kvp.Value > 0)
+                         .OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase))
+            {
+                AnsiConsole.MarkupLine($"    [grey]•[/] {count} {FormatTechniqueLabel(code)}");
+            }
         }
 
         if (result.AlreadyCovered > 0)

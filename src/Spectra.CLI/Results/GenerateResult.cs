@@ -52,6 +52,14 @@ public sealed class GenerateAnalysis
     [JsonPropertyName("breakdown")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, int>? Breakdown { get; init; }
+
+    /// <summary>
+    /// Counts of identified behaviors grouped by ISTQB test design technique.
+    /// Always serialized (as <c>{}</c> when empty) so SKILL/CI consumers see a
+    /// stable contract. Keys are short codes: BVA, EP, DT, ST, EG, UC.
+    /// </summary>
+    [JsonPropertyName("technique_breakdown")]
+    public Dictionary<string, int> TechniqueBreakdown { get; init; } = new();
 }
 
 public sealed class GenerateGeneration
