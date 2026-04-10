@@ -55,7 +55,7 @@ src/
 - **Single AI runtime**: All AI operations go through the GitHub Copilot SDK. No separate agent implementations per provider.
 - **File-based test storage**: Tests are Markdown files with YAML frontmatter. No database for test definitions.
 - **Deterministic execution**: The MCP engine is a state machine. The AI orchestrator doesn't hold execution state.
-- **Three coverage dimensions**: Documentation, Requirements, and Automation coverage are analyzed independently and reported together.
+- **Three coverage dimensions**: Documentation, Acceptance Criteria, and Automation coverage are analyzed independently and reported together.
 - **Dual-model verification**: Generator and critic are separate models to catch hallucination.
 
 For the full technical specification, see [spec-kit/architecture.md](../../spec-kit/architecture.md).

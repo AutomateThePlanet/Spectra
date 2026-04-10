@@ -19,8 +19,11 @@ The engine runs as an MCP server on stdio transport (JSON-RPC 2.0).
 
 ## Starting the Server
 
+The MCP server is the separate `Spectra.MCP` global tool — it is **not** a `spectra` subcommand. Install it once and let your MCP client launch it:
+
 ```bash
-spectra mcp start
+dotnet tool install -g Spectra.MCP
+spectra-mcp                # Started by your MCP client over stdio
 ```
 
 Or from source:

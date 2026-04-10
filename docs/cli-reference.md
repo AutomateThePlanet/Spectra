@@ -38,7 +38,7 @@ Initialize a repository for SPECTRA.
 spectra init
 ```
 
-Creates `spectra.config.json`, `docs/`, `tests/`, `docs/criteria/_criteria_index.yaml`, `.github/skills/` (6 SKILL files), and `.github/agents/` (2 agent prompts).
+Creates `spectra.config.json`, `docs/`, `tests/`, `docs/criteria/_criteria_index.yaml`, `profiles/_default.yaml`, `.spectra/prompts/` (5 templates), `.github/skills/` (12 bundled SKILLs), `.github/agents/` (2 agent prompts), `CUSTOMIZATION.md`, and `USAGE.md`.
 
 **Options:**
 
@@ -277,15 +277,16 @@ See [Generation Profiles](generation-profiles.md) for details.
 
 ## Execution Commands
 
-### `spectra mcp start`
+### `spectra-mcp` (separate tool)
 
-Start the MCP execution server.
+The MCP execution server is a separate global tool packaged as `Spectra.MCP`. Install it once and let your MCP client launch it via stdio:
 
 ```bash
-spectra mcp start
+dotnet tool install -g Spectra.MCP
+spectra-mcp                # Started by your MCP client over stdio (JSON-RPC 2.0)
 ```
 
-The server runs on stdio transport (JSON-RPC 2.0). The MCP tools available are grouped below.
+For VS Code Copilot Chat, `spectra init` writes a working `.vscode/mcp.json` that points at `spectra-mcp`. The MCP tools available are grouped below.
 
 #### Run Management Tools
 

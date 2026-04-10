@@ -19,7 +19,7 @@ component: checkout
 description: Verify that expired credit cards are rejected at checkout
 estimated_duration: 5m
 source_refs: [docs/features/checkout/payment-methods.md]
-requirements: [REQ-042]
+criteria: [AC-CHECKOUT-042]
 automated_by:
   - tests/e2e/CheckoutTests.cs
 grounding:
@@ -64,12 +64,12 @@ grounding:
 | Field | Type | Description |
 |-------|------|-------------|
 | `source_refs` | string[] | Paths to documentation files this test was generated from |
-| `requirements` | string[] | Requirement IDs this test covers (e.g., `[REQ-042]`) |
+| `criteria` | string[] | Acceptance criteria IDs this test covers (e.g., `[AC-CHECKOUT-042]`) |
 | `automated_by` | string[] | Paths to automation code files that implement this test |
 
 These fields power [coverage analysis](coverage.md):
 - `source_refs` → Documentation Coverage
-- `requirements` → Requirements Coverage
+- `criteria` → Acceptance Criteria Coverage
 - `automated_by` → Automation Coverage (can be auto-populated via `--auto-link`)
 
 ## Grounding Fields
@@ -122,11 +122,11 @@ Each suite directory contains an `_index.json` with metadata for all tests:
       "tags": ["smoke", "checkout"],
       "estimated_duration": "5m",
       "source_refs": ["docs/features/checkout.md"],
-      "requirements": ["REQ-042"],
+      "criteria": ["AC-CHECKOUT-042"],
       "automated_by": ["tests/e2e/CheckoutTests.cs"]
     }
   ]
 }
 ```
 
-The `description`, `estimated_duration`, `requirements`, and `automated_by` fields are only included when populated.
+The `description`, `estimated_duration`, `criteria`, and `automated_by` fields are only included when populated.

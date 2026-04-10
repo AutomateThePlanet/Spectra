@@ -165,7 +165,7 @@ See [Coverage](coverage.md) for how these settings are used.
       "@pytest.mark.manual_test(\"{id}\")"
     ],
     "file_extensions": [".cs", ".java", ".py", ".ts"],
-    "requirements_file": "docs/requirements/_requirements.yaml",
+    "criteria_file": "docs/criteria/_criteria_index.yaml",
     "file_patterns": ["*.cs", "*.ts", "*.js", "*.py", "*.java"],
     "attribute_patterns": ["..."],
     "test_id_pattern": "TC-\\d{3,}",
@@ -181,7 +181,6 @@ See [Coverage](coverage.md) for how these settings are used.
 | `automation_dirs` | string[] | `["tests", "test", "spec", "specs", "e2e"]` | Directories to scan for automation code |
 | `scan_patterns` | string[] | (framework defaults) | Templates where `{id}` is replaced with test ID regex |
 | `file_extensions` | string[] | `[".cs", ".java", ".py", ".ts"]` | File types to scan for test references |
-| `requirements_file` | string | `"docs/requirements/_requirements.yaml"` | Path to legacy requirements YAML file |
 | `criteria_file` | string | `"docs/criteria/_criteria_index.yaml"` | Path to acceptance criteria index |
 | `criteria_dir` | string | `"docs/criteria"` | Directory containing per-document `.criteria.yaml` files |
 | `file_patterns` | string[] | `["*.cs", "*.ts", "*.js", "*.py", "*.java"]` | Glob patterns for automation files (legacy) |

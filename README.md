@@ -32,7 +32,7 @@ SPECTRA reads your product documentation, generates comprehensive test suites, a
 
 - **Deterministic execution** — An MCP-based execution engine provides a state machine that any AI orchestrator can drive without holding state.
 
-- **Coverage visibility** — Three-dimensional coverage analysis: documentation, requirements, and automation. Visual dashboard included.
+- **Coverage visibility** — Three-dimensional coverage analysis: documentation, acceptance criteria, and automation. Visual dashboard included.
 
 - **No migration needed** — Integrates with Azure DevOps, Jira, Teams, Slack through their MCP servers. No data sync. No vendor lock-in.
 
@@ -58,7 +58,7 @@ Hallucinated steps are caught and rejected automatically.
 
 Three coverage dimensions tracked automatically:
 - **Documentation** — which docs have linked tests
-- **Requirements** — which requirements are tested
+- **Acceptance Criteria** — which criteria are tested
 - **Automation** — which tests have automation code
 
 ```bash
@@ -86,7 +86,7 @@ Bundled SKILL files let you use SPECTRA through natural language in Copilot Chat
 Say "generate test cases for checkout" and the SKILL handles CLI invocation, JSON parsing, and result presentation.
 
 ```bash
-spectra init                  # Creates 10 SKILLs + 2 agent prompts
+spectra init                  # Creates 12 SKILLs + 2 agent prompts
 spectra update-skills         # Update SKILLs when CLI is upgraded
 ```
 
@@ -105,7 +105,7 @@ dotnet tool install -g Spectra.CLI
 # Initialize (creates config, dirs, SKILL files, agent prompts)
 spectra init
 
-# Build the document index (also extracts requirements automatically)
+# Build the document index (also extracts acceptance criteria automatically)
 spectra docs index
 
 # Generate tests — interactive session with analysis, suggestions, and more

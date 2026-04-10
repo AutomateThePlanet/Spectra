@@ -8,7 +8,7 @@ Related: [CLI Reference](cli-reference.md) | [Getting Started](getting-started.m
 
 ## Overview
 
-SPECTRA ships 9 SKILL files and 2 agent prompts that enable Copilot Chat to invoke CLI commands through natural language. SKILLs translate what users say in chat into CLI commands with `--output-format json --verbosity quiet`, parse the JSON output, and present results conversationally.
+SPECTRA ships 12 SKILL files and 2 agent prompts that enable Copilot Chat to invoke CLI commands through natural language. SKILLs translate what users say in chat into CLI commands with `--output-format json --verbosity quiet`, parse the JSON output, and present results conversationally. The bundled SKILLs are auto-discovered from embedded resources and refreshed by `spectra update-skills`.
 
 ## Architecture
 
@@ -28,14 +28,17 @@ Created by `spectra init` in `.github/skills/`:
 | SKILL | Path | Wraps |
 |-------|------|-------|
 | SPECTRA Generate | `spectra-generate/SKILL.md` | `spectra ai generate` with all session flags |
+| SPECTRA Update | `spectra-update/SKILL.md` | `spectra ai update` with classification reporting |
 | SPECTRA Coverage | `spectra-coverage/SKILL.md` | `spectra ai analyze --coverage --auto-link` |
 | SPECTRA Dashboard | `spectra-dashboard/SKILL.md` | `spectra dashboard --output ./site` |
 | SPECTRA Validate | `spectra-validate/SKILL.md` | `spectra validate` |
 | SPECTRA List | `spectra-list/SKILL.md` | `spectra list` and `spectra show` |
 | SPECTRA Profile | `spectra-init-profile/SKILL.md` | `spectra init-profile` |
-| SPECTRA Help | `spectra-help/SKILL.md` | Help and command reference |
+| SPECTRA Help | `spectra-help/SKILL.md` | Help and command reference (terse, flag-oriented) |
 | SPECTRA Criteria | `spectra-criteria/SKILL.md` | `spectra ai analyze --extract-criteria` and import |
 | SPECTRA Docs | `spectra-docs/SKILL.md` | `spectra docs index` with progress page |
+| SPECTRA Prompts | `spectra-prompts/SKILL.md` | `spectra prompts list/show/reset/validate` for prompt template customization |
+| SPECTRA Quickstart | `spectra-quickstart/SKILL.md` | Workflow-oriented onboarding & walkthroughs (12 workflows) |
 
 ## Agent Prompts
 

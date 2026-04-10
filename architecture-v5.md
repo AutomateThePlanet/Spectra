@@ -1,7 +1,9 @@
 # AI-Native Manual Test Management System — Architecture Specification
 
+> **Historical design document.** This is the original architecture spec that guided initial implementation. It is NOT updated as the codebase evolves. For the current state of the system, read [`CLAUDE.md`](CLAUDE.md), [`PROJECT-KNOWLEDGE.md`](PROJECT-KNOWLEDGE.md), and the per-feature specs under [`specs/`](specs/). Treat this file as background reading for deep technical context, not as a source of truth.
+
 **Version:** 3.0 (Final Consolidated)
-**Status:** Ready for implementation scoping
+**Status:** Original design spec — superseded as implementation has evolved
 
 ---
 

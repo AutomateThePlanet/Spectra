@@ -27,7 +27,7 @@ SPECTRA uses the GitHub Copilot SDK as its sole AI runtime. All AI generation an
 - Follow existing code style
 - Add tests for new functionality
 - Update documentation in `docs/` if the change affects user-facing behavior
-- Update `spec-kit/` if the change affects architecture
+- Use the spec-kit workflow for new features (`/speckit.specify`, `/speckit.plan`, `/speckit.tasks`, `/speckit.implement`) — specs land under `specs/NNN-feature/`
 - Keep PRs focused — one concern per PR
 
 ### Documentation
@@ -35,7 +35,7 @@ SPECTRA uses the GitHub Copilot SDK as its sole AI runtime. All AI generation an
 User-facing documentation lives in `docs/`. See the [documentation index](README.md#documentation) for the full list. Each piece of information should live in one place — don't duplicate content between files.
 
 ### Architecture Changes
-- Propose significant changes as an ADR (Architecture Decision Record) in `spec-kit/adr/`
+- Propose significant changes via the spec-kit workflow — start with `/speckit.specify`, then `/speckit.plan`
 - Discuss in an Issue before implementing
 
 ## Code of Conduct

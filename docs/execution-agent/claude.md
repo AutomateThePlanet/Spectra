@@ -11,15 +11,20 @@ The SPECTRA Execution Agent can be used with Claude via MCP (Model Context Proto
    spectra init
    ```
 
-2. Add SPECTRA to your Claude Desktop MCP configuration:
+2. Install the MCP server (separate global tool):
+
+   ```bash
+   dotnet tool install -g Spectra.MCP
+   ```
+
+3. Add SPECTRA to your Claude Desktop MCP configuration:
 
    **Windows** (`%APPDATA%\Claude\claude_desktop_config.json`):
    ```json
    {
      "mcpServers": {
        "spectra": {
-         "command": "spectra",
-         "args": ["mcp", "start"],
+         "command": "spectra-mcp",
          "cwd": "C:\\path\\to\\your\\repo"
        }
      }
@@ -31,15 +36,14 @@ The SPECTRA Execution Agent can be used with Claude via MCP (Model Context Proto
    {
      "mcpServers": {
        "spectra": {
-         "command": "spectra",
-         "args": ["mcp", "start"],
+         "command": "spectra-mcp",
          "cwd": "/path/to/your/repo"
        }
      }
    }
    ```
 
-3. Restart Claude Desktop
+4. Restart Claude Desktop
 
 ## Project Instructions
 

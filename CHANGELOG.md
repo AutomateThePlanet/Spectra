@@ -5,13 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.36.0] - 2026-04-10
 
 ### Added
-- `spectra-quickstart` SKILL (12th bundled SKILL) — workflow-oriented onboarding for Copilot Chat. Triggered by phrases like "help me get started", "tutorial", "walk me through". Presents 12 SPECTRA workflows with example conversations.
-- `USAGE.md` — offline workflow reference written to the project root by `spectra init`. Mirrors the quickstart SKILL content in a format suitable for async onboarding, code review, and CI documentation. Hash-tracked by `update-skills` so customizations are preserved.
+- **Quickstart SKILL & USAGE.md** (spec 032) — `spectra-quickstart` is the 12th bundled SKILL: workflow-oriented onboarding for Copilot Chat triggered by phrases like "help me get started", "tutorial", "walk me through". Presents 12 SPECTRA workflows with example conversations. Companion `USAGE.md` written to project root by `spectra init` as an offline workflow reference. Both hash-tracked by `update-skills`. Generation and execution agent prompts defer onboarding requests to the new SKILL.
+- **Visible default profile format & customization guide** (spec 031) — `profiles/_default.yaml` and `CUSTOMIZATION.md` are now created by `spectra init` and bundled as embedded resources. Profile format is visible/editable instead of hardcoded. New `ProfileFormatLoader.LoadEmbeddedDefaultYaml()` and `LoadEmbeddedCustomizationGuide()` methods.
+- **Customizable root prompt templates** (spec 030) — `.spectra/prompts/` directory with 5 markdown templates (behavior-analysis, test-generation, criteria-extraction, critic-verification, test-update) controlling all AI operations. Templates use `{{placeholder}}`, `{{#if}}`, `{{#each}}` syntax. New `analysis.categories` config section with 6 default categories. New `spectra prompts list/show/reset/validate` CLI commands. New `spectra-prompts` SKILL (11th bundled SKILL).
 - `ProfileFormatLoader.LoadEmbeddedUsageGuide()` for resolving the bundled `USAGE.md` content.
-- Generation and execution agent prompts now defer onboarding requests to the `spectra-quickstart` SKILL.
+- Bumped Spectre.Console 0.54.0 → 0.55.0, GitHub.Copilot.SDK 0.2.0 → 0.2.1, Markdig 1.1.1 → 1.1.2 (Dependabot PRs #10, #11, #12).
 
 ## [1.35.0] - 2026-04-10
 

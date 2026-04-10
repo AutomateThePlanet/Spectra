@@ -6,8 +6,11 @@ SPECTRA exposes test execution and data tools via MCP (Model Context Protocol), 
 
 ## Starting the Server
 
+The MCP server is the separate `Spectra.MCP` global tool — it is **not** a `spectra` subcommand:
+
 ```bash
-spectra mcp start
+dotnet tool install -g Spectra.MCP
+spectra-mcp                # Started by your MCP client over stdio
 ```
 
 The server runs on stdio transport and follows the MCP JSON-RPC 2.0 protocol.
@@ -110,13 +113,14 @@ On error:
 
 ## Example: Direct Tool Invocation
 
-```bash
-# Via spectra CLI
-spectra mcp call validate_tests
-spectra mcp call validate_tests '{"suite": "checkout"}'
+There is no `spectra mcp call` subcommand — drive `spectra-mcp` with raw JSON-RPC over stdio:
 
-# Via JSON-RPC
-echo '{"jsonrpc":"2.0","id":1,"method":"validate_tests","params":{}}' | spectra mcp start
+```bash
+# Single tool call via JSON-RPC
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"validate_tests","arguments":{}}}' | spectra-mcp
+
+# With arguments
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"validate_tests","arguments":{"suite":"checkout"}}}' | spectra-mcp
 ```
 
 ## Error Codes

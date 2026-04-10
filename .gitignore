@@ -27,6 +27,7 @@ packages/
 
 # Test results
 TestResults/
+coverage/
 
 # SPECTRA lock files
 .spectra.lock

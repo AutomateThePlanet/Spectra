@@ -11,9 +11,14 @@ The SPECTRA Execution Agent works with GitHub Copilot CLI for command-line test 
    spectra init
    ```
 
-2. This creates the skill file at `.github/skills/spectra-execution/SKILL.md`
+2. This creates the execution agent prompt at `.github/agents/spectra-execution.agent.md` and the bundled SKILLs under `.github/skills/`.
 
-3. Ensure you have GitHub Copilot CLI installed:
+3. Install the MCP server (separate global tool):
+   ```bash
+   dotnet tool install -g Spectra.MCP
+   ```
+
+4. Ensure you have GitHub Copilot CLI installed:
    ```bash
    gh extension install github/gh-copilot
    ```
@@ -34,9 +39,9 @@ gh copilot suggest "what spectra test suites are available"
 
 ## How It Works
 
-Copilot CLI discovers the skill from `.github/skills/spectra-execution/SKILL.md` and uses it to:
+Copilot CLI discovers the agent prompt at `.github/agents/spectra-execution.agent.md` and uses it to:
 
-1. Connect to the SPECTRA MCP server
+1. Connect to the SPECTRA MCP server (`spectra-mcp`)
 2. List available test suites
 3. Guide you through test execution
 4. Record results and generate reports
@@ -44,15 +49,13 @@ Copilot CLI discovers the skill from `.github/skills/spectra-execution/SKILL.md`
 ## Example Usage
 
 ```bash
-# Start the MCP server in one terminal
-spectra mcp start
-
-# In another terminal, use Copilot CLI
+# The MCP client launches spectra-mcp on stdio automatically;
+# you don't start the server manually for stdio-based clients.
 gh copilot suggest "run high priority checkout tests"
 ```
 
 ## Prerequisites
 
-- SPECTRA MCP server must be running (`spectra mcp start`)
+- `Spectra.MCP` global tool installed (`dotnet tool install -g Spectra.MCP`)
 - GitHub Copilot CLI extension installed
 - Repository initialized with `spectra init`
