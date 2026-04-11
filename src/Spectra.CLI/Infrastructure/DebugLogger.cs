@@ -180,6 +180,22 @@ public static class DebugLogger
         WriteLine(component, suffixed);
     }
 
+    /// <summary>
+    /// Spec 043: append a one-line error marker to the debug log and
+    /// (when <see cref="ErrorLogger.Enabled"/> is true) include a
+    /// <c>see=&lt;error_log_file&gt;</c> suffix pointing readers at the full
+    /// exception context. The full stack trace + response body live in the
+    /// dedicated error log; the debug log only carries this short marker.
+    /// </summary>
+    public static void AppendError(string component, string message)
+    {
+        if (!Enabled) return;
+        var line = ErrorLogger.Enabled
+            ? $"{message} see={ErrorLogger.LogFile}"
+            : message;
+        WriteLine(component, line);
+    }
+
     private static void WriteLine(string component, string message)
     {
         try

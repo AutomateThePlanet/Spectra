@@ -65,7 +65,8 @@ public static class AgentFactory
         string testsPath,
         Action<string>? onStatus = null,
         CancellationToken ct = default,
-        TokenUsageTracker? tracker = null)
+        TokenUsageTracker? tracker = null,
+        RunErrorTracker? errorTracker = null)
     {
         // Get provider config (or use default)
         var providerConfig = config.Ai?.Providers?.FirstOrDefault(p => p.Enabled)
@@ -117,7 +118,8 @@ public static class AgentFactory
                 basePath,
                 testsPath,
                 onStatus,
-                tracker);
+                tracker,
+                errorTracker);
 
             return AgentCreateResult.Succeeded(agent);
         }

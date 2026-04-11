@@ -54,6 +54,28 @@ public sealed class CriticConfig
     public int TimeoutSeconds { get; init; } = 120;
 
     /// <summary>
+    /// Maximum number of concurrent critic verification calls (Spec 043).
+    /// Default: 1 (sequential — backward compatible with pre-1.48 behavior).
+    /// Values are clamped to the inclusive range [1, 20] via
+    /// <see cref="GetEffectiveMaxConcurrent"/>. Values greater than 10 risk
+    /// provider rate limits — a warning is emitted at run start in that case.
+    /// </summary>
+    [JsonPropertyName("max_concurrent")]
+    public int MaxConcurrent { get; init; } = 1;
+
+    /// <summary>
+    /// Returns the clamped <see cref="MaxConcurrent"/> value, pinned to the
+    /// inclusive range [1, 20]. Values ≤0 clamp silently to 1; values &gt;20
+    /// clamp to 20 (caller is responsible for emitting any stderr warning).
+    /// </summary>
+    public int GetEffectiveMaxConcurrent()
+    {
+        if (MaxConcurrent < 1) return 1;
+        if (MaxConcurrent > 20) return 20;
+        return MaxConcurrent;
+    }
+
+    /// <summary>
     /// Gets the effective model name for the provider. Spec 041: defaults
     /// target current GitHub Copilot free / cross-architecture models —
     /// <c>gpt-5-mini</c> for GPT providers and <c>claude-haiku-4-5</c> for

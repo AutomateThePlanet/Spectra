@@ -30,7 +30,8 @@ public static class RunSummaryDebugFormatter
         string command,
         string? suite,
         TokenUsageTracker tracker,
-        TimeSpan wallClock)
+        TimeSpan wallClock,
+        RunErrorTracker? errorTracker = null)
     {
         ArgumentNullException.ThrowIfNull(tracker);
 
@@ -52,9 +53,14 @@ public static class RunSummaryDebugFormatter
 
         var suiteField = string.IsNullOrEmpty(suite) ? "-" : suite;
 
+        // Spec 043: error + rate-limit suffixes are always present (even on
+        // zero) so consumers can grep without conditional parsing.
+        var errors = errorTracker?.Errors ?? 0;
+        var rateLimits = errorTracker?.RateLimits ?? 0;
+
         return $"RUN TOTAL command={command} suite={suiteField} calls={total.Calls} "
              + $"{tokensInField} {tokensOutField} elapsed={FormatDuration(wallClock)} "
-             + $"phases={phasesField}";
+             + $"phases={phasesField} rate_limits={rateLimits} errors={errors}";
     }
 
     private static string FormatDuration(TimeSpan ts)

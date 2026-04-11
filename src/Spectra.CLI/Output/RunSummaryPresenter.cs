@@ -18,14 +18,16 @@ public static class RunSummaryPresenter
         RunSummary? runSummary,
         TokenUsageReport? tokenUsage,
         VerbosityLevel verbosity,
-        IAnsiConsole? console = null)
+        IAnsiConsole? console = null,
+        Spectra.CLI.Services.RunErrorTracker? errorTracker = null,
+        int? criticConcurrency = null)
     {
         if (verbosity == VerbosityLevel.Quiet) return;
-        if (runSummary is null && tokenUsage is null) return;
+        if (runSummary is null && tokenUsage is null && errorTracker is null) return;
 
         var target = console ?? AnsiConsole.Console;
 
-        var body = new Rows(BuildChildren(runSummary, tokenUsage));
+        var body = new Rows(BuildChildren(runSummary, tokenUsage, errorTracker, criticConcurrency));
         var panel = new Panel(body)
             .Header("[bold]Run Summary[/]")
             .Border(BoxBorder.Rounded)
@@ -38,11 +40,17 @@ public static class RunSummaryPresenter
 
     private static IEnumerable<IRenderable> BuildChildren(
         RunSummary? runSummary,
-        TokenUsageReport? tokenUsage)
+        TokenUsageReport? tokenUsage,
+        Spectra.CLI.Services.RunErrorTracker? errorTracker = null,
+        int? criticConcurrency = null)
     {
         if (runSummary is not null)
         {
-            yield return BuildContextGrid(runSummary);
+            yield return BuildContextGrid(runSummary, errorTracker, criticConcurrency);
+        }
+        else if (errorTracker is not null || criticConcurrency.HasValue)
+        {
+            yield return BuildErrorOnlyGrid(errorTracker, criticConcurrency);
         }
 
         if (tokenUsage is not null && tokenUsage.Total.Calls > 0)
@@ -54,7 +62,10 @@ public static class RunSummaryPresenter
         }
     }
 
-    private static Grid BuildContextGrid(RunSummary r)
+    private static Grid BuildContextGrid(
+        RunSummary r,
+        Spectra.CLI.Services.RunErrorTracker? errorTracker = null,
+        int? criticConcurrency = null)
     {
         var grid = new Grid()
             .AddColumn(new GridColumn().NoWrap().PadRight(4))
@@ -100,7 +111,42 @@ public static class RunSummaryPresenter
 
         grid.AddRow("[grey]Duration[/]", FormatDuration(r.DurationSeconds));
 
+        // Spec 043: critic concurrency + per-run error counters.
+        AppendErrorRows(grid, errorTracker, criticConcurrency);
+
         return grid;
+    }
+
+    private static Grid BuildErrorOnlyGrid(
+        Spectra.CLI.Services.RunErrorTracker? errorTracker,
+        int? criticConcurrency)
+    {
+        var grid = new Grid()
+            .AddColumn(new GridColumn().NoWrap().PadRight(4))
+            .AddColumn();
+        AppendErrorRows(grid, errorTracker, criticConcurrency);
+        return grid;
+    }
+
+    private static void AppendErrorRows(
+        Grid grid,
+        Spectra.CLI.Services.RunErrorTracker? errorTracker,
+        int? criticConcurrency)
+    {
+        if (criticConcurrency.HasValue)
+        {
+            grid.AddRow("[grey]Critic concurrency[/]",
+                criticConcurrency.Value.ToString(CultureInfo.InvariantCulture));
+        }
+        if (errorTracker is not null)
+        {
+            grid.AddRow("[grey]Errors[/]", errorTracker.Errors.ToString(CultureInfo.InvariantCulture));
+            var rl = errorTracker.RateLimits;
+            var rlText = rl > 0
+                ? $"{rl}  [yellow](consider reducing ai.critic.max_concurrent)[/]"
+                : rl.ToString(CultureInfo.InvariantCulture);
+            grid.AddRow("[grey]Rate limits[/]", rlText);
+        }
     }
 
     private static Table BuildTokenTable(TokenUsageReport report)

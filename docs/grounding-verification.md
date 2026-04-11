@@ -90,11 +90,14 @@ Configure the critic in `spectra.config.json`:
       "enabled": true,
       "provider": "github-models",
       "model": "gpt-5-mini",
-      "timeout_seconds": 120
+      "timeout_seconds": 120,
+      "max_concurrent": 5
     }
   }
 }
 ```
+
+> **Spec 043 — parallel verification:** `max_concurrent` (default `1`) controls how many critic verification calls run concurrently. Setting it to `5` typically cuts the critic phase to ~1/5 of sequential time on a large suite without changing any output (results are written in original input order). Clamped to `[1, 20]`. Values >10 emit a rate-limit-risk warning at run start. If you start hitting rate limits, the Run Summary panel surfaces a `Rate limits` count with a hint pointing back at this knob.
 
 > **Spec 041:** `gpt-5-mini` is the new default critic model (was `gpt-4o-mini`). It's included free on any paid Copilot plan and, when paired with a `gpt-4.1` generator, provides cross-architecture verification without burning premium requests. For Claude generators, the default critic rotates to `claude-haiku-4-5`. Per-provider defaults resolved by `CriticConfig.GetEffectiveModel()`: `github-models` / `openai` / `azure-openai` → `gpt-5-mini`; `anthropic` / `azure-anthropic` → `claude-haiku-4-5`.
 

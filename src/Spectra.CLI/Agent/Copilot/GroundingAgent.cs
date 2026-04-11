@@ -19,17 +19,22 @@ public sealed class CopilotCritic : ICriticRuntime
     private readonly CriticPromptBuilder _promptBuilder;
     private readonly CriticResponseParser _responseParser;
     private readonly TokenUsageTracker? _tracker;
+    private readonly RunErrorTracker? _errorTracker;
 
     public string ModelName { get; }
 
     public string ProviderName => _criticConfig.Provider ?? "github-models";
 
-    public CopilotCritic(CriticConfig criticConfig, TokenUsageTracker? tracker = null)
+    public CopilotCritic(
+        CriticConfig criticConfig,
+        TokenUsageTracker? tracker = null,
+        RunErrorTracker? errorTracker = null)
     {
         _criticConfig = criticConfig ?? throw new ArgumentNullException(nameof(criticConfig));
         _promptBuilder = new CriticPromptBuilder();
         _responseParser = new CriticResponseParser();
         _tracker = tracker;
+        _errorTracker = errorTracker;
 
         ModelName = GetEffectiveModel(criticConfig);
     }
@@ -138,13 +143,23 @@ public sealed class CopilotCritic : ICriticRuntime
                 ModelName, ProviderName, tokensIn, tokensOut, estimated);
             return result;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
             stopwatch.Stop();
             var (tokensIn, tokensOut, estimated) = observer.GetOrEstimate(fullPromptForFallback, "");
             _tracker?.Record("critic", ModelName, ProviderName, tokensIn, tokensOut, stopwatch.Elapsed, estimated);
+
+            // Spec 043: capture full timeout context to the error log + bump
+            // the per-run error counter. The debug log line gets a see=
+            // cross-reference when error logging is enabled.
+            _errorTracker?.RecordError();
+            Spectra.CLI.Infrastructure.ErrorLogger.Write(
+                "critic",
+                $"test_id={testId} configured_timeout={timeoutSeconds}s elapsed={stopwatch.Elapsed.TotalSeconds:F1}s",
+                ex);
             Spectra.CLI.Infrastructure.DebugLogger.AppendAi("critic ",
-                $"CRITIC TIMEOUT test_id={testId} configured_timeout={timeoutSeconds}s elapsed={stopwatch.Elapsed.TotalSeconds:F1}s",
+                $"CRITIC TIMEOUT test_id={testId} configured_timeout={timeoutSeconds}s elapsed={stopwatch.Elapsed.TotalSeconds:F1}s"
+                    + (Spectra.CLI.Infrastructure.ErrorLogger.Enabled ? $" see={Spectra.CLI.Infrastructure.ErrorLogger.LogFile}" : ""),
                 ModelName, ProviderName, tokensIn, tokensOut, estimated);
             return CreateErrorResult($"Verification timed out after {timeoutSeconds}s — bump critic.timeout_seconds in spectra.config.json", stopwatch.Elapsed);
         }
@@ -153,8 +168,22 @@ public sealed class CopilotCritic : ICriticRuntime
             stopwatch.Stop();
             var (tokensIn, tokensOut, estimated) = observer.GetOrEstimate(fullPromptForFallback, "");
             _tracker?.Record("critic", ModelName, ProviderName, tokensIn, tokensOut, stopwatch.Elapsed, estimated);
+
+            // Spec 043: classify the failure (rate limit vs. other) and
+            // capture full exception context (type, message, stack, response
+            // body when available) to the dedicated error log.
+            _errorTracker?.Record(ex);
+            var responseBody = ex.Data["ResponseBody"] as string;
+            var retryAfter = ex.Data["RetryAfter"] as string;
+            Spectra.CLI.Infrastructure.ErrorLogger.Write(
+                "critic", $"test_id={testId} elapsed={stopwatch.Elapsed.TotalSeconds:F1}s",
+                ex, responseBody, retryAfter);
+
+            var isRateLimit = Spectra.CLI.Infrastructure.ErrorLogger.IsRateLimit(ex);
+            var debugTag = isRateLimit ? "CRITIC RATE_LIMITED" : "CRITIC ERROR";
             Spectra.CLI.Infrastructure.DebugLogger.AppendAi("critic ",
-                $"CRITIC ERROR test_id={testId} exception={ex.GetType().Name} message=\"{ex.Message}\" elapsed={stopwatch.Elapsed.TotalSeconds:F1}s",
+                $"{debugTag} test_id={testId} exception={ex.GetType().Name} message=\"{ex.Message}\" elapsed={stopwatch.Elapsed.TotalSeconds:F1}s"
+                    + (Spectra.CLI.Infrastructure.ErrorLogger.Enabled ? $" see={Spectra.CLI.Infrastructure.ErrorLogger.LogFile}" : ""),
                 ModelName, ProviderName, tokensIn, tokensOut, estimated);
             return CreateErrorResult(ex.Message, stopwatch.Elapsed);
         }
