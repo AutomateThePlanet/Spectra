@@ -476,6 +476,16 @@ public sealed class UpdateHandler
         };
         _progressManager.Complete(updateResult);
 
+        // Spec 040 follow-up: emit RUN TOTAL line to .spectra-debug.log. The
+        // update flow has no AI calls today, so the tracker is empty and the
+        // line renders `calls=0 tokens_in=0 tokens_out=0 phases=`. Still
+        // useful as a run-boundary marker when grepping the log.
+        var emptyTracker = new Spectra.CLI.Services.TokenUsageTracker();
+        Spectra.CLI.Infrastructure.DebugLogger.Append(
+            "summary ",
+            Spectra.CLI.Services.RunSummaryDebugFormatter.FormatRunTotal(
+                "update", suite, emptyTracker, sw.Elapsed));
+
         // Spec 040: render Run Summary panel unless JSON mode.
         if (_outputFormat != OutputFormat.Json)
         {

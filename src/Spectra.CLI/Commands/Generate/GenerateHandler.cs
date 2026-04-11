@@ -804,6 +804,13 @@ public sealed class GenerateHandler
 
         WriteResultFile(generateResult);
 
+        // Spec 040 follow-up: emit RUN TOTAL line to .spectra-debug.log. When
+        // debug logging is disabled (default), Append is a no-op.
+        Spectra.CLI.Infrastructure.DebugLogger.Append(
+            "summary ",
+            Spectra.CLI.Services.RunSummaryDebugFormatter.FormatRunTotal(
+                "generate", suite, _tokenTracker, _runWallClock.Elapsed));
+
         // Spec 040: render Run Summary panel before final status line, unless
         // JSON mode (where data is emitted in the JSON result instead).
         if (_outputFormat != OutputFormat.Json)

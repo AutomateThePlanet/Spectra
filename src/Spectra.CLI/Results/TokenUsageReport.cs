@@ -22,6 +22,16 @@ public sealed class TokenUsageReport
     public string CostDisplay { get; init; } = "";
 
     /// <summary>
+    /// Spec 040 follow-up: true when any phase in the report came from the
+    /// <see cref="TokenEstimator"/> fallback (text.Length / 4) rather than
+    /// provider-reported <c>AssistantUsageEvent</c> counts. Consumers
+    /// (dashboards, SKILLs) use this to tell honest/approximate numbers
+    /// apart.
+    /// </summary>
+    [JsonPropertyName("estimated")]
+    public bool Estimated { get; init; }
+
+    /// <summary>
     /// Builds a report snapshot from a live <see cref="TokenUsageTracker"/>.
     /// Safe to call at any time; if the tracker has no data, returns an
     /// empty report with zero totals.
@@ -39,7 +49,8 @@ public sealed class TokenUsageReport
             Phases = summary.Select(PhaseUsageDto.From).ToList(),
             Total = PhaseUsageDto.From(total),
             EstimatedCostUsd = cost,
-            CostDisplay = display
+            CostDisplay = display,
+            Estimated = total.Estimated
         };
     }
 }
@@ -70,6 +81,13 @@ public sealed class PhaseUsageDto
     [JsonPropertyName("elapsed_seconds")]
     public double ElapsedSeconds { get; init; }
 
+    /// <summary>
+    /// Spec 040 follow-up: true when any call aggregated into this phase
+    /// used the <see cref="TokenEstimator"/> fallback.
+    /// </summary>
+    [JsonPropertyName("estimated")]
+    public bool Estimated { get; init; }
+
     public static PhaseUsageDto From(PhaseUsage p) => new()
     {
         Phase = p.Phase,
@@ -79,6 +97,7 @@ public sealed class PhaseUsageDto
         TokensIn = p.TokensIn,
         TokensOut = p.TokensOut,
         TotalTokens = p.TotalTokens,
-        ElapsedSeconds = Math.Round(p.Elapsed.TotalSeconds, 2)
+        ElapsedSeconds = Math.Round(p.Elapsed.TotalSeconds, 2),
+        Estimated = p.Estimated
     };
 }

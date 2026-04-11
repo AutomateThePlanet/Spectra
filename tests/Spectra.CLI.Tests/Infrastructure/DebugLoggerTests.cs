@@ -131,4 +131,45 @@ public class DebugLoggerTests : IDisposable
         Assert.DoesNotContain("provider=", content);
         Assert.DoesNotContain("tokens_in=", content);
     }
+
+    [Fact]
+    public void AppendAi_Estimated_PrefixesTildeOnTokenFields()
+    {
+        DebugLogger.Enabled = true;
+        DebugLogger.AppendAi("generate", "BATCH OK elapsed=1.0s",
+            "gpt-4.1", "github-models", 4521, 3890, estimated: true);
+
+        var content = File.ReadAllText(Path.Combine(_tempDir, ".spectra-debug.log"));
+        Assert.Contains("~tokens_in=4521", content);
+        Assert.Contains("~tokens_out=3890", content);
+        // Must NOT contain the unprefixed forms (since the whole suffix uses ~)
+        Assert.DoesNotContain(" tokens_in=4521", content);
+        Assert.DoesNotContain(" tokens_out=3890", content);
+    }
+
+    [Fact]
+    public void AppendAi_NotEstimated_NoTildePrefix()
+    {
+        DebugLogger.Enabled = true;
+        DebugLogger.AppendAi("generate", "BATCH OK elapsed=1.0s",
+            "gpt-4.1", "github-models", 100, 50, estimated: false);
+
+        var content = File.ReadAllText(Path.Combine(_tempDir, ".spectra-debug.log"));
+        Assert.Contains("tokens_in=100", content);
+        Assert.Contains("tokens_out=50", content);
+        Assert.DoesNotContain("~tokens_in", content);
+        Assert.DoesNotContain("~tokens_out", content);
+    }
+
+    [Fact]
+    public void AppendAi_EstimatedWithNullTokens_StillRendersQuestionMarks()
+    {
+        DebugLogger.Enabled = true;
+        DebugLogger.AppendAi("analyze ", "ANALYSIS ERROR",
+            "gpt-4.1", "github-models", null, null, estimated: true);
+
+        var content = File.ReadAllText(Path.Combine(_tempDir, ".spectra-debug.log"));
+        Assert.Contains("~tokens_in=?", content);
+        Assert.Contains("~tokens_out=?", content);
+    }
 }

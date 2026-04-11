@@ -62,7 +62,12 @@ public sealed class BehaviorAnalyzer
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var modelName = _provider?.Model ?? "?";
         var providerName = _provider?.Name ?? "?";
-        DebugLogAi($"ANALYSIS START documents={documents.Count} timeout={timeoutMinutes}min", null, null);
+        // Spec 040 follow-up: observer subscribes to AssistantUsageEvent for
+        // provider-reported token counts. If no usage event arrives within
+        // the grace window, falls back to TokenEstimator(prompt, response).
+        var observer = new CopilotUsageObserver();
+        var prompt = BuildAnalysisPrompt(documents, focusArea, _config, _templateLoader);
+        DebugLogAi($"ANALYSIS START documents={documents.Count} timeout={timeoutMinutes}min", null, null, estimated: false);
 
         try
         {
@@ -74,7 +79,15 @@ public sealed class BehaviorAnalyzer
                 tools: null,
                 ct);
 
-            var prompt = BuildAnalysisPrompt(documents, focusArea, _config, _templateLoader);
+            using var usageSub = session.On(evt =>
+            {
+                if (evt is AssistantUsageEvent u && u.Data is { } data)
+                {
+                    observer.RecordUsage(
+                        (int)(data.InputTokens ?? 0),
+                        (int)(data.OutputTokens ?? 0));
+                }
+            });
 
             _onStatus?.Invoke($"Analyzing {documents.Count} documents (timeout {timeoutMinutes} min)...");
 
@@ -96,13 +109,18 @@ public sealed class BehaviorAnalyzer
             // Cancel delayed timers so they don't overwrite the final result
             await timerCts.CancelAsync();
 
+            // Grace window for AssistantUsageEvent ordering — SDK makes no
+            // documented guarantee that it fires before SessionIdleEvent.
+            await observer.WaitForUsageAsync(TimeSpan.FromMilliseconds(200), ct);
+
             var responseText = response?.Data?.Content ?? "";
+            var (tokensIn, tokensOut, estimated) = observer.GetOrEstimate(prompt, responseText);
 
             if (string.IsNullOrWhiteSpace(responseText))
             {
                 _onStatus?.Invoke("AI returned empty response for behavior analysis");
-                _tracker?.Record("analysis", modelName, providerName, null, null, sw.Elapsed);
-                DebugLogAi($"ANALYSIS EMPTY response_chars=0 elapsed={sw.Elapsed.TotalSeconds:F1}s", null, null);
+                _tracker?.Record("analysis", modelName, providerName, tokensIn, tokensOut, sw.Elapsed, estimated);
+                DebugLogAi($"ANALYSIS EMPTY response_chars=0 elapsed={sw.Elapsed.TotalSeconds:F1}s", tokensIn, tokensOut, estimated);
                 return null;
             }
 
@@ -110,8 +128,8 @@ public sealed class BehaviorAnalyzer
             if (behaviors is null || behaviors.Count == 0)
             {
                 _onStatus?.Invoke("Could not parse behaviors from AI response");
-                _tracker?.Record("analysis", modelName, providerName, null, null, sw.Elapsed);
-                DebugLogAi($"ANALYSIS PARSE_FAIL response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s", null, null);
+                _tracker?.Record("analysis", modelName, providerName, tokensIn, tokensOut, sw.Elapsed, estimated);
+                DebugLogAi($"ANALYSIS PARSE_FAIL response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s", tokensIn, tokensOut, estimated);
                 // Save debug response
                 try
                 {
@@ -123,8 +141,8 @@ public sealed class BehaviorAnalyzer
             }
 
             sw.Stop();
-            _tracker?.Record("analysis", modelName, providerName, null, null, sw.Elapsed);
-            DebugLogAi($"ANALYSIS OK behaviors={behaviors.Count} response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s", null, null);
+            _tracker?.Record("analysis", modelName, providerName, tokensIn, tokensOut, sw.Elapsed, estimated);
+            DebugLogAi($"ANALYSIS OK behaviors={behaviors.Count} response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s", tokensIn, tokensOut, estimated);
             _onStatus?.Invoke($"Found {behaviors.Count} testable behaviors");
 
             // Apply focus filter if specified
@@ -164,13 +182,20 @@ public sealed class BehaviorAnalyzer
         }
         catch (TimeoutException)
         {
-            DebugLogAi($"ANALYSIS TIMEOUT configured_timeout={timeoutMinutes}min elapsed={sw.Elapsed.TotalSeconds:F1}s", null, null);
+            // Best-effort: record whatever usage the observer captured before
+            // the timeout. If none, fall back to prompt-length estimate with
+            // zero completion tokens.
+            var (tokensIn, tokensOut, estimated) = observer.GetOrEstimate(prompt, "");
+            _tracker?.Record("analysis", modelName, providerName, tokensIn, tokensOut, sw.Elapsed, estimated);
+            DebugLogAi($"ANALYSIS TIMEOUT configured_timeout={timeoutMinutes}min elapsed={sw.Elapsed.TotalSeconds:F1}s", tokensIn, tokensOut, estimated);
             _onStatus?.Invoke($"Behavior analysis timed out after {timeoutMinutes} min (model: {modelName}). Bump ai.analysis_timeout_minutes in spectra.config.json. Using default count.");
             return null;
         }
         catch (Exception ex)
         {
-            DebugLogAi($"ANALYSIS ERROR exception={ex.GetType().Name} message=\"{ex.Message}\" elapsed={sw.Elapsed.TotalSeconds:F1}s", null, null);
+            var (tokensIn, tokensOut, estimated) = observer.GetOrEstimate(prompt, "");
+            _tracker?.Record("analysis", modelName, providerName, tokensIn, tokensOut, sw.Elapsed, estimated);
+            DebugLogAi($"ANALYSIS ERROR exception={ex.GetType().Name} message=\"{ex.Message}\" elapsed={sw.Elapsed.TotalSeconds:F1}s", tokensIn, tokensOut, estimated);
             _onStatus?.Invoke($"Behavior analysis failed: {ex.Message}");
             return null;
         }
@@ -180,14 +205,15 @@ public sealed class BehaviorAnalyzer
     /// Wrapper around <see cref="Spectra.CLI.Infrastructure.DebugLogger.AppendAi"/>
     /// for analysis AI lines. Enabled flag is set once from the handler.
     /// </summary>
-    private void DebugLogAi(string message, int? tokensIn, int? tokensOut) =>
+    private void DebugLogAi(string message, int? tokensIn, int? tokensOut, bool estimated = false) =>
         Spectra.CLI.Infrastructure.DebugLogger.AppendAi(
             "analyze ",
             message,
             _provider?.Model,
             _provider?.Name,
             tokensIn,
-            tokensOut);
+            tokensOut,
+            estimated);
 
     internal static string BuildAnalysisPrompt(
         IReadOnlyList<SourceDocument> documents,

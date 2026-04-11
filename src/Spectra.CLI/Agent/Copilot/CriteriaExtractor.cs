@@ -28,16 +28,22 @@ public sealed class CriteriaExtractor
         _tracker = tracker;
     }
 
-    private void DebugLogAi(string message, TimeSpan elapsed)
+    private void RecordAndLog(
+        string message,
+        TimeSpan elapsed,
+        int? tokensIn,
+        int? tokensOut,
+        bool estimated)
     {
         Spectra.CLI.Infrastructure.DebugLogger.AppendAi(
             "criteria",
             message,
             _provider?.Model,
             _provider?.Name,
-            null,
-            null);
-        _tracker?.Record("criteria", _provider?.Model ?? "", _provider?.Name ?? "", null, null, elapsed);
+            tokensIn,
+            tokensOut,
+            estimated);
+        _tracker?.Record("criteria", _provider?.Model ?? "", _provider?.Name ?? "", tokensIn, tokensOut, elapsed, estimated);
     }
 
     /// <summary>
@@ -57,6 +63,16 @@ public sealed class CriteriaExtractor
 
         var prompt = BuildExtractionPrompt(documentPath, documentContent, component);
 
+        // Spec 040 follow-up: capture provider-reported usage or fall back.
+        var observer = new CopilotUsageObserver();
+        using var usageSub = session.On(evt =>
+        {
+            if (evt is AssistantUsageEvent u && u.Data is { } data)
+                observer.RecordUsage(
+                    (int)(data.InputTokens ?? 0),
+                    (int)(data.OutputTokens ?? 0));
+        });
+
         _onStatus?.Invoke($"Extracting criteria from {Path.GetFileName(documentPath)}...");
 
         var sw = Stopwatch.StartNew();
@@ -65,9 +81,13 @@ public sealed class CriteriaExtractor
             timeout: TimeSpan.FromMinutes(2),
             cancellationToken: ct);
         sw.Stop();
+        await observer.WaitForUsageAsync(TimeSpan.FromMilliseconds(200), ct);
 
         var responseText = response?.Data?.Content ?? "";
-        DebugLogAi($"CRITERIA OK doc={Path.GetFileName(documentPath)} response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s", sw.Elapsed);
+        var (tokensIn, tokensOut, estimated) = observer.GetOrEstimate(prompt, responseText);
+        RecordAndLog(
+            $"CRITERIA OK doc={Path.GetFileName(documentPath)} response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s",
+            sw.Elapsed, tokensIn, tokensOut, estimated);
 
         if (string.IsNullOrWhiteSpace(responseText))
             return [];
@@ -92,15 +112,28 @@ public sealed class CriteriaExtractor
 
         var prompt = BuildSplitPrompt(rawText, sourceKey, component);
 
+        var observer = new CopilotUsageObserver();
+        using var usageSub = session.On(evt =>
+        {
+            if (evt is AssistantUsageEvent u && u.Data is { } data)
+                observer.RecordUsage(
+                    (int)(data.InputTokens ?? 0),
+                    (int)(data.OutputTokens ?? 0));
+        });
+
         var sw = Stopwatch.StartNew();
         var response = await session.SendAndWaitAsync(
             new MessageOptions { Prompt = prompt },
             timeout: TimeSpan.FromMinutes(1),
             cancellationToken: ct);
         sw.Stop();
+        await observer.WaitForUsageAsync(TimeSpan.FromMilliseconds(200), ct);
 
         var responseText = response?.Data?.Content ?? "";
-        DebugLogAi($"CRITERIA SPLIT source={sourceKey ?? "?"} response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s", sw.Elapsed);
+        var (tokensIn, tokensOut, estimated) = observer.GetOrEstimate(prompt, responseText);
+        RecordAndLog(
+            $"CRITERIA SPLIT source={sourceKey ?? "?"} response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s",
+            sw.Elapsed, tokensIn, tokensOut, estimated);
 
         if (string.IsNullOrWhiteSpace(responseText))
             return [];

@@ -65,19 +65,20 @@ public sealed class CopilotCritic : ICriticRuntime
             $"CRITIC START test_id={testId} timeout={timeoutSeconds}s",
             ModelName, ProviderName, null, null);
 
+        // Spec 040 follow-up: observer captures provider-reported token
+        // counts from AssistantUsageEvent, with text.Length/4 fallback.
+        var observer = new CopilotUsageObserver();
+        // Built before try so the catch blocks can reference it for the fallback.
+        var systemPromptForFallback = _promptBuilder.BuildSystemPrompt();
+        var userPromptForFallback = _promptBuilder.BuildUserPrompt(test, relevantDocs);
+        var fullPromptForFallback = $"{systemPromptForFallback}\n\n---\n\n{userPromptForFallback}";
+
         try
         {
             var service = await CopilotService.GetInstanceAsync(ct);
 
             // Create session
             await using var session = await service.CreateCriticSessionAsync(_criticConfig, ct);
-
-            // Build prompts using existing builder
-            var systemPrompt = _promptBuilder.BuildSystemPrompt();
-            var userPrompt = _promptBuilder.BuildUserPrompt(test, relevantDocs);
-
-            // Combine system and user prompts
-            var fullPrompt = $"{systemPrompt}\n\n---\n\n{userPrompt}";
 
             // Collect response through events
             var responseBuilder = new StringBuilder();
@@ -92,6 +93,11 @@ public sealed class CopilotCritic : ICriticRuntime
                         break;
                     case AssistantMessageEvent message:
                         responseBuilder.Append(message.Data?.Content ?? "");
+                        break;
+                    case AssistantUsageEvent usage when usage.Data is { } usageData:
+                        observer.RecordUsage(
+                            (int)(usageData.InputTokens ?? 0),
+                            (int)(usageData.OutputTokens ?? 0));
                         break;
                     case SessionIdleEvent:
                         if (!completionSource.Task.IsCompleted)
@@ -110,7 +116,7 @@ public sealed class CopilotCritic : ICriticRuntime
             });
 
             // Send verification request
-            await session.SendAsync(new MessageOptions { Prompt = fullPrompt }, ct);
+            await session.SendAsync(new MessageOptions { Prompt = fullPromptForFallback }, ct);
 
             // Wait for completion with timeout (driven by critic.timeout_seconds).
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
@@ -120,30 +126,36 @@ public sealed class CopilotCritic : ICriticRuntime
 
             stopwatch.Stop();
 
+            // Grace window for AssistantUsageEvent ordering.
+            await observer.WaitForUsageAsync(TimeSpan.FromMilliseconds(200), ct);
+            var (tokensIn, tokensOut, estimated) = observer.GetOrEstimate(fullPromptForFallback, responseText);
+
             // Parse the response using existing parser
             var result = _responseParser.Parse(responseText, ModelName, stopwatch.Elapsed);
-            _tracker?.Record("critic", ModelName, ProviderName, null, null, stopwatch.Elapsed);
+            _tracker?.Record("critic", ModelName, ProviderName, tokensIn, tokensOut, stopwatch.Elapsed, estimated);
             Spectra.CLI.Infrastructure.DebugLogger.AppendAi("critic ",
                 $"CRITIC OK    test_id={testId} verdict={result.Verdict} score={result.Score:F2} elapsed={stopwatch.Elapsed.TotalSeconds:F1}s",
-                ModelName, ProviderName, null, null);
+                ModelName, ProviderName, tokensIn, tokensOut, estimated);
             return result;
         }
         catch (OperationCanceledException)
         {
             stopwatch.Stop();
-            _tracker?.Record("critic", ModelName, ProviderName, null, null, stopwatch.Elapsed);
+            var (tokensIn, tokensOut, estimated) = observer.GetOrEstimate(fullPromptForFallback, "");
+            _tracker?.Record("critic", ModelName, ProviderName, tokensIn, tokensOut, stopwatch.Elapsed, estimated);
             Spectra.CLI.Infrastructure.DebugLogger.AppendAi("critic ",
                 $"CRITIC TIMEOUT test_id={testId} configured_timeout={timeoutSeconds}s elapsed={stopwatch.Elapsed.TotalSeconds:F1}s",
-                ModelName, ProviderName, null, null);
+                ModelName, ProviderName, tokensIn, tokensOut, estimated);
             return CreateErrorResult($"Verification timed out after {timeoutSeconds}s — bump critic.timeout_seconds in spectra.config.json", stopwatch.Elapsed);
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
-            _tracker?.Record("critic", ModelName, ProviderName, null, null, stopwatch.Elapsed);
+            var (tokensIn, tokensOut, estimated) = observer.GetOrEstimate(fullPromptForFallback, "");
+            _tracker?.Record("critic", ModelName, ProviderName, tokensIn, tokensOut, stopwatch.Elapsed, estimated);
             Spectra.CLI.Infrastructure.DebugLogger.AppendAi("critic ",
                 $"CRITIC ERROR test_id={testId} exception={ex.GetType().Name} message=\"{ex.Message}\" elapsed={stopwatch.Elapsed.TotalSeconds:F1}s",
-                ModelName, ProviderName, null, null);
+                ModelName, ProviderName, tokensIn, tokensOut, estimated);
             return CreateErrorResult(ex.Message, stopwatch.Elapsed);
         }
     }

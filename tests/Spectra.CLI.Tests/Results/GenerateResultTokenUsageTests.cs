@@ -57,6 +57,8 @@ public class GenerateResultTokenUsageTests
         Assert.Contains("\"elapsed_seconds\":", json);
         Assert.Contains("\"estimated_cost_usd\":null", json); // github-models
         Assert.Contains("\"cost_display\":\"Included in Copilot plan", json);
+        // Spec 040 follow-up: estimated flag present at report and phase level.
+        Assert.Contains("\"estimated\":false", json);
     }
 
     [Fact]

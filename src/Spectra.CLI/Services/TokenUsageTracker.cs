@@ -19,6 +19,10 @@ public sealed class TokenUsageTracker
 
     /// <summary>
     /// Record a single AI call. Safe to call from multiple threads.
+    /// <paramref name="estimated"/> is true when <paramref name="tokensIn"/>
+    /// and <paramref name="tokensOut"/> came from
+    /// <see cref="TokenEstimator"/> fallback (text.Length / 4) instead of
+    /// provider-reported <c>AssistantUsageEvent</c> counts.
     /// </summary>
     public void Record(
         string phase,
@@ -26,7 +30,8 @@ public sealed class TokenUsageTracker
         string provider,
         int? tokensIn,
         int? tokensOut,
-        TimeSpan elapsed)
+        TimeSpan elapsed,
+        bool estimated = false)
     {
         var entry = new PhaseUsage(
             phase ?? "",
@@ -35,7 +40,8 @@ public sealed class TokenUsageTracker
             1,
             tokensIn ?? 0,
             tokensOut ?? 0,
-            elapsed);
+            elapsed,
+            estimated);
 
         lock (_lock)
         {
@@ -62,12 +68,14 @@ public sealed class TokenUsageTracker
             var tokensIn = 0;
             var tokensOut = 0;
             var elapsed = TimeSpan.Zero;
+            var estimated = false;
             foreach (var e in group)
             {
                 calls += e.Calls;
                 tokensIn += e.TokensIn;
                 tokensOut += e.TokensOut;
                 elapsed += e.Elapsed;
+                estimated |= e.Estimated;
             }
 
             result.Add(new PhaseUsage(
@@ -77,7 +85,8 @@ public sealed class TokenUsageTracker
                 calls,
                 tokensIn,
                 tokensOut,
-                elapsed));
+                elapsed,
+                estimated));
         }
 
         return result
@@ -101,15 +110,17 @@ public sealed class TokenUsageTracker
         var tokensIn = 0;
         var tokensOut = 0;
         var elapsed = TimeSpan.Zero;
+        var estimated = false;
         foreach (var e in snapshot)
         {
             calls += e.Calls;
             tokensIn += e.TokensIn;
             tokensOut += e.TokensOut;
             elapsed += e.Elapsed;
+            estimated |= e.Estimated;
         }
 
-        return new PhaseUsage("TOTAL", "", "", calls, tokensIn, tokensOut, elapsed);
+        return new PhaseUsage("TOTAL", "", "", calls, tokensIn, tokensOut, elapsed, estimated);
     }
 
     public bool HasData()

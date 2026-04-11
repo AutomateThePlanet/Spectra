@@ -122,4 +122,52 @@ public class TokenUsageTrackerTests
         t.Record("analysis", "gpt-4o", "github-models", null, null, TimeSpan.Zero);
         Assert.True(t.HasData());
     }
+
+    [Fact]
+    public void Record_Estimated_AggregatesFlag()
+    {
+        var t = new TokenUsageTracker();
+        t.Record("generation", "gpt-4.1", "github-models", 100, 50, TimeSpan.FromSeconds(1), estimated: false);
+        t.Record("generation", "gpt-4.1", "github-models", 200, 80, TimeSpan.FromSeconds(2), estimated: true);
+
+        var summary = t.GetSummary();
+        Assert.Single(summary);
+        Assert.True(summary[0].Estimated);
+        Assert.Equal(300, summary[0].TokensIn);
+        Assert.Equal(130, summary[0].TokensOut);
+    }
+
+    [Fact]
+    public void Record_NotEstimated_AggregateFalse()
+    {
+        var t = new TokenUsageTracker();
+        t.Record("generation", "gpt-4.1", "github-models", 100, 50, TimeSpan.FromSeconds(1));
+        t.Record("generation", "gpt-4.1", "github-models", 200, 80, TimeSpan.FromSeconds(2));
+
+        var summary = t.GetSummary();
+        Assert.Single(summary);
+        Assert.False(summary[0].Estimated);
+    }
+
+    [Fact]
+    public void GetTotal_MixedEstimated_TotalEstimatedTrue()
+    {
+        var t = new TokenUsageTracker();
+        t.Record("analysis", "gpt-4.1", "github-models", 100, 50, TimeSpan.FromSeconds(1), estimated: false);
+        t.Record("generation", "gpt-4.1", "github-models", 200, 80, TimeSpan.FromSeconds(2), estimated: true);
+
+        var total = t.GetTotal();
+        Assert.True(total.Estimated);
+    }
+
+    [Fact]
+    public void GetTotal_AllNonEstimated_TotalEstimatedFalse()
+    {
+        var t = new TokenUsageTracker();
+        t.Record("analysis", "gpt-4.1", "github-models", 100, 50, TimeSpan.FromSeconds(1));
+        t.Record("generation", "gpt-4.1", "github-models", 200, 80, TimeSpan.FromSeconds(2));
+
+        var total = t.GetTotal();
+        Assert.False(total.Estimated);
+    }
 }

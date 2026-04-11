@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.45.1] - 2026-04-11
+
+### Added
+- **Real token counts from `AssistantUsageEvent`** (spec 040 follow-up) — the Copilot SDK surfaces provider-reported `InputTokens` / `OutputTokens` on a separate `AssistantUsageEvent` (not on `AssistantMessageEvent` as Spectra previously assumed). Every AI call site (BehaviorAnalyzer, GenerationAgent batch loop, GroundingAgent critic, CriteriaExtractor — both methods) now subscribes to this event via a new `CopilotUsageObserver` helper, waits a 200ms grace after the request for ordering-safe capture, and records the real counts into `TokenUsageTracker`. No more `?` placeholders in the normal case.
+- **`text.Length / 4` fallback** when the usage event fails to arrive within the grace window — captured by the new `TokenEstimator` service. Fallback values are flagged end-to-end: `~tokens_in=…` / `~tokens_out=…` in the debug log and `"estimated": true` on both the `token_usage` report and each affected phase DTO in JSON.
+- **`RUN TOTAL` summary line** written to `.spectra-debug.log` at the end of every `generate` / `update` run, via the new `RunSummaryDebugFormatter`. Format: `RUN TOTAL command=generate suite=checkout calls=24 tokens_in=64480 tokens_out=24240 elapsed=2m45s phases=analysis:1/18.5s,generation:3/52.3s,critic:20/1m34s`. Makes the log self-summarizing — one grep and you have the run-level numbers. When any phase used the estimate fallback, the totals gain `~` prefixes.
+- New services: `TokenEstimator`, `CopilotUsageObserver`, `RunSummaryDebugFormatter`.
+- +36 tests (TokenEstimatorTests, CopilotUsageObserverTests, RunSummaryDebugFormatterTests, TokenUsageReportEstimatedTests, plus extensions to TokenUsageTrackerTests, DebugLoggerTests, GenerateResultTokenUsageTests).
+
+### Changed
+- `PhaseUsage`, `TokenUsageTracker.Record`, `TokenUsageReport`, `PhaseUsageDto`, and `DebugLogger.AppendAi` all carry a new `bool estimated` field / parameter. The flag propagates via logical OR during aggregation — any estimated call in a phase flags the whole phase (and the run total) as estimated. Backwards compatible: the parameter defaults to `false`.
+- `UpdateHandler` emits the `RUN TOTAL` line with `calls=0 phases=` as a run-boundary marker (no AI calls today — still useful when grepping the log).
+
+### Notes
+- Event ordering between `AssistantUsageEvent` and `SessionIdleEvent` is undocumented in the SDK. The 200ms grace via `TaskCompletionSource` handles both orderings: returns immediately if usage arrived before idle, waits briefly if it arrives after. On timeout, the length-based estimate kicks in.
+- `AssistantUsageData.InputTokens` / `OutputTokens` are `double?` in the SDK assembly (not `int` as the XML doc implies) — we cast with `(int)(value ?? 0)`.
+
 ## [1.45.0] - 2026-04-11
 
 ### Added

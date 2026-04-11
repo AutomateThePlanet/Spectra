@@ -45,6 +45,12 @@ public static class DebugLogger
     /// Append a one-line timestamped diagnostic for an AI call. The line
     /// is suffixed with <c>model=… provider=… tokens_in=… tokens_out=…</c>.
     /// Null token values render as literal <c>?</c>.
+    ///
+    /// Spec 040 follow-up: when <paramref name="estimated"/> is true, both
+    /// token fields gain a <c>~</c> prefix (<c>~tokens_in=N ~tokens_out=N</c>)
+    /// to signal that the counts came from the <c>text.Length / 4</c>
+    /// fallback in <see cref="Spectra.CLI.Services.TokenEstimator"/> rather
+    /// than provider-reported <c>AssistantUsageEvent</c> data.
     /// </summary>
     public static void AppendAi(
         string component,
@@ -52,7 +58,8 @@ public static class DebugLogger
         string? model,
         string? provider,
         int? tokensIn,
-        int? tokensOut)
+        int? tokensOut,
+        bool estimated = false)
     {
         if (!Enabled) return;
 
@@ -61,8 +68,11 @@ public static class DebugLogger
         var tokensInText = tokensIn.HasValue ? tokensIn.Value.ToString() : "?";
         var tokensOutText = tokensOut.HasValue ? tokensOut.Value.ToString() : "?";
 
+        var tokenPrefix = estimated ? "~" : "";
+
         var suffixed =
-            $"{message} model={modelText} provider={providerText} tokens_in={tokensInText} tokens_out={tokensOutText}";
+            $"{message} model={modelText} provider={providerText} "
+            + $"{tokenPrefix}tokens_in={tokensInText} {tokenPrefix}tokens_out={tokensOutText}";
         WriteLine(component, suffixed);
     }
 

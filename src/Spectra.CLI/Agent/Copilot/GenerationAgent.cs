@@ -149,10 +149,22 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 tools,
                 ct);
 
+            // Spec 040 follow-up: observer captures provider-reported token
+            // counts from AssistantUsageEvent. Falls back to text.Length / 4
+            // estimate if no usage event arrives within the grace window.
+            var observer = new CopilotUsageObserver();
+
             // Track tool calls and schedule delayed composing message
             using var timerCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             using var subscription = session.On(evt =>
             {
+                if (evt is AssistantUsageEvent usage && usage.Data is { } usageData)
+                {
+                    observer.RecordUsage(
+                        (int)(usageData.InputTokens ?? 0),
+                        (int)(usageData.OutputTokens ?? 0));
+                    return;
+                }
                 if (evt is ToolExecutionStartEvent toolStart)
                 {
                     var friendlyName = toolStart.Data.ToolName switch
@@ -197,7 +209,7 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
             var timeoutMinutes = Math.Max(1, _config.Ai.GenerationTimeoutMinutes);
             var batchTimeout = TimeSpan.FromMinutes(timeoutMinutes);
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            DebugLogAi($"BATCH START requested={requestedCount} timeout={timeoutMinutes}min", null, null);
+            DebugLogAi($"BATCH START requested={requestedCount} timeout={timeoutMinutes}min", null, null, estimated: false);
             _onStatus?.Invoke($"Starting AI generation ({requestedCount} tests, timeout {timeoutMinutes} min)...");
             var response = await session.SendAndWaitAsync(
                 new MessageOptions { Prompt = fullPrompt },
@@ -207,12 +219,15 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
             // Cancel delayed timers so they don't overwrite the final result
             await timerCts.CancelAsync();
             sw.Stop();
-            // Spec 040: record token usage (tokens currently unavailable from
-            // the Copilot SDK response — recorded as null, debug log shows `?`).
-            _tracker?.Record("generation", _provider?.Model ?? "", _provider?.Name ?? "", null, null, sw.Elapsed);
-            DebugLogAi($"BATCH OK   requested={requestedCount} elapsed={sw.Elapsed.TotalSeconds:F1}s", null, null);
+
+            // Grace window for AssistantUsageEvent to arrive before we read.
+            await observer.WaitForUsageAsync(TimeSpan.FromMilliseconds(200), ct);
 
             var responseText = response?.Data?.Content ?? "";
+            var (tokensIn, tokensOut, estimated) = observer.GetOrEstimate(fullPrompt, responseText);
+
+            _tracker?.Record("generation", _provider?.Model ?? "", _provider?.Name ?? "", tokensIn, tokensOut, sw.Elapsed, estimated);
+            DebugLogAi($"BATCH OK   requested={requestedCount} elapsed={sw.Elapsed.TotalSeconds:F1}s", tokensIn, tokensOut, estimated);
 
             // Save raw response for debugging
             SaveDebugResponse(responseText);
@@ -255,7 +270,7 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
         catch (TimeoutException)
         {
             var configuredMinutes = Math.Max(1, _config.Ai.GenerationTimeoutMinutes);
-            DebugLogAi($"BATCH TIMEOUT requested={requestedCount} configured_timeout={configuredMinutes}min", null, null);
+            DebugLogAi($"BATCH TIMEOUT requested={requestedCount} configured_timeout={configuredMinutes}min", null, null, estimated: false);
             return new GenerationResult
             {
                 Tests = [],
@@ -323,14 +338,15 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
     private void DebugLog(string message) =>
         Spectra.CLI.Infrastructure.DebugLogger.Append("generate", message);
 
-    private void DebugLogAi(string message, int? tokensIn, int? tokensOut) =>
+    private void DebugLogAi(string message, int? tokensIn, int? tokensOut, bool estimated = false) =>
         Spectra.CLI.Infrastructure.DebugLogger.AppendAi(
             "generate",
             message,
             _provider?.Model,
             _provider?.Name,
             tokensIn,
-            tokensOut);
+            tokensOut,
+            estimated);
 
     private void SaveDebugResponse(string responseText)
     {
