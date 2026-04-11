@@ -277,47 +277,6 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
             // the actual error message. Generation proceeds immediately
             // because the SDK doesn't block session creation on MCP load.
 
-            // Diagnostic snapshot: once MCP servers finish loading, ask the
-            // SDK for the merged tool list and write each tool name to the
-            // debug log. Lets us answer "did testimize tools actually reach
-            // the agent's tool list?" by looking at .spectra-debug.log
-            // instead of guessing from tool-call traces. Best-effort only —
-            // failures here must not block generation.
-            if (mcpServers is not null)
-            {
-                try
-                {
-                    var loaded = await Task.WhenAny(
-                        mcpServersLoadedTcs.Task,
-                        Task.Delay(TimeSpan.FromSeconds(10), ct));
-                    var loadedInTime = loaded == mcpServersLoadedTcs.Task;
-                    DebugLog($"TOOL LIST waiting_for_mcp_loaded={loadedInTime}");
-
-                    var modelName = ProviderMapping.GetModelName(_provider);
-                    var toolList = await service.ListSessionToolsAsync(modelName, ct);
-                    var toolCount = toolList?.Tools?.Count ?? 0;
-                    DebugLog($"TOOL LIST count={toolCount} model={modelName}");
-                    if (toolList?.Tools is { } toolItems)
-                    {
-                        var testimizeHits = 0;
-                        foreach (var tool in toolItems)
-                        {
-                            var displayName = !string.IsNullOrEmpty(tool.NamespacedName)
-                                ? tool.NamespacedName
-                                : tool.Name ?? "?";
-                            DebugLog($"TOOL LIST item={displayName}");
-                            if (displayName.IndexOf("testimize", StringComparison.OrdinalIgnoreCase) >= 0)
-                                testimizeHits++;
-                        }
-                        DebugLog($"TOOL LIST testimize_tools_visible={testimizeHits}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    DebugLog($"TOOL LIST error={ex.GetType().Name}: {ex.Message}");
-                }
-            }
-
             // Build the combined prompt with system instructions and user request.
             // The profile format (JSON schema sent to the AI) is resolved from
             // profiles/_default.yaml on disk if present, else the embedded default.
@@ -342,6 +301,25 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
             // Slower / reasoning models may need 10–20+ minutes per batch.
             var timeoutMinutes = Math.Max(1, _config.Ai.GenerationTimeoutMinutes);
             var batchTimeout = TimeSpan.FromMinutes(timeoutMinutes);
+            // v1.48.2: gate the prompt send on MCP servers being fully loaded.
+            // Without this, the SDK builds the model's tool catalog at session
+            // start before testimize finishes its initialize handshake (~600ms
+            // typical), so testimize tools are absent from the catalog the
+            // model sees. The .spectra-debug.log under 1.48.1 showed BATCH
+            // START firing ~600–700ms before TESTIMIZE LOADED on every batch.
+            // Best-effort with a 30s ceiling — if loading is slow, we still
+            // send the prompt rather than blocking generation indefinitely.
+            if (mcpServers is not null)
+            {
+                var gateSw = System.Diagnostics.Stopwatch.StartNew();
+                var winner = await Task.WhenAny(
+                    mcpServersLoadedTcs.Task,
+                    Task.Delay(TimeSpan.FromSeconds(30), ct));
+                gateSw.Stop();
+                var result = winner == mcpServersLoadedTcs.Task ? "loaded" : "timeout";
+                DebugLog($"GATE mcp_loaded waited={gateSw.Elapsed.TotalSeconds:F2}s result={result}");
+            }
+
             var sw = System.Diagnostics.Stopwatch.StartNew();
             DebugLogAi($"BATCH START requested={requestedCount} timeout={timeoutMinutes}min", null, null, estimated: false);
             _onStatus?.Invoke($"Starting AI generation ({requestedCount} tests, timeout {timeoutMinutes} min)...");

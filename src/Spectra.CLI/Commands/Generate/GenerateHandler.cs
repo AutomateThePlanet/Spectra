@@ -577,7 +577,11 @@ public sealed class GenerateHandler
         var criteriaContext = await LoadCriteriaContextAsync(currentDir, suite, config, ct);
 
         // --- Batch generation loop ---
-        var generatorModel = agent.ProviderName;
+        // v1.48.2: write the actual model name (e.g. "claude-sonnet-4.5") to
+        // the grounding frontmatter, not the agent's ProviderName which is
+        // always "copilot-sdk (github-models)" since the unification under
+        // the Copilot SDK runtime. The critic field already does this.
+        var generatorModel = config.Ai.Providers?.FirstOrDefault(p => p.Enabled)?.Model ?? agent.ProviderName;
         var writer = new TestFileWriter();
         var allWrittenTests = new List<TestCase>();
         var allFilesCreated = new List<string>();
@@ -1259,7 +1263,9 @@ public sealed class GenerateHandler
                 // Verify tests against documentation if critic is configured
                 var verificationResults = new List<(TestCase Test, VerificationResult Result)>();
                 var testsToWrite = result.Tests.ToList();
-                var generatorModel = agent.ProviderName;
+                // v1.48.2: see comment in GenerateAndVerifyAsync — write the
+                // actual model name, not the agent's wrapper ProviderName.
+                var generatorModel = config.Ai.Providers?.FirstOrDefault(p => p.Enabled)?.Model ?? agent.ProviderName;
 
                 if (ShouldVerify(config.Ai.Critic))
                 {

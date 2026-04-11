@@ -147,7 +147,7 @@ public sealed class UserDescribedGenerator
             {
                 Verdict = VerificationVerdict.Manual,
                 Score = 1.0,
-                Generator = agent.ProviderName,
+                Generator = config.Ai.Providers?.FirstOrDefault(p => p.Enabled)?.Model ?? agent.ProviderName,
                 Critic = "user-described",
                 VerifiedAt = DateTimeOffset.UtcNow
             }
