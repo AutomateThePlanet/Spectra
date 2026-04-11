@@ -141,10 +141,6 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
 
             // Track tool calls and schedule delayed composing message
             using var timerCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            // v1.46.0: one-shot latch so we know whether testimize reported a
-            // load status within the grace window. Used for the defensive
-            // fallback below.
-            var testimizeLoadReported = false;
             using var subscription = session.On(evt =>
             {
                 if (evt is AssistantUsageEvent usage && usage.Data is { } usageData)
@@ -168,7 +164,6 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                         DebugLog($"TESTIMIZE LOADED server={name} status={status} source={s.Source ?? "?"}{errorSuffix}");
                         if (string.Equals(name, "testimize", StringComparison.OrdinalIgnoreCase))
                         {
-                            testimizeLoadReported = true;
                             if (status.Equals("Connected", StringComparison.OrdinalIgnoreCase))
                             {
                                 _onStatus?.Invoke("Testimize connected — algorithmic test data available");
@@ -184,10 +179,6 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 if (evt is SessionMcpServerStatusChangedEvent changed && changed.Data is { } changedData)
                 {
                     DebugLog($"TESTIMIZE STATUS_CHANGED server={changedData.ServerName} status={changedData.Status}");
-                    if (string.Equals(changedData.ServerName, "testimize", StringComparison.OrdinalIgnoreCase))
-                    {
-                        testimizeLoadReported = true;
-                    }
                     return;
                 }
                 if (evt is ToolExecutionStartEvent toolStart)
@@ -218,24 +209,16 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 }
             });
 
-            // v1.46.0: defensive 3-second grace window — if testimize was
-            // configured but the SDK hasn't reported a load status by the
-            // time we're ready to send the prompt, log an UNHEALTHY line and
-            // continue. The SDK still owns the process; we're just warning
-            // the user that the MCP server may not be responding.
-            if (mcpServers is not null)
-            {
-                var graceDeadline = DateTime.UtcNow.AddSeconds(3);
-                while (!testimizeLoadReported && DateTime.UtcNow < graceDeadline)
-                {
-                    await Task.Delay(100, ct);
-                }
-                if (!testimizeLoadReported)
-                {
-                    DebugLog("TESTIMIZE UNHEALTHY server=testimize reason=no_load_event_within_3s");
-                    _onStatus?.Invoke("Testimize server didn't report load status within 3s — AI may still succeed without it");
-                }
-            }
+            // v1.46.1: the old 3-second grace window was deleted. The
+            // Copilot CLI's MCP client takes ~60 seconds to attempt +
+            // time out the initialize handshake (JSON-RPC error -32001),
+            // so a 3-second wait would always fire a false UNHEALTHY
+            // line and then the real LOADED event would arrive much
+            // later. Instead, we let the SDK fire SessionMcpServersLoadedEvent
+            // whenever it's ready — the event handler above logs the
+            // real status (Connected / Failed / NeedsAuth / ...) with
+            // the actual error message. Generation proceeds immediately
+            // because the SDK doesn't block session creation on MCP load.
 
             // Build the combined prompt with system instructions and user request.
             // The profile format (JSON schema sent to the AI) is resolved from

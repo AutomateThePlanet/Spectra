@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.46.1] - 2026-04-11
+
+### Fixed
+- **False `TESTIMIZE UNHEALTHY no_load_event_within_3s` line in debug log.** The 3-second grace window in `GenerationAgent` was based on a wrong assumption about how fast the Copilot CLI's MCP client handshakes with a server — in reality it takes ~60s to attempt + time out an initialize against a non-spec-compliant server. Removed the grace window entirely. The SDK's `SessionMcpServersLoadedEvent` is the single source of truth; when it fires (success or failure), the real status is logged with the real error message. Generation proceeds immediately because the SDK does not block session creation on MCP loading.
+- **Session-companion fix in `Testimize.MCP.Server`** (separate repo): the server previously emitted JSON-RPC responses with both `"result"` and `"error":null`, which is a [JSON-RPC 2.0 spec violation](https://www.jsonrpc.org/specification#response_object) — the spec says a response MUST contain `result` OR `error`, not both. The Copilot CLI's MCP client (built on `@modelcontextprotocol/sdk`) correctly rejects malformed responses and times out at ~60s with `MCP error -32001: Request timed out`. Fix: serialize only the field that applies. See `Testimize.MCP.Server/Program.cs` change; requires rebuilding testimize-mcp 1.1.10 from source and reinstalling.
+
+### Notes
+- **Zero code-path changes beyond the 3s grace removal** — token tracking, debug log formatting, run summary, `RUN TOTAL` line, and the native `SessionConfig.McpServers` wiring from v1.46.0 are all untouched.
+- The SDK's behavior (blocking vs non-blocking session creation on MCP load) was empirically verified by observing the timing in `.spectra-debug.log`: session creation completed immediately, generation ran in parallel with the MCP handshake, and the load event arrived ~68s later with `status=Failed`.
+
 ## [1.46.0] - 2026-04-11
 
 ### Added
