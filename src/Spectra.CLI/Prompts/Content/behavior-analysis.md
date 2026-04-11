@@ -103,10 +103,12 @@ Count only DISTINCT testable behaviors — do not duplicate similar scenarios.
 ## ALGORITHMIC TEST DATA (Testimize Available)
 
 When you identify input fields with validation rules (ranges, patterns, required):
-1. Call the `AnalyzeFieldSpec` tool to extract field types and constraints
-2. Call the `GenerateTestData` tool with the extracted field specs
-3. Use the returned boundary values and equivalence classes as EXACT test data in your behaviors
-4. The returned combinations are mathematically optimal — do NOT add your own approximations
+1. Call the `AnalyzeFieldSpec` tool to extract field types and constraints from the documentation text.
+2. Call **one** of the two testimize MCP tools with the extracted field specs:
+   - `testimize/generate_hybrid_test_cases` — Hybrid Artificial Bee Colony. Best for thorough fault detection.
+   - `testimize/generate_pairwise_test_cases` — Pairwise. Best for fast, efficient coverage.
+3. Use the returned boundary values and equivalence classes as EXACT test data in your behaviors.
+4. The returned combinations are mathematically optimal — do NOT add your own approximations.
 
 Testimize produces better boundary values than manual selection because it uses:
 - 3-value BVA (min-1, min, min+1, max-1, max, max+1) instead of 2-value

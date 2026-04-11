@@ -15,8 +15,13 @@ public class TestimizeConditionalBlockTests
         var body = BuiltInTemplates.GetRawContent("behavior-analysis")!;
         Assert.Contains("{{#if testimize_enabled}}", body);
         Assert.Contains("ALGORITHMIC TEST DATA", body);
+        // v1.46.0: AnalyzeFieldSpec is still referenced (local tool), but the
+        // old GenerateTestData wrapper was deleted in favor of two real MCP
+        // tool names: testimize/generate_hybrid_test_cases and
+        // testimize/generate_pairwise_test_cases.
         Assert.Contains("AnalyzeFieldSpec", body);
-        Assert.Contains("GenerateTestData", body);
+        Assert.Contains("testimize/generate_hybrid_test_cases", body);
+        Assert.Contains("testimize/generate_pairwise_test_cases", body);
     }
 
     [Fact]
@@ -24,7 +29,14 @@ public class TestimizeConditionalBlockTests
     {
         var body = BuiltInTemplates.GetRawContent("test-generation")!;
         Assert.Contains("{{#if testimize_enabled}}", body);
-        Assert.Contains("USING TESTIMIZE-GENERATED VALUES", body);
+        // v1.46.0: heading changed from "USING TESTIMIZE-GENERATED VALUES"
+        // to "USING TESTIMIZE FOR OPTIMIZED TEST DATA" to reflect that the
+        // AI now picks between two real MCP tools instead of calling a
+        // wrapper.
+        Assert.Contains("USING TESTIMIZE", body);
+        Assert.Contains("testimize/generate_hybrid_test_cases", body);
+        Assert.Contains("testimize/generate_pairwise_test_cases", body);
+        Assert.Contains("{{testimize_strategy}}", body);
         Assert.Contains("EXACT values from Testimize", body);
     }
 

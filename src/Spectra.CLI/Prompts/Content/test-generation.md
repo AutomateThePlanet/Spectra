@@ -77,11 +77,36 @@ ISTQB technique tag attached to each behavior (BVA, EP, DT, ST, EG, UC).
 - RIGHT: "Enter '√(−1)' in the calculator input and verify error handling"
 
 {{#if testimize_enabled}}
-## USING TESTIMIZE-GENERATED VALUES
+## USING TESTIMIZE FOR OPTIMIZED TEST DATA
 
-When Testimize data is available from the analysis phase:
+Testimize is available as an MCP server with two test-data generation tools.
+Call one of them whenever you encounter input fields that have validation
+rules (min/max length, numeric ranges, required fields, format patterns).
+
+- **`testimize/generate_hybrid_test_cases`** — Hybrid Artificial Bee Colony
+  algorithm. Thorough fault detection via boundary values, equivalence
+  classes, and optimized combinations. Best for form validation,
+  comprehensive API testing, and any batch where test quality matters more
+  than speed.
+- **`testimize/generate_pairwise_test_cases`** — Pairwise algorithm. Fast,
+  minimal test suite covering all parameter interactions. Best for CI/CD
+  pipelines, smoke testing, and initial coverage sweeps.
+
+Default preference for this run: **`{{testimize_strategy}}`**. Use the default
+unless a specific scenario clearly calls for the other algorithm.
+
+### Before calling a testimize tool
+
+If your documentation snippet describes fields in prose (e.g., "username must
+be 3 to 20 characters, email address required"), call `AnalyzeFieldSpec`
+first to turn the text into a structured field-spec JSON. Then pass that JSON
+to `testimize/generate_hybrid_test_cases` or
+`testimize/generate_pairwise_test_cases`.
+
+### When you receive testimize results
+
 - Use the EXACT values from Testimize in test steps — do not round or simplify
-- Use the EXACT error messages from Testimize's expected_error field
+- Use the EXACT error messages from Testimize's `expected_error` field
 - Reference the value category (BoundaryValid, BoundaryInvalid, Invalid) in the test title
 - Example: "Enter username 'An' (BoundaryInvalid: 2 chars, below minimum 3)"
 - Each Testimize combination may become one test case, or related ones may be grouped

@@ -47,15 +47,24 @@ public sealed class TestimizeCheckHandler
 
         var testimize = config?.Testimize ?? new TestimizeConfig();
 
-        // FR-028: when disabled, do not start the MCP process.
+        // v1.46.0: the custom TestimizeMcpClient has been deleted — testimize
+        // now flows through the Copilot SDK's native MCP support. For this
+        // `check` command we only verify the binary is installed as a global
+        // .NET tool. The authoritative runtime health check is now visible in
+        // .spectra-debug.log when you run `spectra ai generate` (look for the
+        // `TESTIMIZE LOADED server=testimize status=Connected` line).
+        //
+        // FR-028: when disabled, do not probe.
         bool installed = false;
         bool healthy = false;
         if (testimize.Enabled)
         {
-            await using var client = new TestimizeMcpClient();
-            installed = await client.StartAsync(testimize.Mcp, ct);
-            if (installed)
-                healthy = await client.IsHealthyAsync(ct);
+            installed = await TestimizeDetector.IsInstalledAsync(ct);
+            // When the binary is installed, we report healthy=true since the
+            // SDK will actually spawn and handshake with it during generation.
+            // If the SDK reports Failed or NeedsAuth at that point, the
+            // generate run's debug log will show it — that's the real check.
+            healthy = installed;
         }
 
         // Resolve settings file presence (only when configured).

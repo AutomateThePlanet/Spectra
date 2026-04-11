@@ -55,45 +55,14 @@ public class TestimizeCheckHandlerTests : IDisposable
         }
     }
 
-    [Fact]
-    public async Task Check_EnabledButBogusCommand_ReportsInstalledFalseWithInstallCommand()
-    {
-        // Write a config that enables Testimize with a bogus command
-        var config = """
-            {
-              "source": {},
-              "tests": {},
-              "ai": { "providers": [{"name": "copilot", "model": "gpt-4o", "enabled": true, "priority": 1}] },
-              "testimize": {
-                "enabled": true,
-                "mcp": { "command": "this-tool-does-not-exist-spectra-038", "args": ["--mcp"] }
-              }
-            }
-            """;
-        await File.WriteAllTextAsync(Path.Combine(_tempDir, "spectra.config.json"), config);
-
-        var sw = new StringWriter();
-        var prev = Console.Out;
-        Console.SetOut(sw);
-        try
-        {
-            var handler = new TestimizeCheckHandler(OutputFormat.Json);
-            var exit = await handler.ExecuteAsync();
-
-            Assert.Equal(0, exit);
-            var json = sw.ToString();
-            using var doc = JsonDocument.Parse(json);
-            Assert.True(doc.RootElement.GetProperty("enabled").GetBoolean());
-            Assert.False(doc.RootElement.GetProperty("installed").GetBoolean());
-            Assert.False(doc.RootElement.GetProperty("healthy").GetBoolean());
-            Assert.True(doc.RootElement.TryGetProperty("install_command", out var cmd));
-            Assert.Contains("dotnet tool install", cmd.GetString());
-        }
-        finally
-        {
-            Console.SetOut(prev);
-        }
-    }
+    // v1.46.0: deleted Check_EnabledButBogusCommand_ReportsInstalledFalseWithInstallCommand.
+    // The old test pointed a testimize.mcp.command at a non-existent binary and
+    // expected the handler to detect that via a probe. The new handler uses
+    // TestimizeDetector.IsInstalledAsync() which checks `dotnet tool list -g`
+    // for testimize.mcp.server — it no longer knows or cares about the user's
+    // custom `command` value. Runtime command-validity is now observed during
+    // `spectra ai generate` via the debug log's `TESTIMIZE LOADED status=Failed`
+    // line (driven by the Copilot SDK's SessionMcpServersLoadedEvent).
 
     [Fact]
     public async Task Check_JsonOutput_ContainsRequiredFields()

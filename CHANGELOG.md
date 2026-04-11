@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.46.0] - 2026-04-11
+
+### Added
+- **Native MCP integration for Testimize** — `spectra ai generate` now passes Testimize to the Copilot SDK via its native `SessionConfig.McpServers` API. The SDK owns the full lifecycle: process spawn, `initialize` handshake, framing variant (Content-Length OR newline-delimited), tool discovery, cost attribution (`AssistantUsageData.Initiator = "mcp-sampling"`), permission prompts, and OAuth. No more custom JSON-RPC protocol client.
+- **`McpConfigBuilder.BuildTestimizeServer(TestimizeConfig)`** — small static helper that translates the user-facing `testimize` config block into an `McpLocalServerConfig` for the SDK. Unit-tested in isolation.
+- **`CopilotService.CreateGenerationSessionAsync(..., mcpServers)`** — new optional parameter on the session factory that forwards an MCP server map into `SessionConfig.McpServers`. Existing callers unaffected.
+- **SDK-driven testimize lifecycle in `.spectra-debug.log`** — the agent subscribes to `SessionMcpServersLoadedEvent` and `SessionMcpServerStatusChangedEvent` and writes `TESTIMIZE CONFIGURED / LOADED / STATUS_CHANGED / DISPOSED` lines driven by the SDK's own status enum (`Connected / Failed / NeedsAuth / Pending / Disabled / NotConfigured`). No more 5-second probe hangs.
+- **`testimize_strategy` prompt placeholder** — the `test-generation.md` template now embeds the preferred testimize tool name (derived from `testimize.strategy`) so the AI knows whether to prefer `testimize/generate_hybrid_test_cases` (HybridArtificialBeeColony, default) or `testimize/generate_pairwise_test_cases` (fast Pairwise).
+- **Defensive 3-second grace window** — if testimize is configured but the SDK hasn't reported a load status by the time the handler is ready to send the prompt, the agent logs `TESTIMIZE UNHEALTHY reason=no_load_event_within_3s` and continues. The AI will still succeed, just without testimize's optimized test data.
+- **+17 tests** — `McpConfigBuilderTests` (7 cases) and `TestimizeStrategyResolverTests` (4 theory cases + 1 fact + 1 edge), plus updates to `TestimizeConditionalBlockTests` and `AnalyzeFieldSpecTests` to reflect the new tool names.
+
+### Fixed
+- **Testimize health probe 5-second hang.** Root cause: our custom `TestimizeMcpClient` used `Content-Length: N\r\n\r\n<body>` MCP-spec-v1 framing, but `Testimize.MCP.Server` uses newline-delimited JSON (`ReadLineAsync`/`WriteLineAsync`). Worse, Spectra wrote the JSON body with no trailing `\n`, so testimize's `ReadLineAsync` blocked forever waiting for one — while Spectra's own `ReadLineAsync` blocked waiting for a response. Exactly 5 seconds later, the probe timeout fired. Deleting the client and delegating to the SDK's native MCP implementation fixes this class of bug permanently (the SDK handles both framing variants correctly).
+
+### Removed
+- **`src/Spectra.CLI/Agent/Testimize/TestimizeMcpClient.cs`** — the 240-line custom JSON-RPC-over-stdio client with the Content-Length framing bug. Gone.
+- **`src/Spectra.CLI/Agent/Testimize/TestimizeTools.cs`** — the `CreateGenerateTestDataTool` `AIFunction` wrapper that routed to the broken client. Gone. The AI now calls the real testimize MCP tools directly.
+- **Tests for the deleted classes** — `TestimizeMcpClientTests`, `TestimizeMcpClientGracefulTests`, `TestimizeToolsTests`. Also deleted one obsolete test from `TestimizeCheckHandlerTests` (`Check_EnabledButBogusCommand_...`) that asserted old-client behavior.
+- `spectra testimize check`'s "healthy" field now just mirrors `installed` — the real runtime health check moved to `spectra ai generate` where the debug log's `TESTIMIZE LOADED server=testimize status=Connected` line is the authoritative signal.
+
+### Changed
+- **`FieldSpecAnalysisTools.cs`** (new file, replaces the surviving half of `TestimizeTools.cs`) — contains `CreateAnalyzeFieldSpecTool` + the local regex-based `ExtractFields` helper. No behavior change; same signatures, new class name scoped to what the code actually does.
+- **`test-generation.md` prompt template** — the `{{#if testimize_enabled}}` block now names both real testimize MCP tools explicitly, references the new `{{testimize_strategy}}` placeholder, and instructs the AI to call `AnalyzeFieldSpec` first for prose-described fields.
+- **`behavior-analysis.md` prompt template** — same update: references `testimize/generate_hybrid_test_cases` / `testimize/generate_pairwise_test_cases` instead of the deleted `GenerateTestData` wrapper name.
+
+### Notes
+- The user-facing config schema (`testimize.enabled`, `testimize.mcp.command`, `testimize.mcp.args`, `testimize.strategy`, `testimize.mode`) is **unchanged**. Existing `spectra.config.json` files continue to work with no edits.
+- `TestimizeDetector.IsInstalledAsync()` is unchanged — still checks `dotnet tool list -g` for `testimize.mcp.server`.
+
 ## [1.45.2] - 2026-04-11
 
 ### Added
