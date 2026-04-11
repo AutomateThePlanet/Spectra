@@ -170,6 +170,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Notes
 - The Copilot SDK does not currently surface `usage.prompt_tokens` / `completion_tokens` on its response object, so token counts are recorded as `null` (rendered as `?` in the debug log and `0` in the Run Summary table). All other Run Summary fields — call count, per-phase elapsed time, model, provider — are captured for every AI call. When the SDK begins exposing usage, a single read point in each agent picks it up with no further wiring.
 
+## [1.43.0]
+
+### Added
+- Tolerant analysis JSON parser (recovers from truncated reasoning-model output).
+- Shared `DebugLogger` writes `CRITIC START/OK/TIMEOUT/ERROR` and `TESTIMIZE` lifecycle lines to `.spectra-debug.log`.
+- Critic now honors `critic.timeout_seconds` (default bumped 30 → 120).
+- Progress page polls terminal pages every 5s for fresh-run detection.
+- Better `analysis_failed` error message.
+
+## [1.42.0]
+
+### Added
+- Configurable `ai.analysis_timeout_minutes` (default 2).
+- `[analyze]` lines in `.spectra-debug.log`.
+- `spectra-generate` SKILL handles `analysis_failed` status.
+
+### Changed
+- Analyze-only path returns `status: "analysis_failed"` with explanatory message instead of fake `analyzed`/15-recommended.
+
+## [1.41.0]
+
+### Added
+- Configurable per-batch generation timeout & batch size: `ai.generation_timeout_minutes` (default 5), `ai.generation_batch_size` (default 30), `ai.debug_log_enabled` (default true).
+- Per-batch `BATCH START/OK/TIMEOUT` lines in `.spectra-debug.log`.
+- Improved timeout error with remediation snippets.
+
 ## [1.36.0] - 2026-04-10
 
 ### Added
@@ -222,3 +248,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Dashboard coverage null-crash fix with zero-state defaults
+
+## Historical Specs (pre-1.30 versioning)
+
+Spec entries that predate the semver `[N.N.N]` release format. Listed newest-first by spec number.
+
+- **039-unify-critic-providers** — critic provider list aligned with generator (canonical 5: github-models, azure-openai, azure-anthropic, openai, anthropic). `github` → `github-models` legacy alias with stderr warning; `google` is now hard error. New `DefaultProvider` constant; case-insensitive resolution.
+- **038-testimize-integration** — optional Testimize.MCP.Server integration for algorithmic test data optimization (BVA/EP/pairwise/ABC). Disabled by default. New `testimize` config section, `TestimizeMcpClient`, two AI tools, `spectra testimize check` command. Graceful degradation everywhere.
+- **037-istqb-test-techniques** — ISTQB black-box techniques (EP, BVA, DT, ST, EG, UC) added to all 5 prompt templates. New `IdentifiedBehavior.Technique` field, `BehaviorAnalysisResult.TechniqueBreakdown` map, `AcceptanceCriterion.TechniqueHint`. Technique breakdown rendered in analysis presenter and progress page.
+- **034-github-pages-docs** — GitHub Pages docs site (Just the Docs theme) at `automatetheplanet.github.io/Spectra/`. Auto-deploys on push to main via `.github/workflows/docs.yml`.
+- **033-from-description-chat-flow** — doc-aware `--from-description` flow. `UserDescribedGenerator.BuildPrompt()` testable; best-effort loads matching docs (cap 3×8000 chars) + criteria; resulting tests get `source_refs`/`criteria` (verdict stays `manual`). Intent routing in SKILL/agent.
+- **027-skill-agent-dedup** — agents delegate CLI tasks to SKILL files (execution agent ~400 → 120 lines, generation agent ~219 → 81). Standardized "Step N" format and `--no-interaction --output-format json --verbosity quiet` flags.
+- **026-criteria-folder-coverage-fix** — renamed `docs/requirements/` → `docs/criteria/` with auto-migration in `AnalyzeHandler`. Skip `_index.*`/`.criteria.yaml`/`_criteria_index.yaml` from criteria extraction. Dashboard uses `AcceptanceCriteriaCoverageAnalyzer`.
+- **025-universal-skill-progress** — shared `ProgressManager` + `ProgressPhases`. All 9 SKILL-wrapped commands write `.spectra-result.json`; 6 long-running ones write `.spectra-progress.html` with phase stepper. Renamed `Requirements` → `AcceptanceCriteria`.
+- **023-criteria-extraction-overhaul** — "requirements" → "acceptance criteria" rename. Per-document iterative extraction → individual `.criteria.yaml` + `_criteria_index.yaml`. SHA-256 incremental. Import from YAML/CSV/JSON with Jira/ADO column auto-detection, AI splitting, RFC 2119 normalization. `--merge`/`--replace`/`--list-criteria` modes. `spectra-criteria` SKILL.
+- **023-copilot-chat-integration** — full VS Code Copilot Chat integration. `--suite` flag, `--analyze-only` two-step flow, automatic batch generation (groups of 30), `.spectra-result.json` lifecycle, `BehaviorAnalyzer` timeout 30s → 2min, 7 bundled SKILLs.
+- **022-bundled-skills** — bundled SKILL files + 2 agent prompts created by `spectra init` in `.github/skills/` and `.github/agents/`. SHA-256 hash tracking via `SkillsManifest`. New `spectra update-skills` command, `--skip-skills` flag.
+- **021-generation-session** — four-phase generation flow (Analysis → Generation → Suggestions → User-Described). `.spectra/session.json` (1h TTL). New `UserDescribedGenerator`, `DuplicateDetector` (Levenshtein), `SuggestionPresenter`. CLI: `--from-suggestions`, `--from-description`, `--context`, `--auto-complete`.
+- **020-cli-non-interactive** — global `--output-format human|json` and `--no-interaction` on all commands. Typed `Results/` models per command, `JsonResultWriter`. Standardized exit codes (0/1/2/3).
+- **017-mcp-tool-resilience** — MCP `run_id`/`test_handle` auto-resolve when only one active run/test exists. New `list_active_runs`, `cancel_all_active_runs` tools. Enhanced `get_run_history` with status filter + summary counts.
+- **015-auto-requirements-extraction** — AI extraction of testable requirements via Copilot SDK. `RequirementsWriter` (YAML merge, duplicate detection, sequential `REQ-NNN`). CLI: `spectra ai analyze --extract-requirements`.
+- **014-open-source-ready** — README redesign, CI pipeline, NuGet publish pipeline, GitHub issue/PR templates, Dependabot.
+- **013-cli-ux-improvements** — `NextStepHints` after every command. Init prompts for automation dirs + critic model. New `spectra config add/remove/list-automation-dir` subcommands. Interactive generation continuation menu.
+- **012-dashboard-branding** — dashboard branding (company name, logo, favicon, light/dark theme, CSS variable overrides). `BrandingInjector` + `SampleDataFactory`. `dashboard --preview` mode.
+- **011-coverage-overhaul** — unified three-type coverage (Documentation, Requirements, Automation). New analyzers/services/models. CLI `--auto-link` writes `automated_by` back into test files.
+- **010-smart-test-selection** — cross-suite test search via `find_test_cases` MCP tool. `start_execution_run` accepts `test_ids` and `selection` modes. New `get_test_execution_history`, `list_saved_selections` tools.
+- **010-document-index** — persistent `docs/_index.md` with per-doc metadata + SHA-256 incremental updates. `spectra docs index [--force]`. Auto-refresh before `ai generate`. `GetDocumentMapTool` prefers index when available.
+- **009-copilot-sdk-consolidation** — unified all AI under GitHub Copilot SDK as the sole runtime. Removed legacy per-provider agent/critic implementations (OpenAiAgent, AnthropicAgent, GitHubModelsAgent, MockAgent, GoogleCritic, OpenAiCritic, AnthropicCritic, GitHubCritic).
+- **008-grounding-verification** — dual-model critic flow (generator + verifier), three verdicts (grounded/partial/hallucinated), grounding metadata in YAML frontmatter, configurable critic provider, `--skip-critic` flag.
+- **007-execution-agent-mcp-tools** — added MCP tools for execution agents.
+- **006-conversational-generation** — two-mode generation (Direct/Interactive), test updates with classification (UP_TO_DATE, OUTDATED, ORPHANED, REDUNDANT), Spectre.Console UX.
+- **004-test-generation-profile** — profile support for test generation settings.

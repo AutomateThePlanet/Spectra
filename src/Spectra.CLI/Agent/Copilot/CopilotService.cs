@@ -110,6 +110,20 @@ public sealed class CopilotService : IAsyncDisposable
     }
 
     /// <summary>
+    /// Lists every tool the Copilot SDK currently exposes for the given model,
+    /// including local AIFunctions, built-in skills, and tools advertised by
+    /// attached MCP servers. Used by GenerationAgent to write a one-shot
+    /// snapshot to .spectra-debug.log so we can verify whether testimize tools
+    /// actually reached the agent's tool list at session start.
+    /// </summary>
+    public async Task<GitHub.Copilot.SDK.Rpc.ToolsListResult> ListSessionToolsAsync(
+        string model,
+        CancellationToken ct = default)
+    {
+        return await _client.Rpc.Tools.ListAsync(model, ct);
+    }
+
+    /// <summary>
     /// Checks if the Copilot CLI binary is available.
     /// </summary>
     public static (bool Available, string? Error) CheckCliAvailable()
