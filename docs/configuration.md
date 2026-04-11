@@ -177,11 +177,15 @@ the configured budget for cross-reference. Use this to dial
 `generation_timeout_minutes` and `generation_batch_size` precisely to your
 model's actual throughput.
 
-The file is **append-only** — it grows over time. Delete it when stale.
+The file's behavior at run start is controlled by `debug.mode` (see the
+[`debug` section](#debug) below): `"append"` (default) prepends a separator
+and header before each new run; `"overwrite"` truncates the file at run
+start so only the latest run is kept.
 
-In addition, the existing `.spectra-debug-response.txt` file (always written,
-not gated by this flag) contains the raw text of the most recent AI response
-for the current batch. Useful when the AI returns a malformed JSON array.
+> **v1.45.2**: the legacy `.spectra-debug-analysis.txt` and
+> `.spectra-debug-response.txt` files are no longer written. All debug output
+> — including raw AI responses and testimize lifecycle — goes to
+> `.spectra-debug.log` only.
 
 #### Example: configuring for a slow / reasoning model
 
@@ -452,6 +456,29 @@ logging, eliminating stale-file accumulation in CI environments.
 |----------|------|---------|-------------|
 | `enabled` | bool | `false` | When true, every AI call (analyze, generate, critic, criteria extraction) writes a timestamped line to the debug log. Non-AI lifecycle lines (testimize) are also written. Best-effort; never blocks the calling code. |
 | `log_file` | string | `".spectra-debug.log"` | Path to the log file. Relative paths resolve against the repo root. |
+| `mode` | string | `"append"` | Controls how the file is opened at run start. `"append"` prepends a separator + header block before each new run (useful for comparing multiple runs). `"overwrite"` truncates the file and writes just the header (keeps only the latest run). Any other value falls back to `"append"`. |
+
+### Run header (v1.45.2)
+
+At the start of every `generate` / `update` run, `spectra` writes a header
+identifying the version, command line, and UTC timestamp:
+
+```text
+──────────────────────────────────────────────────────────────
+=== SPECTRA v1.45.2 | spectra ai generate checkout --count 20 | 2026-04-11T14:30:00Z ===
+```
+
+In `"append"` mode, the separator line is prepended before each new run so
+multiple runs are visually distinct. In `"overwrite"` mode, the separator
+still appears but it's written fresh (file was just truncated).
+
+### Testimize lifecycle lines (always written)
+
+Testimize `DISABLED` / `START` / `NOT_INSTALLED` / `UNHEALTHY` / `HEALTHY` /
+`DISPOSED` lines are written to `.spectra-debug.log` whenever debug logging
+is enabled. They appear after the header, mixed in with the AI call lines
+in timestamp order, and always survive a mode=overwrite truncate (since
+truncate happens at run start, before any testimize activity).
 
 ### `--verbosity diagnostic` one-shot override
 

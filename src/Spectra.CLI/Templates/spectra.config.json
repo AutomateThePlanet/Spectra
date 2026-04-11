@@ -104,6 +104,8 @@
   "debug": {
     "enabled": false,
     "_comment": "Spec 040: opt-in .spectra-debug.log. Set enabled=true to persist per-call AI diagnostics, or run any AI command with --verbosity diagnostic to force-enable for a single run.",
-    "log_file": ".spectra-debug.log"
+    "log_file": ".spectra-debug.log",
+    "mode": "append",
+    "_comment_mode": "append (default): keep existing log content and add a separator + header before each new run. overwrite: truncate the file at run start, keeping only the latest run."
   }
 }

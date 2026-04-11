@@ -26,23 +26,27 @@ public class DebugLoggerTests : IDisposable
     private readonly string _tempDir;
     private readonly bool _previousEnabled;
     private readonly string _previousLogFile;
+    private readonly string _previousMode;
 
     public DebugLoggerTests()
     {
         _lockHold = new LockHold(_globalLock);
         _previousEnabled = DebugLogger.Enabled;
         _previousLogFile = DebugLogger.LogFile;
+        _previousMode = DebugLogger.Mode;
         _tempDir = Path.Combine(Path.GetTempPath(), "spectra-debuglogger-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_tempDir);
         // Write using an absolute path — do NOT mutate the process CWD, since
         // xUnit may run other test classes in parallel that depend on it.
         DebugLogger.LogFile = Path.Combine(_tempDir, ".spectra-debug.log");
+        DebugLogger.Mode = "append";
     }
 
     public void Dispose()
     {
         DebugLogger.Enabled = _previousEnabled;
         DebugLogger.LogFile = _previousLogFile;
+        DebugLogger.Mode = _previousMode;
         try
         {
             if (Directory.Exists(_tempDir)) Directory.Delete(_tempDir, recursive: true);
@@ -171,5 +175,133 @@ public class DebugLoggerTests : IDisposable
         var content = File.ReadAllText(Path.Combine(_tempDir, ".spectra-debug.log"));
         Assert.Contains("~tokens_in=?", content);
         Assert.Contains("~tokens_out=?", content);
+    }
+
+    [Fact]
+    public void BeginRun_Disabled_NoFileWritten()
+    {
+        DebugLogger.Enabled = false;
+        DebugLogger.BeginRun();
+
+        var path = Path.Combine(_tempDir, ".spectra-debug.log");
+        Assert.False(File.Exists(path));
+    }
+
+    [Fact]
+    public void BeginRun_Overwrite_TruncatesAndWritesHeader()
+    {
+        var path = Path.Combine(_tempDir, ".spectra-debug.log");
+        // Seed existing content.
+        File.WriteAllText(path, "STALE CONTENT FROM PRIOR RUN\n");
+
+        DebugLogger.Enabled = true;
+        DebugLogger.Mode = "overwrite";
+        DebugLogger.BeginRun();
+
+        var content = File.ReadAllText(path);
+        Assert.DoesNotContain("STALE CONTENT", content);
+        Assert.Contains("=== SPECTRA v", content);
+        Assert.Contains(" ===", content);
+        Assert.Contains("──────────", content); // separator
+    }
+
+    [Fact]
+    public void BeginRun_Append_ExistingFile_PrependsSeparatorAndHeader()
+    {
+        var path = Path.Combine(_tempDir, ".spectra-debug.log");
+        File.WriteAllText(path, "PRIOR RUN LINE\n");
+
+        DebugLogger.Enabled = true;
+        DebugLogger.Mode = "append";
+        DebugLogger.BeginRun();
+
+        var content = File.ReadAllText(path);
+        // Prior run content preserved
+        Assert.Contains("PRIOR RUN LINE", content);
+        // New header present
+        Assert.Contains("=== SPECTRA v", content);
+        Assert.Contains("──────────", content);
+        // Prior content comes BEFORE the separator
+        var separatorIndex = content.IndexOf("──────────");
+        var priorIndex = content.IndexOf("PRIOR RUN LINE");
+        Assert.True(priorIndex < separatorIndex, "Separator should appear after prior content in append mode");
+    }
+
+    [Fact]
+    public void BeginRun_Append_MissingFile_CreatesWithHeader()
+    {
+        var path = Path.Combine(_tempDir, ".spectra-debug.log");
+        Assert.False(File.Exists(path));
+
+        DebugLogger.Enabled = true;
+        DebugLogger.Mode = "append";
+        DebugLogger.BeginRun();
+
+        Assert.True(File.Exists(path));
+        var content = File.ReadAllText(path);
+        Assert.Contains("=== SPECTRA v", content);
+        Assert.Contains("──────────", content);
+    }
+
+    [Fact]
+    public void BeginRun_UnknownMode_TreatedAsAppend()
+    {
+        var path = Path.Combine(_tempDir, ".spectra-debug.log");
+        File.WriteAllText(path, "PRIOR CONTENT\n");
+
+        DebugLogger.Enabled = true;
+        DebugLogger.Mode = "garbage-value";
+        DebugLogger.BeginRun();
+
+        // Unknown values fall back to append, so prior content is preserved.
+        var content = File.ReadAllText(path);
+        Assert.Contains("PRIOR CONTENT", content);
+        Assert.Contains("=== SPECTRA v", content);
+    }
+
+    [Fact]
+    public void BeginRun_HeaderIncludesIsoTimestamp()
+    {
+        DebugLogger.Enabled = true;
+        DebugLogger.Mode = "overwrite";
+        DebugLogger.BeginRun();
+
+        var content = File.ReadAllText(Path.Combine(_tempDir, ".spectra-debug.log"));
+        // ISO-8601 UTC timestamp pattern: YYYY-MM-DDTHH:MM:SSZ
+        Assert.Matches(@"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", content);
+    }
+
+    [Fact]
+    public void BeginRun_ThenAppendAi_LogContainsHeaderAndAiLine()
+    {
+        DebugLogger.Enabled = true;
+        DebugLogger.Mode = "overwrite";
+        DebugLogger.BeginRun();
+        DebugLogger.AppendAi("generate", "BATCH OK elapsed=1.0s",
+            "gpt-4.1", "github-models", 100, 50);
+
+        var content = File.ReadAllText(Path.Combine(_tempDir, ".spectra-debug.log"));
+        Assert.Contains("=== SPECTRA v", content);
+        Assert.Contains("BATCH OK", content);
+        Assert.Contains("tokens_in=100", content);
+    }
+
+    [Fact]
+    public void BeginRun_ThenAppendTestimize_LinesSurvive()
+    {
+        // Regression test: testimize lifecycle must be written AFTER BeginRun
+        // and survive the truncate (in overwrite mode).
+        DebugLogger.Enabled = true;
+        DebugLogger.Mode = "overwrite";
+        DebugLogger.BeginRun();
+        DebugLogger.Append("generate", "TESTIMIZE DISABLED");
+        DebugLogger.Append("generate", "TESTIMIZE HEALTHY command=testimize-mcp");
+        DebugLogger.Append("generate", "TESTIMIZE DISPOSED");
+
+        var content = File.ReadAllText(Path.Combine(_tempDir, ".spectra-debug.log"));
+        Assert.Contains("=== SPECTRA v", content);
+        Assert.Contains("TESTIMIZE DISABLED", content);
+        Assert.Contains("TESTIMIZE HEALTHY", content);
+        Assert.Contains("TESTIMIZE DISPOSED", content);
     }
 }

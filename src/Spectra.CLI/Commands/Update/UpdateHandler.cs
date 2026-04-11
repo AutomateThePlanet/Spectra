@@ -214,6 +214,8 @@ public sealed class UpdateHandler
         Spectra.CLI.Infrastructure.DebugLogger.Enabled =
             config.Debug.Enabled || _verbosity == VerbosityLevel.Diagnostic;
         Spectra.CLI.Infrastructure.DebugLogger.LogFile = config.Debug.LogFile;
+        Spectra.CLI.Infrastructure.DebugLogger.Mode = config.Debug.Mode;
+        Spectra.CLI.Infrastructure.DebugLogger.BeginRun();
 
         var sw = Stopwatch.StartNew();
         _progressManager.Update("classifying", $"Analyzing changes in {suite} suite...");

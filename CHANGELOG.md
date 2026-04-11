@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.45.2] - 2026-04-11
+
+### Added
+- **Run header in `.spectra-debug.log`** — every `generate` / `update` run now writes a header block at the start containing the SPECTRA version, the full user command line, and an ISO-8601 UTC timestamp:
+  ```text
+  ──────────────────────────────────────────────────────────────
+  === SPECTRA v1.45.2 | spectra ai generate checkout --count 20 | 2026-04-11T14:30:00Z ===
+  ```
+  Makes each run self-identifying when grepping or comparing logs across days.
+- **`debug.mode` config option** with two values:
+  - `"append"` (**default**): keeps existing log content and prepends a horizontal separator + header before each new run. Good for comparing multiple runs post-hoc.
+  - `"overwrite"`: truncates `.spectra-debug.log` at run start so only the latest run is preserved. Good for focused troubleshooting.
+  Unknown values fall back to `"append"`. Wired from `GenerateHandler` and `UpdateHandler` at run start via new `DebugLogger.BeginRun()`.
+- New `DebugLogger.BeginRun()` static method that materializes the header and honors the mode. Best-effort — never throws, no-op when debug logging is disabled.
+- Version is read via `AssemblyInformationalVersionAttribute` so the header reflects the actual installed build.
+- Command line is reconstructed from `Environment.GetCommandLineArgs()` (skipping the dotnet tool shim path) so it looks like what the user typed.
+- +11 tests: `BeginRun_Disabled_NoFileWritten`, `BeginRun_Overwrite_TruncatesAndWritesHeader`, `BeginRun_Append_ExistingFile_PrependsSeparatorAndHeader`, `BeginRun_Append_MissingFile_CreatesWithHeader`, `BeginRun_UnknownMode_TreatedAsAppend`, `BeginRun_HeaderIncludesIsoTimestamp`, `BeginRun_ThenAppendAi_LogContainsHeaderAndAiLine`, `BeginRun_ThenAppendTestimize_LinesSurvive` (regression test for the mode=overwrite truncate), plus `DebugConfigTests.Default_Mode_IsAppend` and two deserialization round-trip tests.
+
+### Removed
+- **`.spectra-debug-analysis.txt`** — no longer written by `BehaviorAnalyzer` on `ANALYSIS PARSE_FAIL`. The parse-fail reason is still logged to `.spectra-debug.log`.
+- **`.spectra-debug-response.txt`** — no longer written by `GenerationAgent` after each batch. The `SaveDebugResponse` method and its call site have been deleted. The stale "Check .spectra-debug-response.txt for the raw AI output" error message now points at `.spectra-debug.log`.
+- All debug output now flows through a single file: `.spectra-debug.log`.
+
+### Verified
+- **Testimize lifecycle lines** (`TESTIMIZE DISABLED` / `START` / `NOT_INSTALLED` / `UNHEALTHY` / `HEALTHY` / `DISPOSED`) are written via `DebugLogger.Append("generate", ...)` after `BeginRun`, so they survive the `mode=overwrite` truncate. Covered by `BeginRun_ThenAppendTestimize_LinesSurvive`.
+
 ## [1.45.1] - 2026-04-11
 
 ### Added

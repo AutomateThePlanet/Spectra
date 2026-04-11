@@ -130,13 +130,6 @@ public sealed class BehaviorAnalyzer
                 _onStatus?.Invoke("Could not parse behaviors from AI response");
                 _tracker?.Record("analysis", modelName, providerName, tokensIn, tokensOut, sw.Elapsed, estimated);
                 DebugLogAi($"ANALYSIS PARSE_FAIL response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s", tokensIn, tokensOut, estimated);
-                // Save debug response
-                try
-                {
-                    var debugPath = Path.Combine(Directory.GetCurrentDirectory(), ".spectra-debug-analysis.txt");
-                    File.WriteAllText(debugPath, responseText);
-                }
-                catch { /* non-critical */ }
                 return null;
             }
 

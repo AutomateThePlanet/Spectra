@@ -21,6 +21,36 @@ public class DebugConfigTests
     }
 
     [Fact]
+    public void Default_Mode_IsAppend()
+    {
+        var config = new DebugConfig();
+        Assert.Equal("append", config.Mode);
+    }
+
+    [Fact]
+    public void Deserialization_OverwriteMode_RoundTrip()
+    {
+        const string json = """
+            {
+              "enabled": true,
+              "mode": "overwrite"
+            }
+            """;
+        var config = JsonSerializer.Deserialize<DebugConfig>(json);
+        Assert.NotNull(config);
+        Assert.Equal("overwrite", config!.Mode);
+    }
+
+    [Fact]
+    public void Deserialization_MissingMode_DefaultsToAppend()
+    {
+        const string json = """{"enabled": true}""";
+        var config = JsonSerializer.Deserialize<DebugConfig>(json);
+        Assert.NotNull(config);
+        Assert.Equal("append", config!.Mode);
+    }
+
+    [Fact]
     public void Deserialization_FromJson_RoundTrip()
     {
         const string json = """

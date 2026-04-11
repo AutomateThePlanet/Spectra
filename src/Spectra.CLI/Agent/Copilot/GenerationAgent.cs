@@ -229,9 +229,6 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
             _tracker?.Record("generation", _provider?.Model ?? "", _provider?.Name ?? "", tokensIn, tokensOut, sw.Elapsed, estimated);
             DebugLogAi($"BATCH OK   requested={requestedCount} elapsed={sw.Elapsed.TotalSeconds:F1}s", tokensIn, tokensOut, estimated);
 
-            // Save raw response for debugging
-            SaveDebugResponse(responseText);
-
             // Parse the response
             var tests = ParseTestsFromResponse(responseText);
 
@@ -243,7 +240,7 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                     Tests = [],
                     Errors = [
                         $"AI returned a response ({responseText.Length} chars) but no test cases could be parsed.",
-                        "Check .spectra-debug-response.txt for the raw AI output.",
+                        "Check .spectra-debug.log for per-batch details.",
                         "The response may not contain a valid JSON array of test cases."
                     ]
                 };
@@ -347,25 +344,6 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
             tokensIn,
             tokensOut,
             estimated);
-
-    private void SaveDebugResponse(string responseText)
-    {
-        try
-        {
-            var debugPath = Path.Combine(_basePath, ".spectra-debug-response.txt");
-            var header = $"--- Spectra AI Response Debug ---\n" +
-                         $"Timestamp: {DateTime.UtcNow:O}\n" +
-                         $"Provider: {_provider?.Name}\n" +
-                         $"Model: {_provider?.Model}\n" +
-                         $"Response length: {responseText.Length} chars\n" +
-                         $"---\n\n";
-            File.WriteAllText(debugPath, header + responseText);
-        }
-        catch
-        {
-            // Debug file write failure is non-fatal
-        }
-    }
 
     internal static string BuildFullPrompt(string userPrompt, int requestedCount, string? criteriaContext = null,
         PromptTemplateLoader? templateLoader = null, string? profileFormat = null, bool testimizeEnabled = false)

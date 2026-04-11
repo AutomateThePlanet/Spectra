@@ -202,6 +202,10 @@ public sealed class GenerateHandler
         Spectra.CLI.Infrastructure.DebugLogger.Enabled =
             config.Debug.Enabled || _verbosity == VerbosityLevel.Diagnostic;
         Spectra.CLI.Infrastructure.DebugLogger.LogFile = config.Debug.LogFile;
+        Spectra.CLI.Infrastructure.DebugLogger.Mode = config.Debug.Mode;
+        // Spec 040 follow-up: writes separator + header at run start. No-op
+        // when debug is disabled.
+        Spectra.CLI.Infrastructure.DebugLogger.BeginRun();
 
         // Spec 040: start run-level wall-clock for the Run Summary panel.
         _runWallClock.Restart();
@@ -845,6 +849,8 @@ public sealed class GenerateHandler
         Spectra.CLI.Infrastructure.DebugLogger.Enabled =
             config.Debug.Enabled || _verbosity == VerbosityLevel.Diagnostic;
         Spectra.CLI.Infrastructure.DebugLogger.LogFile = config.Debug.LogFile;
+        Spectra.CLI.Infrastructure.DebugLogger.Mode = config.Debug.Mode;
+        Spectra.CLI.Infrastructure.DebugLogger.BeginRun();
 
         // Auto-refresh document index before generation
         var indexService = new DocumentIndexService();
