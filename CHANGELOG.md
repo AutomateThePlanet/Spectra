@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.48.0] - 2026-04-12
+
+### Added — Spec 043: Parallel Critic Verification & Error Log
+
+- **`ai.critic.max_concurrent` config option** (default `1`, max `20`) — runs the critic verification phase in parallel using a `SemaphoreSlim` throttle. With `max_concurrent: 5` on a 200-test suite, the critic phase typically completes in ~1/5 of sequential time. Output is unchanged: results are written into a pre-sized array indexed by original position, so test files, indexes, and verdicts come back in the same order regardless of completion order. Manual-verdict short-circuit is preserved. Default of `1` keeps the byte-identical sequential path.
+- **`.spectra-errors.log` dedicated error log** — companion to `.spectra-debug.log`. Written only when `debug.enabled: true` AND at least one error occurs during the run (lazy file creation; clean runs leave it untouched). Captures full exception type, message, response body (truncated to 500 chars), `Retry-After` header, and stack trace. New `debug.error_log_file` config (default `.spectra-errors.log`) and matching `mode` (append/overwrite) following the debug log. Errors are captured at every catch site that talks to the AI runtime: `BehaviorAnalyzer`, `CopilotGenerationAgent`, `CopilotCritic`, `CriteriaExtractor` (via `AnalyzeHandler`), and `UpdateHandler`. Each captured error gets a `see=.spectra-errors.log` cross-reference suffix on the corresponding debug log line.
+- **Rate limit + error counts in Run Summary** — new `Errors`, `Rate limits`, and `Critic concurrency` rows in the Spectre.Console panel. When `Rate limits > 0`, a hint `(consider reducing ai.critic.max_concurrent)` appears next to the count. The same counts suffix the `RUN TOTAL` debug log line as ` rate_limits=<n> errors=<n>` (always present, even on zero runs, for grep-friendly CI consumption).
+- **`ErrorLogger` static class** at `src/Spectra.CLI/Infrastructure/ErrorLogger.cs` — mirrors `DebugLogger`'s static-class pattern. Thread-safe via single lock. File-write failures are caught, emit one stderr warning, then disable further writes for the run (graceful degradation; never aborts the run). Includes `IsRateLimit(Exception)` classifier (HTTP 429 / `HttpStatusCode.TooManyRequests` / message-substring fallbacks for `429`, `rate limit`, `too many requests`, `rate_limit_exceeded`).
+- **`RunErrorTracker` instance class** at `src/Spectra.CLI/Services/RunErrorTracker.cs` — per-run counters with `Errors` + `RateLimits` properties; thread-safe via `Interlocked`. Lives on `GenerateHandler` and `UpdateHandler` and is forwarded into `BehaviorAnalyzer`, `CopilotGenerationAgent`, `CriticFactory.TryCreate`, and `CopilotCritic` constructor.
+- **+14 new tests** — `CriticConfigClampTests` (clamping ≤0→1, >20→20, in-range pass-through, JSON roundtrip), `ErrorLoggerTests` (file lazy-creation, disabled no-op, stack trace + response body capture, response truncation at 500, retry-after, multi-error append, concurrent-write thread safety, `IsRateLimit` classifier), `RunErrorTrackerTests` (counter atomicity under 1000-task contention), and 2 new `RunSummaryDebugFormatterTests` cases for the error/rate-limit suffixes.
+
+### Changed
+- `RunSummaryDebugFormatter.FormatRunTotal` gained an optional `RunErrorTracker` parameter; line now always ends with ` rate_limits=<n> errors=<n>`.
+- `RunSummaryPresenter.Render` gained optional `errorTracker` and `criticConcurrency` parameters that drive the new rows.
+- `CopilotCritic.VerifyTestAsync` distinguishes rate-limit failures from generic exceptions in the debug log (`CRITIC RATE_LIMITED` vs. `CRITIC ERROR`).
+- `CriticFactory.TryCreate` and `TryCreateAsync` accept an optional `RunErrorTracker` parameter and forward it to `CopilotCritic`.
+- `AgentFactory.CreateAgentAsync` accepts an optional `RunErrorTracker` parameter and forwards it to `CopilotGenerationAgent`.
+
+### Notes
+- `max_concurrent > 10` emits a one-line stderr warning at run start about provider rate-limit risk. `max_concurrent > 20` emits a "clamped to 20" warning.
+- The error log uses lazy file creation: on a clean run, no `.spectra-errors.log` file is touched, so its mere existence indicates "this run had at least one failure".
+- All existing tests still pass (513 Core / 351 MCP / 827 CLI). Adds 14 new tests.
+
 ## [1.47.1] - 2026-04-11
 
 ### Added

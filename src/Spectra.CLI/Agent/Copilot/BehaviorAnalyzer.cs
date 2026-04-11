@@ -22,6 +22,7 @@ public sealed class BehaviorAnalyzer
     private readonly SpectraConfig? _config;
     private readonly PromptTemplateLoader? _templateLoader;
     private readonly TokenUsageTracker? _tracker;
+    private readonly RunErrorTracker? _errorTracker;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
@@ -32,13 +33,15 @@ public sealed class BehaviorAnalyzer
         Action<string>? onStatus = null,
         SpectraConfig? config = null,
         PromptTemplateLoader? templateLoader = null,
-        TokenUsageTracker? tracker = null)
+        TokenUsageTracker? tracker = null,
+        RunErrorTracker? errorTracker = null)
     {
         _provider = provider;
         _onStatus = onStatus;
         _config = config;
         _templateLoader = templateLoader;
         _tracker = tracker;
+        _errorTracker = errorTracker;
     }
 
     /// <summary>
@@ -173,14 +176,22 @@ public sealed class BehaviorAnalyzer
                 TotalWords = totalWords
             };
         }
-        catch (TimeoutException)
+        catch (TimeoutException ex)
         {
             // Best-effort: record whatever usage the observer captured before
             // the timeout. If none, fall back to prompt-length estimate with
             // zero completion tokens.
             var (tokensIn, tokensOut, estimated) = observer.GetOrEstimate(prompt, "");
             _tracker?.Record("analysis", modelName, providerName, tokensIn, tokensOut, sw.Elapsed, estimated);
-            DebugLogAi($"ANALYSIS TIMEOUT configured_timeout={timeoutMinutes}min elapsed={sw.Elapsed.TotalSeconds:F1}s", tokensIn, tokensOut, estimated);
+            // Spec 043: capture full timeout context.
+            _errorTracker?.RecordError();
+            Spectra.CLI.Infrastructure.ErrorLogger.Write(
+                "analyze",
+                $"configured_timeout={timeoutMinutes}min elapsed={sw.Elapsed.TotalSeconds:F1}s",
+                ex);
+            DebugLogAi($"ANALYSIS TIMEOUT configured_timeout={timeoutMinutes}min elapsed={sw.Elapsed.TotalSeconds:F1}s"
+                + (Spectra.CLI.Infrastructure.ErrorLogger.Enabled ? $" see={Spectra.CLI.Infrastructure.ErrorLogger.LogFile}" : ""),
+                tokensIn, tokensOut, estimated);
             _onStatus?.Invoke($"Behavior analysis timed out after {timeoutMinutes} min (model: {modelName}). Bump ai.analysis_timeout_minutes in spectra.config.json. Using default count.");
             return null;
         }
@@ -188,7 +199,13 @@ public sealed class BehaviorAnalyzer
         {
             var (tokensIn, tokensOut, estimated) = observer.GetOrEstimate(prompt, "");
             _tracker?.Record("analysis", modelName, providerName, tokensIn, tokensOut, sw.Elapsed, estimated);
-            DebugLogAi($"ANALYSIS ERROR exception={ex.GetType().Name} message=\"{ex.Message}\" elapsed={sw.Elapsed.TotalSeconds:F1}s", tokensIn, tokensOut, estimated);
+            // Spec 043: capture full exception context to the error log.
+            _errorTracker?.Record(ex);
+            Spectra.CLI.Infrastructure.ErrorLogger.Write(
+                "analyze", $"elapsed={sw.Elapsed.TotalSeconds:F1}s", ex);
+            DebugLogAi($"ANALYSIS ERROR exception={ex.GetType().Name} message=\"{ex.Message}\" elapsed={sw.Elapsed.TotalSeconds:F1}s"
+                + (Spectra.CLI.Infrastructure.ErrorLogger.Enabled ? $" see={Spectra.CLI.Infrastructure.ErrorLogger.LogFile}" : ""),
+                tokensIn, tokensOut, estimated);
             _onStatus?.Invoke($"Behavior analysis failed: {ex.Message}");
             return null;
         }

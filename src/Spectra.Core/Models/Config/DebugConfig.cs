@@ -30,4 +30,14 @@ public sealed class DebugConfig
     /// </summary>
     [JsonPropertyName("mode")]
     public string Mode { get; init; } = "append";
+
+    /// <summary>
+    /// Path to the dedicated error log file (Spec 043). Written only when
+    /// <see cref="Enabled"/> is <c>true</c> AND at least one error occurs
+    /// during the run. On clean runs the file is not created or modified.
+    /// Follows the same <see cref="Mode"/> (append/overwrite) semantics as
+    /// <see cref="LogFile"/>.
+    /// </summary>
+    [JsonPropertyName("error_log_file")]
+    public string ErrorLogFile { get; init; } = ".spectra-errors.log";
 }

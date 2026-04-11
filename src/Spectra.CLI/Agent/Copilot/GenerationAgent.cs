@@ -27,6 +27,7 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
     private readonly string _testsPath;
     private readonly Action<string>? _onStatus;
     private readonly TokenUsageTracker? _tracker;
+    private readonly RunErrorTracker? _errorTracker;
 
     public string ProviderName => $"copilot-sdk ({_provider?.Name ?? "github-models"})";
 
@@ -36,7 +37,8 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
         string basePath,
         string testsPath,
         Action<string>? onStatus = null,
-        TokenUsageTracker? tracker = null)
+        TokenUsageTracker? tracker = null,
+        RunErrorTracker? errorTracker = null)
     {
         _provider = provider ?? throw new ArgumentNullException(nameof(provider));
         _config = config ?? throw new ArgumentNullException(nameof(config));
@@ -44,6 +46,7 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
         _testsPath = testsPath ?? throw new ArgumentNullException(nameof(testsPath));
         _onStatus = onStatus;
         _tracker = tracker;
+        _errorTracker = errorTracker;
     }
 
     public async Task<bool> IsAvailableAsync(CancellationToken ct = default)
@@ -348,10 +351,18 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 }
             }
         }
-        catch (TimeoutException)
+        catch (TimeoutException ex)
         {
             var configuredMinutes = Math.Max(1, _config.Ai.GenerationTimeoutMinutes);
-            DebugLogAi($"BATCH TIMEOUT requested={requestedCount} configured_timeout={configuredMinutes}min", null, null, estimated: false);
+            // Spec 043: capture full timeout context to error log + bump tracker.
+            _errorTracker?.RecordError();
+            Spectra.CLI.Infrastructure.ErrorLogger.Write(
+                "generate",
+                $"requested={requestedCount} configured_timeout={configuredMinutes}min",
+                ex);
+            DebugLogAi($"BATCH TIMEOUT requested={requestedCount} configured_timeout={configuredMinutes}min"
+                + (Spectra.CLI.Infrastructure.ErrorLogger.Enabled ? $" see={Spectra.CLI.Infrastructure.ErrorLogger.LogFile}" : ""),
+                null, null, estimated: false);
             return new GenerationResult
             {
                 Tests = [],
@@ -370,6 +381,8 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
         catch (Exception ex) when (ex.Message.Contains("copilot", StringComparison.OrdinalIgnoreCase)
                                    || ex.Message.Contains("CLI", StringComparison.OrdinalIgnoreCase))
         {
+            _errorTracker?.Record(ex);
+            Spectra.CLI.Infrastructure.ErrorLogger.Write("generate", $"requested={requestedCount}", ex);
             return new GenerationResult
             {
                 Tests = [],
@@ -382,6 +395,8 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
         }
         catch (HttpRequestException ex) when (ex.Message.Contains("429"))
         {
+            _errorTracker?.Record(ex);
+            Spectra.CLI.Infrastructure.ErrorLogger.Write("generate", $"requested={requestedCount}", ex);
             return new GenerationResult
             {
                 Tests = [],
@@ -394,6 +409,8 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
         catch (InvalidOperationException ex) when (ex.Message.Contains("Session error", StringComparison.OrdinalIgnoreCase))
         {
             // SDK wraps session errors in InvalidOperationException
+            _errorTracker?.Record(ex);
+            Spectra.CLI.Infrastructure.ErrorLogger.Write("generate", $"requested={requestedCount}", ex);
             var innerMessage = ex.Message.Replace("Session error: ", "");
             return new GenerationResult
             {
@@ -403,6 +420,8 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
         }
         catch (Exception ex)
         {
+            _errorTracker?.Record(ex);
+            Spectra.CLI.Infrastructure.ErrorLogger.Write("generate", $"requested={requestedCount}", ex);
             return new GenerationResult
             {
                 Tests = [],

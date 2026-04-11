@@ -100,7 +100,10 @@ public static class CriticFactory
     /// <summary>
     /// Tries to create a critic from configuration using the Copilot SDK.
     /// </summary>
-    public static CriticCreateResult TryCreate(CriticConfig? config, TokenUsageTracker? tracker = null)
+    public static CriticCreateResult TryCreate(
+        CriticConfig? config,
+        TokenUsageTracker? tracker = null,
+        RunErrorTracker? errorTracker = null)
     {
         if (config is null || !config.Enabled)
         {
@@ -115,7 +118,9 @@ public static class CriticFactory
 
         // Spec 039: construct CopilotCritic with the resolved (normalized) name.
         // The original config is preserved so model/api_key_env/base_url still apply.
-        var critic = new CopilotCritic(config, tracker);
+        // Spec 043: forward the per-run error tracker so the critic can bump
+        // errors / rate_limits counters from inside its catch blocks.
+        var critic = new CopilotCritic(config, tracker, errorTracker);
         return CriticCreateResult.Succeeded(critic, resolved);
     }
 
@@ -125,7 +130,8 @@ public static class CriticFactory
     public static async Task<CriticCreateResult> TryCreateAsync(
         CriticConfig? config,
         CancellationToken ct = default,
-        TokenUsageTracker? tracker = null)
+        TokenUsageTracker? tracker = null,
+        RunErrorTracker? errorTracker = null)
     {
         if (config is null || !config.Enabled)
         {
@@ -147,7 +153,7 @@ public static class CriticFactory
             return CriticCreateResult.Failed("copilot-sdk", sdkError ?? "Copilot SDK not available");
         }
 
-        var critic = new CopilotCritic(config, tracker);
+        var critic = new CopilotCritic(config, tracker, errorTracker);
         return CriticCreateResult.Succeeded(critic, resolved);
     }
 

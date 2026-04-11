@@ -248,6 +248,25 @@ Grounding verification configuration. See [Grounding Verification](grounding-ver
 | `api_key_env` | string | — | Environment variable for critic API key |
 | `base_url` | string | — | Custom API endpoint |
 | `timeout_seconds` | int | `30` | Critic request timeout |
+| `max_concurrent` | int | `1` | **Spec 043:** number of concurrent critic verification calls. `1` (default) preserves the original sequential behavior. Higher values run multiple critic calls in parallel via a `SemaphoreSlim` throttle and dramatically reduce critic phase time on large suites. Clamped to `[1, 20]`. Values >10 emit a rate-limit-risk warning at run start. |
+
+#### Critic concurrency tuning (Spec 043)
+
+The critic phase is typically the dominant cost on large generate runs (one
+sequential API call per test). Setting `max_concurrent` higher parallelizes
+those calls without changing any output. Test files, verdicts, and indexes
+are written in the original input order regardless of completion order.
+
+| `max_concurrent` | 200 tests × ~6s | Approx. critic phase |
+|------------------|-----------------|----------------------|
+| `1` (default)    | sequential      | ~20 min              |
+| `3`              | 3 parallel      | ~7 min               |
+| `5`              | 5 parallel      | ~4 min               |
+| `10`             | 10 parallel     | ~2 min               |
+
+If you start hitting provider rate limits, the Run Summary panel surfaces a
+`Rate limits` count with a hint pointing back at this knob. Drop the value
+and re-run.
 
 #### Example: Azure-only billing (generator + critic on the same account)
 
@@ -456,7 +475,34 @@ logging, eliminating stale-file accumulation in CI environments.
 |----------|------|---------|-------------|
 | `enabled` | bool | `false` | When true, every AI call (analyze, generate, critic, criteria extraction) writes a timestamped line to the debug log. Non-AI lifecycle lines (testimize) are also written. Best-effort; never blocks the calling code. |
 | `log_file` | string | `".spectra-debug.log"` | Path to the log file. Relative paths resolve against the repo root. |
+| `error_log_file` | string | `".spectra-errors.log"` | **Spec 043:** path to the dedicated error log. Written only when `enabled` is `true` AND at least one error occurs during the run. On a clean run the file is not created or modified. Captures full exception type, message, response body (truncated to 500 chars), `Retry-After` header, and stack trace per failure. Follows the same `mode` semantics as `log_file`. |
 | `mode` | string | `"append"` | Controls how the file is opened at run start. `"append"` prepends a separator + header block before each new run (useful for comparing multiple runs). `"overwrite"` truncates the file and writes just the header (keeps only the latest run). Any other value falls back to `"append"`. |
+
+### Error log (Spec 043)
+
+The error log is the companion to the debug log. Where the debug log is
+high-volume (one line per AI call, hundreds per run), the error log is
+zero-volume on a healthy run and only fills up when something actually
+fails. A single `cat .spectra-errors.log` answers "did anything go wrong?"
+without grepping through hundreds of OK lines.
+
+Each entry includes:
+
+```text
+2026-04-11T19:05:12.345Z [critic ] ERROR test_id=TC-150
+  Type: System.Net.Http.HttpRequestException
+  Message: Response status code does not indicate success: 429 (Too Many Requests).
+  Response: {"error":{"code":"rate_limit_exceeded","message":"Rate limit reached for gpt-4.1"}}
+  Retry-After: 2
+  Stack: at Spectra.CLI.Agent.Copilot.CopilotCritic.VerifyTestAsync(...)
+```
+
+When an error fires, the corresponding debug-log line gains a
+`see=<error_log_file>` suffix so you can jump from the timeline view to
+the full context with one search.
+
+Errors are captured from every phase that talks to the AI runtime:
+analyze, generate, critic, criteria extraction, and update.
 
 ### Run header (v1.45.2)
 

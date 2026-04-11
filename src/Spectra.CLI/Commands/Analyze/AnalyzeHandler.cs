@@ -461,6 +461,9 @@ public sealed class AnalyzeHandler
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
+                    // Spec 043: full exception context to error log.
+                    Spectra.CLI.Infrastructure.ErrorLogger.Write(
+                        "criteria", $"doc={doc.Path}", ex);
                     if (_verbosity >= VerbosityLevel.Normal)
                         Console.Error.WriteLine($"  Failed to extract from {doc.Path}: {ex.Message}");
                     documentsFailed++;
@@ -876,6 +879,8 @@ public sealed class AnalyzeHandler
                                 }
                                 catch (Exception ex) when (ex is not OperationCanceledException)
                                 {
+                                    Spectra.CLI.Infrastructure.ErrorLogger.Write(
+                                        "criteria", $"split criterion={criterion.Id}", ex);
                                     if (_verbosity >= VerbosityLevel.Normal)
                                         Console.Error.WriteLine($"  Failed to split criterion: {ex.Message}");
                                     expandedList.Add(criterion);

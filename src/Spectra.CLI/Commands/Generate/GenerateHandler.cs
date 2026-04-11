@@ -50,6 +50,12 @@ public sealed class GenerateHandler
     private readonly Spectra.CLI.Services.TokenUsageTracker _tokenTracker = new();
     private readonly System.Diagnostics.Stopwatch _runWallClock = new();
 
+    // Spec 043: per-run error + rate-limit counters surfaced in the Run
+    // Summary panel and the RUN TOTAL debug log line. Bumped from every
+    // catch site (analyze / generate / critic / update / criteria).
+    private readonly Spectra.CLI.Services.RunErrorTracker _errorTracker = new();
+    private int _effectiveCriticConcurrency = 1;
+
     // Spec 041: in-flight progress snapshot for the current run. Mutated by
     // the batch loop and the per-test critic callback. Picked up by
     // WriteInProgressResultFile / WriteVerificationProgress and serialized
@@ -213,6 +219,31 @@ public sealed class GenerateHandler
         // when debug is disabled.
         Spectra.CLI.Infrastructure.DebugLogger.BeginRun();
 
+        // Spec 043: configure the dedicated error log alongside the debug
+        // log. Same enable switch (debug.enabled), separate path. The file
+        // is only created on first error — clean runs leave it untouched.
+        Spectra.CLI.Infrastructure.ErrorLogger.Enabled =
+            config.Debug.Enabled || _verbosity == VerbosityLevel.Diagnostic;
+        Spectra.CLI.Infrastructure.ErrorLogger.LogFile = config.Debug.ErrorLogFile;
+        Spectra.CLI.Infrastructure.ErrorLogger.Mode = config.Debug.Mode;
+        Spectra.CLI.Infrastructure.ErrorLogger.BeginRun();
+
+        // Spec 043: warn at run start when critic concurrency is risky.
+        // Clamping itself happens in CriticConfig.GetEffectiveMaxConcurrent.
+        var rawConcurrency = config.Ai?.Critic?.MaxConcurrent ?? 1;
+        if (rawConcurrency > 20)
+        {
+            Console.Error.WriteLine(
+                $"warning: ai.critic.max_concurrent={rawConcurrency} exceeds the maximum of 20; clamped to 20.");
+        }
+        else if (rawConcurrency > 10)
+        {
+            Console.Error.WriteLine(
+                $"warning: ai.critic.max_concurrent={rawConcurrency} is high — provider rate limits may trigger. " +
+                $"Consider lowering if you see rate_limits>0 in the run summary.");
+        }
+        _effectiveCriticConcurrency = config.Ai?.Critic?.GetEffectiveMaxConcurrent() ?? 1;
+
         // Spec 040: start run-level wall-clock for the Run Summary panel.
         _runWallClock.Restart();
 
@@ -311,7 +342,7 @@ public sealed class GenerateHandler
                     {
                         _progress.Info($"  {status}");
                         UpdateProgress(suite, progressStatus, status);
-                    }, config, loader, _tokenTracker);
+                    }, config, loader, _tokenTracker, _errorTracker);
                     return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct);
                 });
 
@@ -370,7 +401,7 @@ public sealed class GenerateHandler
                         var analyzer = new BehaviorAnalyzer(provider, status =>
                         {
                             UpdateProgress(suite, progressStatus, status);
-                        }, config, loader, _tokenTracker);
+                        }, config, loader, _tokenTracker, _errorTracker);
                         return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct);
                     });
 
@@ -522,7 +553,8 @@ public sealed class GenerateHandler
                 UpdateProgress(suite, "generating", status);
             },
             ct,
-            _tokenTracker);
+            _tokenTracker,
+            _errorTracker);
 
         if (!createResult.Success)
         {
@@ -878,13 +910,16 @@ public sealed class GenerateHandler
         Spectra.CLI.Infrastructure.DebugLogger.Append(
             "summary ",
             Spectra.CLI.Services.RunSummaryDebugFormatter.FormatRunTotal(
-                "generate", suite, _tokenTracker, _runWallClock.Elapsed));
+                "generate", suite, _tokenTracker, _runWallClock.Elapsed, _errorTracker));
 
         // Spec 040: render Run Summary panel before final status line, unless
         // JSON mode (where data is emitted in the JSON result instead).
         if (_outputFormat != OutputFormat.Json)
         {
-            Spectra.CLI.Output.RunSummaryPresenter.Render(runSummary, tokenUsage, _verbosity);
+            Spectra.CLI.Output.RunSummaryPresenter.Render(
+                runSummary, tokenUsage, _verbosity,
+                errorTracker: _errorTracker,
+                criticConcurrency: _effectiveCriticConcurrency);
         }
 
         if (_outputFormat == OutputFormat.Json)
@@ -1068,7 +1103,7 @@ public sealed class GenerateHandler
                 {
                     var provider = config.Ai.Providers?.FirstOrDefault(p => p.Enabled);
                     var loader = new PromptTemplateLoader(currentDir);
-                    var analyzer = new BehaviorAnalyzer(provider, null, config, loader, _tokenTracker);
+                    var analyzer = new BehaviorAnalyzer(provider, null, config, loader, _tokenTracker, _errorTracker);
                     return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct);
                 });
 
@@ -1812,7 +1847,7 @@ public sealed class GenerateHandler
     {
         var results = new List<(TestCase Test, VerificationResult Result)>();
 
-        var createResult = CriticFactory.TryCreate(criticConfig, _tokenTracker);
+        var createResult = CriticFactory.TryCreate(criticConfig, _tokenTracker, _errorTracker);
         if (!createResult.Success)
         {
             _verification.ShowCriticUnavailable(createResult.ErrorMessage ?? "Critic not available");
@@ -1855,45 +1890,109 @@ public sealed class GenerateHandler
             })
             .ToList();
 
-        // Verify each test
-        for (var i = 0; i < tests.Count; i++)
-        {
-            var test = tests[i];
+        // Spec 043: parallelize critic verification with a SemaphoreSlim.
+        // max_concurrent=1 (default) preserves the original sequential
+        // behavior; higher values let multiple critic calls run in flight.
+        // Results are written into a pre-sized array indexed by the
+        // test's original position so the returned list order is
+        // deterministic regardless of completion order.
+        var maxConcurrent = criticConfig.GetEffectiveMaxConcurrent();
+        var slots = new (TestCase Test, VerificationResult Result)?[tests.Count];
+        var completed = 0;
+        using var semaphore = new SemaphoreSlim(maxConcurrent, maxConcurrent);
 
-            // T013: Skip verification for tests with Manual verdict — pass through as-is
+        async Task VerifyOneAsync(int index)
+        {
+            var test = tests[index];
+
+            // Skip verification for tests with Manual verdict — pass through as-is.
             if (test.Grounding is not null && test.Grounding.Verdict == VerificationVerdict.Manual)
             {
-                results.Add((test, new VerificationResult
+                slots[index] = (test, new VerificationResult
                 {
                     Verdict = VerificationVerdict.Manual,
                     Score = 1.0,
                     Findings = [],
                     CriticModel = critic.ModelName
-                }));
-                continue;
+                });
+                Interlocked.Increment(ref completed);
+                return;
             }
 
-            if (suite is not null)
+            await semaphore.WaitAsync(ct).ConfigureAwait(false);
+            try
             {
-                UpdateProgress(suite, "verifying",
-                    $"Verifying test {i + 1}/{tests.Count}: {test.Id} ({critic.ModelName})...");
-            }
+                if (suite is not null)
+                {
+                    var done = Interlocked.CompareExchange(ref completed, 0, 0);
+                    UpdateProgress(suite, "verifying",
+                        $"Verifying test {done + 1}/{tests.Count}: {test.Id} ({critic.ModelName})...");
+                }
 
-            await _progress.StatusAsync($"Verifying {test.Id} ({critic.ModelName})...", async () =>
-            {
                 try
                 {
-                    var result = await critic.VerifyTestAsync(test, sourceDocs, ct);
-                    results.Add((test, result));
+                    var result = await critic.VerifyTestAsync(test, sourceDocs, ct).ConfigureAwait(false);
+                    slots[index] = (test, result);
                     onTestVerified?.Invoke(test, result);
                 }
                 catch (Exception ex)
                 {
+                    // Spec 043: record full context to the dedicated error
+                    // log + bump per-run counters. Other in-flight tasks
+                    // continue running; this test gets an Unverified verdict.
+                    _errorTracker.Record(ex);
+                    Spectra.CLI.Infrastructure.ErrorLogger.Write(
+                        "critic", $"test_id={test.Id}", ex);
+                    Spectra.CLI.Infrastructure.DebugLogger.AppendError(
+                        "critic ",
+                        $"CRITIC ERROR test_id={test.Id} type={ex.GetType().Name} message={ex.Message}");
+
                     var unverified = VerificationResult.Unverified(critic.ModelName, ex.Message);
-                    results.Add((test, unverified));
+                    slots[index] = (test, unverified);
                     onTestVerified?.Invoke(test, unverified);
                 }
-            });
+                finally
+                {
+                    Interlocked.Increment(ref completed);
+                }
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }
+
+        if (maxConcurrent <= 1)
+        {
+            // Strict sequential path (default) — preserves the pre-spec-043
+            // ordering of progress messages and any provider-side ordering
+            // assumptions.
+            for (var i = 0; i < tests.Count; i++)
+            {
+                await _progress.StatusAsync(
+                    $"Verifying {tests[i].Id} ({critic.ModelName})...",
+                    () => VerifyOneAsync(i));
+            }
+        }
+        else
+        {
+            // Parallel path — Task.WhenAll across all tests, throttled by
+            // the semaphore above. Single status line announces the batch.
+            await _progress.StatusAsync(
+                $"Verifying {tests.Count} tests ({critic.ModelName}, max {maxConcurrent} parallel)...",
+                async () =>
+                {
+                    var tasks = Enumerable.Range(0, tests.Count).Select(VerifyOneAsync);
+                    await Task.WhenAll(tasks).ConfigureAwait(false);
+                });
+        }
+
+        for (var i = 0; i < slots.Length; i++)
+        {
+            if (slots[i] is { } slot)
+            {
+                results.Add(slot);
+            }
         }
 
         return results;

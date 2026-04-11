@@ -38,7 +38,9 @@
     "critic": {
       "enabled": true,
       "provider": "github-models",
-      "model": "gpt-5-mini"
+      "model": "gpt-5-mini",
+      "max_concurrent": 1,
+      "_comment_max_concurrent": "Spec 043: number of concurrent critic verification calls. 1 = sequential (default). 5 = ~5x faster on large suites. Max 20. Values >10 risk provider rate limits."
     }
   },
   "generation": {
@@ -105,6 +107,8 @@
     "enabled": false,
     "_comment": "Spec 040: opt-in .spectra-debug.log. Set enabled=true to persist per-call AI diagnostics, or run any AI command with --verbosity diagnostic to force-enable for a single run.",
     "log_file": ".spectra-debug.log",
+    "error_log_file": ".spectra-errors.log",
+    "_comment_error_log_file": "Spec 043: dedicated error log. Written only when debug.enabled is true AND at least one error occurs during the run. On clean runs the file is not created.",
     "mode": "append",
     "_comment_mode": "append (default): keep existing log content and add a separator + header before each new run. overwrite: truncate the file at run start, keeping only the latest run."
   }

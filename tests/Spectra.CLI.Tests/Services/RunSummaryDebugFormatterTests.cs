@@ -43,7 +43,37 @@ public class RunSummaryDebugFormatterTests
         Assert.Contains("tokens_in=0", line);
         Assert.Contains("tokens_out=0", line);
         Assert.Contains("elapsed=4m12s", line);
-        Assert.EndsWith("phases=", line);
+        // Spec 043: rate_limits + errors counters always suffix the line.
+        Assert.Contains("phases=", line);
+        Assert.EndsWith("rate_limits=0 errors=0", line);
+    }
+
+    [Fact]
+    public void FormatRunTotal_WithErrorTracker_AppendsCounts()
+    {
+        var tracker = new TokenUsageTracker();
+        var errorTracker = new RunErrorTracker();
+        errorTracker.RecordError();
+        errorTracker.RecordError();
+        errorTracker.Record(new HttpRequestException(
+            "Response status code does not indicate success: 429 (Too Many Requests).",
+            null, System.Net.HttpStatusCode.TooManyRequests));
+
+        var line = RunSummaryDebugFormatter.FormatRunTotal(
+            "generate", "checkout", tracker, TimeSpan.FromSeconds(5), errorTracker);
+
+        Assert.Contains("rate_limits=1", line);
+        Assert.Contains("errors=3", line);
+    }
+
+    [Fact]
+    public void FormatRunTotal_NoErrorTracker_StillEmitsZeroCounts()
+    {
+        var tracker = new TokenUsageTracker();
+        var line = RunSummaryDebugFormatter.FormatRunTotal(
+            "generate", "x", tracker, TimeSpan.FromSeconds(1));
+        Assert.Contains("rate_limits=0", line);
+        Assert.Contains("errors=0", line);
     }
 
     [Fact]

@@ -36,6 +36,8 @@ public sealed class UpdateHandler
     private readonly OutputFormat _outputFormat;
     private readonly ProgressReporter _progress;
     private readonly ClassificationPresenter _classificationPresenter;
+    // Spec 043: per-run error counters surfaced in run summary.
+    private readonly Spectra.CLI.Services.RunErrorTracker _errorTracker = new();
 
     public UpdateHandler(
         VerbosityLevel verbosity = VerbosityLevel.Normal,
@@ -129,6 +131,9 @@ public sealed class UpdateHandler
         }
         catch (Exception ex)
         {
+            // Spec 043: capture handler-level failure to error log.
+            _errorTracker.Record(ex);
+            Spectra.CLI.Infrastructure.ErrorLogger.Write("update", $"suite={suite}", ex);
             _progress.Error(ex.Message);
             return ExitCodes.Error;
         }
@@ -221,6 +226,14 @@ public sealed class UpdateHandler
         Spectra.CLI.Infrastructure.DebugLogger.LogFile = config.Debug.LogFile;
         Spectra.CLI.Infrastructure.DebugLogger.Mode = config.Debug.Mode;
         Spectra.CLI.Infrastructure.DebugLogger.BeginRun();
+
+        // Spec 043: error log mirrors debug log enable/mode but writes to a
+        // separate file (created lazily on first error).
+        Spectra.CLI.Infrastructure.ErrorLogger.Enabled =
+            config.Debug.Enabled || _verbosity == VerbosityLevel.Diagnostic;
+        Spectra.CLI.Infrastructure.ErrorLogger.LogFile = config.Debug.ErrorLogFile;
+        Spectra.CLI.Infrastructure.ErrorLogger.Mode = config.Debug.Mode;
+        Spectra.CLI.Infrastructure.ErrorLogger.BeginRun();
 
         var sw = Stopwatch.StartNew();
         _progressManager.Update("classifying", $"Analyzing changes in {suite} suite...");
@@ -521,12 +534,14 @@ public sealed class UpdateHandler
         Spectra.CLI.Infrastructure.DebugLogger.Append(
             "summary ",
             Spectra.CLI.Services.RunSummaryDebugFormatter.FormatRunTotal(
-                "update", suite, emptyTracker, sw.Elapsed));
+                "update", suite, emptyTracker, sw.Elapsed, _errorTracker));
 
         // Spec 040: render Run Summary panel unless JSON mode.
         if (_outputFormat != OutputFormat.Json)
         {
-            Spectra.CLI.Output.RunSummaryPresenter.Render(runSummary, tokenUsage: null, _verbosity);
+            Spectra.CLI.Output.RunSummaryPresenter.Render(
+                runSummary, tokenUsage: null, _verbosity,
+                errorTracker: _errorTracker);
         }
 
         return ExitCodes.Success;
