@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.47.1] - 2026-04-11
+
+### Added
+- **`TOOL CALL` lines in `.spectra-debug.log` for the generation flow.** `CopilotGenerationAgent` now subscribes to `ToolExecutionStartEvent` + `ToolExecutionCompleteEvent` from the Copilot SDK and emits one line per tool invocation, with elapsed time computed by correlating start/complete via `ToolCallId`. Format: `TOOL CALL tool=<name> mcp_server=<server-or--> elapsed=<sec>s success=<bool>`. For MCP tools the SDK exposes `McpServerName` + `McpToolName` directly, so testimize calls show as `tool=generate_hybrid_test_cases mcp_server=testimize elapsed=1.23s success=true` — making it possible to verify (a) whether the AI is actually invoking testimize tools during generation, or just ignoring them, and (b) which built-in tools (ReadDocument, GetNextTestIds, BatchWriteTests, ...) take how long. Previously only the testimize lifecycle (CONFIGURED/LOADED/STATUS_CHANGED/DISPOSED) was logged, with no visibility into per-call usage.
+
+### Notes
+- Tool-call tracking is per-session, scoped to a single `GenerateTestsAsync` call. The correlation dictionary is `ConcurrentDictionary<string, ...>` since SDK events fire from internal tasks.
+- Only added to the generation agent (`CopilotGenerationAgent`). The other Copilot-SDK agents — `BehaviorAnalyzer`, `CriteriaExtractor`, `GroundingAgent` (critic) — don't currently emit `TOOL CALL` lines. They could be extended the same way if needed; the only flow where MCP tools (testimize) are wired in is generation, which is what this change targets.
+
 ## [1.47.0] - 2026-04-11
 
 ### Added

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -141,6 +142,14 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
 
             // Track tool calls and schedule delayed composing message
             using var timerCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+            // Spec 042: per-tool start tracking, keyed by ToolCallId. Captured by
+            // the event subscription below — Start records the timestamp + name,
+            // Complete looks it up to compute elapsed and emits one
+            // `TOOL CALL ...` line to .spectra-debug.log per tool invocation.
+            // ConcurrentDictionary because SDK events fire from internal tasks.
+            var toolStarts = new ConcurrentDictionary<string, (DateTime StartUtc, string ToolName, string? McpServer, string? McpToolName)>();
+
             using var subscription = session.On(evt =>
             {
                 if (evt is AssistantUsageEvent usage && usage.Data is { } usageData)
@@ -183,6 +192,19 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 }
                 if (evt is ToolExecutionStartEvent toolStart)
                 {
+                    // Spec 042: record start so the matching Complete event can
+                    // compute elapsed time. Key on ToolCallId (always present);
+                    // values are stable for the lifetime of the call.
+                    var startData = toolStart.Data;
+                    if (!string.IsNullOrEmpty(startData.ToolCallId))
+                    {
+                        toolStarts[startData.ToolCallId] = (
+                            DateTime.UtcNow,
+                            startData.ToolName ?? "?",
+                            startData.McpServerName,
+                            startData.McpToolName);
+                    }
+
                     var friendlyName = toolStart.Data.ToolName switch
                     {
                         "report_intent" => "Planning test generation strategy...",
@@ -206,6 +228,31 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                             _onStatus?.Invoke($"AI is writing {requestedCount} test cases — this takes about a minute..."),
                             TaskContinuationOptions.OnlyOnRanToCompletion);
                     }
+                    return;
+                }
+
+                // Spec 042: emit one TOOL CALL line per tool invocation to the
+                // debug log. We see exactly which tools the AI actually used
+                // (e.g. testimize/generate_hybrid_test_cases) and how long each
+                // one took, so we can tell whether testimize was a no-op.
+                if (evt is ToolExecutionCompleteEvent toolComplete)
+                {
+                    var completeData = toolComplete.Data;
+                    if (string.IsNullOrEmpty(completeData.ToolCallId)) return;
+
+                    if (toolStarts.TryRemove(completeData.ToolCallId, out var startInfo))
+                    {
+                        var elapsed = DateTime.UtcNow - startInfo.StartUtc;
+                        var displayName = !string.IsNullOrEmpty(startInfo.McpToolName)
+                            ? startInfo.McpToolName
+                            : startInfo.ToolName;
+                        var serverName = !string.IsNullOrEmpty(startInfo.McpServer)
+                            ? startInfo.McpServer
+                            : "-";
+                        var success = completeData.Success ? "true" : "false";
+                        DebugLog($"TOOL CALL tool={displayName} mcp_server={serverName} elapsed={elapsed.TotalSeconds:F2}s success={success}");
+                    }
+                    return;
                 }
             });
 
