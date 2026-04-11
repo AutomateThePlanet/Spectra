@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.45.0] - 2026-04-11
+
+### Added
+- **Interactive model preset menu** (spec 041) — `spectra init -i` gains a new "AI Model Preset" step that offers four curated generator + critic pairings: (1) GPT-4.1 + GPT-5 mini (free, unlimited), (2) Claude Sonnet 4.5 + GPT-4.1 critic (premium, high quality), (3) GPT-4.1 + Claude Haiku 4.5 critic (free gen + cross-family critic), (4) Custom — writes preset 1 defaults so you can edit `spectra.config.json` by hand. Non-custom presets rewrite both `ai.providers[0]` and `ai.critic` in a single step and skip the separate granular critic wizard.
+- **Embedded `spectra.config.json` template** — the init config template is now an `<EmbeddedResource>` so `spectra init` produces the same file whether run from published (single-file) builds or from dev source. Previously the fallback path used `ConfigLoader.GenerateDefaultConfig()` which omitted the critic block entirely.
+
+### Changed
+- **New default models** (spec 041) — `spectra init` now writes `gpt-4.1` (generator) + `gpt-5-mini` (critic) instead of `gpt-4o` / `gpt-4o-mini`. Both are 0× multiplier on any paid Copilot plan, and they're from different model architectures so the dual-model critic (spec 008) provides genuine cross-verification. `SpectraConfig.Default`, `CriticConfig.GetEffectiveModel()`, `CopilotCritic.GetEffectiveModel()`, and `CopilotService.GetCriticModel()` all reflect the new defaults. Per-provider defaults: `github-models` / `openai` / `azure-openai` → `gpt-5-mini`; `anthropic` / `azure-anthropic` → `claude-haiku-4-5`.
+- `spectra init -i` granular critic step provider menu updated: dropped `google` (hard-error since spec 039), added `github-models`, updated `anthropic` / `openai` / `azure-openai` / `azure-anthropic` defaults to current model strings.
+
+### Backwards compatibility
+- Existing `spectra.config.json` files with `gpt-4o` / `gpt-4o-mini` (or any other valid model) continue to work unchanged. The Copilot SDK still routes those models. No migration is required — the new defaults only affect fresh `spectra init` runs.
+
+## [1.44.0] - 2026-04-11
+
+### Added
+- **Token usage tracking & Run Summary** (spec 040) — every `spectra ai generate` and `spectra ai update` run now prints a Run Summary panel (documents, behaviors, tests, verdict breakdown, duration) plus a per-phase Token Usage table grouped by `(phase, model, provider)` with an estimated USD cost for BYOK providers. `github-models` renders *"Included in Copilot plan (rate limits apply)"*. New `TokenUsageTracker` (thread-safe, one instance per run) records every AI call across analysis, generation, critic, and criteria phases. Hardcoded rate table in `CostEstimator` covers gpt-4o, gpt-4o-mini, gpt-4.1 family, claude-sonnet-4, claude-3-5-haiku, deepseek-v3.2.
+- **`run_summary` and `token_usage` in JSON output and `.spectra-result.json`** — SKILLs and the live progress page read the same fields, so `spectra-generate` reports token totals + cost in its final summary message. The `.spectra-progress.html` page gains an AI Calls / Tokens In / Tokens Out / Total / AI Time card grid that updates as batches complete.
+- **Model + provider in every AI debug log line** — debug log format gains `model=<name> provider=<name> tokens_in=<n|?> tokens_out=<n|?>` suffix on all AI lines (ANALYSIS, BATCH, CRITIC, UPDATE, CRITERIA). Non-AI lines (testimize lifecycle, file I/O) are unchanged.
+- **`debug` config section** (spec 040) — new top-level `debug` block in `spectra.config.json` with `enabled` (bool, **default false**) and `log_file` (string, default `.spectra-debug.log`). `spectra init` writes the section disabled by default. `--verbosity diagnostic` force-enables debug logging for a single run without editing config.
+
+### Changed
+- **`.spectra-debug.log` is now opt-in.** Default Spectra runs produce zero debug log files, eliminating stale-file accumulation in CI environments. Existing configs without a `debug` section continue to load (no breaking change).
+- Unified `TokenUsage` record now lives in `Spectra.Core.Models` with `PromptTokens` / `CompletionTokens` fields (replaces the unused CLI-scoped `InputTokens` / `OutputTokens` record).
+
+### Removed
+- **`ai.debug_log_enabled`** has been removed from `AiConfig`. Use the new top-level `debug.enabled` field instead. Existing configs that still set `ai.debug_log_enabled` are silently ignored (System.Text.Json default behavior for unknown fields).
+
+### Notes
+- The Copilot SDK does not currently surface `usage.prompt_tokens` / `completion_tokens` on its response object, so token counts are recorded as `null` (rendered as `?` in the debug log and `0` in the Run Summary table). All other Run Summary fields — call count, per-phase elapsed time, model, provider — are captured for every AI call. When the SDK begins exposing usage, a single read point in each agent picks it up with no further wiring.
+
 ## [1.36.0] - 2026-04-10
 
 ### Added

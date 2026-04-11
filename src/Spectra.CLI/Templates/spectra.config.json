@@ -15,26 +15,31 @@
     "providers": [
       {
         "name": "github-models",
-        "model": "gpt-4o",
+        "model": "gpt-4.1",
         "enabled": true,
         "priority": 1
       },
       {
         "name": "openai",
-        "model": "gpt-4o",
+        "model": "gpt-4.1",
         "enabled": false,
         "priority": 2,
         "api_key_env": "OPENAI_API_KEY"
       },
       {
         "name": "anthropic",
-        "model": "claude-sonnet-4-5-20250514",
+        "model": "claude-sonnet-4-5",
         "enabled": false,
         "priority": 3,
         "api_key_env": "ANTHROPIC_API_KEY"
       }
     ],
-    "fallback_strategy": "auto"
+    "fallback_strategy": "auto",
+    "critic": {
+      "enabled": true,
+      "provider": "github-models",
+      "model": "gpt-5-mini"
+    }
   },
   "generation": {
     "default_count": 15,
@@ -95,5 +100,10 @@
       "command": "testimize-mcp",
       "args": ["--mcp"]
     }
+  },
+  "debug": {
+    "enabled": false,
+    "_comment": "Spec 040: opt-in .spectra-debug.log. Set enabled=true to persist per-call AI diagnostics, or run any AI command with --verbosity diagnostic to force-enable for a single run.",
+    "log_file": ".spectra-debug.log"
   }
 }

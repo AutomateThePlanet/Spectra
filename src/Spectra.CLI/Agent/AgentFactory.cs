@@ -1,4 +1,5 @@
 using Spectra.CLI.Agent.Copilot;
+using Spectra.CLI.Services;
 using Spectra.Core.Models.Config;
 
 namespace Spectra.CLI.Agent;
@@ -63,7 +64,8 @@ public static class AgentFactory
         string basePath,
         string testsPath,
         Action<string>? onStatus = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        TokenUsageTracker? tracker = null)
     {
         // Get provider config (or use default)
         var providerConfig = config.Ai?.Providers?.FirstOrDefault(p => p.Enabled)
@@ -114,7 +116,8 @@ public static class AgentFactory
                 config,
                 basePath,
                 testsPath,
-                onStatus);
+                onStatus,
+                tracker);
 
             return AgentCreateResult.Succeeded(agent);
         }

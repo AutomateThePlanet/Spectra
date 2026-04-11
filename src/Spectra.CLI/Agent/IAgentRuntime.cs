@@ -1,4 +1,5 @@
 using Spectra.Core.Models;
+using TokenUsage = Spectra.Core.Models.TokenUsage;
 
 namespace Spectra.CLI.Agent;
 
@@ -72,7 +73,3 @@ public sealed class GenerationResult
     public bool IsSuccess => Errors.Count == 0;
 }
 
-/// <summary>
-/// Token usage statistics.
-/// </summary>
-public sealed record TokenUsage(int InputTokens, int OutputTokens, int TotalTokens);

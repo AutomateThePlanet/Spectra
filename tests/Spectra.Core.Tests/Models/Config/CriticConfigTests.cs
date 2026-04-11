@@ -48,12 +48,18 @@ public class CriticConfigTests
         Assert.False(config.IsValid());
     }
 
+    // Spec 041: critic defaults updated from gpt-4o-mini → gpt-5-mini and from
+    // claude-3-5-haiku-latest → claude-haiku-4-5 to track the current GitHub
+    // Copilot free / cross-architecture critic story.
     [Theory]
     [InlineData("google", "gemini-2.0-flash")]
-    [InlineData("openai", "gpt-4o-mini")]
-    [InlineData("anthropic", "claude-3-5-haiku-latest")]
-    [InlineData("github", "gpt-4o-mini")]
-    [InlineData("unknown", "gpt-4o-mini")]
+    [InlineData("github-models", "gpt-5-mini")]
+    [InlineData("openai", "gpt-5-mini")]
+    [InlineData("azure-openai", "gpt-5-mini")]
+    [InlineData("anthropic", "claude-haiku-4-5")]
+    [InlineData("azure-anthropic", "claude-haiku-4-5")]
+    [InlineData("github", "gpt-5-mini")]
+    [InlineData("unknown", "gpt-5-mini")]
     public void CriticConfig_GetEffectiveModel_ReturnsDefaultForProvider(string provider, string expectedModel)
     {
         var config = new CriticConfig { Provider = provider };

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using System.Web;
 
 namespace Spectra.CLI.Progress;
@@ -649,6 +650,12 @@ public static class ProgressPageWriter
                 sb.Append("</div>");
             }
 
+            // Spec 040: Token usage summary (generate/update)
+            if (root.TryGetProperty("token_usage", out var tokenUsage))
+            {
+                sb.Append(BuildTokenUsageSection(tokenUsage));
+            }
+
             // Error section
             if (status == "failed" && !string.IsNullOrEmpty(error))
             {
@@ -751,6 +758,54 @@ public static class ProgressPageWriter
             "failed" or "partial" => (PhasesForCommand(command), -1),
             _ => (PhasesForCommand(command), -1)
         };
+    }
+
+    // Spec 040: renders the Token Usage section from the token_usage block of
+    // .spectra-result.json. Called live during long-running runs so totals
+    // climb as batches complete, and at the end for the final snapshot.
+    private static string BuildTokenUsageSection(JsonElement tokenUsage)
+    {
+        if (!tokenUsage.TryGetProperty("total", out var total)) return "";
+        var calls = total.TryGetProperty("calls", out var c) ? c.GetInt32() : 0;
+        if (calls == 0) return "";
+
+        var tokensIn = total.TryGetProperty("tokens_in", out var ti) ? ti.GetInt32() : 0;
+        var tokensOut = total.TryGetProperty("tokens_out", out var to) ? to.GetInt32() : 0;
+        var totalTokens = total.TryGetProperty("total_tokens", out var tt) ? tt.GetInt32() : 0;
+        var elapsed = total.TryGetProperty("elapsed_seconds", out var es) ? es.GetDouble() : 0;
+        var costDisplay = tokenUsage.TryGetProperty("cost_display", out var cd) ? cd.GetString() ?? "" : "";
+
+        var sb = new StringBuilder();
+        sb.Append("""<div class="summary-grid">""");
+        sb.Append($"""<div class="summary-card"><div class="summary-number">{calls}</div><div class="summary-label">AI Calls</div></div>""");
+        sb.Append($"""<div class="summary-card"><div class="summary-number">{FormatKTokens(tokensIn)}</div><div class="summary-label">Tokens In</div></div>""");
+        sb.Append($"""<div class="summary-card"><div class="summary-number">{FormatKTokens(tokensOut)}</div><div class="summary-label">Tokens Out</div></div>""");
+        sb.Append($"""<div class="summary-card"><div class="summary-number">{FormatKTokens(totalTokens)}</div><div class="summary-label">Total Tokens</div></div>""");
+        sb.Append($"""<div class="summary-card"><div class="summary-number">{FormatSeconds(elapsed)}</div><div class="summary-label">AI Time</div></div>""");
+        sb.Append("</div>");
+
+        if (!string.IsNullOrEmpty(costDisplay))
+        {
+            sb.Append($"""<p style="text-align:center;margin-top:0.5rem;color:var(--color-muted);font-size:0.9rem;">Estimated cost: {Escape(costDisplay)}</p>""");
+        }
+
+        return sb.ToString();
+    }
+
+    private static string FormatKTokens(int tokens)
+    {
+        if (tokens == 0) return "-";
+        if (tokens >= 1_000_000) return $"{tokens / 1_000_000.0:F1}M";
+        if (tokens >= 1_000) return $"{tokens / 1_000.0:F1}K";
+        return tokens.ToString();
+    }
+
+    private static string FormatSeconds(double seconds)
+    {
+        if (seconds <= 0) return "-";
+        if (seconds < 60) return $"{seconds:F1}s";
+        var ts = TimeSpan.FromSeconds(seconds);
+        return $"{(int)ts.TotalMinutes}m{ts.Seconds:D2}s";
     }
 
     private static string BuildStepper(string status, string command = "")

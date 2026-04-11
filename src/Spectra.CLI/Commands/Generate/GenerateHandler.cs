@@ -45,6 +45,11 @@ public sealed class GenerateHandler
     private readonly GapPresenter _gapPresenter;
     private readonly VerificationPresenter _verification;
 
+    // Spec 040: per-run token tracker. Agents record per-call usage; the
+    // handler attaches a TokenUsageReport to the final GenerateResult.
+    private readonly Spectra.CLI.Services.TokenUsageTracker _tokenTracker = new();
+    private readonly System.Diagnostics.Stopwatch _runWallClock = new();
+
     public GenerateHandler(
         VerbosityLevel verbosity = VerbosityLevel.Normal,
         bool dryRun = false,
@@ -192,10 +197,14 @@ public sealed class GenerateHandler
             return ExitCodes.Error;
         }
 
-        // v1.43.0: configure the shared debug logger from ai.debug_log_enabled
-        // before any agent runs. All components (analyze, generate, critic,
-        // testimize) honor this single flag.
-        Spectra.CLI.Infrastructure.DebugLogger.Enabled = config.Ai.DebugLogEnabled;
+        // Spec 040: configure the shared debug logger from config.debug.enabled
+        // with a --verbosity diagnostic override. Default is disabled.
+        Spectra.CLI.Infrastructure.DebugLogger.Enabled =
+            config.Debug.Enabled || _verbosity == VerbosityLevel.Diagnostic;
+        Spectra.CLI.Infrastructure.DebugLogger.LogFile = config.Debug.LogFile;
+
+        // Spec 040: start run-level wall-clock for the Run Summary panel.
+        _runWallClock.Restart();
 
         // Clear stale result/progress files from previous runs
         DeleteResultFile();
@@ -292,7 +301,7 @@ public sealed class GenerateHandler
                     {
                         _progress.Info($"  {status}");
                         UpdateProgress(suite, progressStatus, status);
-                    }, config, loader);
+                    }, config, loader, _tokenTracker);
                     return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct);
                 });
 
@@ -351,7 +360,7 @@ public sealed class GenerateHandler
                         var analyzer = new BehaviorAnalyzer(provider, status =>
                         {
                             UpdateProgress(suite, progressStatus, status);
-                        }, config, loader);
+                        }, config, loader, _tokenTracker);
                         return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct);
                     });
 
@@ -502,7 +511,8 @@ public sealed class GenerateHandler
                 _progress.Info($"  {status}");
                 UpdateProgress(suite, "generating", status);
             },
-            ct);
+            ct,
+            _tokenTracker);
 
         if (!createResult.Success)
         {
@@ -733,6 +743,28 @@ public sealed class GenerateHandler
             ? $"Generated {allWrittenTests.Count} of {effectiveCount} requested across {batchesCompleted} batch(es)."
             : null;
 
+        // Spec 040: stop wall-clock and build run summary + token usage.
+        _runWallClock.Stop();
+        var batchSize = Math.Max(1, config.Ai.GenerationBatchSize);
+        var runSummary = new RunSummary
+        {
+            DocumentsProcessed = analysisResult?.DocumentsAnalyzed,
+            BehaviorsIdentified = analysisResult?.TotalBehaviors,
+            TestsGenerated = allWrittenTests.Count,
+            Verdicts = allVerificationResults.Count > 0 ? new RunSummaryVerdicts
+            {
+                Grounded = finalGroundedCount,
+                Partial = finalPartialCount,
+                Hallucinated = totalRejected
+            } : null,
+            BatchSize = batchSize,
+            Batches = batchesCompleted,
+            DurationSeconds = Math.Round(_runWallClock.Elapsed.TotalSeconds, 2)
+        };
+        var tokenUsage = _tokenTracker.HasData()
+            ? TokenUsageReport.FromTracker(_tokenTracker)
+            : null;
+
         var generateResult = new GenerateResult
         {
             Command = "generate",
@@ -765,10 +797,19 @@ public sealed class GenerateHandler
             },
             Verification = allVerifiedTests.Count > 0 ? allVerifiedTests : null,
             RejectedTests = allRejectedTests.Count > 0 ? allRejectedTests : null,
-            FilesCreated = allFilesCreated
+            FilesCreated = allFilesCreated,
+            RunSummary = runSummary,
+            TokenUsage = tokenUsage
         };
 
         WriteResultFile(generateResult);
+
+        // Spec 040: render Run Summary panel before final status line, unless
+        // JSON mode (where data is emitted in the JSON result instead).
+        if (_outputFormat != OutputFormat.Json)
+        {
+            Spectra.CLI.Output.RunSummaryPresenter.Render(runSummary, tokenUsage, _verbosity);
+        }
 
         if (_outputFormat == OutputFormat.Json)
         {
@@ -793,8 +834,10 @@ public sealed class GenerateHandler
             return ExitCodes.Error;
         }
 
-        // v1.43.0: configure the shared debug logger before any agent runs.
-        Spectra.CLI.Infrastructure.DebugLogger.Enabled = config.Ai.DebugLogEnabled;
+        // Spec 040: configure the shared debug logger before any agent runs.
+        Spectra.CLI.Infrastructure.DebugLogger.Enabled =
+            config.Debug.Enabled || _verbosity == VerbosityLevel.Diagnostic;
+        Spectra.CLI.Infrastructure.DebugLogger.LogFile = config.Debug.LogFile;
 
         // Auto-refresh document index before generation
         var indexService = new DocumentIndexService();
@@ -947,7 +990,7 @@ public sealed class GenerateHandler
                 {
                     var provider = config.Ai.Providers?.FirstOrDefault(p => p.Enabled);
                     var loader = new PromptTemplateLoader(currentDir);
-                    var analyzer = new BehaviorAnalyzer(provider, null, config, loader);
+                    var analyzer = new BehaviorAnalyzer(provider, null, config, loader, _tokenTracker);
                     return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct);
                 });
 
@@ -1037,7 +1080,8 @@ public sealed class GenerateHandler
                 currentDir,
                 testsPath,
                 status => _progress.Info($"  {status}"),
-                ct);
+                ct,
+                _tokenTracker);
 
             if (!createResult.Success)
             {
@@ -1690,7 +1734,7 @@ public sealed class GenerateHandler
     {
         var results = new List<(TestCase Test, VerificationResult Result)>();
 
-        var createResult = CriticFactory.TryCreate(criticConfig);
+        var createResult = CriticFactory.TryCreate(criticConfig, _tokenTracker);
         if (!createResult.Success)
         {
             _verification.ShowCriticUnavailable(createResult.ErrorMessage ?? "Critic not available");

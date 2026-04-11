@@ -54,21 +54,23 @@ public sealed class CriticConfig
     public int TimeoutSeconds { get; init; } = 120;
 
     /// <summary>
-    /// Gets the effective model name for the provider. Spec 039: canonical
-    /// providers map to current per-provider defaults; legacy entries kept
-    /// for read-side safety in case any caller bypasses CriticFactory.
+    /// Gets the effective model name for the provider. Spec 041: defaults
+    /// target current GitHub Copilot free / cross-architecture models —
+    /// <c>gpt-5-mini</c> for GPT providers and <c>claude-haiku-4-5</c> for
+    /// Claude providers. Legacy entries kept for read-side safety in case
+    /// any caller bypasses CriticFactory.
     /// </summary>
     public string GetEffectiveModel() => Model ?? Provider?.ToLowerInvariant() switch
     {
-        "github-models" => "gpt-4o-mini",
-        "azure-openai" => "gpt-4o-mini",
-        "azure-anthropic" => "claude-3-5-haiku-latest",
-        "openai" => "gpt-4o-mini",
-        "anthropic" => "claude-3-5-haiku-latest",
+        "github-models" => "gpt-5-mini",
+        "azure-openai" => "gpt-5-mini",
+        "azure-anthropic" => "claude-haiku-4-5",
+        "openai" => "gpt-5-mini",
+        "anthropic" => "claude-haiku-4-5",
         // Legacy fallthroughs (alias-resolved by CriticFactory before reaching here)
-        "github" => "gpt-4o-mini",
+        "github" => "gpt-5-mini",
         "google" => "gemini-2.0-flash",
-        _ => "gpt-4o-mini"
+        _ => "gpt-5-mini"
     };
 
     /// <summary>

@@ -46,12 +46,4 @@ public sealed class AiConfig
     /// </summary>
     [JsonPropertyName("generation_batch_size")]
     public int GenerationBatchSize { get; init; } = 30;
-
-    /// <summary>
-    /// Append per-batch diagnostics to <c>.spectra-debug.log</c> in the
-    /// project root. Default true. Useful for diagnosing slow models and
-    /// timeout issues. Set false to silence.
-    /// </summary>
-    [JsonPropertyName("debug_log_enabled")]
-    public bool DebugLogEnabled { get; init; } = true;
 }

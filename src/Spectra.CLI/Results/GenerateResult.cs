@@ -36,6 +36,14 @@ public sealed class GenerateResult : CommandResult
     [JsonPropertyName("session")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SessionCounts? Session { get; init; }
+
+    [JsonPropertyName("run_summary")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RunSummary? RunSummary { get; init; }
+
+    [JsonPropertyName("token_usage")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TokenUsageReport? TokenUsage { get; init; }
 }
 
 public sealed class GenerateAnalysis

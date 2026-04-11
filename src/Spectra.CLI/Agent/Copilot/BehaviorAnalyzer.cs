@@ -3,6 +3,7 @@ using System.Text.Json;
 using GitHub.Copilot.SDK;
 using Spectra.CLI.Agent.Analysis;
 using Spectra.CLI.Prompts;
+using Spectra.CLI.Services;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Validation;
@@ -20,6 +21,7 @@ public sealed class BehaviorAnalyzer
     private readonly Action<string>? _onStatus;
     private readonly SpectraConfig? _config;
     private readonly PromptTemplateLoader? _templateLoader;
+    private readonly TokenUsageTracker? _tracker;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
@@ -29,12 +31,14 @@ public sealed class BehaviorAnalyzer
         SpectraProviderConfig? provider,
         Action<string>? onStatus = null,
         SpectraConfig? config = null,
-        PromptTemplateLoader? templateLoader = null)
+        PromptTemplateLoader? templateLoader = null,
+        TokenUsageTracker? tracker = null)
     {
         _provider = provider;
         _onStatus = onStatus;
         _config = config;
         _templateLoader = templateLoader;
+        _tracker = tracker;
     }
 
     /// <summary>
@@ -58,7 +62,7 @@ public sealed class BehaviorAnalyzer
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var modelName = _provider?.Model ?? "?";
         var providerName = _provider?.Name ?? "?";
-        DebugLog($"ANALYSIS START documents={documents.Count} model={modelName} provider={providerName} timeout={timeoutMinutes}min");
+        DebugLogAi($"ANALYSIS START documents={documents.Count} timeout={timeoutMinutes}min", null, null);
 
         try
         {
@@ -97,7 +101,8 @@ public sealed class BehaviorAnalyzer
             if (string.IsNullOrWhiteSpace(responseText))
             {
                 _onStatus?.Invoke("AI returned empty response for behavior analysis");
-                DebugLog($"ANALYSIS EMPTY response_chars=0 elapsed={sw.Elapsed.TotalSeconds:F1}s");
+                _tracker?.Record("analysis", modelName, providerName, null, null, sw.Elapsed);
+                DebugLogAi($"ANALYSIS EMPTY response_chars=0 elapsed={sw.Elapsed.TotalSeconds:F1}s", null, null);
                 return null;
             }
 
@@ -105,7 +110,8 @@ public sealed class BehaviorAnalyzer
             if (behaviors is null || behaviors.Count == 0)
             {
                 _onStatus?.Invoke("Could not parse behaviors from AI response");
-                DebugLog($"ANALYSIS PARSE_FAIL response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s");
+                _tracker?.Record("analysis", modelName, providerName, null, null, sw.Elapsed);
+                DebugLogAi($"ANALYSIS PARSE_FAIL response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s", null, null);
                 // Save debug response
                 try
                 {
@@ -117,7 +123,8 @@ public sealed class BehaviorAnalyzer
             }
 
             sw.Stop();
-            DebugLog($"ANALYSIS OK behaviors={behaviors.Count} response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s");
+            _tracker?.Record("analysis", modelName, providerName, null, null, sw.Elapsed);
+            DebugLogAi($"ANALYSIS OK behaviors={behaviors.Count} response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s", null, null);
             _onStatus?.Invoke($"Found {behaviors.Count} testable behaviors");
 
             // Apply focus filter if specified
@@ -157,25 +164,30 @@ public sealed class BehaviorAnalyzer
         }
         catch (TimeoutException)
         {
-            DebugLog($"ANALYSIS TIMEOUT model={modelName} configured_timeout={timeoutMinutes}min elapsed={sw.Elapsed.TotalSeconds:F1}s");
+            DebugLogAi($"ANALYSIS TIMEOUT configured_timeout={timeoutMinutes}min elapsed={sw.Elapsed.TotalSeconds:F1}s", null, null);
             _onStatus?.Invoke($"Behavior analysis timed out after {timeoutMinutes} min (model: {modelName}). Bump ai.analysis_timeout_minutes in spectra.config.json. Using default count.");
             return null;
         }
         catch (Exception ex)
         {
-            DebugLog($"ANALYSIS ERROR exception={ex.GetType().Name} message=\"{ex.Message}\" elapsed={sw.Elapsed.TotalSeconds:F1}s");
+            DebugLogAi($"ANALYSIS ERROR exception={ex.GetType().Name} message=\"{ex.Message}\" elapsed={sw.Elapsed.TotalSeconds:F1}s", null, null);
             _onStatus?.Invoke($"Behavior analysis failed: {ex.Message}");
             return null;
         }
     }
 
     /// <summary>
-    /// Thin wrapper around the shared <see cref="Spectra.CLI.Infrastructure.DebugLogger"/>.
-    /// v1.43.0: all components share the same on/off flag, set once from
-    /// <c>GenerateHandler</c> based on <c>ai.debug_log_enabled</c>.
+    /// Wrapper around <see cref="Spectra.CLI.Infrastructure.DebugLogger.AppendAi"/>
+    /// for analysis AI lines. Enabled flag is set once from the handler.
     /// </summary>
-    private void DebugLog(string message) =>
-        Spectra.CLI.Infrastructure.DebugLogger.Append("analyze ", message);
+    private void DebugLogAi(string message, int? tokensIn, int? tokensOut) =>
+        Spectra.CLI.Infrastructure.DebugLogger.AppendAi(
+            "analyze ",
+            message,
+            _provider?.Model,
+            _provider?.Name,
+            tokensIn,
+            tokensOut);
 
     internal static string BuildAnalysisPrompt(
         IReadOnlyList<SourceDocument> documents,

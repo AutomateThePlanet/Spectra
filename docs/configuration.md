@@ -64,7 +64,7 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
     "providers": [
       {
         "name": "github-models",
-        "model": "gpt-4o",
+        "model": "gpt-4.1",
         "enabled": true,
         "priority": 1,
         "api_key_env": null,
@@ -75,14 +75,16 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
     "critic": {
       "enabled": true,
       "provider": "github-models",
-      "model": "gpt-4o-mini",
+      "model": "gpt-5-mini",
       "api_key_env": null,
       "base_url": null,
-      "timeout_seconds": 30
+      "timeout_seconds": 120
     }
   }
 }
 ```
+
+> **Spec 041 defaults:** `spectra init` writes `gpt-4.1` + `gpt-5-mini` — both 0× multiplier on any paid Copilot plan and from different model architectures for independent critic verification. `spectra init -i` offers a choice of four presets (GPT-4.1 + GPT-5 mini free, Claude Sonnet 4.5 + GPT-4.1 critic premium, GPT-4.1 + Claude Haiku 4.5 cross-family, or Custom). Existing configs with `gpt-4o` / `gpt-4o-mini` continue to work unchanged.
 
 ### `ai.providers[]`
 
@@ -107,19 +109,21 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 
 All providers are accessed through the GitHub Copilot SDK.
 
-### `ai.generation_timeout_minutes`, `ai.generation_batch_size`, `ai.debug_log_enabled`
+### `ai.generation_timeout_minutes`, `ai.generation_batch_size`
 
-Per-batch tuning for `spectra ai generate` and an append-only diagnostic log.
-These knobs are needed for slower / reasoning-class models (DeepSeek-V3, large
-Azure Anthropic deployments, GPT-4 Turbo with long contexts) where the default
-5-minute / 30-tests-per-batch budget is too small.
+Per-batch tuning for `spectra ai generate`. These knobs are needed for slower
+/ reasoning-class models (DeepSeek-V3, large Azure Anthropic deployments,
+GPT-4 Turbo with long contexts) where the default 5-minute / 30-tests-per-batch
+budget is too small.
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `analysis_timeout_minutes` | int | `2` | Timeout for the **behavior analysis** SDK call (the analyze step that runs before generation). Slower models routinely overshoot 2 minutes when scanning a multi-document suite — bump to 5–10 minutes for those. The same timer applies to the retry attempt. |
 | `generation_timeout_minutes` | int | `5` | Per-batch **generation** SDK call timeout. The timer measures the entire batch round-trip including all tool calls the AI makes. Slower models may need 10–20+ minutes. Minimum effective value is 1. |
 | `generation_batch_size` | int | `30` | Number of tests requested per AI call. Smaller batches reduce per-batch latency on slow models at the cost of more total round-trips. Pair with `generation_timeout_minutes`. Values ≤ 0 fall back to the default. |
-| `debug_log_enabled` | bool | `true` | When true, appends per-call diagnostics to `.spectra-debug.log` in the project root for all four components (analyze, generate, critic, testimize). Best-effort writes; never blocks the calling code. Set to `false` to silence. |
+
+> **Spec 040 note:** the former `ai.debug_log_enabled` setting has moved to a
+> new top-level [`debug`](#debug) section and defaults to **off**. See below.
 
 **Critic timeout**: `ai.critic.timeout_seconds` (default 120, was 30 prior to v1.43.0) controls the per-test verification timeout. Pre-v1.43.0 the runtime ignored the config and used a hardcoded 2 minutes. v1.43.0 honors the field; the default was bumped to 120 to preserve existing behavior. Slow critic models (Claude Sonnet, GPT-4 Turbo) on long tests may need 180–300 seconds.
 
@@ -201,16 +205,24 @@ splits into 13 batches of 8 tests each, every batch with a 20-minute budget.
 Every analyze and generate call's actual elapsed time is logged so you can
 re-tune later.
 
-#### Example: silencing the debug log on a fast model
+#### Example: silencing the debug log
+
+As of Spec 040 the debug log is **disabled by default** (no `.spectra-debug.log`
+file is written). No action needed to silence it.
+
+If you previously set `ai.debug_log_enabled: false` it can be removed; the field
+is obsolete. If you previously set it to `true` to force logging, move that
+preference to the new top-level `debug` section:
 
 ```json
 {
-  "ai": {
-    "providers": [{ "name": "github-models", "model": "gpt-4o", "enabled": true }],
-    "debug_log_enabled": false
+  "debug": {
+    "enabled": true
   }
 }
 ```
+
+See [the `debug` section](#debug) below for the full contract.
 
 #### Timeout error message
 
@@ -429,3 +441,47 @@ When configured, the execution agent uses the specified Copilot Space to answer 
 | `auto_load` | bool | `true` | Automatically load profiles during generation |
 | `validate_on_load` | bool | `true` | Validate profile structure on load |
 | `include_in_validation` | bool | `true` | Include profile validation in `spectra validate` |
+
+## `debug` — Debug Logging (Spec 040)
+
+Controls the append-only `.spectra-debug.log` diagnostic file. **Disabled by
+default.** When off, no file is created and no disk I/O occurs for debug
+logging, eliminating stale-file accumulation in CI environments.
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `enabled` | bool | `false` | When true, every AI call (analyze, generate, critic, criteria extraction) writes a timestamped line to the debug log. Non-AI lifecycle lines (testimize) are also written. Best-effort; never blocks the calling code. |
+| `log_file` | string | `".spectra-debug.log"` | Path to the log file. Relative paths resolve against the repo root. |
+
+### `--verbosity diagnostic` one-shot override
+
+You can force-enable debug logging for a single run without editing config:
+
+```bash
+spectra ai generate checkout --count 20 --verbosity diagnostic
+```
+
+The override takes effect for that invocation only and does not touch config.
+
+### AI line format (Spec 040)
+
+Every AI-call line ends with `model=<name> provider=<name> tokens_in=<n> tokens_out=<n>`:
+
+```text
+2026-04-11T12:34:56.789Z [analyze ] ANALYSIS OK behaviors=42 elapsed=18.5s model=gpt-4.1 provider=github-models tokens_in=? tokens_out=?
+2026-04-11T12:35:09.123Z [generate] BATCH OK   requested=8 elapsed=12.3s model=gpt-4.1 provider=github-models tokens_in=? tokens_out=?
+2026-04-11T12:35:11.456Z [critic  ] CRITIC OK  test_id=TC-201 verdict=grounded elapsed=2.1s model=gpt-4o-mini provider=github-models tokens_in=? tokens_out=?
+```
+
+When the provider response does not include a `usage` block, `tokens_in` and
+`tokens_out` are written as the literal `?` so the line stays grep-able. When
+the SDK surfaces token counts (future runtime versions), numeric values appear
+instead.
+
+### Cost and token summary
+
+After every `spectra ai generate` and `spectra ai update` run the terminal
+prints a Run Summary panel containing per-phase call counts, pure-AI elapsed
+time, and an estimated USD cost (BYOK providers) or *Included in Copilot plan*
+(for `github-models`). The same data is written to `.spectra-result.json`
+under `run_summary` and `token_usage` so SKILL / CI consumers can read it.

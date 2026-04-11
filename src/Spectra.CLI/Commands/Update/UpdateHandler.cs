@@ -207,6 +207,14 @@ public sealed class UpdateHandler
         bool deleteOrphaned,
         CancellationToken ct)
     {
+        // Spec 040: configure the shared debug logger from config.debug.enabled
+        // with a --verbosity diagnostic override. (Update currently makes no
+        // AI calls, so this only matters if DebugLogger.Append is called from
+        // other components invoked downstream.)
+        Spectra.CLI.Infrastructure.DebugLogger.Enabled =
+            config.Debug.Enabled || _verbosity == VerbosityLevel.Diagnostic;
+        Spectra.CLI.Infrastructure.DebugLogger.LogFile = config.Debug.LogFile;
+
         var sw = Stopwatch.StartNew();
         _progressManager.Update("classifying", $"Analyzing changes in {suite} suite...");
 
@@ -417,6 +425,22 @@ public sealed class UpdateHandler
             .Where(p => p.Classification is UpdateClassification.Orphaned or UpdateClassification.Redundant)
             .ToList();
 
+        // Spec 040: build RunSummary for the terminal panel and .spectra-result.json.
+        var runSummary = new Results.RunSummary
+        {
+            TestsScanned = proposals.Count,
+            TestsUpdated = reviewResult.ToUpdate.Count,
+            TestsUnchanged = proposals.Count(p => p.Classification == UpdateClassification.UpToDate),
+            Classifications = new Dictionary<string, int>
+            {
+                ["up_to_date"] = proposals.Count(p => p.Classification == UpdateClassification.UpToDate),
+                ["outdated"] = proposals.Count(p => p.Classification == UpdateClassification.Outdated),
+                ["orphaned"] = proposals.Count(p => p.Classification == UpdateClassification.Orphaned),
+                ["redundant"] = proposals.Count(p => p.Classification == UpdateClassification.Redundant)
+            },
+            DurationSeconds = Math.Round(sw.Elapsed.TotalSeconds, 2)
+        };
+
         var updateResult = new Results.UpdateResult
         {
             Command = "update",
@@ -444,9 +468,19 @@ public sealed class UpdateHandler
                     Reason = p.Reason
                 }).ToList()
                 : null,
-            Duration = sw.Elapsed.ToString(@"hh\:mm\:ss")
+            Duration = sw.Elapsed.ToString(@"hh\:mm\:ss"),
+            RunSummary = runSummary,
+            // TokenUsage intentionally null — update flow currently performs no
+            // AI calls (classification is purely local heuristics in TestClassifier).
+            TokenUsage = null
         };
         _progressManager.Complete(updateResult);
+
+        // Spec 040: render Run Summary panel unless JSON mode.
+        if (_outputFormat != OutputFormat.Json)
+        {
+            Spectra.CLI.Output.RunSummaryPresenter.Render(runSummary, tokenUsage: null, _verbosity);
+        }
 
         return ExitCodes.Success;
     }

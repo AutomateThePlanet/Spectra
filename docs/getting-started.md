@@ -108,11 +108,18 @@ Edit `spectra.config.json` to point to your docs. See [Configuration Reference](
   },
   "ai": {
     "providers": [
-      { "name": "github-models", "model": "gpt-4o", "enabled": true }
-    ]
+      { "name": "github-models", "model": "gpt-4.1", "enabled": true }
+    ],
+    "critic": {
+      "enabled": true,
+      "provider": "github-models",
+      "model": "gpt-5-mini"
+    }
   }
 }
 ```
+
+> **Spec 041 defaults:** generator `gpt-4.1` + critic `gpt-5-mini` are both 0× multiplier on any paid Copilot plan (Pro, Pro+, Business, Enterprise) and come from different model architectures for independent verification. Running `spectra init -i` offers an **AI Model Preset** menu with alternative pairings (Claude Sonnet 4.5 + GPT-4.1 critic for premium quality, GPT-4.1 + Claude Haiku 4.5 for cross-family verification, or Custom to edit by hand).
 
 ## Authentication
 
@@ -180,7 +187,7 @@ Override the default environment variable name in config:
     "providers": [
       {
         "name": "openai",
-        "model": "gpt-4o",
+        "model": "gpt-4.1",
         "api_key_env": "MY_CUSTOM_OPENAI_KEY",
         "enabled": true
       }

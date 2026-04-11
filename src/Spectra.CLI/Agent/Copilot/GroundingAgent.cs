@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using GitHub.Copilot.SDK;
 using Spectra.CLI.Agent.Critic;
+using Spectra.CLI.Services;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Grounding;
@@ -17,14 +18,18 @@ public sealed class CopilotCritic : ICriticRuntime
     private readonly CriticConfig _criticConfig;
     private readonly CriticPromptBuilder _promptBuilder;
     private readonly CriticResponseParser _responseParser;
+    private readonly TokenUsageTracker? _tracker;
 
     public string ModelName { get; }
 
-    public CopilotCritic(CriticConfig criticConfig)
+    public string ProviderName => _criticConfig.Provider ?? "github-models";
+
+    public CopilotCritic(CriticConfig criticConfig, TokenUsageTracker? tracker = null)
     {
         _criticConfig = criticConfig ?? throw new ArgumentNullException(nameof(criticConfig));
         _promptBuilder = new CriticPromptBuilder();
         _responseParser = new CriticResponseParser();
+        _tracker = tracker;
 
         ModelName = GetEffectiveModel(criticConfig);
     }
@@ -56,8 +61,9 @@ public sealed class CopilotCritic : ICriticRuntime
         // Surface model + timeout in the debug log so cost can be attributed
         // — every critic call is one billable API call to the critic provider.
         var timeoutSeconds = Math.Max(30, _criticConfig.TimeoutSeconds);
-        Spectra.CLI.Infrastructure.DebugLogger.Append("critic ",
-            $"CRITIC START test_id={testId} model={ModelName} timeout={timeoutSeconds}s");
+        Spectra.CLI.Infrastructure.DebugLogger.AppendAi("critic ",
+            $"CRITIC START test_id={testId} timeout={timeoutSeconds}s",
+            ModelName, ProviderName, null, null);
 
         try
         {
@@ -116,22 +122,28 @@ public sealed class CopilotCritic : ICriticRuntime
 
             // Parse the response using existing parser
             var result = _responseParser.Parse(responseText, ModelName, stopwatch.Elapsed);
-            Spectra.CLI.Infrastructure.DebugLogger.Append("critic ",
-                $"CRITIC OK    test_id={testId} verdict={result.Verdict} score={result.Score:F2} elapsed={stopwatch.Elapsed.TotalSeconds:F1}s");
+            _tracker?.Record("critic", ModelName, ProviderName, null, null, stopwatch.Elapsed);
+            Spectra.CLI.Infrastructure.DebugLogger.AppendAi("critic ",
+                $"CRITIC OK    test_id={testId} verdict={result.Verdict} score={result.Score:F2} elapsed={stopwatch.Elapsed.TotalSeconds:F1}s",
+                ModelName, ProviderName, null, null);
             return result;
         }
         catch (OperationCanceledException)
         {
             stopwatch.Stop();
-            Spectra.CLI.Infrastructure.DebugLogger.Append("critic ",
-                $"CRITIC TIMEOUT test_id={testId} model={ModelName} configured_timeout={timeoutSeconds}s elapsed={stopwatch.Elapsed.TotalSeconds:F1}s");
+            _tracker?.Record("critic", ModelName, ProviderName, null, null, stopwatch.Elapsed);
+            Spectra.CLI.Infrastructure.DebugLogger.AppendAi("critic ",
+                $"CRITIC TIMEOUT test_id={testId} configured_timeout={timeoutSeconds}s elapsed={stopwatch.Elapsed.TotalSeconds:F1}s",
+                ModelName, ProviderName, null, null);
             return CreateErrorResult($"Verification timed out after {timeoutSeconds}s — bump critic.timeout_seconds in spectra.config.json", stopwatch.Elapsed);
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
-            Spectra.CLI.Infrastructure.DebugLogger.Append("critic ",
-                $"CRITIC ERROR test_id={testId} exception={ex.GetType().Name} message=\"{ex.Message}\" elapsed={stopwatch.Elapsed.TotalSeconds:F1}s");
+            _tracker?.Record("critic", ModelName, ProviderName, null, null, stopwatch.Elapsed);
+            Spectra.CLI.Infrastructure.DebugLogger.AppendAi("critic ",
+                $"CRITIC ERROR test_id={testId} exception={ex.GetType().Name} message=\"{ex.Message}\" elapsed={stopwatch.Elapsed.TotalSeconds:F1}s",
+                ModelName, ProviderName, null, null);
             return CreateErrorResult(ex.Message, stopwatch.Elapsed);
         }
     }
@@ -141,15 +153,15 @@ public sealed class CopilotCritic : ICriticRuntime
         if (!string.IsNullOrEmpty(config.Model))
             return config.Model;
 
-        // Default to fast/cheap models for verification
+        // Spec 041: default critic models. Cross-architecture when possible
+        // so the critic catches hallucinations the generator can't see.
         var provider = config.Provider?.ToLowerInvariant() ?? "github-models";
         return provider switch
         {
-            "anthropic" or "azure-anthropic" => "claude-haiku-4-5-20250514",
+            "anthropic" or "azure-anthropic" => "claude-haiku-4-5",
             "azure-deepseek" => "DeepSeek-V3-0324",
-            "openai" or "azure-openai" => "gpt-4o-mini",
-            "google" => "gemini-2.0-flash",
-            _ => "gpt-4o-mini"
+            "openai" or "azure-openai" => "gpt-5-mini",
+            _ => "gpt-5-mini"
         };
     }
 

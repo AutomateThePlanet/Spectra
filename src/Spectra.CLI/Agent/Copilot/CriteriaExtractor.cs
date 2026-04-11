@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using System.Text.Json;
 using GitHub.Copilot.SDK;
 using Spectra.CLI.Prompts;
+using Spectra.CLI.Services;
 using Spectra.Core.Models.Coverage;
 using SpectraProviderConfig = Spectra.Core.Models.Config.ProviderConfig;
 
@@ -14,11 +16,28 @@ public sealed class CriteriaExtractor
 {
     private readonly SpectraProviderConfig _provider;
     private readonly Action<string>? _onStatus;
+    private readonly TokenUsageTracker? _tracker;
 
-    public CriteriaExtractor(SpectraProviderConfig provider, Action<string>? onStatus = null)
+    public CriteriaExtractor(
+        SpectraProviderConfig provider,
+        Action<string>? onStatus = null,
+        TokenUsageTracker? tracker = null)
     {
         _provider = provider;
         _onStatus = onStatus;
+        _tracker = tracker;
+    }
+
+    private void DebugLogAi(string message, TimeSpan elapsed)
+    {
+        Spectra.CLI.Infrastructure.DebugLogger.AppendAi(
+            "criteria",
+            message,
+            _provider?.Model,
+            _provider?.Name,
+            null,
+            null);
+        _tracker?.Record("criteria", _provider?.Model ?? "", _provider?.Name ?? "", null, null, elapsed);
     }
 
     /// <summary>
@@ -40,12 +59,16 @@ public sealed class CriteriaExtractor
 
         _onStatus?.Invoke($"Extracting criteria from {Path.GetFileName(documentPath)}...");
 
+        var sw = Stopwatch.StartNew();
         var response = await session.SendAndWaitAsync(
             new MessageOptions { Prompt = prompt },
             timeout: TimeSpan.FromMinutes(2),
             cancellationToken: ct);
+        sw.Stop();
 
         var responseText = response?.Data?.Content ?? "";
+        DebugLogAi($"CRITERIA OK doc={Path.GetFileName(documentPath)} response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s", sw.Elapsed);
+
         if (string.IsNullOrWhiteSpace(responseText))
             return [];
 
@@ -69,12 +92,16 @@ public sealed class CriteriaExtractor
 
         var prompt = BuildSplitPrompt(rawText, sourceKey, component);
 
+        var sw = Stopwatch.StartNew();
         var response = await session.SendAndWaitAsync(
             new MessageOptions { Prompt = prompt },
             timeout: TimeSpan.FromMinutes(1),
             cancellationToken: ct);
+        sw.Stop();
 
         var responseText = response?.Data?.Content ?? "";
+        DebugLogAi($"CRITERIA SPLIT source={sourceKey ?? "?"} response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s", sw.Elapsed);
+
         if (string.IsNullOrWhiteSpace(responseText))
             return [];
 

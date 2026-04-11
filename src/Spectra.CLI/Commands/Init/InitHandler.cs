@@ -129,8 +129,22 @@ public sealed class InitHandler
                 // Automation directory setup
                 await InteractiveAutomationDirsAsync(ct);
 
-                // Critic model setup
-                await InteractiveCriticSetupAsync(ct);
+                // Spec 041: AI model preset selection (generator + critic in
+                // one step). A non-custom preset writes both blocks and we
+                // skip the granular critic-setup step below.
+                var preset = await InteractiveModelPresetAsync(ct);
+                if (preset is not null && preset.IsCustom)
+                {
+                    // Custom → run the existing granular critic setup so the
+                    // user can pick a BYOK provider / custom model.
+                    await InteractiveCriticSetupAsync(ct);
+                }
+                else if (preset is null)
+                {
+                    // No preset selection happened for some reason — fall back
+                    // to the legacy granular flow.
+                    await InteractiveCriticSetupAsync(ct);
+                }
             }
 
             NextStepHints.Print("init", true,
@@ -331,10 +345,10 @@ public sealed class InitHandler
                 ("gpt-5.2-codex", "GPT-5.2 Codex"),
                 ("gpt-5.1-codex-max", "GPT-5.1 Codex Max"),
                 ("gpt-5.1-codex-mini", "GPT-5.1 Codex Mini (Preview)"),
-                ("gpt-5-mini", "GPT-5 Mini"),
+                ("gpt-5-mini", "GPT-5 Mini (Recommended critic, 0x cost)"),
                 // GPT-4.x Models
-                ("gpt-4.1", "GPT-4.1"),
-                ("gpt-4o", "GPT-4o (Recommended)"),
+                ("gpt-4.1", "GPT-4.1 (Recommended generator, 0x cost)"),
+                ("gpt-4o", "GPT-4o"),
                 // Gemini Models
                 ("gemini-3-flash", "Gemini 3 Flash (Preview, 0.33x cost)"),
                 ("gemini-3-pro", "Gemini 3 Pro (Preview)"),
@@ -352,9 +366,10 @@ public sealed class InitHandler
                 ("gpt-5.4-mini", "GPT-5.4 Mini"),
                 ("gpt-5.4-nano", "GPT-5.4 Nano"),
                 ("gpt-5.2", "GPT-5.2"),
+                ("gpt-5-mini", "GPT-5 Mini"),
                 // GPT-4.x
-                ("gpt-4.1", "GPT-4.1"),
-                ("gpt-4o", "GPT-4o (Recommended)"),
+                ("gpt-4.1", "GPT-4.1 (Recommended)"),
+                ("gpt-4o", "GPT-4o"),
                 ("gpt-4o-mini", "GPT-4o Mini"),
                 ("gpt-4-turbo", "GPT-4 Turbo"),
                 ("gpt-4-turbo-preview", "GPT-4 Turbo Preview"),
@@ -937,6 +952,124 @@ public sealed class InitHandler
         AnsiConsole.MarkupLine($"[green]Added {dirs.Count} automation director{(dirs.Count == 1 ? "y" : "ies")} to spectra.config.json[/]");
     }
 
+    /// <summary>
+    /// Spec 041: interactive preset selection for generator + critic model
+    /// pairing. A non-custom preset rewrites both <c>ai.providers[0]</c> and
+    /// <c>ai.critic</c> in the generated config in a single step. Returns the
+    /// selected preset (or null if skipped / errored), so the caller knows
+    /// whether to run the legacy granular critic-setup step after this one.
+    /// </summary>
+    internal async Task<ModelPreset?> InteractiveModelPresetAsync(CancellationToken ct)
+    {
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[bold]AI Model Preset[/]");
+        AnsiConsole.MarkupLine("[grey]Choose a model configuration for test generation and verification.[/]");
+        AnsiConsole.WriteLine();
+
+        foreach (var p in ModelPreset.All.Select((preset, idx) => (preset, idx)))
+        {
+            var i = p.idx + 1;
+            AnsiConsole.MarkupLine($"  [cyan]{i}.[/] [bold]{Markup.Escape(p.preset.Name)}[/]");
+            if (!p.preset.IsCustom)
+            {
+                AnsiConsole.MarkupLine($"     Generator: [green]{p.preset.GeneratorModel}[/] | Critic: [green]{p.preset.CriticModel}[/]");
+            }
+            AnsiConsole.MarkupLine($"     [grey]{Markup.Escape(p.preset.Description)}[/]");
+            AnsiConsole.MarkupLine($"     [grey]Copilot plan: {Markup.Escape(p.preset.PlanNote)}[/]");
+            AnsiConsole.WriteLine();
+        }
+
+        var choice = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("Select a [cyan]model preset[/]:")
+                .HighlightStyle(Style.Parse("cyan"))
+                .AddChoices(ModelPreset.All.Select(p => p.Name)));
+
+        var selected = ModelPreset.All.First(p => p.Name == choice);
+
+        // Write generator + critic to the config (if the config exists).
+        var configPath = Path.Combine(_workingDirectory, ConfigFileName);
+        if (File.Exists(configPath))
+        {
+            await ApplyModelPresetAsync(configPath, selected, ct);
+        }
+
+        AnsiConsole.WriteLine();
+        if (selected.IsCustom)
+        {
+            AnsiConsole.MarkupLine("[yellow]Custom preset selected.[/] [grey]You'll be prompted for critic settings next.[/]");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine($"[green]Preset applied:[/] generator=[cyan]{selected.GeneratorModel}[/], critic=[cyan]{selected.CriticModel}[/]");
+        }
+
+        return selected;
+    }
+
+    /// <summary>
+    /// Spec 041: rewrite <c>ai.providers[0]</c> and <c>ai.critic</c> in the
+    /// already-written config file to match the selected preset. Preserves
+    /// other config fields intact by round-tripping through <see cref="System.Text.Json.Nodes.JsonNode"/>.
+    /// </summary>
+    internal static async Task ApplyModelPresetAsync(
+        string configPath, ModelPreset preset, CancellationToken ct)
+    {
+        var json = await File.ReadAllTextAsync(configPath, ct);
+        var root = System.Text.Json.Nodes.JsonNode.Parse(json);
+        if (root is null) return;
+
+        root["ai"] ??= new System.Text.Json.Nodes.JsonObject();
+        var ai = root["ai"]!;
+
+        // Replace the enabled primary provider's name/model. Preserve any
+        // other providers (disabled alternates) and fields like priority or
+        // api_key_env on the primary row.
+        if (ai["providers"] is System.Text.Json.Nodes.JsonArray providers && providers.Count > 0)
+        {
+            System.Text.Json.Nodes.JsonNode? primary = null;
+            foreach (var node in providers)
+            {
+                if (node is System.Text.Json.Nodes.JsonObject obj
+                    && obj["enabled"] is System.Text.Json.Nodes.JsonValue v
+                    && v.GetValue<bool>())
+                {
+                    primary = obj;
+                    break;
+                }
+            }
+            primary ??= providers[0];
+            if (primary is System.Text.Json.Nodes.JsonObject primaryObj)
+            {
+                primaryObj["name"] = preset.GeneratorProvider;
+                primaryObj["model"] = preset.GeneratorModel;
+                primaryObj["enabled"] = true;
+            }
+        }
+        else
+        {
+            ai["providers"] = new System.Text.Json.Nodes.JsonArray(
+                new System.Text.Json.Nodes.JsonObject
+                {
+                    ["name"] = preset.GeneratorProvider,
+                    ["model"] = preset.GeneratorModel,
+                    ["enabled"] = true,
+                    ["priority"] = 1
+                });
+        }
+
+        // Write critic config (overwrites any existing block).
+        ai["critic"] = new System.Text.Json.Nodes.JsonObject
+        {
+            ["enabled"] = true,
+            ["provider"] = preset.CriticProvider,
+            ["model"] = preset.CriticModel
+        };
+
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        await File.WriteAllTextAsync(configPath, root.ToJsonString(options), ct);
+    }
+
     private async Task InteractiveCriticSetupAsync(CancellationToken ct)
     {
         AnsiConsole.WriteLine();
@@ -961,11 +1094,11 @@ public sealed class InitHandler
 
         var providerChoices = new Dictionary<string, (string Provider, string Model, string DefaultKeyEnv)>
         {
-            ["google (Gemini Flash — fast and cheap, recommended)"] = ("google", "gemini-2.0-flash", "GOOGLE_API_KEY"),
-            ["anthropic (Claude Haiku)"] = ("anthropic", "claude-haiku-4-5-20251001", "ANTHROPIC_API_KEY"),
-            ["openai (GPT-4o-mini)"] = ("openai", "gpt-4o-mini", "OPENAI_API_KEY"),
-            ["azure-openai (GPT-4o)"] = ("azure-openai", "gpt-4o", "AZURE_OPENAI_API_KEY"),
-            ["azure-deepseek (DeepSeek V3)"] = ("azure-deepseek", "DeepSeek-V3-0324", "AZURE_DEEPSEEK_API_KEY"),
+            ["github-models (GPT-5 mini — fast, included in Copilot plan)"] = ("github-models", "gpt-5-mini", ""),
+            ["anthropic (Claude Haiku 4.5)"] = ("anthropic", "claude-haiku-4-5", "ANTHROPIC_API_KEY"),
+            ["openai (GPT-5 mini)"] = ("openai", "gpt-5-mini", "OPENAI_API_KEY"),
+            ["azure-openai (GPT-4.1)"] = ("azure-openai", "gpt-4.1", "AZURE_OPENAI_API_KEY"),
+            ["azure-anthropic (Claude Haiku 4.5)"] = ("azure-anthropic", "claude-haiku-4-5", "AZURE_ANTHROPIC_API_KEY"),
             ["Same as primary provider"] = ("same", "", "")
         };
 
@@ -994,20 +1127,20 @@ public sealed class InitHandler
                 if (primary is not null)
                 {
                     provider = primary.Name;
-                    model = primary.Model ?? "gpt-4o";
+                    model = primary.Model ?? "gpt-4.1";
                     apiKeyEnv = primary.ApiKeyEnv ?? "";
                 }
                 else
                 {
                     provider = "github-models";
-                    model = "gpt-4o";
+                    model = "gpt-4.1";
                     apiKeyEnv = "";
                 }
             }
             else
             {
                 provider = "github-models";
-                model = "gpt-4o";
+                model = "gpt-4.1";
                 apiKeyEnv = "";
             }
         }

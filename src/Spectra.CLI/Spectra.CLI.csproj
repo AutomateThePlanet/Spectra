@@ -61,6 +61,11 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Prompts\Content\*.md" />
     <EmbeddedResource Include="Templates\deploy-dashboard.yml" />
+    <!-- Spec 041: embed spectra.config.json so `spectra init` produces the
+         same file in published (single-file) builds and in dev. Previously
+         the init handler fell through to ConfigLoader.GenerateDefaultConfig()
+         when run from bin output, which missed the critic block entirely. -->
+    <EmbeddedResource Include="Templates\spectra.config.json" />
     <EmbeddedResource Include="Dashboard\Templates\index.html" />
     <EmbeddedResource Include="Dashboard\Templates\scripts\app.js" />
     <EmbeddedResource Include="Dashboard\Templates\scripts\coverage-map.js" />

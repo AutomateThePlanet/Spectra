@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spectra.dev/schemas/debug-config.json",
+  "title": "Spectra Debug Config",
+  "description": "The `debug` section of spectra.config.json (Spec 040).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "When true, .spectra-debug.log is written during AI commands. When false (default), debug logging is a no-op."
+    },
+    "log_file": {
+      "type": "string",
+      "default": ".spectra-debug.log",
+      "description": "Path (relative to repo root or absolute) for the debug log file."
+    }
+  }
+}

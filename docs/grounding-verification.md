@@ -89,12 +89,14 @@ Configure the critic in `spectra.config.json`:
     "critic": {
       "enabled": true,
       "provider": "github-models",
-      "model": "gpt-4o-mini",
-      "timeout_seconds": 30
+      "model": "gpt-5-mini",
+      "timeout_seconds": 120
     }
   }
 }
 ```
+
+> **Spec 041:** `gpt-5-mini` is the new default critic model (was `gpt-4o-mini`). It's included free on any paid Copilot plan and, when paired with a `gpt-4.1` generator, provides cross-architecture verification without burning premium requests. For Claude generators, the default critic rotates to `claude-haiku-4-5`. Per-provider defaults resolved by `CriticConfig.GetEffectiveModel()`: `github-models` / `openai` / `azure-openai` → `gpt-5-mini`; `anthropic` / `azure-anthropic` → `claude-haiku-4-5`.
 
 Supported critic providers (spec 039 — same set as the generator):
 `github-models`, `azure-openai`, `azure-anthropic`, `openai`, `anthropic`.

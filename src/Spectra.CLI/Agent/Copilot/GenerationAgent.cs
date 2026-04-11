@@ -6,6 +6,7 @@ using Microsoft.Extensions.AI;
 using Spectra.CLI.Agent.Tools;
 using Spectra.CLI.Profile;
 using Spectra.CLI.Prompts;
+using Spectra.CLI.Services;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
@@ -24,6 +25,7 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
     private readonly string _basePath;
     private readonly string _testsPath;
     private readonly Action<string>? _onStatus;
+    private readonly TokenUsageTracker? _tracker;
 
     public string ProviderName => $"copilot-sdk ({_provider?.Name ?? "github-models"})";
 
@@ -32,13 +34,15 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
         SpectraConfig config,
         string basePath,
         string testsPath,
-        Action<string>? onStatus = null)
+        Action<string>? onStatus = null,
+        TokenUsageTracker? tracker = null)
     {
         _provider = provider ?? throw new ArgumentNullException(nameof(provider));
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _basePath = basePath ?? throw new ArgumentNullException(nameof(basePath));
         _testsPath = testsPath ?? throw new ArgumentNullException(nameof(testsPath));
         _onStatus = onStatus;
+        _tracker = tracker;
     }
 
     public async Task<bool> IsAvailableAsync(CancellationToken ct = default)
@@ -193,7 +197,7 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
             var timeoutMinutes = Math.Max(1, _config.Ai.GenerationTimeoutMinutes);
             var batchTimeout = TimeSpan.FromMinutes(timeoutMinutes);
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            DebugLog($"BATCH START requested={requestedCount} model={_provider?.Model ?? "?"} provider={_provider?.Name ?? "?"} timeout={timeoutMinutes}min");
+            DebugLogAi($"BATCH START requested={requestedCount} timeout={timeoutMinutes}min", null, null);
             _onStatus?.Invoke($"Starting AI generation ({requestedCount} tests, timeout {timeoutMinutes} min)...");
             var response = await session.SendAndWaitAsync(
                 new MessageOptions { Prompt = fullPrompt },
@@ -203,7 +207,10 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
             // Cancel delayed timers so they don't overwrite the final result
             await timerCts.CancelAsync();
             sw.Stop();
-            DebugLog($"BATCH OK   requested={requestedCount} elapsed={sw.Elapsed.TotalSeconds:F1}s");
+            // Spec 040: record token usage (tokens currently unavailable from
+            // the Copilot SDK response — recorded as null, debug log shows `?`).
+            _tracker?.Record("generation", _provider?.Model ?? "", _provider?.Name ?? "", null, null, sw.Elapsed);
+            DebugLogAi($"BATCH OK   requested={requestedCount} elapsed={sw.Elapsed.TotalSeconds:F1}s", null, null);
 
             var responseText = response?.Data?.Content ?? "";
 
@@ -248,7 +255,7 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
         catch (TimeoutException)
         {
             var configuredMinutes = Math.Max(1, _config.Ai.GenerationTimeoutMinutes);
-            DebugLog($"BATCH TIMEOUT requested={requestedCount} model={_provider?.Model ?? "?"} configured_timeout={configuredMinutes}min");
+            DebugLogAi($"BATCH TIMEOUT requested={requestedCount} configured_timeout={configuredMinutes}min", null, null);
             return new GenerationResult
             {
                 Tests = [],
@@ -309,12 +316,21 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
     }
 
     /// <summary>
-    /// Thin wrapper around the shared <see cref="Spectra.CLI.Infrastructure.DebugLogger"/>.
-    /// v1.43.0: all components share the same on/off flag, set once from
-    /// <c>GenerateHandler</c> based on <c>ai.debug_log_enabled</c>.
+    /// Wrapper around <see cref="Spectra.CLI.Infrastructure.DebugLogger"/> for
+    /// non-AI lines (e.g. testimize lifecycle). AI call lines go through
+    /// <see cref="DebugLogAi"/> to include model/provider/token suffixes.
     /// </summary>
     private void DebugLog(string message) =>
         Spectra.CLI.Infrastructure.DebugLogger.Append("generate", message);
+
+    private void DebugLogAi(string message, int? tokensIn, int? tokensOut) =>
+        Spectra.CLI.Infrastructure.DebugLogger.AppendAi(
+            "generate",
+            message,
+            _provider?.Model,
+            _provider?.Name,
+            tokensIn,
+            tokensOut);
 
     private void SaveDebugResponse(string responseText)
     {

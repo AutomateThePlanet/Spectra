@@ -305,7 +305,7 @@ public sealed class CopilotService : IAsyncDisposable
         return new SpectraProviderConfig
         {
             Name = criticConfig.Provider ?? "github-models",
-            Model = criticConfig.Model ?? "gpt-4o-mini",
+            Model = criticConfig.Model ?? "gpt-5-mini",
             BaseUrl = criticConfig.BaseUrl,
             ApiKeyEnv = criticConfig.ApiKeyEnv,
             Enabled = true
@@ -317,15 +317,17 @@ public sealed class CopilotService : IAsyncDisposable
         if (!string.IsNullOrEmpty(criticConfig?.Model))
             return criticConfig.Model;
 
-        // Default to fast/cheap models for verification
+        // Spec 041: Default to fast/cheap models for verification. Defaults
+        // target the current GitHub Copilot free models where possible and
+        // favor cross-architecture verification (GPT critic for a Claude
+        // generator and vice versa).
         var provider = criticConfig?.Provider?.ToLowerInvariant() ?? "github-models";
         return provider switch
         {
-            "anthropic" or "azure-anthropic" => "claude-haiku-4-5-20250514",
+            "anthropic" or "azure-anthropic" => "claude-haiku-4-5",
             "azure-deepseek" => "DeepSeek-V3-0324",
-            "openai" or "azure-openai" => "gpt-4o-mini",
-            "google" => "gemini-2.0-flash",
-            _ => "gpt-4o-mini"
+            "openai" or "azure-openai" => "gpt-5-mini",
+            _ => "gpt-5-mini"
         };
     }
 

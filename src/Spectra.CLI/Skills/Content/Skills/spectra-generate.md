@@ -110,6 +110,7 @@ spectra ai generate --suite {suite} --count {count} [--focus "{focus}"] --no-int
 **Step 7** — readFile `.spectra-result.json` — check `status`:
 - `"failed"` → tell user the `error`.
 - `"completed"` → "Generated **{generation.tests_written}** test cases." List `files_created`. If tests_written < tests_requested, say "Run again to generate more."
+- If `token_usage` is present, also include a one-line cost/usage summary from `token_usage.total.total_tokens` and `token_usage.cost_display` (e.g. "Token usage: **89K tokens** in {run_summary.duration_seconds}s. Cost: {token_usage.cost_display}"). Do NOT invent numbers if the field is absent.
 
 ---
 

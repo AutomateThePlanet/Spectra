@@ -57,6 +57,9 @@ public sealed class SpectraConfig
     [JsonPropertyName("testimize")]
     public TestimizeConfig Testimize { get; init; } = new();
 
+    [JsonPropertyName("debug")]
+    public DebugConfig Debug { get; init; } = new();
+
     /// <summary>
     /// Creates a default configuration.
     /// </summary>
@@ -66,16 +69,24 @@ public sealed class SpectraConfig
         Tests = new TestsConfig(),
         Ai = new AiConfig
         {
+            // Spec 041: default to gpt-4.1 generator + gpt-5-mini critic
+            // (both 0× on any paid Copilot plan, cross-architecture critic).
             Providers =
             [
                 new ProviderConfig
                 {
-                    Name = "copilot",
-                    Model = "gpt-4o",
+                    Name = "github-models",
+                    Model = "gpt-4.1",
                     Enabled = true,
                     Priority = 1
                 }
-            ]
+            ],
+            Critic = new CriticConfig
+            {
+                Enabled = true,
+                Provider = "github-models",
+                Model = "gpt-5-mini"
+            }
         },
         Selections = new Dictionary<string, SavedSelectionConfig>
         {

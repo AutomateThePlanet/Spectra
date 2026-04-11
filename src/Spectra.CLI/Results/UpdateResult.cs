@@ -48,6 +48,14 @@ public sealed class UpdateResult : CommandResult
     [JsonPropertyName("duration")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Duration { get; init; }
+
+    [JsonPropertyName("run_summary")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RunSummary? RunSummary { get; init; }
+
+    [JsonPropertyName("token_usage")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TokenUsageReport? TokenUsage { get; init; }
 }
 
 public sealed class UpdateClassificationCounts
