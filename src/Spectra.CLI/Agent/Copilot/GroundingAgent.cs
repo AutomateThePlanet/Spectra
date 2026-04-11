@@ -48,6 +48,16 @@ public sealed class CopilotCritic : ICriticRuntime
         CancellationToken ct = default)
     {
         var stopwatch = Stopwatch.StartNew();
+        ArgumentNullException.ThrowIfNull(test);
+        var testId = test.Id ?? "?";
+
+        // v1.43.0: per-call critic timeout is now driven by
+        // critic.timeout_seconds (was hardcoded 2 min, ignoring the config).
+        // Surface model + timeout in the debug log so cost can be attributed
+        // — every critic call is one billable API call to the critic provider.
+        var timeoutSeconds = Math.Max(30, _criticConfig.TimeoutSeconds);
+        Spectra.CLI.Infrastructure.DebugLogger.Append("critic ",
+            $"CRITIC START test_id={testId} model={ModelName} timeout={timeoutSeconds}s");
 
         try
         {
@@ -96,8 +106,8 @@ public sealed class CopilotCritic : ICriticRuntime
             // Send verification request
             await session.SendAsync(new MessageOptions { Prompt = fullPrompt }, ct);
 
-            // Wait for completion with timeout
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+            // Wait for completion with timeout (driven by critic.timeout_seconds).
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
 
             var responseText = await completionSource.Task.WaitAsync(linkedCts.Token);
@@ -105,16 +115,23 @@ public sealed class CopilotCritic : ICriticRuntime
             stopwatch.Stop();
 
             // Parse the response using existing parser
-            return _responseParser.Parse(responseText, ModelName, stopwatch.Elapsed);
+            var result = _responseParser.Parse(responseText, ModelName, stopwatch.Elapsed);
+            Spectra.CLI.Infrastructure.DebugLogger.Append("critic ",
+                $"CRITIC OK    test_id={testId} verdict={result.Verdict} score={result.Score:F2} elapsed={stopwatch.Elapsed.TotalSeconds:F1}s");
+            return result;
         }
         catch (OperationCanceledException)
         {
             stopwatch.Stop();
-            return CreateErrorResult("Verification timed out", stopwatch.Elapsed);
+            Spectra.CLI.Infrastructure.DebugLogger.Append("critic ",
+                $"CRITIC TIMEOUT test_id={testId} model={ModelName} configured_timeout={timeoutSeconds}s elapsed={stopwatch.Elapsed.TotalSeconds:F1}s");
+            return CreateErrorResult($"Verification timed out after {timeoutSeconds}s — bump critic.timeout_seconds in spectra.config.json", stopwatch.Elapsed);
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
+            Spectra.CLI.Infrastructure.DebugLogger.Append("critic ",
+                $"CRITIC ERROR test_id={testId} exception={ex.GetType().Name} message=\"{ex.Message}\" elapsed={stopwatch.Elapsed.TotalSeconds:F1}s");
             return CreateErrorResult(ex.Message, stopwatch.Elapsed);
         }
     }

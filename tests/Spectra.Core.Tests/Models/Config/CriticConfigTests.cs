@@ -14,7 +14,10 @@ public class CriticConfigTests
         Assert.Null(config.Model);
         Assert.Null(config.ApiKeyEnv);
         Assert.Null(config.BaseUrl);
-        Assert.Equal(30, config.TimeoutSeconds);
+        // v1.43.0: bumped default from 30 to 120 to match the prior hardcoded
+        // 2-minute runtime behavior in CopilotCritic (the 30-sec default was a
+        // dead value that the runtime ignored).
+        Assert.Equal(120, config.TimeoutSeconds);
     }
 
     [Fact]

@@ -487,15 +487,16 @@ public static class ProgressPageWriter
                     // Auto-refresh policy:
                     //   - In-progress pages: poll every 1.5s, saving scroll position
                     //     before each reload so the user doesn't get bounced to top.
-                    //   - Terminal pages (completed/failed): stop polling entirely.
-                    //     The agent re-opens the page via Simple Browser when the next
-                    //     run begins, so a stale Completed view will refresh then —
-                    //     and meanwhile the user can scroll and read in peace.
+                    //   - Terminal pages (completed/failed): poll every 5s. v1.43.0
+                    //     fix: previously this case stopped polling entirely, which
+                    //     meant a stale Completed view stayed stale even after the
+                    //     user kicked off a new run that rewrote .spectra-progress.html.
+                    //     Slow polling lets the page auto-detect the new run without
+                    //     requiring the agent to re-open the browser.
                     (function() {
                         var isTerminal = {{(isTerminal ? "true" : "false")}};
                         if (isTerminal) {
                             try { sessionStorage.removeItem('spectra-progress-scroll'); } catch (e) {}
-                            return;
                         }
                         setInterval(function() {
                             try {
@@ -503,7 +504,7 @@ public static class ProgressPageWriter
                             } catch (e) {}
                             var base = window.location.pathname;
                             window.location.replace(base + '?_=' + Date.now());
-                        }, 1500);
+                        }, isTerminal ? 5000 : 1500);
                     })();
 
                     // File links: open vscode:// URIs via JavaScript click handler

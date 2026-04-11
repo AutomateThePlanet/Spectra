@@ -99,22 +99,39 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
             // are silent — log a status message and continue with AI-only tools.
             // The client (and child process) is disposed in a `finally` further
             // below so the process is always killed before this method returns.
+            // v1.43.0: lifecycle is also logged to .spectra-debug.log for
+            // visibility ("did Testimize actually run on this batch?").
             Testimize.TestimizeMcpClient? testimizeClient = null;
-            if (_config.Testimize.Enabled)
+            if (!_config.Testimize.Enabled)
             {
+                DebugLog("TESTIMIZE DISABLED (testimize.enabled=false in config)");
+            }
+            else
+            {
+                var tCmd = _config.Testimize.Mcp.Command;
+                DebugLog($"TESTIMIZE START command={tCmd} args=[{string.Join(" ", _config.Testimize.Mcp.Args)}]");
                 testimizeClient = new Testimize.TestimizeMcpClient();
                 var started = await testimizeClient.StartAsync(_config.Testimize.Mcp, ct);
-                if (started && await testimizeClient.IsHealthyAsync(ct))
+                if (!started)
                 {
-                    tools.Add(Testimize.TestimizeTools.CreateGenerateTestDataTool(testimizeClient, _config.Testimize));
-                    tools.Add(Testimize.TestimizeTools.CreateAnalyzeFieldSpecTool());
-                    _onStatus?.Invoke("Testimize connected — using algorithmic test data optimization");
-                }
-                else
-                {
+                    DebugLog($"TESTIMIZE NOT_INSTALLED command={tCmd}");
                     _onStatus?.Invoke("Testimize not available — falling back to AI-generated test values. Install with: dotnet tool install --global Testimize.MCP.Server");
                     await testimizeClient.DisposeAsync();
                     testimizeClient = null;
+                }
+                else if (!await testimizeClient.IsHealthyAsync(ct))
+                {
+                    DebugLog($"TESTIMIZE UNHEALTHY command={tCmd} (started but health probe failed)");
+                    _onStatus?.Invoke("Testimize started but health probe failed — falling back to AI-generated test values.");
+                    await testimizeClient.DisposeAsync();
+                    testimizeClient = null;
+                }
+                else
+                {
+                    tools.Add(Testimize.TestimizeTools.CreateGenerateTestDataTool(testimizeClient, _config.Testimize));
+                    tools.Add(Testimize.TestimizeTools.CreateAnalyzeFieldSpecTool());
+                    DebugLog($"TESTIMIZE HEALTHY command={tCmd} tools_added=2 strategy={_config.Testimize.Strategy} mode={_config.Testimize.Mode}");
+                    _onStatus?.Invoke("Testimize connected — using algorithmic test data optimization");
                 }
             }
 
@@ -222,7 +239,10 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 // Spec 038 (FR-015, SC-006): MCP child process must be killed in
                 // every exit path — success, exception, or cancellation.
                 if (testimizeClient is not null)
+                {
                     await testimizeClient.DisposeAsync();
+                    DebugLog("TESTIMIZE DISPOSED");
+                }
             }
         }
         catch (TimeoutException)
@@ -289,24 +309,12 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
     }
 
     /// <summary>
-    /// Append a one-line timestamped diagnostic to <c>.spectra-debug.log</c>
-    /// in the project root. Best-effort; never throws. Gated by
-    /// <c>ai.debug_log_enabled</c> (default true).
+    /// Thin wrapper around the shared <see cref="Spectra.CLI.Infrastructure.DebugLogger"/>.
+    /// v1.43.0: all components share the same on/off flag, set once from
+    /// <c>GenerateHandler</c> based on <c>ai.debug_log_enabled</c>.
     /// </summary>
-    private void DebugLog(string message)
-    {
-        try
-        {
-            if (!_config.Ai.DebugLogEnabled) return;
-            var path = Path.Combine(_basePath, ".spectra-debug.log");
-            var line = $"{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fffZ} [generate] {message}{Environment.NewLine}";
-            File.AppendAllText(path, line);
-        }
-        catch
-        {
-            // Diagnostics must never block generation.
-        }
-    }
+    private void DebugLog(string message) =>
+        Spectra.CLI.Infrastructure.DebugLogger.Append("generate", message);
 
     private void SaveDebugResponse(string responseText)
     {

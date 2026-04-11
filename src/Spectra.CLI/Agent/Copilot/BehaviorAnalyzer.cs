@@ -170,24 +170,12 @@ public sealed class BehaviorAnalyzer
     }
 
     /// <summary>
-    /// Append a one-line timestamped diagnostic to <c>.spectra-debug.log</c>
-    /// in the project root. Best-effort; never throws. Gated by
-    /// <c>ai.debug_log_enabled</c> (default true).
+    /// Thin wrapper around the shared <see cref="Spectra.CLI.Infrastructure.DebugLogger"/>.
+    /// v1.43.0: all components share the same on/off flag, set once from
+    /// <c>GenerateHandler</c> based on <c>ai.debug_log_enabled</c>.
     /// </summary>
-    private void DebugLog(string message)
-    {
-        try
-        {
-            if (_config?.Ai.DebugLogEnabled == false) return;
-            var path = Path.Combine(Directory.GetCurrentDirectory(), ".spectra-debug.log");
-            var line = $"{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ss.fffZ} [analyze]  {message}{Environment.NewLine}";
-            File.AppendAllText(path, line);
-        }
-        catch
-        {
-            // Diagnostics must never block analysis.
-        }
-    }
+    private void DebugLog(string message) =>
+        Spectra.CLI.Infrastructure.DebugLogger.Append("analyze ", message);
 
     internal static string BuildAnalysisPrompt(
         IReadOnlyList<SourceDocument> documents,
@@ -300,6 +288,7 @@ public sealed class BehaviorAnalyzer
         if (json is null)
             return null;
 
+        // Strict pass: try the response as-is.
         try
         {
             using var doc = JsonDocument.Parse(json);
@@ -317,13 +306,107 @@ public sealed class BehaviorAnalyzer
                 return JsonSerializer.Deserialize<List<IdentifiedBehavior>>(
                     behaviorsElement.GetRawText(), JsonOptions);
             }
-
-            return null;
         }
         catch
         {
-            return null;
+            // Fall through to tolerant pass below.
         }
+
+        // Tolerant pass: handle truncated / malformed responses by walking the
+        // string and grabbing every balanced {...} object inside the first
+        // top-level array. Slow / reasoning models (DeepSeek-V3, o1-class)
+        // routinely hit their max output token limit mid-stream and produce
+        // a response that's mostly valid JSON but missing the closing braces.
+        // This pass returns whatever objects parsed cleanly, even if the tail
+        // of the response is garbage. Returns null only when zero objects
+        // could be recovered.
+        var recovered = ParseTolerant(responseText);
+        return recovered.Count > 0 ? recovered : null;
+    }
+
+    /// <summary>
+    /// Tolerant parser: walks the response text char-by-char tracking string
+    /// state and brace depth, yielding every balanced top-level <c>{...}</c>
+    /// object that appears inside the first array. Each object is parsed
+    /// independently — partial objects at the end of a truncated response
+    /// are silently skipped.
+    /// </summary>
+    internal static List<IdentifiedBehavior> ParseTolerant(string responseText)
+    {
+        var results = new List<IdentifiedBehavior>();
+        if (string.IsNullOrEmpty(responseText)) return results;
+
+        // Locate the start of the behaviors array. Prefer the array right
+        // after the "behaviors" key; otherwise fall back to the first '['.
+        var arrayStart = -1;
+        var behaviorsKeyIdx = responseText.IndexOf("\"behaviors\"", StringComparison.OrdinalIgnoreCase);
+        if (behaviorsKeyIdx >= 0)
+        {
+            arrayStart = responseText.IndexOf('[', behaviorsKeyIdx);
+        }
+        if (arrayStart < 0)
+        {
+            arrayStart = responseText.IndexOf('[');
+        }
+        if (arrayStart < 0) return results;
+
+        var depth = 0;
+        var objStart = -1;
+        var inString = false;
+        var escape = false;
+
+        for (var i = arrayStart + 1; i < responseText.Length; i++)
+        {
+            var c = responseText[i];
+
+            if (escape)
+            {
+                escape = false;
+                continue;
+            }
+            if (inString)
+            {
+                if (c == '\\') { escape = true; continue; }
+                if (c == '"') { inString = false; }
+                continue;
+            }
+            if (c == '"')
+            {
+                inString = true;
+                continue;
+            }
+
+            if (c == '{')
+            {
+                if (depth == 0) objStart = i;
+                depth++;
+            }
+            else if (c == '}')
+            {
+                depth--;
+                if (depth == 0 && objStart >= 0)
+                {
+                    var objJson = responseText.Substring(objStart, i - objStart + 1);
+                    try
+                    {
+                        var behavior = JsonSerializer.Deserialize<IdentifiedBehavior>(objJson, JsonOptions);
+                        if (behavior is not null) results.Add(behavior);
+                    }
+                    catch
+                    {
+                        // Skip malformed object; keep walking.
+                    }
+                    objStart = -1;
+                }
+                else if (depth < 0)
+                {
+                    // Stray '}' — clamp and continue.
+                    depth = 0;
+                }
+            }
+        }
+
+        return results;
     }
 
     private static string? ExtractJson(string text)

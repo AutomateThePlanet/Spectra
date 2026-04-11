@@ -192,6 +192,11 @@ public sealed class GenerateHandler
             return ExitCodes.Error;
         }
 
+        // v1.43.0: configure the shared debug logger from ai.debug_log_enabled
+        // before any agent runs. All components (analyze, generate, critic,
+        // testimize) honor this single flag.
+        Spectra.CLI.Infrastructure.DebugLogger.Enabled = config.Ai.DebugLogEnabled;
+
         // Clear stale result/progress files from previous runs
         DeleteResultFile();
 
@@ -374,13 +379,14 @@ public sealed class GenerateHandler
         {
             var analysisFailed = analysisResult is null;
             var generatorModelName = config.Ai.Providers?.FirstOrDefault(p => p.Enabled)?.Model ?? "?";
+            var configuredAnalysisTimeout = Math.Max(1, config.Ai.AnalysisTimeoutMinutes);
             var analyzeResult = new GenerateResult
             {
                 Command = "generate",
                 Status = analysisFailed ? "analysis_failed" : "analyzed",
                 Suite = suite,
                 Message = analysisFailed
-                    ? $"Behavior analysis did not return results (model: {generatorModelName}). Recommended count of {effectiveCount} is a fallback default — NOT a real analysis. Common cause: ai.analysis_timeout_minutes (default 2) is too low for a slow / reasoning model. Bump it to 5–10 minutes in spectra.config.json and re-run. See .spectra-debug.log for the actual elapsed time."
+                    ? $"Behavior analysis did not return results (model: {generatorModelName}, configured timeout: {configuredAnalysisTimeout} min). Recommended count of {effectiveCount} is a fallback default — NOT a real analysis. Inspect .spectra-debug.log to see the actual elapsed time and failure reason. Common causes: (1) ai.analysis_timeout_minutes too low (current: {configuredAnalysisTimeout} min) — bump it; (2) the model truncated its JSON response by hitting its max-output-token limit — split the suite into fewer documents or switch to a model with a larger output budget; (3) the model produced text that does not match the expected behaviors schema. The tolerant parser (v1.43.0+) recovers what it can from truncated responses, so recurring failures here usually mean the model output is unusable, not just truncated."
                     : null,
                 Analysis = analysisResult is not null ? new GenerateAnalysis
                 {
@@ -786,6 +792,9 @@ public sealed class GenerateHandler
         {
             return ExitCodes.Error;
         }
+
+        // v1.43.0: configure the shared debug logger before any agent runs.
+        Spectra.CLI.Infrastructure.DebugLogger.Enabled = config.Ai.DebugLogEnabled;
 
         // Auto-refresh document index before generation
         var indexService = new DocumentIndexService();

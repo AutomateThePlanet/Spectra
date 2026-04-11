@@ -43,11 +43,15 @@ public sealed class CriticConfig
     public string? BaseUrl { get; init; }
 
     /// <summary>
-    /// Timeout for verification calls in seconds.
-    /// Default: 30 seconds.
+    /// Timeout for each critic verification call in seconds.
+    /// Default: 120 seconds (was 30 prior to v1.43.0, but the actual runtime
+    /// behavior was hardcoded to 2 minutes — the 30-second default was a
+    /// dead value that the code ignored). v1.43.0 honors this field, with
+    /// the default raised to 120 to preserve the prior behavior. Slow critic
+    /// models on long tests may need 180–300 seconds.
     /// </summary>
     [JsonPropertyName("timeout_seconds")]
-    public int TimeoutSeconds { get; init; } = 30;
+    public int TimeoutSeconds { get; init; } = 120;
 
     /// <summary>
     /// Gets the effective model name for the provider. Spec 039: canonical

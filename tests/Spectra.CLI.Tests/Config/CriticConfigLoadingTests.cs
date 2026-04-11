@@ -96,7 +96,7 @@ public class CriticConfigLoadingTests
         Assert.Equal("anthropic", config.Provider);
         Assert.Null(config.Model); // Uses provider default
         Assert.Null(config.ApiKeyEnv); // Uses provider default
-        Assert.Equal(30, config.TimeoutSeconds); // Default
+        Assert.Equal(120, config.TimeoutSeconds); // v1.43.0: default bumped from 30 to 120
     }
 
     [Fact]

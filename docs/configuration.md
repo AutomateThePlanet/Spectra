@@ -119,7 +119,9 @@ Azure Anthropic deployments, GPT-4 Turbo with long contexts) where the default
 | `analysis_timeout_minutes` | int | `2` | Timeout for the **behavior analysis** SDK call (the analyze step that runs before generation). Slower models routinely overshoot 2 minutes when scanning a multi-document suite — bump to 5–10 minutes for those. The same timer applies to the retry attempt. |
 | `generation_timeout_minutes` | int | `5` | Per-batch **generation** SDK call timeout. The timer measures the entire batch round-trip including all tool calls the AI makes. Slower models may need 10–20+ minutes. Minimum effective value is 1. |
 | `generation_batch_size` | int | `30` | Number of tests requested per AI call. Smaller batches reduce per-batch latency on slow models at the cost of more total round-trips. Pair with `generation_timeout_minutes`. Values ≤ 0 fall back to the default. |
-| `debug_log_enabled` | bool | `true` | When true, appends per-batch diagnostics to `.spectra-debug.log` in the project root. Best-effort writes; never blocks analysis or generation. Set to `false` to silence. |
+| `debug_log_enabled` | bool | `true` | When true, appends per-call diagnostics to `.spectra-debug.log` in the project root for all four components (analyze, generate, critic, testimize). Best-effort writes; never blocks the calling code. Set to `false` to silence. |
+
+**Critic timeout**: `ai.critic.timeout_seconds` (default 120, was 30 prior to v1.43.0) controls the per-test verification timeout. Pre-v1.43.0 the runtime ignored the config and used a hardcoded 2 minutes. v1.43.0 honors the field; the default was bumped to 120 to preserve existing behavior. Slow critic models (Claude Sonnet, GPT-4 Turbo) on long tests may need 180–300 seconds.
 
 **Why a separate analysis timeout?** Behavior analysis runs once before generation and tends to be a single big call (no tool-calling loop). With slow / reasoning models on multi-doc suites it often takes 3–7 minutes — well over the 2-minute default — and fails silently. The symptom is `behaviors_found: 0` with a `recommended` count that looks plausible but is actually a hardcoded fallback default. v1.42.0+ surfaces this clearly: when analysis fails, the result file's `status` is set to `"analysis_failed"` (not `"analyzed"`) and the `message` field explains the cause and remediation. The bundled `spectra-generate` SKILL recognizes the new status and stops the agent from confidently presenting fallback numbers as a real recommendation.
 
@@ -129,21 +131,40 @@ When `debug_log_enabled` is true, every batch writes one or more timestamped
 lines to `.spectra-debug.log`. Example session:
 
 ```text
-2026-04-11T01:30:01.045Z [analyze]  ANALYSIS START documents=12 model=DeepSeek-V3.2 provider=azure-openai timeout=10min
-2026-04-11T01:33:47.219Z [analyze]  ANALYSIS OK behaviors=75 response_chars=18402 elapsed=226.2s
+2026-04-11T01:30:00.012Z [generate] TESTIMIZE DISABLED (testimize.enabled=false in config)
+2026-04-11T01:30:01.045Z [analyze ] ANALYSIS START documents=12 model=DeepSeek-V3.2 provider=azure-openai timeout=10min
+2026-04-11T01:33:47.219Z [analyze ] ANALYSIS OK behaviors=75 response_chars=18402 elapsed=226.2s
 2026-04-11T01:33:48.221Z [generate] BATCH START requested=8 model=DeepSeek-V3.2 provider=azure-openai timeout=20min
 2026-04-11T01:38:25.778Z [generate] BATCH OK   requested=8 elapsed=277.6s
-2026-04-11T01:38:27.014Z [generate] BATCH START requested=8 model=DeepSeek-V3.2 provider=azure-openai timeout=20min
-2026-04-11T01:42:44.004Z [generate] BATCH OK   requested=8 elapsed=257.0s
-2026-04-11T01:42:45.221Z [generate] BATCH START requested=8 model=DeepSeek-V3.2 provider=azure-openai timeout=20min
-2026-04-11T02:02:45.330Z [generate] BATCH TIMEOUT requested=8 model=DeepSeek-V3.2 configured_timeout=20min
+2026-04-11T01:38:26.014Z [critic ] CRITIC START test_id=TC-101 model=gpt-4.1-mini timeout=120s
+2026-04-11T01:38:32.881Z [critic ] CRITIC OK    test_id=TC-101 verdict=Grounded score=0.95 elapsed=6.9s
+2026-04-11T01:38:33.014Z [critic ] CRITIC START test_id=TC-102 model=gpt-4.1-mini timeout=120s
+2026-04-11T01:38:41.220Z [critic ] CRITIC OK    test_id=TC-102 verdict=Partial score=0.62 elapsed=8.2s
+2026-04-11T01:42:45.330Z [generate] BATCH TIMEOUT requested=8 model=DeepSeek-V3.2 configured_timeout=20min
 ```
 
-The `[analyze]` lines come from `BehaviorAnalyzer`; the `[generate]` lines come
-from `CopilotGenerationAgent`. `ANALYSIS OK` and `BATCH OK` record success and
-elapsed wall time. `ANALYSIS TIMEOUT`, `ANALYSIS PARSE_FAIL`, `ANALYSIS EMPTY`,
-`ANALYSIS ERROR`, and `BATCH TIMEOUT` record failures with the configured
-budget for cross-reference.
+**Component prefixes** (v1.43.0+):
+- `[analyze ]` — behavior analysis (one START + OK/TIMEOUT/PARSE_FAIL/EMPTY/ERROR per run)
+- `[generate]` — test generation (one BATCH START + BATCH OK/TIMEOUT per batch, plus TESTIMIZE lifecycle lines)
+- `[critic ]` — grounding verification (one CRITIC START + OK/TIMEOUT/ERROR per test verified)
+
+**Testimize lifecycle lines** (always emitted, even when disabled, so you can verify what actually ran):
+
+| Line | Meaning |
+|------|---------|
+| `TESTIMIZE DISABLED (testimize.enabled=false in config)` | The optional integration is off. No MCP process spawned. |
+| `TESTIMIZE START command=X args=[...]` | Attempting to start the MCP server. |
+| `TESTIMIZE NOT_INSTALLED command=X` | The tool is not on PATH. SPECTRA falls back to AI-generated values. |
+| `TESTIMIZE UNHEALTHY command=X` | The process started but the health probe failed. Fallback. |
+| `TESTIMIZE HEALTHY command=X tools_added=2 strategy=X mode=Y` | Tools registered with the AI session. |
+| `TESTIMIZE DISPOSED` | Child process killed at the end of the run. |
+
+**Cost attribution**: every line is one billable API call to the corresponding
+provider. To estimate cost for a run, count the lines:
+- `ANALYSIS START` lines × analyzer model input cost
+- `BATCH START` lines × generator model input cost
+- `CRITIC START` lines × critic model input cost (typically dominant — one per generated test)
+- `TESTIMIZE *` lines have zero AI cost (local MCP child process, not an API call)
 
 Lines starting with `BATCH START` mark the beginning of an AI call (model,
 provider, batch size, configured timeout). `BATCH OK` marks success and
