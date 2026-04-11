@@ -188,6 +188,15 @@ spectra ai generate checkout --no-interaction --output-format json    # CI pipel
 
 Session state is stored in `.spectra/session.json` and expires after 1 hour.
 
+**Live progress bars** (spec 041) — at default verbosity, long runs render two
+sequential Spectre.Console progress bars in the terminal: a `Generating tests`
+bar that advances per batch, then a `Verifying tests` bar that advances per
+critic call (showing the most recent test ID and verdict). The same data is
+mirrored to `.spectra-progress.html` via an in-flight `progress` object inside
+`.spectra-result.json`. Progress bars are automatically suppressed under
+`--output-format json`, `--verbosity quiet`, or non-interactive stdout (piped
+or redirected) so SKILL/CI output remains clean.
+
 User-described tests are marked with `grounding.verdict: manual` and `source: user-described`.
 
 When a project has documentation in `docs/` and acceptance criteria in `docs/criteria/`, `--from-description` runs in **doc-aware mode**: it best-effort loads matching docs (capped at 3 docs × 8000 chars) and matching `.criteria.yaml` entries as formatting context, then populates the new test's `source_refs` (with the doc paths used) and `criteria` fields (with any IDs the AI matches to your description). The grounding verdict stays `manual` — doc context is used for terminology and navigation alignment only, never for verification. If no docs or criteria exist, the flow is identical to the no-context behavior.

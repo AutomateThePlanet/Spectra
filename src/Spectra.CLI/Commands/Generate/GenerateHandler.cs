@@ -50,6 +50,12 @@ public sealed class GenerateHandler
     private readonly Spectra.CLI.Services.TokenUsageTracker _tokenTracker = new();
     private readonly System.Diagnostics.Stopwatch _runWallClock = new();
 
+    // Spec 041: in-flight progress snapshot for the current run. Mutated by
+    // the batch loop and the per-test critic callback. Picked up by
+    // WriteInProgressResultFile / WriteVerificationProgress and serialized
+    // into .spectra-result.json. Cleared by ProgressManager on Complete/Fail.
+    private static Progress.ProgressSnapshot? _currentProgress;
+
     public GenerateHandler(
         VerbosityLevel verbosity = VerbosityLevel.Normal,
         bool dryRun = false,
@@ -64,7 +70,7 @@ public sealed class GenerateHandler
         _noInteraction = noInteraction;
         _skipCritic = skipCritic;
         _outputFormat = outputFormat;
-        _progress = new ProgressReporter(outputFormat: outputFormat);
+        _progress = new ProgressReporter(outputFormat: outputFormat, verbosity: verbosity);
         _results = new ResultPresenter(outputFormat: outputFormat);
         _gapPresenter = new GapPresenter();
         _verification = new VerificationPresenter(outputFormat);
@@ -561,6 +567,33 @@ public sealed class GenerateHandler
             : DefaultBatchSize;
         var totalBatches = (int)Math.Ceiling(effectiveCount / (double)configuredBatchSize);
 
+        // Spec 041: initialize the in-flight progress snapshot. Mutated by
+        // the batch loop and per-test critic callback below; serialized into
+        // .spectra-result.json each time UpdateProgress() / WriteVerificationProgress()
+        // fires; cleared by ProgressManager on Complete()/Fail().
+        _currentProgress = new Progress.ProgressSnapshot
+        {
+            Phase = Progress.ProgressPhase.Generating,
+            TestsTarget = effectiveCount,
+            TotalBatches = totalBatches,
+            CurrentBatch = 1
+        };
+
+        var willVerify = ShouldVerify(config.Ai.Critic);
+
+        // Spec 041: wrap the batch + critic loop in a Spectre.Console two-task
+        // progress display. The generation handle advances per batch; the
+        // verification handle advances per critic call (via onTestVerified).
+        // Suppression rules (JSON, quiet, non-TTY) live inside the wrapper —
+        // when suppressed, both handles are no-ops and the loop runs unchanged.
+        await _progress.ProgressTwoTaskAsync(
+            genDescription: "Generating tests",
+            verifyDescription: "Verifying tests",
+            total: effectiveCount,
+            includeVerifyTask: willVerify,
+            action: async (genHandle, verifyHandle) =>
+        {
+
         for (var batchNum = 1; totalGenerated < effectiveCount; batchNum++)
         {
             var remaining = effectiveCount - totalGenerated;
@@ -595,6 +628,18 @@ public sealed class GenerateHandler
             }
 
             totalGenerated += batchResult.Tests.Count;
+
+            // Spec 041: advance the generation progress bar by the number of
+            // tests this batch produced, and mirror the count into the in-flight
+            // snapshot so the progress page picks it up on the next refresh.
+            genHandle.Increment(batchResult.Tests.Count);
+            if (_currentProgress is not null)
+            {
+                _currentProgress.TestsGenerated = totalGenerated;
+                _currentProgress.CurrentBatch = batchNum;
+                _currentProgress.LastTestId = batchResult.Tests[^1].Id;
+            }
+
             _progress.Success($"Batch {batchNum}: generated {batchResult.Tests.Count} tests");
             _results.ShowGeneratedTests(batchResult.Tests);
 
@@ -620,6 +665,25 @@ public sealed class GenerateHandler
                     onTestVerified: (test, result) =>
                     {
                         allVerifiedTests.Add(BuildVerifiedTest(test, result));
+
+                        // Spec 041: advance the verification bar and update the
+                        // in-flight snapshot. Description shows the most recent
+                        // test ID + verdict at Normal verbosity; at Minimal it
+                        // stays generic.
+                        verifyHandle?.Increment(1);
+                        if (_currentProgress is not null)
+                        {
+                            _currentProgress.Phase = Progress.ProgressPhase.Verifying;
+                            _currentProgress.TestsVerified = allVerifiedTests.Count;
+                            _currentProgress.LastTestId = test.Id;
+                            _currentProgress.LastVerdict = result.Verdict.ToString().ToLowerInvariant();
+                        }
+                        if (verifyHandle is not null && !_progress.IsMinimalVerbosity)
+                        {
+                            verifyHandle.SetDescription(
+                                $"Verifying tests  {test.Id} {result.Verdict.ToString().ToLowerInvariant()}");
+                        }
+
                         WriteVerificationProgress(suite, allVerifiedTests);
                     });
 
@@ -678,6 +742,7 @@ public sealed class GenerateHandler
             _progress.Success($"Progress: {allWrittenTests.Count}/{effectiveCount} tests written to disk");
         }
         // --- End batch loop ---
+        }); // close ProgressTwoTaskAsync lambda
 
         if (_dryRun)
         {
@@ -1975,11 +2040,14 @@ public sealed class GenerateHandler
             Message = message,
             Generation = new GenerateGeneration
             {
-                TestsGenerated = 0,
+                TestsGenerated = _currentProgress?.TestsGenerated ?? 0,
                 TestsWritten = 0,
                 TestsRejectedByCritic = 0
             },
-            FilesCreated = []
+            FilesCreated = [],
+            // Spec 041: attach in-flight snapshot so the progress page can
+            // render the new generation/verification bars.
+            Progress = _currentProgress
         };
         _progressManager.Update(result);
     }
@@ -2004,12 +2072,14 @@ public sealed class GenerateHandler
             Message = message,
             Generation = new GenerateGeneration
             {
-                TestsGenerated = 0,
+                TestsGenerated = _currentProgress?.TestsGenerated ?? 0,
                 TestsWritten = 0,
                 TestsRejectedByCritic = hallucinated
             },
             Verification = verifiedTests,
-            FilesCreated = []
+            FilesCreated = [],
+            // Spec 041: attach in-flight snapshot.
+            Progress = _currentProgress
         };
         _progressManager.Update(result);
     }

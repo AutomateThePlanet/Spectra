@@ -24,6 +24,11 @@ public sealed class UpdateHandler
     private static readonly Progress.ProgressManager _progressManager =
         new("update", Progress.ProgressPhases.Update, title: "Test Update");
 
+    // Spec 041: in-flight progress snapshot for the current update run.
+    // Mutated by the proposal apply loop and serialized into .spectra-result.json
+    // via _progressManager.Update(updateResult).
+    private static Progress.ProgressSnapshot? _currentProgress;
+
     private readonly VerbosityLevel _verbosity;
     private readonly bool _dryRun;
     private readonly bool _noReview;
@@ -44,7 +49,7 @@ public sealed class UpdateHandler
         _noReview = noReview;
         _noInteraction = noInteraction;
         _outputFormat = outputFormat;
-        _progress = new ProgressReporter(outputFormat: outputFormat);
+        _progress = new ProgressReporter(outputFormat: outputFormat, verbosity: verbosity);
         _classificationPresenter = new ClassificationPresenter();
     }
 
@@ -356,7 +361,37 @@ public sealed class UpdateHandler
         var orphanedCount = 0;
         if (!_dryRun)
         {
-            orphanedCount = await ApplyChangesAsync(suitePath, reviewResult, ct);
+            // Spec 041: per-proposal progress bar. Total counts every proposal
+            // that ApplyChangesAsync will touch (updates + orphaned marks +
+            // deletes). The snapshot mirrors the bar so the progress page
+            // can render it.
+            var orphanedToMark = reviewResult.Skipped.Count(p => p.Classification == UpdateClassification.Orphaned);
+            var totalProposals = reviewResult.ToUpdate.Count + orphanedToMark + reviewResult.ToDelete.Count;
+
+            _currentProgress = new Progress.ProgressSnapshot
+            {
+                Phase = Progress.ProgressPhase.Updating,
+                TestsTarget = totalProposals,
+                TotalBatches = totalProposals,
+                CurrentBatch = 0,
+                TestsGenerated = 0,
+                TestsVerified = 0
+            };
+
+            await _progress.ProgressAsync("Updating tests", Math.Max(1, totalProposals), async increment =>
+            {
+                orphanedCount = await ApplyChangesAsync(suitePath, reviewResult, ct,
+                    onProposalApplied: testId =>
+                    {
+                        increment(1);
+                        if (_currentProgress is not null)
+                        {
+                            _currentProgress.CurrentBatch++;
+                            _currentProgress.LastTestId = testId;
+                            WriteUpdateProgress(suite, _currentProgress);
+                        }
+                    });
+            });
         }
         else
         {
@@ -570,7 +605,8 @@ public sealed class UpdateHandler
     private static async Task<int> ApplyChangesAsync(
         string suitePath,
         UpdateReviewResult result,
-        CancellationToken ct)
+        CancellationToken ct,
+        Action<string>? onProposalApplied = null)
     {
         var writer = new TestFileWriter();
         var orphanedCount = 0;
@@ -584,6 +620,7 @@ public sealed class UpdateHandler
                 await writer.WriteAsync(path, proposal.ProposedTest, ct);
                 Console.WriteLine($"  Updated: {proposal.OriginalTest.Id}");
             }
+            onProposalApplied?.Invoke(proposal.OriginalTest.Id);
         }
 
         // Mark orphaned tests (in skipped list) with status
@@ -617,6 +654,7 @@ public sealed class UpdateHandler
             await writer.WriteAsync(path, orphanedTest, ct);
             Console.WriteLine($"  Marked orphaned: {originalTest.Id}");
             orphanedCount++;
+            onProposalApplied?.Invoke(originalTest.Id);
         }
 
         // Delete tests
@@ -628,9 +666,29 @@ public sealed class UpdateHandler
                 File.Delete(path);
                 Console.WriteLine($"  Deleted: {proposal.OriginalTest.Id}");
             }
+            onProposalApplied?.Invoke(proposal.OriginalTest.Id);
         }
 
         return orphanedCount;
+    }
+
+    /// <summary>
+    /// Spec 041: writes an in-flight update result with the current progress
+    /// snapshot attached, so the progress page picks it up on next refresh.
+    /// </summary>
+    private static void WriteUpdateProgress(string suite, Progress.ProgressSnapshot snapshot)
+    {
+        var partial = new Results.UpdateResult
+        {
+            Command = "update",
+            Status = "updating",
+            Success = false,
+            Suite = suite,
+            TotalTests = snapshot.TestsTarget,
+            TestsUpdated = snapshot.CurrentBatch,
+            Progress = snapshot
+        };
+        _progressManager.Update(partial);
     }
 
     private async Task<SpectraConfig?> LoadConfigAsync(string configPath, CancellationToken ct)

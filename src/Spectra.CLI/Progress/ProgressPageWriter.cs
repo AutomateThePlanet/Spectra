@@ -296,6 +296,53 @@ public static class ProgressPageWriter
                         color: var(--color-primary);
                     }
 
+                    /* Spec 041: Live progress bars (generation + verification) */
+                    .progress-section {
+                        background: var(--color-card);
+                        border-radius: 12px;
+                        padding: 1rem 1.5rem;
+                        border: 1px solid var(--color-border);
+                        margin-bottom: 0.75rem;
+                        transition: opacity 0.3s ease;
+                    }
+                    .progress-section.dimmed { opacity: 0.4; }
+                    .progress-label {
+                        display: flex;
+                        justify-content: space-between;
+                        font-size: 0.85rem;
+                        font-weight: 600;
+                        color: var(--color-text);
+                        margin-bottom: 0.5rem;
+                    }
+                    .progress-label-count {
+                        font-family: 'JetBrains Mono', monospace;
+                        color: var(--color-text-muted);
+                        font-weight: 500;
+                    }
+                    .progress-bar-track {
+                        width: 100%;
+                        height: 10px;
+                        background: var(--color-bg);
+                        border-radius: 5px;
+                        overflow: hidden;
+                        border: 1px solid var(--color-border);
+                    }
+                    .progress-bar-fill {
+                        height: 100%;
+                        background: linear-gradient(90deg, var(--color-primary) 0%, #5fa3ff 100%);
+                        border-radius: 5px;
+                        transition: width 0.4s ease;
+                    }
+                    .progress-bar-fill.verifying {
+                        background: linear-gradient(90deg, #14b8a6 0%, #5eead4 100%);
+                    }
+                    .progress-detail {
+                        font-size: 0.75rem;
+                        color: var(--color-text-muted);
+                        margin-top: 0.4rem;
+                        font-family: 'JetBrains Mono', monospace;
+                    }
+
                     /* Verification progress */
                     .verification-section {
                         background: var(--color-card);
@@ -542,6 +589,13 @@ public static class ProgressPageWriter
 
             // Phase stepper
             sb.Append(BuildStepper(status, command));
+
+            // Spec 041: live progress bars (generation + verification or update)
+            if (root.TryGetProperty("progress", out var progress)
+                && progress.ValueKind == JsonValueKind.Object)
+            {
+                sb.Append(RenderProgressBars(progress));
+            }
 
             // Status card
             sb.Append(BuildStatusCard(status, suite, message, timestamp));
@@ -1013,6 +1067,73 @@ public static class ProgressPageWriter
         sb.Append("</div>");
         return sb.ToString();
     }
+
+    /// <summary>
+    /// Spec 041: renders live progress bars from the in-flight <c>progress</c>
+    /// object in <c>.spectra-result.json</c>. For generate runs, shows two bars
+    /// (generation + verification, the second dimmed until generation completes).
+    /// For update runs, shows a single "Updating tests" bar.
+    /// </summary>
+    private static string RenderProgressBars(JsonElement progress)
+    {
+        var phase = progress.TryGetProperty("phase", out var ph) ? (ph.GetString() ?? "") : "";
+        var target = progress.TryGetProperty("testsTarget", out var tt) ? tt.GetInt32() : 0;
+        var generated = progress.TryGetProperty("testsGenerated", out var tg) ? tg.GetInt32() : 0;
+        var verified = progress.TryGetProperty("testsVerified", out var tv) ? tv.GetInt32() : 0;
+        var currentBatch = progress.TryGetProperty("currentBatch", out var cb) ? cb.GetInt32() : 0;
+        var totalBatches = progress.TryGetProperty("totalBatches", out var tb) ? tb.GetInt32() : 0;
+        var lastTestId = progress.TryGetProperty("lastTestId", out var lti) ? lti.GetString() : null;
+        var lastVerdict = progress.TryGetProperty("lastVerdict", out var lv) ? lv.GetString() : null;
+
+        if (target <= 0) return "";
+
+        var sb = new StringBuilder();
+
+        if (string.Equals(phase, "Updating", StringComparison.OrdinalIgnoreCase))
+        {
+            var pct = ClampPct((double)currentBatch / Math.Max(1, totalBatches) * 100.0);
+            var detail = totalBatches > 0
+                ? $"Proposal {currentBatch} of {totalBatches}"
+                : "";
+            sb.Append($"""<div class="progress-section">""");
+            sb.Append($"""<div class="progress-label"><span>Updating tests</span><span class="progress-label-count">{currentBatch} / {totalBatches}</span></div>""");
+            sb.Append($"""<div class="progress-bar-track"><div class="progress-bar-fill" style="width: {pct:F1}%"></div></div>""");
+            if (!string.IsNullOrEmpty(detail))
+                sb.Append($"""<div class="progress-detail">{Escape(detail)}</div>""");
+            sb.Append("</div>");
+            return sb.ToString();
+        }
+
+        // Generate flow: two bars (generation + verification).
+        var genPct = ClampPct((double)generated / target * 100.0);
+        var genDetail = totalBatches > 0
+            ? $"Batch {Math.Max(1, currentBatch)} of {totalBatches}"
+            : "";
+        sb.Append($"""<div class="progress-section">""");
+        sb.Append($"""<div class="progress-label"><span>Generating tests</span><span class="progress-label-count">{generated} / {target}</span></div>""");
+        sb.Append($"""<div class="progress-bar-track"><div class="progress-bar-fill" style="width: {genPct:F1}%"></div></div>""");
+        if (!string.IsNullOrEmpty(genDetail))
+            sb.Append($"""<div class="progress-detail">{Escape(genDetail)}</div>""");
+        sb.Append("</div>");
+
+        var isVerifying = string.Equals(phase, "Verifying", StringComparison.OrdinalIgnoreCase);
+        var verifyClass = isVerifying ? "progress-section" : "progress-section dimmed";
+        var verifyPct = ClampPct((double)verified / target * 100.0);
+        var verifyDetail = isVerifying && !string.IsNullOrEmpty(lastTestId)
+            ? $"{lastTestId}{(string.IsNullOrEmpty(lastVerdict) ? "" : " — " + lastVerdict)}"
+            : "";
+
+        sb.Append($"""<div class="{verifyClass}">""");
+        sb.Append($"""<div class="progress-label"><span>Verifying tests</span><span class="progress-label-count">{verified} / {target}</span></div>""");
+        sb.Append($"""<div class="progress-bar-track"><div class="progress-bar-fill verifying" style="width: {verifyPct:F1}%"></div></div>""");
+        if (!string.IsNullOrEmpty(verifyDetail))
+            sb.Append($"""<div class="progress-detail">{Escape(verifyDetail)}</div>""");
+        sb.Append("</div>");
+
+        return sb.ToString();
+    }
+
+    private static double ClampPct(double pct) => pct < 0 ? 0 : pct > 100 ? 100 : pct;
 
     private static string BuildVerificationSection(System.Text.Json.JsonElement verification)
     {

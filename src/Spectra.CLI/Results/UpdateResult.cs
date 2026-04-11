@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Spectra.CLI.Progress;
 
 namespace Spectra.CLI.Results;
 
@@ -7,6 +8,15 @@ namespace Spectra.CLI.Results;
 /// </summary>
 public sealed class UpdateResult : CommandResult
 {
+    /// <summary>
+    /// Spec 041: in-flight progress snapshot. Present only while the run is
+    /// active; cleared by ProgressManager.Complete()/Fail() before the final
+    /// write.
+    /// </summary>
+    [JsonPropertyName("progress")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ProgressSnapshot? Progress { get; set; }
+
     [JsonPropertyName("success")]
     public bool Success { get; init; }
 

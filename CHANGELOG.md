@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.47.0] - 2026-04-11
+
+### Added
+- **Live progress bars for `spectra ai generate` and `spectra ai update`** (spec 041). Long runs (`--count 40+`) now show real progress feedback in two places:
+  - **Terminal**: a `Generating tests` Spectre.Console progress bar advances per batch, followed by a `Verifying tests` bar that increments once per critic call (showing the most recent test ID and verdict). For `update`, an `Updating tests` bar advances per applied proposal.
+  - **Browser progress page** (`.spectra-progress.html`): a new live progress section renders the same data driven by an in-flight `progress` object inside `.spectra-result.json`, picked up on the existing 1.5s auto-refresh cycle. Verification bar is dimmed during the generation phase, then activated.
+- **`progress` field in `.spectra-result.json`** — present only while a run is in flight (snapshot of phase, target, generated, verified, current batch, total batches, last test ID, last verdict). Removed automatically by `ProgressManager.Complete()` / `Fail()` so the final result file shows `runSummary` instead. Schema documented in `specs/041-progress-bars/contracts/result-json-progress-schema.md`.
+- **`ProgressReporter.ProgressTwoTaskAsync(...)`** — new wrapper that creates two sequential Spectre tasks inside a single live region. Handles passed to the action implement a small `IProgressTaskHandle` abstraction so command handlers don't take a direct dependency on Spectre internals.
+- **`ProgressSnapshot` + `ProgressPhase` model** at `src/Spectra.CLI/Progress/ProgressSnapshot.cs`.
+- **+17 unit tests** — `ProgressBarTests`, `ProgressManagerProgressFieldTests`, `ProgressPageProgressBarTests` covering suppression rules, progress field clear-on-complete/fail, and HTML rendering for generation/verifying/updating phases.
+
+### Changed
+- **`ProgressReporter` suppression rules** — now suppresses progress bars not just under `--output-format json`, but also under `--verbosity quiet` and when stdout is non-interactive (redirected, piped, or no TTY). SKILL/CI invocations remain ANSI-free.
+- **`ProgressReporter.StatusAsync`** — short-circuits when the reporter is inside an active `ProgressTwoTaskAsync` block, so existing inline `_progress.StatusAsync(...)` spinners inside the batch loop don't conflict with the outer progress bars.
+- **`UpdateHandler.ApplyChangesAsync`** — gained an optional `onProposalApplied` callback parameter for per-proposal progress reporting. Existing call sites unaffected.
+
+### Notes
+- ETA / time-remaining display, per-test progress within a single generation batch, and formal cancel-with-cleanup on Ctrl+C are explicitly out of scope. See `specs/041-progress-bars/spec.md`.
+- `--output-format json` and `--verbosity quiet` behavior is unchanged: SKILLs and CI scripts see no progress-bar output on stdout.
+
 ## [1.46.1] - 2026-04-11
 
 ### Fixed

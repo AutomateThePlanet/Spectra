@@ -137,6 +137,9 @@ public sealed class ProgressManager
     {
         try
         {
+            // Spec 041: clear in-flight progress snapshot so the final result
+            // file shows runSummary instead of stale progress data.
+            ClearProgressSnapshot(result);
             var json = SerializeTyped(result);
             FlushWriteFile(_resultPath, json);
             ProgressPageWriter.WriteProgressPage(_progressPath, json, isTerminal: true, _title);
@@ -160,6 +163,9 @@ public sealed class ProgressManager
             };
             if (partialResult != null)
                 partialResult.Message ??= error;
+
+            // Spec 041: clear in-flight progress snapshot on failure too.
+            ClearProgressSnapshot(result);
 
             var json = SerializeTyped(result);
             FlushWriteFile(_resultPath, json);
@@ -193,6 +199,25 @@ public sealed class ProgressManager
     private static string SerializeTyped(CommandResult result)
     {
         return JsonSerializer.Serialize(result, result.GetType(), ResultFileOptions);
+    }
+
+    /// <summary>
+    /// Spec 041: null out the optional <c>Progress</c> field on result types
+    /// that carry one (GenerateResult, UpdateResult). Called from
+    /// Complete()/Fail() so the final on-disk JSON shows runSummary instead
+    /// of in-flight progress data.
+    /// </summary>
+    private static void ClearProgressSnapshot(CommandResult result)
+    {
+        switch (result)
+        {
+            case Spectra.CLI.Results.GenerateResult gen:
+                gen.Progress = null;
+                break;
+            case Spectra.CLI.Results.UpdateResult upd:
+                upd.Progress = null;
+                break;
+        }
     }
 
     private static void FlushWriteFile(string path, string json)
