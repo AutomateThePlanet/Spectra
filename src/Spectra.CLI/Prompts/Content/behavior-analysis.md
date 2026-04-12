@@ -100,21 +100,30 @@ Return ONLY a JSON object in this exact format (no other text):
 Count only DISTINCT testable behaviors — do not duplicate similar scenarios.
 
 {{#if testimize_enabled}}
-## ALGORITHMIC TEST DATA (Testimize Available)
+## STRUCTURED FIELD SPECIFICATIONS
 
-When you identify input fields with validation rules (ranges, patterns, required):
-1. Call the `AnalyzeFieldSpec` tool to extract field types and constraints from the documentation text.
-2. Call **one** of the two testimize MCP tools with the extracted field specs:
-   - `testimize/generate_hybrid_test_cases` — Hybrid Artificial Bee Colony. Best for thorough fault detection.
-   - `testimize/generate_pairwise_test_cases` — Pairwise. Best for fast, efficient coverage.
-3. Use the returned boundary values and equivalence classes as EXACT test data in your behaviors.
-4. The returned combinations are mathematically optimal — do NOT add your own approximations.
+In addition to the `behaviors` array, include a top-level `field_specs` array in your JSON output listing every input field the documentation constrains (numeric ranges, string lengths, date ranges, enumerated values, required/optional). SPECTRA will feed these specs into the Testimize engine in-process to pre-compute optimal boundary values, equivalence classes, and error-message pairings *before* the test-generation step runs. You do NOT need to call any tool yourself — just emit the structured data.
 
-Testimize produces better boundary values than manual selection because it uses:
-- 3-value BVA (min-1, min, min+1, max-1, max, max+1) instead of 2-value
-- Pre-configured invalid patterns per type (email, phone, URL — real-world defect patterns)
-- ABC algorithm fitness scoring that maximizes coverage with minimal test cases
-- Pairwise covering arrays for multi-field forms
+For each field, include these keys (omit keys that don't apply to the type):
+
+- `name`: field label as it appears in the UI (e.g., "Age", "Email", "First Day of Week")
+- `type`: one of `Text`, `Integer`, `Date`, `Email`, `Phone`, `Password`, `Url`, `Username`, `Boolean`, `SingleSelect`, `MultiSelect`
+- `required`: `true` if the documentation says the field is required, `false` otherwise
+- `min` / `max`: numeric bounds for `Integer` fields
+- `minLength` / `maxLength`: length bounds for string-like types (`Text`, `Email`, `Password`, `Url`, `Username`, `Phone`)
+- `minDate` / `maxDate`: ISO-8601 bounds for `Date` fields (e.g., `"1900-01-01"`)
+- `allowedValues`: array of strings for `SingleSelect` / `MultiSelect`
+- `expectedInvalidMessage`: exact error message string the documentation says is shown when the field is invalid — quote it verbatim if possible
+
+Output shape (example):
+
+{"behaviors": [...], "field_specs": [
+  {"name": "Age", "type": "Integer", "required": true, "min": 18, "max": 100, "expectedInvalidMessage": "Age must be between 18 and 100."},
+  {"name": "Email", "type": "Email", "required": true, "minLength": 6, "maxLength": 254, "expectedInvalidMessage": "Enter a valid email address."},
+  {"name": "First Day of Week", "type": "SingleSelect", "required": false, "allowedValues": ["Monday", "Sunday", "Saturday"]}
+]}
+
+When the documentation has NO constrained input fields (e.g., a pure button-tap UI with no text entry or ranges), return `"field_specs": []` or omit the key entirely. Do not invent fields that aren't in the docs.
 {{/if}}
 
 {{#if focus_areas}}

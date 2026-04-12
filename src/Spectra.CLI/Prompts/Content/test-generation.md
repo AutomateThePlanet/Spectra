@@ -17,6 +17,10 @@ placeholders:
     description: "Number of tests to generate"
   - name: focus_areas
     description: "User-specified --focus filter value"
+  - name: testimize_dataset
+    description: "Pre-computed algorithmic test data rendered as a YAML block (empty when Testimize is disabled, skipped, or found no constrained fields)"
+  - name: testimize_strategy_name
+    description: "Human-readable Testimize strategy name (e.g., HybridArtificialBeeColony). Only meaningful when testimize_dataset is non-empty."
 ---
 
 <!-- Pattern: Persona + Boundaries + Few-shot + Structured output -->
@@ -76,40 +80,23 @@ ISTQB technique tag attached to each behavior (BVA, EP, DT, ST, EG, UC).
 - WRONG: "Test with special characters"
 - RIGHT: "Enter '√(−1)' in the calculator input and verify error handling"
 
-{{#if testimize_enabled}}
-## USING TESTIMIZE FOR OPTIMIZED TEST DATA
+{{#if testimize_dataset}}
+## PRE-COMPUTED ALGORITHMIC TEST DATA (from Testimize, strategy={{testimize_strategy_name}})
 
-Testimize is available as an MCP server with two test-data generation tools.
-Call one of them whenever you encounter input fields that have validation
-rules (min/max length, numeric ranges, required fields, format patterns).
+The following test data was generated algorithmically by the Testimize engine BEFORE this prompt was sent, using Boundary Value Analysis, Equivalence Partitioning, and the **{{testimize_strategy_name}}** strategy. These values are authoritative — use them verbatim in your generated test case steps. Do NOT round, simplify, or paraphrase them, and do NOT invent additional boundary values; Testimize has already computed the mathematically optimal set.
 
-- **`testimize/generate_hybrid_test_cases`** — Hybrid Artificial Bee Colony
-  algorithm. Thorough fault detection via boundary values, equivalence
-  classes, and optimized combinations. Best for form validation,
-  comprehensive API testing, and any batch where test quality matters more
-  than speed.
-- **`testimize/generate_pairwise_test_cases`** — Pairwise algorithm. Fast,
-  minimal test suite covering all parameter interactions. Best for CI/CD
-  pipelines, smoke testing, and initial coverage sweeps.
+{{testimize_dataset}}
 
-Default preference for this run: **`{{testimize_strategy}}`**. Use the default
-unless a specific scenario clearly calls for the other algorithm.
+When you write a test case that exercises one of these fields:
 
-### Before calling a testimize tool
-
-If your documentation snippet describes fields in prose (e.g., "username must
-be 3 to 20 characters, email address required"), call `AnalyzeFieldSpec`
-first to turn the text into a structured field-spec JSON. Then pass that JSON
-to `testimize/generate_hybrid_test_cases` or
-`testimize/generate_pairwise_test_cases`.
-
-### When you receive testimize results
-
-- Use the EXACT values from Testimize in test steps — do not round or simplify
-- Use the EXACT error messages from Testimize's `expected_error` field
-- Reference the value category (BoundaryValid, BoundaryInvalid, Invalid) in the test title
-- Example: "Enter username 'An' (BoundaryInvalid: 2 chars, below minimum 3)"
-- Each Testimize combination may become one test case, or related ones may be grouped
+- Use the EXACT `value` in the test step (e.g., "Enter 17 in the Age field", not "Enter a low age")
+- When a value's `category` is `BoundaryInvalid` or `Invalid`, quote the EXACT `expectedInvalidMessage` in the test's expected result
+- Reference the `category` in the test title so the BVA/EP coverage is visible — for example:
+  - `"Enter age 17 (BoundaryInvalid: below minimum 18)"`
+  - `"Enter age 18 (BoundaryValid: at minimum)"`
+  - `"Enter valid age 42 (Valid)"`
+- Each row in the table above may become one test case, or closely related rows (same field, different category) may be grouped into a parameterized test
+- Every `BoundaryInvalid` and `Invalid` row MUST be covered by at least one generated test — these are the highest-value defect-finding cases
 {{/if}}
 
 ## OUTPUT FORMAT

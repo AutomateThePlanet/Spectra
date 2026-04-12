@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.48.3] - 2026-04-12
+
+### Changed — Testimize migrated from MCP child process to in-process NuGet
+
+- **Direct `Testimize` 1.1.10 NuGet reference** in `Spectra.CLI.csproj`. The library runs in the same process as the CLI — no child process spawn, no JSON-RPC, no MCP handshake.
+- **New `TestimizeRunner`** at `src/Spectra.CLI/Agent/Testimize/TestimizeRunner.cs` orchestrates the in-process call. Maps `FieldSpec` values from behavior analysis onto `TestimizeInputBuilder.Add*` calls, maps `config.Testimize.Strategy` / `Mode` strings onto the library's enums, and calls `TestimizeEngine.Configure(...).Generate()`. Runs once per suite between behavior analysis and the batch generation loop (not once per batch).
+- **Behavior-analysis schema extended** with a top-level `field_specs[]` array. The AI emits structured field constraints (numeric ranges, string lengths, date ranges, enumerated values, required flags, expected error messages) in the same JSON response as `behaviors`. `BehaviorAnalyzer.ParseFieldSpecs` deserialises it. When the AI returns no field specs, `TestimizeRunner` falls back to the local `FieldSpecAnalysisTools.Analyze` regex extractor over the raw documentation.
+- **Test-generation prompt template** rewritten: the old `{{#if testimize_enabled}}` block that instructed the model to call `testimize/generate_hybrid_test_cases` / `testimize/generate_pairwise_test_cases` is replaced by `{{#if testimize_dataset}}`, which embeds a literal `PRE-COMPUTED ALGORITHMIC TEST DATA (from Testimize, strategy=…)` YAML block with the exact values, categories, and expected error messages the engine produced. The model no longer has to "choose" to use Testimize — the values are in the prompt as authoritative facts.
+- **New shared types** `Spectra.Core.Models.Testimize.FieldSpec`, `TestimizeDataset`, `TestimizeRow`, `TestimizeCell` — contract between behavior analysis, `TestimizeRunner`, and the prompt embedder. Spectra.Core has no dependency on Testimize itself, keeping the library surface isolated to Spectra.CLI.
+- **`testimizeSettings.json` ships with the tool** at `src/Spectra.CLI/Templates/testimizeSettings.json`. Copied to the tool's output directory so `Testimize.FakerFactory.Initialize` finds it at runtime (without it, the library throws `NullReferenceException` before generating anything).
+- **`TESTIMIZE OK strategy=… fields=… test_data_sets=… elapsed=…s` log line** in `.spectra-debug.log`, once per suite, when generation succeeds. Replaces `TESTIMIZE CONFIGURED` / `LOADED` / `STATUS_CHANGED` / `DISPOSED` / `GATE mcp_loaded` lines. New skip reasons: `disabled`, `no_field_specs`, `insufficient_fields` (Testimize requires ≥ 2 parameters). Also `TESTIMIZE FALLBACK source=regex fields=<n>` when the regex extractor recovers from an empty AI response, and `TESTIMIZE ERROR exception=<Type> message="…"` when the engine throws.
+
+### Removed
+
+- `src/Spectra.CLI/Agent/Copilot/McpConfigBuilder.cs` + tests — no longer needed, MCP server registration is gone.
+- `src/Spectra.CLI/Agent/Testimize/TestimizeDetector.cs` + tests — the `dotnet tool list -g` probe for the old global `Testimize.MCP.Server` tool is obsolete.
+- `tests/Spectra.CLI.Tests/Agent/Copilot/TestimizeStrategyResolverTests.cs` — tested `CopilotGenerationAgent.ResolveTestimizeStrategyToolName`, which mapped config strategy to MCP tool names. The helper is deleted.
+- MCP event subscription branches in `CopilotGenerationAgent`: `SessionMcpServersLoadedEvent`, `SessionMcpServerStatusChangedEvent`, `mcpServersLoadedTcs` `TaskCompletionSource`, and the 30-second `GATE mcp_loaded` block added in 1.48.2.
+- `mcpServers` parameter from `CopilotService.CreateGenerationSessionAsync`.
+- `TestimizeMcpConfig` nested class and `Mcp` property from `TestimizeConfig`. Old configs with `testimize.mcp.command` / `args` still parse cleanly — the JSON serializer ignores the unknown keys — but those values no longer affect anything.
+- `testimize.mcp` block from the default `spectra.config.json` template.
+- `InstallCommand` field from `TestimizeCheckResult` — there is no global tool to install anymore.
+
+### Rewritten
+
+- `TestimizeCheckHandler` now probes the `Testimize` assembly via reflection (`typeof(Testimize.Usage.TestimizeEngine).Assembly`) instead of shelling out to `dotnet tool list -g`. "Installed" means "assembly is loadable in the current process" — always true when Spectra.CLI is running, since it's a compile-time `PackageReference`. `Healthy` means `Enabled && Installed`.
+
+### Why
+
+Across every log from 1.48.1 and 1.48.2 the Copilot SDK consistently fired `TESTIMIZE LOADED` ~700 ms *after* `BATCH START`, never before. The SDK loads MCP servers lazily — the child process doesn't spawn until the first `SendAndWaitAsync` — so the model's tool catalog is frozen before testimize's tools can reach it. Every attempt to gate the send on `SessionMcpServersLoadedEvent` timed out because the event cannot fire until the send it's trying to gate. The in-process path sidesteps the entire race: by the time the prompt is built, the test data already exists as strings that go straight into the prompt, and the model uses them verbatim.
+
+### Notes
+
+- All tests still pass: 514 Core / 351 MCP / 839 CLI (1704 total). New `TestimizeRunnerTests` covers strategy/mode enum mapping, empty-spec skip, insufficient-fields skip, regex fallback recovery, Integer+Email, Date+Integer, and SingleSelect+Integer happy paths.
+- Testimize prints its output-generator result to stdout and attempts to copy it to the clipboard on every run. `TestimizeRunner` temporarily redirects `Console.Out` during the `Generate()` call so neither corrupts `--output-format json` nor fails on headless CI.
+- Testimize's generators require ≥ 2 parameters (`Pairwise testing requires at least two parameters.`). Single-field suites skip cleanly with `TESTIMIZE SKIP reason=insufficient_fields fields=1 …`.
+
 ## [1.48.0] - 2026-04-12
 
 ### Added — Spec 043: Parallel Critic Verification & Error Log

@@ -116,7 +116,8 @@ public sealed class UserDescribedGenerator
             [],
             1,
             criteriaContext: null,
-            ct);
+            testimizeData: null,
+            ct: ct);
 
         if (!result.IsSuccess || result.Tests.Count == 0)
             return null;

@@ -52,20 +52,16 @@ public sealed class CopilotService : IAsyncDisposable
     }
 
     /// <summary>
-    /// Creates a new session for test generation with the specified configuration.
-    ///
-    /// v1.46.0: <paramref name="mcpServers"/> accepts a map of MCP server
-    /// configurations (keys are server names, values are
-    /// <see cref="McpLocalServerConfig"/> or <see cref="McpRemoteServerConfig"/>)
-    /// that the Copilot SDK attaches to the session. The SDK handles process
-    /// spawn, initialize handshake, framing, tool discovery, and lifecycle —
-    /// callers no longer need a custom MCP protocol client.
+    /// Creates a new session for test generation with the specified
+    /// configuration. v1.48.3: the <c>mcpServers</c> parameter was removed
+    /// along with the MCP-based Testimize integration — Testimize now runs
+    /// in-process via <see cref="Spectra.CLI.Agent.Testimize.TestimizeRunner"/>
+    /// so no MCP child process needs to be attached to the session.
     /// </summary>
     public async Task<CopilotSession> CreateGenerationSessionAsync(
         SpectraProviderConfig? providerConfig,
         IEnumerable<AIFunction>? tools = null,
-        CancellationToken ct = default,
-        IReadOnlyDictionary<string, object>? mcpServers = null)
+        CancellationToken ct = default)
     {
         var config = new SessionConfig
         {
@@ -78,11 +74,6 @@ public sealed class CopilotService : IAsyncDisposable
         if (tools is not null)
         {
             config.Tools = tools.ToList();
-        }
-
-        if (mcpServers is not null && mcpServers.Count > 0)
-        {
-            config.McpServers = new Dictionary<string, object>(mcpServers);
         }
 
         return await _client.CreateSessionAsync(config, ct);

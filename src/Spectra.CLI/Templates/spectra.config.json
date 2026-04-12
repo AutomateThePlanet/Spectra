@@ -95,13 +95,11 @@
   },
   "testimize": {
     "enabled": false,
-    "_comment": "Optional integration with Testimize.MCP.Server for algorithmic test data optimization (BVA, EP, pairwise, ABC). Install with: dotnet tool install --global Testimize.MCP.Server",
+    "_comment": "v1.48.3: in-process algorithmic test data generation via the Testimize NuGet library (no child process, no MCP). When enabled, SPECTRA extracts field constraints from behavior analysis and runs the engine before sending the generation prompt, embedding optimized BVA/EP/pairwise values as authoritative facts.",
     "mode": "exploratory",
+    "_comment_mode": "all | valid | validation. Maps to Testimize.TestCaseCategory. 'exploratory' and any unknown value defaults to 'all' (valid + invalid + boundary).",
     "strategy": "HybridArtificialBeeColony",
-    "mcp": {
-      "command": "testimize-mcp",
-      "args": ["--mcp"]
-    }
+    "_comment_strategy": "HybridArtificialBeeColony (default, thorough) | Pairwise (fast, minimal) | Combinatorial | OptimizedPairwise | OptimizedCombinatorial"
   },
   "debug": {
     "enabled": false,

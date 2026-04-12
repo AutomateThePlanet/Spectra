@@ -81,6 +81,7 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
         IReadOnlyList<TestCase> existingTests,
         int requestedCount,
         string? criteriaContext = null,
+        Spectra.Core.Models.Testimize.TestimizeDataset? testimizeData = null,
         CancellationToken ct = default)
     {
         try
@@ -103,40 +104,19 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 .Concat(testIndexTools.CreateFunctions())
                 .ToList();
 
-            // v1.46.0: AnalyzeFieldSpec is a local regex parser (no MCP call),
-            // always available regardless of whether testimize is enabled.
+            // v1.48.3: AnalyzeFieldSpec stays as a local AIFunction. The
+            // model can still call it mid-turn if it wants to structure a
+            // prose snippet on the fly, but the primary Testimize flow now
+            // runs in-process via TestimizeRunner *before* this prompt is
+            // sent (see GenerateHandler). There is no MCP server anymore.
             tools.Add(Testimize.FieldSpecAnalysisTools.CreateAnalyzeFieldSpecTool());
-
-            // v1.46.0: Optional Testimize integration now flows through the
-            // Copilot SDK's native McpServers dictionary. The SDK owns the
-            // full lifecycle (spawn, initialize handshake, framing, tool
-            // discovery, cost attribution, permission prompts). The old
-            // custom TestimizeMcpClient has been deleted — it spoke
-            // Content-Length framing while testimize-mcp actually uses
-            // newline-delimited JSON, which caused the 5s health-probe hang.
-            Dictionary<string, object>? mcpServers = null;
-            var testimizeServer = McpConfigBuilder.BuildTestimizeServer(_config.Testimize);
-            if (testimizeServer is null)
-            {
-                DebugLog("TESTIMIZE DISABLED (testimize.enabled=false in config)");
-            }
-            else
-            {
-                mcpServers = new Dictionary<string, object> { ["testimize"] = testimizeServer };
-                DebugLog($"TESTIMIZE CONFIGURED server=testimize command={_config.Testimize.Mcp.Command} args=[{string.Join(" ", _config.Testimize.Mcp.Args)}] strategy={_config.Testimize.Strategy} mode={_config.Testimize.Mode}");
-                _onStatus?.Invoke("Testimize configured — the Copilot SDK will spawn it when the AI session starts");
-            }
-
-            try
-            {
 
             // Create session with tools
             _onStatus?.Invoke("Creating AI session...");
             await using var session = await service.CreateGenerationSessionAsync(
                 _provider,
                 tools,
-                ct,
-                mcpServers);
+                ct);
 
             // Spec 040 follow-up: observer captures provider-reported token
             // counts from AssistantUsageEvent. Falls back to text.Length / 4
@@ -153,12 +133,6 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
             // ConcurrentDictionary because SDK events fire from internal tasks.
             var toolStarts = new ConcurrentDictionary<string, (DateTime StartUtc, string ToolName, string? McpServer, string? McpToolName)>();
 
-            // Signaled by the SessionMcpServersLoadedEvent handler. Lets us
-            // wait for the SDK to finish discovering MCP server tools before
-            // we ask it for the merged tool list. Always created — if
-            // testimize isn't configured we just don't await it.
-            var mcpServersLoadedTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-
             using var subscription = session.On(evt =>
             {
                 if (evt is AssistantUsageEvent usage && usage.Data is { } usageData)
@@ -166,38 +140,6 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                     observer.RecordUsage(
                         (int)(usageData.InputTokens ?? 0),
                         (int)(usageData.OutputTokens ?? 0));
-                    return;
-                }
-                // v1.46.0: SDK-driven testimize lifecycle logging. Replaces
-                // the old custom TestimizeMcpClient health probe. The SDK
-                // exposes per-server status (Connected / Failed / NeedsAuth
-                // / Pending / Disabled / NotConfigured) via this event.
-                if (evt is SessionMcpServersLoadedEvent loaded && loaded.Data?.Servers is { } servers)
-                {
-                    foreach (var s in servers)
-                    {
-                        var name = s.Name ?? "?";
-                        var status = s.Status.ToString();
-                        var errorSuffix = string.IsNullOrEmpty(s.Error) ? "" : $" error=\"{s.Error}\"";
-                        DebugLog($"TESTIMIZE LOADED server={name} status={status} source={s.Source ?? "?"}{errorSuffix}");
-                        if (string.Equals(name, "testimize", StringComparison.OrdinalIgnoreCase))
-                        {
-                            if (status.Equals("Connected", StringComparison.OrdinalIgnoreCase))
-                            {
-                                _onStatus?.Invoke("Testimize connected — algorithmic test data available");
-                            }
-                            else
-                            {
-                                _onStatus?.Invoke($"Testimize server status={status} — falling back to AI-generated values");
-                            }
-                        }
-                    }
-                    mcpServersLoadedTcs.TrySetResult(true);
-                    return;
-                }
-                if (evt is SessionMcpServerStatusChangedEvent changed && changed.Data is { } changedData)
-                {
-                    DebugLog($"TESTIMIZE STATUS_CHANGED server={changedData.ServerName} status={changedData.Status}");
                     return;
                 }
                 if (evt is ToolExecutionStartEvent toolStart)
@@ -266,26 +208,15 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 }
             });
 
-            // v1.46.1: the old 3-second grace window was deleted. The
-            // Copilot CLI's MCP client takes ~60 seconds to attempt +
-            // time out the initialize handshake (JSON-RPC error -32001),
-            // so a 3-second wait would always fire a false UNHEALTHY
-            // line and then the real LOADED event would arrive much
-            // later. Instead, we let the SDK fire SessionMcpServersLoadedEvent
-            // whenever it's ready — the event handler above logs the
-            // real status (Connected / Failed / NeedsAuth / ...) with
-            // the actual error message. Generation proceeds immediately
-            // because the SDK doesn't block session creation on MCP load.
-
             // Build the combined prompt with system instructions and user request.
             // The profile format (JSON schema sent to the AI) is resolved from
             // profiles/_default.yaml on disk if present, else the embedded default.
             var profileFormat = ProfileFormatLoader.LoadFormat(_basePath);
-            // Spec 038: pass a PromptTemplateLoader so the test-generation.md
-            // template's {{#if testimize_enabled}} block is rendered when the
-            // user has enabled Testimize. v1.46.0: also passes the tool name
-            // hint via testimize_strategy so the AI knows which testimize
-            // tool to prefer.
+            // v1.48.3: testimizeData is pre-computed by TestimizeRunner in
+            // GenerateHandler — when non-null, we embed it as a literal
+            // authoritative "Pre-computed algorithmic test data (from
+            // Testimize, strategy=X)" block in the prompt via the
+            // {{#if testimize_dataset}} template section.
             var promptLoader = new PromptTemplateLoader(_basePath);
             var fullPrompt = BuildFullPrompt(
                 prompt,
@@ -293,32 +224,13 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 criteriaContext,
                 templateLoader: promptLoader,
                 profileFormat: profileFormat,
-                testimizeEnabled: _config.Testimize.Enabled,
-                testimizeStrategy: _config.Testimize.Strategy);
+                testimizeData: testimizeData);
 
             // Send and wait for the complete response.
             // The per-batch timeout is configurable via ai.generation_timeout_minutes.
             // Slower / reasoning models may need 10–20+ minutes per batch.
             var timeoutMinutes = Math.Max(1, _config.Ai.GenerationTimeoutMinutes);
             var batchTimeout = TimeSpan.FromMinutes(timeoutMinutes);
-            // v1.48.2: gate the prompt send on MCP servers being fully loaded.
-            // Without this, the SDK builds the model's tool catalog at session
-            // start before testimize finishes its initialize handshake (~600ms
-            // typical), so testimize tools are absent from the catalog the
-            // model sees. The .spectra-debug.log under 1.48.1 showed BATCH
-            // START firing ~600–700ms before TESTIMIZE LOADED on every batch.
-            // Best-effort with a 30s ceiling — if loading is slow, we still
-            // send the prompt rather than blocking generation indefinitely.
-            if (mcpServers is not null)
-            {
-                var gateSw = System.Diagnostics.Stopwatch.StartNew();
-                var winner = await Task.WhenAny(
-                    mcpServersLoadedTcs.Task,
-                    Task.Delay(TimeSpan.FromSeconds(30), ct));
-                gateSw.Stop();
-                var result = winner == mcpServersLoadedTcs.Task ? "loaded" : "timeout";
-                DebugLog($"GATE mcp_loaded waited={gateSw.Elapsed.TotalSeconds:F2}s result={result}");
-            }
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
             DebugLogAi($"BATCH START requested={requestedCount} timeout={timeoutMinutes}min", null, null, estimated: false);
@@ -363,19 +275,6 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 Tests = tests,
                 TokenUsage = null
             };
-
-            }
-            finally
-            {
-                // v1.46.0: MCP server process lifecycle is now owned by the
-                // Copilot SDK via the session's McpServers config. When the
-                // session disposes (above, via `await using`), the SDK kills
-                // all attached MCP child processes. We just log the boundary.
-                if (mcpServers is not null)
-                {
-                    DebugLog("TESTIMIZE DISPOSED (session closed)");
-                }
-            }
         }
         catch (TimeoutException ex)
         {
@@ -475,21 +374,79 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
             estimated);
 
     /// <summary>
-    /// v1.46.0: maps <c>config.Testimize.Strategy</c> to the real MCP tool name
-    /// exposed by <c>testimize-mcp --mcp</c>. Used by the test-generation prompt
-    /// template as the default tool hint. Unknown strategies fall back to the
-    /// hybrid tool since it's the most capable.
+    /// v1.48.3: renders a <see cref="Spectra.Core.Models.Testimize.TestimizeDataset"/>
+    /// as a compact YAML-ish block for embedding in the test-generation
+    /// prompt. Returns an empty string when the dataset is null or contains
+    /// no rows, which causes the <c>{{#if testimize_dataset}}</c> block in
+    /// <c>test-generation.md</c> to collapse to nothing.
     /// </summary>
-    internal static string ResolveTestimizeStrategyToolName(string? strategy) =>
-        (strategy ?? "").Trim() switch
+    internal static string FormatTestimizeDataset(Spectra.Core.Models.Testimize.TestimizeDataset? dataset)
+    {
+        if (dataset is null || dataset.TestCases.Count == 0)
+            return "";
+
+        var sb = new StringBuilder();
+        sb.AppendLine("```yaml");
+        sb.AppendLine($"strategy: {dataset.Strategy}");
+        sb.AppendLine($"field_count: {dataset.FieldCount}");
+        sb.AppendLine($"test_data_sets: {dataset.TestCases.Count}");
+        sb.AppendLine("fields:");
+        foreach (var f in dataset.Fields)
         {
-            "Pairwise" or "PairwiseOptimized" => "testimize/generate_pairwise_test_cases",
-            _ => "testimize/generate_hybrid_test_cases"
-        };
+            sb.AppendLine($"  - name: {f.Name}");
+            sb.AppendLine($"    type: {f.Type}");
+            if (f.Required) sb.AppendLine("    required: true");
+            if (f.Min is not null) sb.AppendLine($"    min: {f.Min}");
+            if (f.Max is not null) sb.AppendLine($"    max: {f.Max}");
+            if (f.MinLength is not null) sb.AppendLine($"    min_length: {f.MinLength}");
+            if (f.MaxLength is not null) sb.AppendLine($"    max_length: {f.MaxLength}");
+            if (!string.IsNullOrWhiteSpace(f.MinDate)) sb.AppendLine($"    min_date: {f.MinDate}");
+            if (!string.IsNullOrWhiteSpace(f.MaxDate)) sb.AppendLine($"    max_date: {f.MaxDate}");
+            if (f.AllowedValues is { Count: > 0 })
+                sb.AppendLine($"    allowed_values: [{string.Join(", ", f.AllowedValues.Select(v => $"\"{v}\""))}]");
+            if (!string.IsNullOrWhiteSpace(f.ExpectedInvalidMessage))
+                sb.AppendLine($"    expected_invalid_message: \"{EscapeYaml(f.ExpectedInvalidMessage)}\"");
+        }
+        sb.AppendLine("test_cases:");
+        for (var i = 0; i < dataset.TestCases.Count; i++)
+        {
+            var row = dataset.TestCases[i];
+            sb.AppendLine($"  - id: {i + 1}");
+            if (row.Score > 0) sb.AppendLine($"    score: {row.Score:F2}");
+            sb.AppendLine("    values:");
+            foreach (var cell in row.Values)
+            {
+                sb.AppendLine($"      - field: {cell.FieldName}");
+                sb.AppendLine($"        value: {FormatYamlValue(cell.Value)}");
+                sb.AppendLine($"        category: {cell.Category}");
+                if (!string.IsNullOrWhiteSpace(cell.ExpectedInvalidMessage))
+                    sb.AppendLine($"        expected_invalid_message: \"{EscapeYaml(cell.ExpectedInvalidMessage)}\"");
+            }
+        }
+        sb.AppendLine("```");
+        return sb.ToString();
+    }
+
+    private static string FormatYamlValue(object? value)
+    {
+        if (value is null) return "null";
+        if (value is string s) return $"\"{EscapeYaml(s)}\"";
+        if (value is bool b) return b ? "true" : "false";
+        if (value is DateTime dt) return $"\"{dt:yyyy-MM-dd}\"";
+        if (value is System.Collections.IEnumerable en && value is not string)
+        {
+            var items = new List<string>();
+            foreach (var item in en) items.Add(FormatYamlValue(item));
+            return $"[{string.Join(", ", items)}]";
+        }
+        return value.ToString() ?? "null";
+    }
+
+    private static string EscapeYaml(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
 
     internal static string BuildFullPrompt(string userPrompt, int requestedCount, string? criteriaContext = null,
         PromptTemplateLoader? templateLoader = null, string? profileFormat = null,
-        bool testimizeEnabled = false, string? testimizeStrategy = null)
+        Spectra.Core.Models.Testimize.TestimizeDataset? testimizeData = null)
     {
         // The JSON output schema sent to the AI. Prefer the caller-supplied
         // profileFormat (resolved from profiles/_default.yaml on disk or the
@@ -498,17 +455,23 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
         // identical.
         var jsonExample = profileFormat ?? ProfileFormatLoader.LoadFormat(Directory.GetCurrentDirectory());
 
+        // v1.48.3: render the optional Testimize dataset as a YAML-ish block
+        // only when it's present and non-empty. When null or empty, both
+        // placeholders are empty strings and the {{#if testimize_dataset}}
+        // block in test-generation.md collapses to nothing.
+        var testimizeBlock = FormatTestimizeDataset(testimizeData);
+        var testimizeStrategyName = testimizeData?.Strategy ?? "";
+
         if (templateLoader is not null)
         {
             var template = templateLoader.LoadTemplate("test-generation");
             var values = new Dictionary<string, string>
             {
-                // Spec 038: gates the {{#if testimize_enabled}} block in test-generation.md
-                ["testimize_enabled"] = testimizeEnabled ? "true" : "",
-                // v1.46.0: name of the preferred testimize MCP tool (derived from
-                // config.Testimize.Strategy). The prompt template embeds this so
-                // the AI knows which of the two testimize tools to prefer.
-                ["testimize_strategy"] = ResolveTestimizeStrategyToolName(testimizeStrategy),
+                // v1.48.3: new placeholders; the {{#if testimize_dataset}}
+                // block in test-generation.md is gated on the block text
+                // being non-empty.
+                ["testimize_dataset"] = testimizeBlock,
+                ["testimize_strategy_name"] = testimizeStrategyName,
                 ["behaviors"] = userPrompt,
                 ["suite_name"] = "",
                 ["existing_tests"] = "",

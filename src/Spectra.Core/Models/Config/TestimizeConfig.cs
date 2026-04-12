@@ -3,9 +3,11 @@ using System.Text.Json.Serialization;
 namespace Spectra.Core.Models.Config;
 
 /// <summary>
-/// Configures the optional Testimize integration.
-/// When <see cref="Enabled"/> is false (the default) SPECTRA does not start
-/// the Testimize MCP server and behaves exactly as it did before spec 038.
+/// Configures the optional Testimize integration. When <see cref="Enabled"/>
+/// is false (the default) SPECTRA does not invoke TestimizeEngine and
+/// generation behaves exactly as it did before spec 038. v1.48.3 replaced
+/// the MCP child-process integration with a direct in-process NuGet
+/// reference, so the old <c>mcp</c> sub-config (command/args) is gone.
 /// </summary>
 public sealed class TestimizeConfig
 {
@@ -21,20 +23,8 @@ public sealed class TestimizeConfig
     [JsonPropertyName("settings_file")]
     public string? SettingsFile { get; init; }
 
-    [JsonPropertyName("mcp")]
-    public TestimizeMcpConfig Mcp { get; init; } = new();
-
     [JsonPropertyName("abc_settings")]
     public TestimizeAbcSettings? AbcSettings { get; init; }
-}
-
-public sealed class TestimizeMcpConfig
-{
-    [JsonPropertyName("command")]
-    public string Command { get; init; } = "testimize-mcp";
-
-    [JsonPropertyName("args")]
-    public string[] Args { get; init; } = ["--mcp"];
 }
 
 public sealed class TestimizeAbcSettings

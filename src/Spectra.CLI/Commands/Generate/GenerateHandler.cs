@@ -3,6 +3,7 @@ using Spectra.CLI.Agent;
 using Spectra.CLI.Agent.Analysis;
 using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Agent.Critic;
+using Spectra.CLI.Agent.Testimize;
 using Spectra.CLI.Commands.Auth;
 using Spectra.CLI.Coverage;
 using Spectra.CLI.Infrastructure;
@@ -16,6 +17,7 @@ using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Grounding;
 using Spectra.Core.Models.Profile;
+using Spectra.Core.Models.Testimize;
 using Spectre.Console;
 using Spectra.CLI.Results;
 using Spectra.CLI.Session;
@@ -576,6 +578,20 @@ public sealed class GenerateHandler
         // Load criteria context for the suite
         var criteriaContext = await LoadCriteriaContextAsync(currentDir, suite, config, ct);
 
+        // v1.48.3: run Testimize in-process once per suite, BEFORE the batch
+        // loop. Feeds field specs from behavior analysis (AI) or falls back
+        // to the local regex extractor on the raw docs. Result is embedded
+        // in every batch's prompt as a literal authoritative data block via
+        // the {{#if testimize_dataset}} template section. Null when
+        // testimize is disabled, no field specs are recoverable, or the
+        // engine errors — generation proceeds normally in that case.
+        var testimizeDataset = TestimizeRunner.Generate(
+            analysisResult?.FieldSpecs,
+            config.Testimize,
+            documents,
+            suite,
+            msg => _progress.Info(msg));
+
         // --- Batch generation loop ---
         // v1.48.2: write the actual model name (e.g. "claude-sonnet-4.5") to
         // the grounding frontmatter, not the agent's ProviderName which is
@@ -645,7 +661,10 @@ public sealed class GenerateHandler
             await _progress.StatusAsync($"Generating batch {batchNum}...", async () =>
             {
                 batchResult = await agent.GenerateTestsAsync(
-                    prompt, documents, mutableExistingTests, batchRequestCount, criteriaContext, ct);
+                    prompt, documents, mutableExistingTests, batchRequestCount,
+                    criteriaContext: criteriaContext,
+                    testimizeData: testimizeDataset,
+                    ct: ct);
             });
 
             // Handle batch failure — keep tests from prior batches
@@ -1217,12 +1236,26 @@ public sealed class GenerateHandler
             // Load criteria context for the suite
             var criteriaContext = await LoadCriteriaContextAsync(currentDir, suiteName, config, ct);
 
+            // v1.48.3: run Testimize once per suite before generation. See
+            // the detailed comment at the equivalent call site in
+            // GenerateAndVerifyAsync for rationale.
+            var testimizeDataset = TestimizeRunner.Generate(
+                analysisResult?.FieldSpecs,
+                config.Testimize,
+                documents,
+                suiteName,
+                msg => _progress.Info(msg));
+
             // Generate tests
             var prompt = BuildPrompt(suiteName, effectiveCount, allExistingIds, effectiveProfile, focus);
             GenerationResult result = null!;
             await _progress.StatusAsync("Generating tests...", async () =>
             {
-                result = await agent.GenerateTestsAsync(prompt, documents, existingTests, effectiveCount, criteriaContext, ct);
+                result = await agent.GenerateTestsAsync(
+                    prompt, documents, existingTests, effectiveCount,
+                    criteriaContext: criteriaContext,
+                    testimizeData: testimizeDataset,
+                    ct: ct);
             });
 
             if (!result.IsSuccess)

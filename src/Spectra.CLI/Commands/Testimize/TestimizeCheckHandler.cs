@@ -1,5 +1,5 @@
+using System.Reflection;
 using System.Text.Json;
-using Spectra.CLI.Agent.Testimize;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Output;
 using Spectra.CLI.Results;
@@ -8,13 +8,20 @@ using Spectra.Core.Models.Config;
 namespace Spectra.CLI.Commands.Testimize;
 
 /// <summary>
-/// Handles `spectra testimize check`. Reports whether Testimize is enabled,
-/// installed, and healthy. Spec 038 FR-026 through FR-029.
+/// Handles <c>spectra testimize check</c>. Reports whether Testimize is
+/// enabled, whether the <c>Testimize</c> NuGet assembly is loadable, and
+/// what version is bundled.
+///
+/// v1.48.3: rewritten for the in-process NuGet integration. The previous
+/// implementation shelled out to <c>dotnet tool list -g</c> to probe for a
+/// global <c>Testimize.MCP.Server</c> tool; that tool is no longer a
+/// prerequisite because the Testimize library ships as a direct
+/// <c>PackageReference</c> in Spectra.CLI. "Installed" now means
+/// "the assembly is present in the process" and is verified by reflecting
+/// the type that Spectra.CLI already references at compile time.
 /// </summary>
 public sealed class TestimizeCheckHandler
 {
-    private const string InstallCommand = "dotnet tool install --global Testimize.MCP.Server";
-
     private readonly OutputFormat _outputFormat;
 
     public TestimizeCheckHandler(OutputFormat outputFormat = OutputFormat.Human)
@@ -47,27 +54,17 @@ public sealed class TestimizeCheckHandler
 
         var testimize = config?.Testimize ?? new TestimizeConfig();
 
-        // v1.46.0: the custom TestimizeMcpClient has been deleted — testimize
-        // now flows through the Copilot SDK's native MCP support. For this
-        // `check` command we only verify the binary is installed as a global
-        // .NET tool. The authoritative runtime health check is now visible in
-        // .spectra-debug.log when you run `spectra ai generate` (look for the
-        // `TESTIMIZE LOADED server=testimize status=Connected` line).
-        //
-        // FR-028: when disabled, do not probe.
-        bool installed = false;
-        bool healthy = false;
-        if (testimize.Enabled)
-        {
-            installed = await TestimizeDetector.IsInstalledAsync(ct);
-            // When the binary is installed, we report healthy=true since the
-            // SDK will actually spawn and handshake with it during generation.
-            // If the SDK reports Failed or NeedsAuth at that point, the
-            // generate run's debug log will show it — that's the real check.
-            healthy = installed;
-        }
+        // The Testimize NuGet assembly is a compile-time dependency of
+        // Spectra.CLI — it is always loadable if the CLI itself loaded.
+        // We still reflect on it so the version line is accurate to the
+        // assembly actually in the process, not a hard-coded constant.
+        var (installed, version) = ProbeTestimizeAssembly();
 
-        // Resolve settings file presence (only when configured).
+        // "Healthy" used to mean "MCP child process spawned and handshook
+        // successfully." Now it simply means "the assembly is loadable and
+        // testimize is enabled" — there's no runtime handshake.
+        var healthy = installed;
+
         bool? settingsFileFound = null;
         if (!string.IsNullOrWhiteSpace(testimize.SettingsFile))
         {
@@ -83,12 +80,12 @@ public sealed class TestimizeCheckHandler
             Status = "completed",
             Enabled = testimize.Enabled,
             Installed = installed,
-            Healthy = healthy,
+            Healthy = testimize.Enabled && healthy,
             Mode = testimize.Mode,
             Strategy = testimize.Strategy,
             SettingsFile = testimize.SettingsFile,
             SettingsFileFound = settingsFileFound,
-            InstallCommand = (testimize.Enabled && !installed) ? InstallCommand : null
+            Version = version,
         };
 
         if (_outputFormat == OutputFormat.Json)
@@ -103,6 +100,19 @@ public sealed class TestimizeCheckHandler
         return ExitCodes.Success;
     }
 
+    private static (bool Installed, string? Version) ProbeTestimizeAssembly()
+    {
+        try
+        {
+            var asm = typeof(global::Testimize.Usage.TestimizeEngine).Assembly;
+            return (true, asm.GetName().Version?.ToString());
+        }
+        catch
+        {
+            return (false, null);
+        }
+    }
+
     private static void RenderHuman(TestimizeCheckResult r)
     {
         Console.WriteLine("Testimize Integration Status");
@@ -114,8 +124,8 @@ public sealed class TestimizeCheckHandler
             return;
         }
 
-        Console.WriteLine($"  MCP Server:  {(r.Installed ? "installed" : "NOT FOUND")}");
-        Console.WriteLine($"  Connection:  {(r.Healthy ? "✓ healthy" : "unhealthy")}");
+        Console.WriteLine($"  Library:     {(r.Installed ? $"loaded (v{r.Version})" : "NOT LOADED")}");
+        Console.WriteLine($"  Ready:       {(r.Healthy ? "✓ yes" : "no")}");
         Console.WriteLine($"  Mode:        {r.Mode}");
         Console.WriteLine($"  Strategy:    {r.Strategy}");
         if (r.SettingsFile is not null)
@@ -131,7 +141,7 @@ public sealed class TestimizeCheckHandler
         }
         else if (!r.Installed)
         {
-            Console.WriteLine($"Install with: {InstallCommand}");
+            Console.WriteLine("Testimize library not loaded — this should not happen with a properly-installed Spectra.CLI. Reinstall the CLI.");
         }
     }
 }

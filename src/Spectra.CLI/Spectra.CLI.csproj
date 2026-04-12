@@ -14,6 +14,7 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.5" />
     <PackageReference Include="Spectre.Console" Version="0.55.0" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    <PackageReference Include="Testimize" Version="1.1.10" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -66,6 +67,15 @@
          the init handler fell through to ConfigLoader.GenerateDefaultConfig()
          when run from bin output, which missed the critic block entirely. -->
     <EmbeddedResource Include="Templates\spectra.config.json" />
+    <!-- v1.48.3: Testimize's FakerFactory reads testimizeSettings.json from
+         the assembly base directory at runtime. We ship our own copy (based
+         on the NuGet contentFiles sample) so the in-process TestimizeRunner
+         can call TestimizeEngine.Configure(...) without crashing on a null
+         Settings root. -->
+    <None Include="Templates\testimizeSettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>testimizeSettings.json</Link>
+    </None>
     <EmbeddedResource Include="Dashboard\Templates\index.html" />
     <EmbeddedResource Include="Dashboard\Templates\scripts\app.js" />
     <EmbeddedResource Include="Dashboard\Templates\scripts\coverage-map.js" />

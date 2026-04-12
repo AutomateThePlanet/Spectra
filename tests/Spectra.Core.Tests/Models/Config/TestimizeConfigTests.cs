@@ -4,7 +4,10 @@ using Spectra.Core.Models.Config;
 namespace Spectra.Core.Tests.Models.Config;
 
 /// <summary>
-/// Spec 038: TestimizeConfig defaults, deserialization, and backward compatibility.
+/// Spec 038 / v1.48.3: TestimizeConfig defaults, deserialization, and
+/// backward compatibility. The <c>mcp</c> sub-config was removed in v1.48.3
+/// when the MCP child-process integration was replaced with a direct
+/// Testimize NuGet reference.
 /// </summary>
 public class TestimizeConfigTests
 {
@@ -16,10 +19,6 @@ public class TestimizeConfigTests
         Assert.Equal("exploratory", c.Mode);
         Assert.Equal("HybridArtificialBeeColony", c.Strategy);
         Assert.Null(c.SettingsFile);
-        Assert.NotNull(c.Mcp);
-        Assert.Equal("testimize-mcp", c.Mcp.Command);
-        Assert.Single(c.Mcp.Args);
-        Assert.Equal("--mcp", c.Mcp.Args[0]);
         Assert.Null(c.AbcSettings);
     }
 
@@ -32,7 +31,6 @@ public class TestimizeConfigTests
               "mode": "precise",
               "strategy": "Pairwise",
               "settings_file": "testimizeSettings.json",
-              "mcp": { "command": "custom-cmd", "args": ["--mcp", "--verbose"] },
               "abc_settings": {
                 "total_population_generations": 200,
                 "mutation_rate": 0.7,
@@ -51,8 +49,6 @@ public class TestimizeConfigTests
         Assert.Equal("precise", c.Mode);
         Assert.Equal("Pairwise", c.Strategy);
         Assert.Equal("testimizeSettings.json", c.SettingsFile);
-        Assert.Equal("custom-cmd", c.Mcp.Command);
-        Assert.Equal(2, c.Mcp.Args.Length);
         Assert.NotNull(c.AbcSettings);
         Assert.Equal(200, c.AbcSettings.TotalPopulationGenerations);
         Assert.Equal(0.7, c.AbcSettings.MutationRate);
@@ -71,7 +67,29 @@ public class TestimizeConfigTests
         Assert.True(c.Enabled);
         Assert.Equal("exploratory", c.Mode);
         Assert.Equal("HybridArtificialBeeColony", c.Strategy);
-        Assert.NotNull(c.Mcp);
+    }
+
+    [Fact]
+    public void Deserialize_LegacyMcpKey_IsIgnored()
+    {
+        // v1.48.3: old configs with testimize.mcp.command/args should still
+        // parse cleanly — the JSON serializer ignores unknown properties by
+        // default. We just verify no exception and the rest still binds.
+        var json = """
+            {
+              "enabled": true,
+              "mode": "exploratory",
+              "strategy": "HybridArtificialBeeColony",
+              "mcp": { "command": "testimize-mcp", "args": ["--mcp"] }
+            }
+            """;
+
+        var c = JsonSerializer.Deserialize<TestimizeConfig>(json);
+
+        Assert.NotNull(c);
+        Assert.True(c.Enabled);
+        Assert.Equal("exploratory", c.Mode);
+        Assert.Equal("HybridArtificialBeeColony", c.Strategy);
     }
 
     [Fact]

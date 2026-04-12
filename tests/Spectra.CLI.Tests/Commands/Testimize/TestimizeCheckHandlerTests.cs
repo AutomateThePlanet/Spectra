@@ -31,9 +31,13 @@ public class TestimizeCheckHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task Check_NoConfig_ReportsDisabledNoStartup()
+    public async Task Check_NoConfig_ReportsDisabledAndNotReady()
     {
-        // Capture stdout
+        // v1.48.3: the `installed` field now reflects whether the Testimize
+        // NuGet assembly is loadable (which it always is, because Spectra.CLI
+        // has a compile-time PackageReference to it). `healthy` now means
+        // "enabled AND loadable" — disabled ⇒ healthy=false. The old
+        // meaning (MCP child process spawned cleanly) is gone.
         var sw = new StringWriter();
         var prev = Console.Out;
         Console.SetOut(sw);
@@ -46,7 +50,9 @@ public class TestimizeCheckHandlerTests : IDisposable
             var json = sw.ToString();
             using var doc = JsonDocument.Parse(json);
             Assert.False(doc.RootElement.GetProperty("enabled").GetBoolean());
-            Assert.False(doc.RootElement.GetProperty("installed").GetBoolean());
+            // Assembly is always present in the process when Spectra.CLI runs.
+            Assert.True(doc.RootElement.GetProperty("installed").GetBoolean());
+            // Healthy is gated on Enabled=true, so disabled ⇒ healthy=false.
             Assert.False(doc.RootElement.GetProperty("healthy").GetBoolean());
         }
         finally
@@ -54,15 +60,6 @@ public class TestimizeCheckHandlerTests : IDisposable
             Console.SetOut(prev);
         }
     }
-
-    // v1.46.0: deleted Check_EnabledButBogusCommand_ReportsInstalledFalseWithInstallCommand.
-    // The old test pointed a testimize.mcp.command at a non-existent binary and
-    // expected the handler to detect that via a probe. The new handler uses
-    // TestimizeDetector.IsInstalledAsync() which checks `dotnet tool list -g`
-    // for testimize.mcp.server — it no longer knows or cares about the user's
-    // custom `command` value. Runtime command-validity is now observed during
-    // `spectra ai generate` via the debug log's `TESTIMIZE LOADED status=Failed`
-    // line (driven by the Copilot SDK's SessionMcpServersLoadedEvent).
 
     [Fact]
     public async Task Check_JsonOutput_ContainsRequiredFields()

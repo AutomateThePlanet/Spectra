@@ -6,6 +6,7 @@ using Spectra.CLI.Prompts;
 using Spectra.CLI.Services;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
+using Spectra.Core.Models.Testimize;
 using Spectra.Core.Validation;
 using SpectraProviderConfig = Spectra.Core.Models.Config.ProviderConfig;
 
@@ -128,6 +129,7 @@ public sealed class BehaviorAnalyzer
             }
 
             var behaviors = ParseAnalysisResponse(responseText);
+            var fieldSpecs = ParseFieldSpecs(responseText);
             if (behaviors is null || behaviors.Count == 0)
             {
                 _onStatus?.Invoke("Could not parse behaviors from AI response");
@@ -173,7 +175,8 @@ public sealed class BehaviorAnalyzer
                 Behaviors = behaviors,
                 AlreadyCovered = coveredCount,
                 DocumentsAnalyzed = documents.Count,
-                TotalWords = totalWords
+                TotalWords = totalWords,
+                FieldSpecs = fieldSpecs
             };
         }
         catch (TimeoutException ex)
@@ -324,6 +327,38 @@ public sealed class BehaviorAnalyzer
             sb.AppendLine(preview);
         }
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// v1.48.3: parses the optional top-level <c>field_specs</c> array from
+    /// the behavior-analysis AI response. Gated by the
+    /// <c>{{#if testimize_enabled}}</c> block in
+    /// <c>behavior-analysis.md</c>. Returns null if missing or unparseable —
+    /// <see cref="Spectra.CLI.Agent.Testimize.TestimizeRunner"/> will fall
+    /// back to the regex extractor when this is null or empty.
+    /// </summary>
+    internal static List<FieldSpec>? ParseFieldSpecs(string responseText)
+    {
+        if (string.IsNullOrWhiteSpace(responseText)) return null;
+
+        var json = ExtractJson(responseText);
+        if (json is null) return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object) return null;
+            if (!doc.RootElement.TryGetProperty("field_specs", out var fsEl) &&
+                !doc.RootElement.TryGetProperty("fieldSpecs", out fsEl))
+                return null;
+
+            var specs = JsonSerializer.Deserialize<List<FieldSpec>>(fsEl.GetRawText(), JsonOptions);
+            return specs is { Count: > 0 } ? specs : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     internal static List<IdentifiedBehavior>? ParseAnalysisResponse(string responseText)

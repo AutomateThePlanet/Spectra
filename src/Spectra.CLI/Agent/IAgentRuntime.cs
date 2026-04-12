@@ -1,4 +1,5 @@
 using Spectra.Core.Models;
+using Spectra.Core.Models.Testimize;
 using TokenUsage = Spectra.Core.Models.TokenUsage;
 
 namespace Spectra.CLI.Agent;
@@ -16,6 +17,14 @@ public interface IAgentRuntime
     /// <param name="documents">Full source documents with content</param>
     /// <param name="existingTests">Existing tests for semantic deduplication</param>
     /// <param name="requestedCount">Number of tests requested</param>
+    /// <param name="criteriaContext">Optional acceptance criteria context block</param>
+    /// <param name="testimizeData">
+    /// Optional pre-computed algorithmic test data for this suite (from
+    /// <see cref="Spectra.CLI.Agent.Testimize.TestimizeRunner"/>). When non-null,
+    /// the agent embeds it into the generation prompt as an authoritative
+    /// "Pre-computed algorithmic test data (from Testimize…)" block so the
+    /// model uses the exact values/categories/messages verbatim.
+    /// </param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>Generated test cases</returns>
     Task<GenerationResult> GenerateTestsAsync(
@@ -24,6 +33,7 @@ public interface IAgentRuntime
         IReadOnlyList<TestCase> existingTests,
         int requestedCount,
         string? criteriaContext = null,
+        TestimizeDataset? testimizeData = null,
         CancellationToken ct = default);
 
     /// <summary>

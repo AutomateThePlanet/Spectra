@@ -1,3 +1,5 @@
+using Spectra.Core.Models.Testimize;
+
 namespace Spectra.CLI.Agent.Analysis;
 
 /// <summary>
@@ -48,6 +50,16 @@ public sealed record BehaviorAnalysisResult
     /// Approximate total word count of analyzed documentation.
     /// </summary>
     public required int TotalWords { get; init; }
+
+    /// <summary>
+    /// Structured input field specifications emitted by the AI in the
+    /// <c>field_specs</c> top-level array (gated by <c>testimize_enabled</c>
+    /// in the prompt template). Consumed by
+    /// <see cref="Spectra.CLI.Agent.Testimize.TestimizeRunner"/> to drive
+    /// in-process algorithmic test-data generation. Null or empty when
+    /// testimize is disabled or the AI didn't identify any constrained fields.
+    /// </summary>
+    public IReadOnlyList<FieldSpec>? FieldSpecs { get; init; }
 
     /// <summary>
     /// Gets the remaining (uncovered) behaviors by category.

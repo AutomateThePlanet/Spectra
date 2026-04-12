@@ -35,8 +35,4 @@ public sealed class TestimizeCheckResult : CommandResult
     [JsonPropertyName("version")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Version { get; init; }
-
-    [JsonPropertyName("install_command")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? InstallCommand { get; init; }
 }
