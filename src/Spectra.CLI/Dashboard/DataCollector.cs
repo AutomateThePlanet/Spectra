@@ -683,11 +683,44 @@ public sealed class DataCollector
             var docsDir = Path.Combine(_basePath, "docs");
             if (Directory.Exists(docsDir))
             {
+                // Load exclude patterns from config
+                var excludePatterns = new List<string> { "**/CHANGELOG.md" };
+                var configPath2 = Path.Combine(_basePath, "spectra.config.json");
+                if (File.Exists(configPath2))
+                {
+                    try
+                    {
+                        var configJson = await File.ReadAllTextAsync(configPath2);
+                        var configDoc = JsonSerializer.Deserialize<JsonElement>(configJson, s_jsonOptions);
+                        if (configDoc.TryGetProperty("source", out var sourceEl) &&
+                            sourceEl.TryGetProperty("exclude_patterns", out var patternsEl) &&
+                            patternsEl.ValueKind == JsonValueKind.Array)
+                        {
+                            excludePatterns = patternsEl.EnumerateArray()
+                                .Select(e => e.GetString() ?? "")
+                                .Where(s => !string.IsNullOrEmpty(s))
+                                .ToList();
+                        }
+                    }
+                    catch { /* use defaults */ }
+                }
+
                 var docFiles = Directory.GetFiles(docsDir, "*.md", SearchOption.AllDirectories);
                 foreach (var docFile in docFiles)
                 {
                     var relativePath = SourceRefNormalizer.NormalizePath(
                         Path.GetRelativePath(_basePath, docFile));
+                    var fileName = Path.GetFileName(docFile);
+
+                    // Check exclude patterns
+                    var excluded = excludePatterns.Any(pattern =>
+                    {
+                        var p = pattern.Replace("**/", "");
+                        return fileName.Equals(p, StringComparison.OrdinalIgnoreCase) ||
+                               relativePath.EndsWith(p, StringComparison.OrdinalIgnoreCase);
+                    });
+                    if (excluded) continue;
+
                     var testIds = docToTests.TryGetValue(relativePath, out var ids)
                         ? ids.OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList()
                         : [];

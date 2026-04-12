@@ -963,7 +963,7 @@ function renderKPICards(summary) {
         const colorClass = pct >= 80 ? 'green' : pct >= 50 ? 'amber' : 'red';
 
         html += `
-            <div class="cov-kpi-card ${colorClass}" onclick="document.getElementById('details-${s.key}-coverage')?.scrollIntoView({behavior:'smooth'})">
+            <div class="cov-kpi-card ${colorClass}" onclick="scrollToCoverageSection('${s.target}')">
                 <div class="cov-kpi-label">${s.label}</div>
                 <div class="cov-kpi-value ${colorClass}">${pct.toFixed(1)}%</div>
                 <div class="cov-kpi-bar"><div class="cov-kpi-bar-fill ${colorClass}" style="width:${Math.min(pct,100)}%"></div></div>
@@ -1459,6 +1459,23 @@ function filterCoverageDetails(sectionId, query) {
 
     if (countEl) {
         countEl.textContent = q ? `${visible} of ${list.children.length}` : `${list.children.length} items`;
+    }
+}
+
+/**
+ * Scroll to a coverage section and auto-expand its details.
+ */
+function scrollToCoverageSection(sectionId) {
+    // The detail list has id="details-{sectionId}"
+    const detailList = document.getElementById('details-' + sectionId);
+    // The section wrapper is the parent .coverage-section
+    const section = detailList?.closest('.coverage-section');
+    if (section) {
+        // Auto-expand if collapsed
+        if (detailList.classList.contains('collapsed')) {
+            toggleCoverageDetails(sectionId);
+        }
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 }
 

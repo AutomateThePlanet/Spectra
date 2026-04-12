@@ -1408,6 +1408,35 @@ details.result-row[open] summary::before {
     border-color: var(--text-muted);
 }
 
+.uncovered-filter-btn {
+    background: none;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    padding: 0.3rem 0.75rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.uncovered-filter-btn:hover {
+    background: var(--bg-color);
+    color: var(--text-color);
+    border-color: var(--text-muted);
+}
+
+.uncovered-filter-btn.active {
+    background: #dc3545;
+    color: #fff;
+    border-color: #dc3545;
+}
+
+.uncovered-filter-btn.active:hover {
+    background: #c82333;
+    border-color: #c82333;
+}
+
 /* Coverage Empty State */
 .coverage-empty-state {
     display: flex;
