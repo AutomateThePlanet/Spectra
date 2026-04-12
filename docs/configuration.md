@@ -109,6 +109,12 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 
 All providers are accessed through the GitHub Copilot SDK.
 
+### `ai.fallback_strategy`
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `fallback_strategy` | string | `"auto"` | How to handle provider failures. `"auto"` tries the next enabled provider in priority order. When all providers fail, generation exits with an error. |
+
 ### `ai.generation_timeout_minutes`, `ai.generation_batch_size`
 
 Per-batch tuning for `spectra ai generate`. These knobs are needed for slower
@@ -312,6 +318,36 @@ and re-run.
 | `duplicate_threshold` | double | `0.6` | Similarity threshold for duplicate detection |
 | `categories` | string[] | `["happy_path", "negative", "boundary", "integration"]` | Test categories to generate |
 
+## `analysis` — Behavior Analysis Categories
+
+Controls how the AI categorizes testable behaviors during the analysis phase
+(`spectra ai generate` runs this automatically before generation). See
+[Customization > Behavior Categories](customization.md#3-behavior-categories)
+for domain-specific examples.
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `categories` | object[] | (6 built-in) | Behavior classification taxonomy injected into the analysis prompt. |
+| `categories[].name` | string | — | Category identifier (used in tags and breakdown). |
+| `categories[].description` | string | — | One-line description injected into the AI prompt to guide classification. |
+
+Default categories:
+
+```json
+{
+  "analysis": {
+    "categories": [
+      { "name": "happy_path", "description": "Core happy-path functionality" },
+      { "name": "negative", "description": "Invalid input, unauthorized access, bad state" },
+      { "name": "edge_case", "description": "Unusual but valid scenarios" },
+      { "name": "boundary", "description": "Min/max values, exact limits, off-by-one" },
+      { "name": "error_handling", "description": "System failures, timeouts, downstream errors" },
+      { "name": "security", "description": "Auth checks, input sanitization, data exposure" }
+    ]
+  }
+}
+```
+
 ## `update` — Test Update Settings
 
 | Property | Type | Default | Description |
@@ -375,9 +411,14 @@ See [Coverage](coverage.md) for how these settings are used.
 | `file_patterns` | string[] | `["*.cs", "*.ts", "*.js", "*.py", "*.java"]` | Glob patterns for automation files (legacy) |
 | `attribute_patterns` | string[] | (framework defaults) | Regex patterns for test attributes (legacy, use `scan_patterns` instead) |
 | `test_id_pattern` | string | `"TC-\\d{3,}"` | Regex for matching test IDs |
+| `requirements_file` | string | `"docs/requirements/_requirements.yaml"` | Path to requirements YAML index for requirements coverage analysis |
 | `report_orphans` | bool | `true` | Report automation files not linked to any test |
 | `report_broken_links` | bool | `true` | Report tests referencing non-existent files |
 | `report_mismatches` | bool | `true` | Report inconsistencies between index and files |
+| `criteria_import.default_source_type` | string | `"manual"` | Default source type for imported acceptance criteria |
+| `criteria_import.auto_split` | bool | `true` | Automatically split compound criteria into atomic ones during import |
+| `criteria_import.normalize_rfc2119` | bool | `true` | Normalize RFC 2119 keywords (MUST, SHALL, SHOULD) in imported criteria |
+| `criteria_import.id_prefix` | string | `"AC"` | Prefix for auto-generated acceptance criteria IDs |
 
 ## `selections` — Saved Test Selections
 
@@ -464,6 +505,22 @@ When configured, the execution agent uses the specified Copilot Space to answer 
 | `auto_load` | bool | `true` | Automatically load profiles during generation |
 | `validate_on_load` | bool | `true` | Validate profile structure on load |
 | `include_in_validation` | bool | `true` | Include profile validation in `spectra validate` |
+
+## `testimize` — Testimize Integration (Optional)
+
+Disabled by default. When enabled, SPECTRA runs the Testimize engine
+in-process during test generation to produce algorithmically precise
+boundary values, equivalence partitions, and multi-field combinations.
+See [Testimize Integration](testimize-integration.md) for the full setup
+guide, how-it-works flow, and ABC tuning reference.
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `enabled` | bool | `false` | Master switch. |
+| `mode` | string | `"exploratory"` | Maps to Testimize's `TestCaseCategory`: `"exploratory"` → All, `"valid"` → Valid only, `"validation"` → Invalid only. |
+| `strategy` | string | `"HybridArtificialBeeColony"` | Algorithm for multi-field suites: `Pairwise`, `OptimizedPairwise`, `Combinatorial`, `OptimizedCombinatorial`, `HybridArtificialBeeColony`. |
+| `settings_file` | string? | `null` | Path to a `testimizeSettings.json` with per-type equivalence classes and ABC tuning. |
+| `abc_settings` | object? | `null` | Optional ABC algorithm tuning. See [Testimize Integration > abc_settings](testimize-integration.md#abc_settings-optional-tuning). |
 
 ## `debug` — Debug Logging (Spec 040)
 

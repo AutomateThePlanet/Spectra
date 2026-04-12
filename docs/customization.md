@@ -183,6 +183,33 @@ match, and where acceptance criteria live.
 - `scan_patterns` — glob patterns for automation code files.
 - `criteria_dir` — where per-document `.criteria.yaml` files are stored.
 - `criteria_file` — path to the master criteria index.
+- `requirements_file` — path to the requirements YAML index (default:
+  `"docs/requirements/_requirements.yaml"`). Used by requirements coverage
+  analysis.
+- `report_orphans` / `report_broken_links` / `report_mismatches` — boolean
+  flags (all default `true`) controlling which coverage report sections are
+  generated. Set to `false` to suppress noisy sections in large repos.
+
+**Criteria import tuning** (`coverage.criteria_import`):
+
+```json
+{
+  "coverage": {
+    "criteria_import": {
+      "default_source_type": "manual",
+      "auto_split": true,
+      "normalize_rfc2119": true,
+      "id_prefix": "AC"
+    }
+  }
+}
+```
+
+- `auto_split` — when importing compound acceptance criteria from CSV/YAML,
+  automatically split them into atomic criteria.
+- `normalize_rfc2119` — normalize RFC 2119 keywords (MUST, SHALL, SHOULD) to
+  a consistent form during import.
+- `id_prefix` — prefix for auto-generated acceptance criteria IDs (default: `"AC"`).
 
 ---
 

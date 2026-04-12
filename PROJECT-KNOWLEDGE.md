@@ -299,8 +299,7 @@ Three-section unified coverage with distinct semantics:
   "testimize": {
     "enabled": false,
     "mode": "exploratory",
-    "strategy": "HybridArtificialBeeColony",
-    "mcp": { "command": "testimize-mcp", "args": ["--mcp"] }
+    "strategy": "HybridArtificialBeeColony"
   }
 }
 ```
@@ -309,8 +308,9 @@ Three-section unified coverage with distinct semantics:
 > - `ai.analysis_timeout_minutes` (default 2) — behavior analysis timeout
 > - `ai.generation_timeout_minutes` (default 5) — per-batch generation timeout
 > - `ai.generation_batch_size` (default 30) — tests per AI call
-> - `ai.debug_log_enabled` (default true) — writes per-call timing diagnostics
->   to `.spectra-debug.log` in the project root
+> - `debug.enabled` (default false) — writes per-call timing diagnostics
+>   to `.spectra-debug.log` in the project root. Use `--verbosity diagnostic`
+>   for one-shot override without changing config.
 >
 > Slower / reasoning models (DeepSeek-V3, large Azure deployments) typically
 > need: analysis 5–10 min, generation 15–20 min, batches of 6–10.
@@ -325,8 +325,13 @@ Three-section unified coverage with distinct semantics:
 > (`github-models`, `azure-openai`, `azure-anthropic`, `openai`, `anthropic`).
 > Legacy `github` is a soft alias; legacy `google` is rejected.
 >
-> **Spec 038**: optional `testimize` section enables external Testimize MCP
-> integration for algorithmic test data optimization (off by default).
+> **Spec 038 / v1.48.3**: optional `testimize` section enables in-process
+> Testimize integration for algorithmic test data optimization (BVA, EP,
+> pairwise, ABC). The library runs in-process as a bundled NuGet dependency
+> — no MCP child process, no separate tool installation. When enabled,
+> `TestimizeRunner` calls `TestimizeEngine.Configure(...).Generate()` once
+> per suite and embeds the result in the generation prompt as authoritative
+> facts. Off by default.
 
 ## Code Conventions
 

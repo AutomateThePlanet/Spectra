@@ -197,13 +197,14 @@ SPECTRA is part of the [Automate The Planet](https://www.automatetheplanet.com/)
 
 **BELLATRIX** automates test execution. **Testimize** optimizes test case selection. **SPECTRA** generates and maintains the test cases themselves — closing the loop between documentation and quality assurance.
 
-> **Optional Testimize integration**: SPECTRA can call the
-> [Testimize.MCP.Server](https://github.com/AutomateThePlanet/Testimize) global
-> tool to replace AI-approximated boundary values with mathematically optimal
-> ones (BVA / EP / pairwise / ABC). Disabled by default; enable with
-> `dotnet tool install --global Testimize.MCP.Server` and set
-> `testimize.enabled` to `true` in `spectra.config.json`. See
-> [Testimize Integration](docs/testimize-integration.md).
+> **Optional Testimize integration**: SPECTRA ships with the
+> [Testimize](https://github.com/AutomateThePlanet/Testimize) library bundled
+> as an in-process NuGet dependency (no separate installation needed). When
+> enabled, it replaces AI-approximated boundary values with mathematically
+> precise ones — exact min-1/min/max/max+1 BVA, security-focused invalid
+> patterns (XSS, SQLi), and optimized multi-field pairwise/ABC combinations.
+> Disabled by default; set `testimize.enabled` to `true` in
+> `spectra.config.json`. See [Testimize Integration](docs/testimize-integration.md).
 
 ## Documentation
 
