@@ -17,7 +17,7 @@ public class ConfigLoaderTests
                 "local_dir": "docs/"
               },
               "tests": {
-                "dir": "tests/",
+                "dir": "test-cases/",
                 "id_prefix": "TC",
                 "id_start": 100
               },
@@ -42,7 +42,7 @@ public class ConfigLoaderTests
         Assert.True(result.IsSuccess);
         Assert.Equal("local", result.Value.Source.Mode);
         Assert.Equal("docs/", result.Value.Source.LocalDir);
-        Assert.Equal("tests/", result.Value.Tests.Dir);
+        Assert.Equal("test-cases/", result.Value.Tests.Dir);
         Assert.Equal("TC", result.Value.Tests.IdPrefix);
         Assert.Single(result.Value.Ai.Providers);
         Assert.Equal("copilot", result.Value.Ai.Providers[0].Name);
@@ -55,7 +55,7 @@ public class ConfigLoaderTests
         const string json = """
             {
               "source": { "local_dir": "docs/" },
-              "tests": { "dir": "tests/" },
+              "tests": { "dir": "test-cases/" },
               "ai": {
                 "providers": [
                   { "name": "copilot", "model": "gpt-4o", "priority": 1 },
@@ -98,7 +98,7 @@ public class ConfigLoaderTests
         // Arrange - missing 'source' required property
         const string json = """
             {
-              "tests": { "dir": "tests/" },
+              "tests": { "dir": "test-cases/" },
               "ai": {
                 "providers": [{ "name": "copilot", "model": "gpt-4o" }]
               }
@@ -122,7 +122,7 @@ public class ConfigLoaderTests
         const string json = """
             {
               "source": { "local_dir": "docs/" },
-              "tests": { "dir": "tests/" },
+              "tests": { "dir": "test-cases/" },
               "ai": {
                 "providers": [],
                 "fallback_strategy": "auto"
@@ -145,7 +145,7 @@ public class ConfigLoaderTests
         const string json = """
             {
               "source": { "local_dir": "docs/" },
-              "tests": { "dir": "tests/" },
+              "tests": { "dir": "test-cases/" },
               "ai": {
                 "providers": [{ "name": "copilot", "model": "gpt-4o" }]
               },
@@ -192,7 +192,7 @@ public class ConfigLoaderTests
         Assert.Equal("local", result.Value.Source.Mode);
         Assert.Equal("docs/", result.Value.Source.LocalDir);
         Assert.Equal(50, result.Value.Source.MaxFileSizeKb);
-        Assert.Equal("tests/", result.Value.Tests.Dir);
+        Assert.Equal("test-cases/", result.Value.Tests.Dir);
         Assert.Equal("TC", result.Value.Tests.IdPrefix);
         Assert.Equal(100, result.Value.Tests.IdStart);
         Assert.Equal(15, result.Value.Generation.DefaultCount);
@@ -207,7 +207,7 @@ public class ConfigLoaderTests
             {
               // This is a comment
               "source": { "local_dir": "docs/" },
-              "tests": { "dir": "tests/" },
+              "tests": { "dir": "test-cases/" },
               "ai": {
                 "providers": [{ "name": "copilot", "model": "gpt-4o" }]
               }

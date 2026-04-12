@@ -16,8 +16,8 @@ Related: [Full Technical Specification](../../spec-kit/architecture.md)
 
 | Subsystem | Purpose | Can be used independently |
 |-----------|---------|--------------------------|
-| **AI CLI** | Generate, update, and analyze test cases from documentation | Yes — tests are useful even without the execution engine |
-| **MCP Engine** | Execute tests through deterministic AI-orchestrated protocol | Yes — works with any Markdown tests, not just AI-generated ones |
+| **AI CLI** | Generate, update, and analyze test cases from documentation | Yes — test cases are useful even without the execution engine |
+| **MCP Engine** | Execute test cases through deterministic AI-orchestrated protocol | Yes — works with any Markdown test cases, not just AI-generated ones |
 
 ## System Flow
 
@@ -28,7 +28,7 @@ docs/_index.md               <- Pre-built document index (incremental)
   |
 AI Test Generation CLI       <- GitHub Copilot SDK (sole AI runtime)
   |                            Supports: github-models, azure-openai,
-tests/                       <-          azure-anthropic, openai, anthropic
+test-cases/                  <-          azure-anthropic, openai, anthropic
   |
 MCP Execution Engine         <- Deterministic state machine
   |
@@ -44,7 +44,7 @@ Azure DevOps / Jira / Teams  <- Bug logging, notifications via their MCPs
 - **CLI Framework:** System.CommandLine + Spectre.Console
 - **Serialization:** System.Text.Json (data), YamlDotNet (frontmatter)
 - **MCP Server:** ASP.NET Core (stdio transport, JSON-RPC 2.0)
-- **Storage:** Microsoft.Data.Sqlite (execution state), file system (tests, reports)
+- **Storage:** Microsoft.Data.Sqlite (execution state), file system (test cases, reports)
 
 ## Project Structure
 
@@ -59,7 +59,7 @@ src/
 ## Key Design Decisions
 
 - **Single AI runtime**: All AI operations go through the GitHub Copilot SDK. No separate agent implementations per provider.
-- **File-based test storage**: Tests are Markdown files with YAML frontmatter. No database for test definitions.
+- **File-based test case storage**: Test cases are Markdown files with YAML frontmatter. No database for test case definitions.
 - **Deterministic execution**: The MCP engine is a state machine. The AI orchestrator doesn't hold execution state.
 - **Three coverage dimensions**: Documentation, Acceptance Criteria, and Automation coverage are analyzed independently and reported together.
 - **Dual-model verification**: Generator and critic are separate models to catch hallucination.

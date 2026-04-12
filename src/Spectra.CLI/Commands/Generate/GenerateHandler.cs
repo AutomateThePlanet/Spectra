@@ -292,7 +292,7 @@ public sealed class GenerateHandler
             });
 
         // Load existing tests
-        var testsDir = config.Tests?.Dir ?? "tests";
+        var testsDir = config.Tests?.Dir ?? "test-cases";
         var testsPath = Path.Combine(currentDir, testsDir);
         var suitePath = Path.Combine(testsPath, suite);
 
@@ -983,7 +983,7 @@ public sealed class GenerateHandler
         var session = new InteractiveSession { Mode = SessionMode.Generate };
 
         // Scan for suites
-        var testsDir = config.Tests?.Dir ?? "tests";
+        var testsDir = config.Tests?.Dir ?? "test-cases";
         var testsPath = Path.Combine(currentDir, testsDir);
 
         var scanner = new SuiteScanner();
@@ -1603,7 +1603,7 @@ public sealed class GenerateHandler
         var config = await LoadConfigAsync(configPath, ct);
         if (config is null) return ExitCodes.Error;
 
-        var testsDir = config.Tests?.Dir ?? "tests";
+        var testsDir = config.Tests?.Dir ?? "test-cases";
         var testsPath = Path.Combine(currentDir, testsDir);
         var suitePath = Path.Combine(testsPath, suite);
 
@@ -1633,7 +1633,7 @@ public sealed class GenerateHandler
         var config = await LoadConfigAsync(configPath, ct);
         if (config is null) return ExitCodes.Error;
 
-        var testsDir = config.Tests?.Dir ?? "tests";
+        var testsDir = config.Tests?.Dir ?? "test-cases";
         var testsPath = Path.Combine(currentDir, testsDir);
         var suitePath = Path.Combine(testsPath, suite);
 

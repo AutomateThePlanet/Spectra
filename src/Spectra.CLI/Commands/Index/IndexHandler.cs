@@ -55,7 +55,7 @@ public sealed class IndexHandler
             }
         }
 
-        var testsDir = config?.Tests?.Dir ?? "tests";
+        var testsDir = config?.Tests?.Dir ?? "test-cases";
         var testsPath = Path.Combine(currentDir, testsDir);
 
         if (!Directory.Exists(testsPath))

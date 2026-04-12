@@ -32,7 +32,7 @@ On Windows use: `if exist site rmdir /s /q site && spectra ai analyze ...`
 show preview site/index.html?nocache=1
 ```
 
-Report: "Dashboard generated." Show suite count and test count from the result JSON.
+Report: "Dashboard generated." Show suite count and test case count from the result JSON.
 
 ---
 

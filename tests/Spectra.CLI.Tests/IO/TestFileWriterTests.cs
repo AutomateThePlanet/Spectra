@@ -211,9 +211,9 @@ public class TestFileWriterTests
     [Fact]
     public void GetFilePath_ReturnsCorrectPath()
     {
-        var result = TestFileWriter.GetFilePath("tests", "auth", "TC-001");
+        var result = TestFileWriter.GetFilePath("test-cases", "auth", "TC-001");
 
-        Assert.Equal(Path.Combine("tests", "auth", "TC-001.md"), result);
+        Assert.Equal(Path.Combine("test-cases", "auth", "TC-001.md"), result);
     }
 
     private static TestCase CreateTestCase(GroundingMetadata? grounding = null) => new()

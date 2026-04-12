@@ -34,7 +34,7 @@ public class AnalyzeCoverageGapsToolTests : IDisposable
     [Fact]
     public async Task Execute_NoDocsDir_ReturnsError()
     {
-        Directory.CreateDirectory(Path.Combine(_testDir, "tests"));
+        Directory.CreateDirectory(Path.Combine(_testDir, "test-cases"));
 
         var tool = new AnalyzeCoverageGapsTool(_testDir);
 
@@ -47,7 +47,7 @@ public class AnalyzeCoverageGapsToolTests : IDisposable
     [Fact]
     public async Task Execute_SuiteNotFound_ReturnsError()
     {
-        Directory.CreateDirectory(Path.Combine(_testDir, "tests"));
+        Directory.CreateDirectory(Path.Combine(_testDir, "test-cases"));
         Directory.CreateDirectory(Path.Combine(_testDir, "docs"));
 
         var tool = new AnalyzeCoverageGapsTool(_testDir);
@@ -61,7 +61,7 @@ public class AnalyzeCoverageGapsToolTests : IDisposable
     [Fact]
     public async Task Execute_DocumentNotCovered_ReturnsGap()
     {
-        var testsDir = Path.Combine(_testDir, "tests", "auth");
+        var testsDir = Path.Combine(_testDir, "test-cases", "auth");
         var docsDir = Path.Combine(_testDir, "docs");
         Directory.CreateDirectory(testsDir);
         Directory.CreateDirectory(docsDir);
@@ -89,7 +89,7 @@ public class AnalyzeCoverageGapsToolTests : IDisposable
     [Fact]
     public async Task Execute_DocumentCovered_NotInGaps()
     {
-        var testsDir = Path.Combine(_testDir, "tests", "auth");
+        var testsDir = Path.Combine(_testDir, "test-cases", "auth");
         var docsDir = Path.Combine(_testDir, "docs");
         Directory.CreateDirectory(testsDir);
         Directory.CreateDirectory(docsDir);
@@ -130,7 +130,7 @@ public class AnalyzeCoverageGapsToolTests : IDisposable
     [Fact]
     public async Task Execute_LargeDocument_HighSeverity()
     {
-        var testsDir = Path.Combine(_testDir, "tests", "auth");
+        var testsDir = Path.Combine(_testDir, "test-cases", "auth");
         var docsDir = Path.Combine(_testDir, "docs");
         Directory.CreateDirectory(testsDir);
         Directory.CreateDirectory(docsDir);
@@ -153,7 +153,7 @@ public class AnalyzeCoverageGapsToolTests : IDisposable
     [Fact]
     public async Task Execute_ManyHeadings_HighSeverity()
     {
-        var testsDir = Path.Combine(_testDir, "tests", "auth");
+        var testsDir = Path.Combine(_testDir, "test-cases", "auth");
         var docsDir = Path.Combine(_testDir, "docs");
         Directory.CreateDirectory(testsDir);
         Directory.CreateDirectory(docsDir);
@@ -184,7 +184,7 @@ public class AnalyzeCoverageGapsToolTests : IDisposable
     [Fact]
     public async Task Execute_CustomDocsPath_Works()
     {
-        var testsDir = Path.Combine(_testDir, "tests", "auth");
+        var testsDir = Path.Combine(_testDir, "test-cases", "auth");
         var customDocsDir = Path.Combine(_testDir, "documentation");
         Directory.CreateDirectory(testsDir);
         Directory.CreateDirectory(customDocsDir);
@@ -203,7 +203,7 @@ public class AnalyzeCoverageGapsToolTests : IDisposable
     [Fact]
     public async Task Execute_ExtractsTitleFromH1()
     {
-        var testsDir = Path.Combine(_testDir, "tests", "auth");
+        var testsDir = Path.Combine(_testDir, "test-cases", "auth");
         var docsDir = Path.Combine(_testDir, "docs");
         Directory.CreateDirectory(testsDir);
         Directory.CreateDirectory(docsDir);

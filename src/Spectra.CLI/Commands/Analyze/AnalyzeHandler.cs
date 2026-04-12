@@ -90,7 +90,7 @@ public sealed class AnalyzeHandler
             var documentMap = await mapBuilder.BuildAsync(basePath, ct);
 
             // Load all tests
-            var testsDir = Path.Combine(basePath, config.Tests?.Dir ?? "tests");
+            var testsDir = Path.Combine(basePath, config.Tests?.Dir ?? "test-cases");
             var allTests = new List<TestCase>();
 
             if (Directory.Exists(testsDir))
@@ -1234,7 +1234,7 @@ public sealed class AnalyzeHandler
             var filteredList = filtered.ToList();
 
             // Load all tests to check coverage
-            var testsDir = Path.Combine(currentDir, config.Tests?.Dir ?? "tests");
+            var testsDir = Path.Combine(currentDir, config.Tests?.Dir ?? "test-cases");
             var allTests = new List<TestCase>();
 
             if (Directory.Exists(testsDir))

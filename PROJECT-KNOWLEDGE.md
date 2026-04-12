@@ -2,7 +2,7 @@
 
 ## What is SPECTRA?
 
-SPECTRA is an AI-native test case generation, execution, coverage analysis, and maintenance CLI tool. It reads product documentation, extracts testable behaviors, generates structured manual test cases (as Markdown files with YAML frontmatter), executes them through an MCP server with AI agent orchestration, and produces coverage reports and dashboards.
+SPECTRA is an AI-native test case generation and execution framework. It reads product documentation, extracts testable behaviors, generates structured manual test cases (as Markdown files with YAML frontmatter), executes them through an MCP server with AI agent orchestration, and produces coverage reports and dashboards.
 
 ## Architecture Overview
 
@@ -123,7 +123,7 @@ spectra update-skills                            # Sync bundled SKILL files
 
 ## Test Case Format
 
-Tests are Markdown files with YAML frontmatter in `tests/{suite}/`:
+Test cases are Markdown files with YAML frontmatter in `test-cases/{suite}/`:
 
 ```yaml
 ---

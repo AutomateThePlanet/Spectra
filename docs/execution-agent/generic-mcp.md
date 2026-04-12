@@ -8,7 +8,7 @@ nav_order: 5
 
 ## Overview
 
-SPECTRA exposes test execution and data tools via MCP (Model Context Protocol), allowing any MCP-compatible client to interact with your test suites.
+SPECTRA exposes test execution and data tools via MCP (Model Context Protocol), allowing any MCP-compatible client to interact with your test case suites.
 
 ## Starting the Server
 
@@ -30,7 +30,7 @@ The server runs on stdio transport and follows the MCP JSON-RPC 2.0 protocol.
 | `list_available_suites` | List all test suites with test counts |
 | `start_execution_run` | Start a new test execution run |
 | `get_execution_status` | Get current run status |
-| `get_test_case_details` | Get full details for a test |
+| `get_test_case_details` | Get full details for a test case |
 | `advance_test_case` | Record pass/fail result |
 | `skip_test_case` | Skip with reason |
 | `pause_execution_run` | Pause the current run |
@@ -42,7 +42,7 @@ The server runs on stdio transport and follows the MCP JSON-RPC 2.0 protocol.
 
 | Tool | Description |
 |------|-------------|
-| `validate_tests` | Validate test files against schema |
+| `validate_tests` | Validate test case files against schema |
 | `rebuild_indexes` | Regenerate `_index.json` files |
 | `analyze_coverage_gaps` | Find uncovered documentation |
 
@@ -133,7 +133,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"validate_t
 
 | Code | Description |
 |------|-------------|
-| `TESTS_DIR_NOT_FOUND` | No tests/ directory exists |
+| `TESTS_DIR_NOT_FOUND` | No test-cases/ directory exists |
 | `SUITE_NOT_FOUND` | Specified suite not found |
 | `DOCS_DIR_NOT_FOUND` | No docs/ directory exists |
 | `MISSING_ID` | Test file missing required ID |

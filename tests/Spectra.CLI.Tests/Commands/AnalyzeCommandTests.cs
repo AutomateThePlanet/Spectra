@@ -56,7 +56,7 @@ public class AnalyzeCommandTests : IDisposable
 
             // Create empty docs and tests directories
             Directory.CreateDirectory(Path.Combine(_testDir, "docs"));
-            Directory.CreateDirectory(Path.Combine(_testDir, "tests"));
+            Directory.CreateDirectory(Path.Combine(_testDir, "test-cases"));
 
             var command = CreateCommand();
             var result = await command.InvokeAsync(["ai", "analyze"]);
@@ -88,7 +88,7 @@ public class AnalyzeCommandTests : IDisposable
                 "# Feature\n\nThis is a feature.");
 
             // Create test suite with test
-            var suiteDir = Path.Combine(_testDir, "tests", "checkout");
+            var suiteDir = Path.Combine(_testDir, "test-cases", "checkout");
             Directory.CreateDirectory(suiteDir);
 
             var testContent = @"---
@@ -142,7 +142,7 @@ Success";
 
             await CreateConfigAsync();
             Directory.CreateDirectory(Path.Combine(_testDir, "docs"));
-            Directory.CreateDirectory(Path.Combine(_testDir, "tests"));
+            Directory.CreateDirectory(Path.Combine(_testDir, "test-cases"));
 
             var command = CreateCommand();
             var result = await command.InvokeAsync(["ai", "analyze", "--format", "json"]);
@@ -165,7 +165,7 @@ Success";
 
             await CreateConfigAsync();
             Directory.CreateDirectory(Path.Combine(_testDir, "docs"));
-            Directory.CreateDirectory(Path.Combine(_testDir, "tests"));
+            Directory.CreateDirectory(Path.Combine(_testDir, "test-cases"));
 
             var command = CreateCommand();
             var result = await command.InvokeAsync(["ai", "analyze", "--format", "markdown"]);
@@ -188,7 +188,7 @@ Success";
 
             await CreateConfigAsync();
             Directory.CreateDirectory(Path.Combine(_testDir, "docs"));
-            Directory.CreateDirectory(Path.Combine(_testDir, "tests"));
+            Directory.CreateDirectory(Path.Combine(_testDir, "test-cases"));
 
             var outputPath = Path.Combine(_testDir, "report.md");
 
@@ -217,7 +217,7 @@ Success";
         var config = new
         {
             source = new { local_dir = "docs/", include_patterns = new[] { "**/*.md" } },
-            tests = new { dir = "tests/" },
+            tests = new { dir = "test-cases/" },
             ai = new { providers = new[] { new { name = "test", model = "test-model", enabled = true, priority = 1 } } }
         };
         await File.WriteAllTextAsync(

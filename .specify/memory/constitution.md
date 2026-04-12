@@ -2,7 +2,7 @@
 ================================================================================
 SYNC IMPACT REPORT
 ================================================================================
-Version Change: N/A → 1.0.0 (Initial ratification)
+Version Change: 1.0.0 → 1.1.0 (Terminology: tests/ → test-cases/)
 
 Added Sections:
   - Core Principles (5 principles)
@@ -27,7 +27,7 @@ Follow-up TODOs: None
 
 All test definitions, documentation, and configuration MUST be stored in Git repositories. GitHub is the authoritative source for:
 
-- Test cases as Markdown files with YAML frontmatter in `tests/{suite}/`
+- Test cases as Markdown files with YAML frontmatter in `test-cases/{suite}/`
 - Documentation in `docs/` that drives test generation
 - Configuration in `spectra.config.json` at repository root
 - Metadata indexes (`_index.json`) committed to enable deterministic builds
@@ -134,4 +134,4 @@ All changes MUST be reviewed before merge:
 
 This Constitution supersedes all other practices when conflicts arise. If a pattern in existing code conflicts with these principles, new code MUST follow the Constitution and technical debt SHOULD be logged for remediation.
 
-**Version**: 1.0.0 | **Ratified**: 2026-03-13 | **Last Amended**: 2026-03-13
+**Version**: 1.1.0 | **Ratified**: 2026-03-13 | **Last Amended**: 2026-04-12

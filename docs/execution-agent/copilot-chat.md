@@ -41,7 +41,7 @@ Or with a specific suite:
 
 1. **Suite Selection**: The agent lists available test suites
 2. **Filter Options**: Choose priority, tags, or component filters
-3. **Test Presentation**: Each test is presented one at a time with:
+3. **Test Case Presentation**: Each test case is presented one at a time with:
    - Title and priority
    - Preconditions
    - Numbered steps
@@ -49,7 +49,7 @@ Or with a specific suite:
    - Test data (if any)
 4. **Result Collection**: Say "passed", "failed", "blocked", or "skip"
 5. **Progress Tracking**: See live progress after each test
-6. **Summary**: Final pass/fail counts when complete
+6. **Summary**: Final pass/fail counts when the run completes
 
 ## Example Session
 
@@ -57,15 +57,15 @@ Or with a specific suite:
 You: @spectra-execution run auth tests
 
 Agent: I found 3 test suites:
-- auth (18 tests)
-- checkout (42 tests)
-- orders (7 tests)
+- auth (18 test cases)
+- checkout (42 test cases)
+- orders (7 test cases)
 
 Which suite would you like to run? Any filters?
 
 You: auth, high priority only
 
-Agent: Starting run with 5 high-priority tests...
+Agent: Starting run with 5 high-priority test cases...
 
 ## TC-101: Login with valid credentials
 **Priority**: high | **Component**: auth

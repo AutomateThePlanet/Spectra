@@ -28,7 +28,7 @@ public sealed class InitHandler
     private const string VsCodeMcpPath = ".vscode/mcp.json";
     private const string DeployWorkflowPath = ".github/workflows/deploy-dashboard.yml";
     private const string DocsDir = "docs";
-    private const string TestsDir = "tests";
+    private const string TestsDir = "test-cases";
     private const string TemplatesDir = "templates";
     private const string BugReportTemplatePath = "templates/bug-report.md";
 

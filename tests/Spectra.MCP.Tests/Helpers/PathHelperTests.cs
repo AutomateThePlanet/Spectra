@@ -55,9 +55,9 @@ public class PathHelperTests
         var oldFormatFile = "citizen" + Path.DirectorySeparatorChar + "TC-100.md";
 
         var fileName = StripSuitePrefixIfPresent(suite, oldFormatFile);
-        var testPath = Path.Combine(basePath, "tests", suite, fileName);
+        var testPath = Path.Combine(basePath, "test-cases", suite, fileName);
 
-        Assert.Equal(Path.Combine("project", "tests", "citizen", "TC-100.md"), testPath);
+        Assert.Equal(Path.Combine("project", "test-cases", "citizen", "TC-100.md"), testPath);
     }
 
     [Fact]
@@ -68,9 +68,9 @@ public class PathHelperTests
         var newFormatFile = "TC-100.md";
 
         var fileName = StripSuitePrefixIfPresent(suite, newFormatFile);
-        var testPath = Path.Combine(basePath, "tests", suite, fileName);
+        var testPath = Path.Combine(basePath, "test-cases", suite, fileName);
 
-        Assert.Equal(Path.Combine("project", "tests", "citizen", "TC-100.md"), testPath);
+        Assert.Equal(Path.Combine("project", "test-cases", "citizen", "TC-100.md"), testPath);
     }
 
     /// <summary>

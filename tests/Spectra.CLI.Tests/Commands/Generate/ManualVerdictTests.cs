@@ -38,7 +38,7 @@ public class ManualVerdictTests
             CriticModel = "gemini-2.0-flash"
         };
 
-        var testsPath = Path.Combine(Path.GetTempPath(), "tests");
+        var testsPath = Path.Combine(Path.GetTempPath(), "test-cases");
         var filePath = Path.Combine(testsPath, "suite", "TC-100.md");
 
         var result = GenerateHandler.CreateTestWithGrounding(
@@ -69,7 +69,7 @@ public class ManualVerdictTests
             CriticModel = "gemini-2.0-flash"
         };
 
-        var testsPath = Path.Combine(Path.GetTempPath(), "tests");
+        var testsPath = Path.Combine(Path.GetTempPath(), "test-cases");
         var filePath = Path.Combine(testsPath, "suite", "TC-101.md");
 
         var result = GenerateHandler.CreateTestWithGrounding(
@@ -90,7 +90,7 @@ public class ManualVerdictTests
     {
         var test = CreateTestCase("TC-102", "No verification test", grounding: null);
 
-        var testsPath = Path.Combine(Path.GetTempPath(), "tests");
+        var testsPath = Path.Combine(Path.GetTempPath(), "test-cases");
         var filePath = Path.Combine(testsPath, "suite", "TC-102.md");
 
         var result = GenerateHandler.CreateTestWithGrounding(

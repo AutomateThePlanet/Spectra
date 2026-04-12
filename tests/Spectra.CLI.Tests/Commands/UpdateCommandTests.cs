@@ -53,7 +53,7 @@ public class UpdateCommandTests : IDisposable
 
             await CreateConfigAsync();
             Directory.CreateDirectory(Path.Combine(_testDir, "docs"));
-            var suiteDir = Path.Combine(_testDir, "tests", "empty-suite");
+            var suiteDir = Path.Combine(_testDir, "test-cases", "empty-suite");
             Directory.CreateDirectory(suiteDir);
 
             var command = CreateCommand();
@@ -79,8 +79,8 @@ public class UpdateCommandTests : IDisposable
             Directory.CreateDirectory(Path.Combine(_testDir, "docs"));
 
             // Create suite1 and suite2
-            var suite1Dir = Path.Combine(_testDir, "tests", "suite1");
-            var suite2Dir = Path.Combine(_testDir, "tests", "suite2");
+            var suite1Dir = Path.Combine(_testDir, "test-cases", "suite1");
+            var suite2Dir = Path.Combine(_testDir, "test-cases", "suite2");
             Directory.CreateDirectory(suite1Dir);
             Directory.CreateDirectory(suite2Dir);
 
@@ -137,7 +137,7 @@ Success";
 
             await CreateConfigAsync();
             Directory.CreateDirectory(Path.Combine(_testDir, "docs"));
-            var suiteDir = Path.Combine(_testDir, "tests", "diff-suite");
+            var suiteDir = Path.Combine(_testDir, "test-cases", "diff-suite");
             Directory.CreateDirectory(suiteDir);
 
             var command = CreateCommand();
@@ -161,7 +161,7 @@ Success";
 
             await CreateConfigAsync();
             Directory.CreateDirectory(Path.Combine(_testDir, "docs"));
-            Directory.CreateDirectory(Path.Combine(_testDir, "tests"));
+            Directory.CreateDirectory(Path.Combine(_testDir, "test-cases"));
 
             var command = CreateCommand();
             // suite is a positional argument
@@ -188,7 +188,7 @@ Success";
         var config = new
         {
             source = new { local_dir = "docs/", include_patterns = new[] { "**/*.md" } },
-            tests = new { dir = "tests/" },
+            tests = new { dir = "test-cases/" },
             ai = new { providers = new[] { new { name = "test", model = "test-model", enabled = true, priority = 1 } } }
         };
         await File.WriteAllTextAsync(

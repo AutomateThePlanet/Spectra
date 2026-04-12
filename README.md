@@ -19,7 +19,7 @@
 
 <!-- Tagline -->
 <p align="center">
-  <strong>AI-native test generation and execution framework.</strong><br>
+  <strong>AI-native test case generation and execution framework.</strong><br>
   From documentation to deterministic test execution.
 </p>
 
@@ -46,7 +46,7 @@ SPECTRA reads your product documentation, generates comprehensive test suites, a
 
 - **AI with guardrails** — Dual-model grounding verification catches hallucinated test steps before they reach your suite.
 
-- **Tests as Markdown** — Test cases are plain Markdown files with YAML frontmatter. They live in GitHub, versioned alongside your code.
+- **Test cases as Markdown** — Test cases are plain Markdown files with YAML frontmatter. They live in GitHub, versioned alongside your code.
 
 - **Deterministic execution** — An MCP-based execution engine provides a state machine that any AI orchestrator can drive without holding state.
 
@@ -171,7 +171,7 @@ docs/_index.md               <- Pre-built document index (incremental)
   |
 AI Test Generation CLI       <- GitHub Copilot SDK (sole AI runtime)
   |                            Supports: github-models, azure-openai,
-tests/                       <-          azure-anthropic, openai, anthropic
+test-cases/                  <-          azure-anthropic, openai, anthropic
   |
 MCP Execution Engine         <- Deterministic state machine
   |

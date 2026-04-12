@@ -44,7 +44,7 @@ Initialize a repository for SPECTRA.
 spectra init
 ```
 
-Creates `spectra.config.json`, `docs/`, `tests/`, `docs/criteria/_criteria_index.yaml`, `profiles/_default.yaml`, `.spectra/prompts/` (5 templates), `.github/skills/` (12 bundled SKILLs), `.github/agents/` (2 agent prompts), `CUSTOMIZATION.md`, and `USAGE.md`.
+Creates `spectra.config.json`, `docs/`, `test-cases/`, `docs/criteria/_criteria_index.yaml`, `profiles/_default.yaml`, `.spectra/prompts/` (5 templates), `.github/skills/` (12 bundled SKILLs), `.github/agents/` (2 agent prompts), `CUSTOMIZATION.md`, and `USAGE.md`.
 
 **Options:**
 
@@ -57,11 +57,11 @@ Creates `spectra.config.json`, `docs/`, `tests/`, `docs/criteria/_criteria_index
 
 ### `spectra validate`
 
-Validate all test files against the schema.
+Validate all test case files against the schema.
 
 ```bash
 spectra validate
-spectra validate --path tests/checkout
+spectra validate --path test-cases/checkout
 ```
 
 ### `spectra index`
@@ -145,8 +145,8 @@ spectra ai generate
 Launches a generation session that flows through:
 1. **Phase 1 — Analysis**: Counts testable behaviors in documentation, shows breakdown by category
 2. **Phase 2 — Generation**: Creates test cases with AI verification (grounded/partial/hallucinated)
-3. **Phase 3 — Suggestions**: Proposes additional tests for uncovered areas
-4. **Phase 4 — User-Described**: Create tests from your own descriptions (skips critic, marked `verdict: manual`)
+3. **Phase 3 — Suggestions**: Proposes additional test cases for uncovered areas
+4. **Phase 4 — User-Described**: Create test cases from your own descriptions (skips critic, marked `verdict: manual`)
 5. Phases 3-4 loop until you choose "Done", then displays session summary
 
 **Direct Mode** — specify suite and options upfront:
@@ -163,7 +163,7 @@ spectra ai generate checkout --count 5 --dry-run
 ```bash
 spectra ai generate checkout --from-suggestions                     # Generate from last session's suggestions
 spectra ai generate checkout --from-suggestions 1,3                 # Generate specific suggestions by index
-spectra ai generate checkout --from-description "IBAN validation"   # Create test from description
+spectra ai generate checkout --from-description "IBAN validation"   # Create test case from description
 spectra ai generate checkout --from-description "IBAN validation" --context "checkout page"
 spectra ai generate checkout --auto-complete --output-format json   # CI: all phases, no prompts
 ```
@@ -177,11 +177,11 @@ spectra ai generate checkout --no-interaction --output-format json    # CI pipel
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--count` | `-n` | Number of tests to generate (default: AI-recommended count) |
+| `--count` | `-n` | Number of test cases to generate (default: AI-recommended count) |
 | `--focus` | `-f` | Focus area description for targeted generation |
 | `--skip-critic` | | Skip grounding verification (faster) |
 | `--from-suggestions` | | Generate from previous session's suggestions (optionally pass indices like `1,3`) |
-| `--from-description` | | Create a test from a plain-language behavior description |
+| `--from-description` | | Create a test case from a plain-language behavior description |
 | `--context` | | Additional context for `--from-description` |
 | `--auto-complete` | | Run all phases without prompts (analyze → generate → suggestions → finalize) |
 | `--dry-run` | | Preview without writing files |
@@ -189,44 +189,44 @@ spectra ai generate checkout --no-interaction --output-format json    # CI pipel
 Session state is stored in `.spectra/session.json` and expires after 1 hour.
 
 **Live progress bars** (spec 041) — at default verbosity, long runs render two
-sequential Spectre.Console progress bars in the terminal: a `Generating tests`
-bar that advances per batch, then a `Verifying tests` bar that advances per
+sequential Spectre.Console progress bars in the terminal: a `Generating test cases`
+bar that advances per batch, then a `Verifying test cases` bar that advances per
 critic call (showing the most recent test ID and verdict). The same data is
 mirrored to `.spectra-progress.html` via an in-flight `progress` object inside
 `.spectra-result.json`. Progress bars are automatically suppressed under
 `--output-format json`, `--verbosity quiet`, or non-interactive stdout (piped
 or redirected) so SKILL/CI output remains clean.
 
-User-described tests are marked with `grounding.verdict: manual` and `source: user-described`.
+User-described test cases are marked with `grounding.verdict: manual` and `source: user-described`.
 
-When a project has documentation in `docs/` and acceptance criteria in `docs/criteria/`, `--from-description` runs in **doc-aware mode**: it best-effort loads matching docs (capped at 3 docs × 8000 chars) and matching `.criteria.yaml` entries as formatting context, then populates the new test's `source_refs` (with the doc paths used) and `criteria` fields (with any IDs the AI matches to your description). The grounding verdict stays `manual` — doc context is used for terminology and navigation alignment only, never for verification. If no docs or criteria exist, the flow is identical to the no-context behavior.
+When a project has documentation in `docs/` and acceptance criteria in `docs/criteria/`, `--from-description` runs in **doc-aware mode**: it best-effort loads matching docs (capped at 3 docs × 8000 chars) and matching `.criteria.yaml` entries as formatting context, then populates the new test case's `source_refs` (with the doc paths used) and `criteria` fields (with any IDs the AI matches to your description). The grounding verdict stays `manual` — doc context is used for terminology and navigation alignment only, never for verification. If no docs or criteria exist, the flow is identical to the no-context behavior.
 
-Duplicate detection warns when a new test has >80% title similarity to an existing test.
+Duplicate detection warns when a new test case has >80% title similarity to an existing test case.
 
 **Exit codes:** `0` = success, `1` = error, `3` = missing required args with `--no-interaction`.
 
-**Speeding up the critic phase** (Spec 043, v1.48.0+): on a large generate run, the critic verifies tests one at a time and is typically the dominant cost (~6s/call × N tests). Set `ai.critic.max_concurrent: 5` (or higher, max 20) in `spectra.config.json` to run multiple critic calls in parallel — this typically cuts critic phase time to ~1/N of sequential without changing any output. The Run Summary panel shows the active `Critic concurrency` along with `Errors` and `Rate limits` counts. If you see `Rate limits > 0`, drop `max_concurrent` and re-run.
+**Speeding up the critic phase** (Spec 043, v1.48.0+): on a large generate run, the critic verifies test cases one at a time and is typically the dominant cost (~6s/call × N tests). Set `ai.critic.max_concurrent: 5` (or higher, max 20) in `spectra.config.json` to run multiple critic calls in parallel — this typically cuts critic phase time to ~1/N of sequential without changing any output. The Run Summary panel shows the active `Critic concurrency` along with `Errors` and `Rate limits` counts. If you see `Rate limits > 0`, drop `max_concurrent` and re-run.
 
 **Troubleshooting failed runs** (Spec 043, v1.48.0+): when `debug.enabled: true`, every failed AI call (timeout, HTTP 429, parse error, MCP failure, generic exception) writes a full entry to `.spectra-errors.log` — exception type, message, response body (truncated to 500 chars), `Retry-After` header, and stack trace. The file is created lazily on first error and never touched on healthy runs, so a single `cat .spectra-errors.log` answers "did anything go wrong?". Each error gets a `see=.spectra-errors.log` cross-reference in `.spectra-debug.log` so you can jump from the timeline to the full context.
 
-**Tuning for slow models** (v1.41.0+): generation runs in batches of `ai.generation_batch_size` tests (default 30), each subject to `ai.generation_timeout_minutes` (default 5). Slower / reasoning-class models (DeepSeek-V3, large Azure deployments, GPT-4 Turbo with long contexts) typically need `generation_timeout_minutes: 15–20` and `generation_batch_size: 6–10`. When `ai.debug_log_enabled` is true (the default), each batch writes a timestamped `BATCH START` / `BATCH OK` / `BATCH TIMEOUT` line to `.spectra-debug.log` in the project root with the model, provider, requested count, and elapsed seconds — inspect this file to dial the knobs precisely. See [Configuration → ai.generation_timeout_minutes](configuration.md) for the full reference, example configs, and the timeout error message format.
+**Tuning for slow models** (v1.41.0+): generation runs in batches of `ai.generation_batch_size` test cases (default 30), each subject to `ai.generation_timeout_minutes` (default 5). Slower / reasoning-class models (DeepSeek-V3, large Azure deployments, GPT-4 Turbo with long contexts) typically need `generation_timeout_minutes: 15–20` and `generation_batch_size: 6–10`. When `ai.debug_log_enabled` is true (the default), each batch writes a timestamped `BATCH START` / `BATCH OK` / `BATCH TIMEOUT` line to `.spectra-debug.log` in the project root with the model, provider, requested count, and elapsed seconds — inspect this file to dial the knobs precisely. See [Configuration → ai.generation_timeout_minutes](configuration.md) for the full reference, example configs, and the timeout error message format.
 
 ### `spectra ai update`
 
-Update existing tests when documentation changes. Classifies tests as UP_TO_DATE, OUTDATED, ORPHANED, or REDUNDANT.
+Update existing test cases when documentation changes. Classifies test cases as UP_TO_DATE, OUTDATED, ORPHANED, or REDUNDANT.
 
 ```bash
 spectra ai update                             # Interactive mode
 spectra ai update checkout                    # Direct mode
 spectra ai update checkout --diff             # Show proposed changes
-spectra ai update checkout --delete-orphaned  # Auto-delete orphaned tests
+spectra ai update checkout --delete-orphaned  # Auto-delete orphaned test cases
 spectra ai update checkout --no-interaction   # CI mode
 ```
 
 | Option | Short | Description |
 |--------|-------|-------------|
 | `--diff` | `-d` | Show diff of proposed changes |
-| `--delete-orphaned` | | Automatically delete orphaned tests |
+| `--delete-orphaned` | | Automatically delete orphaned test cases |
 | `--no-interaction` | | Disable interactive prompts |
 | `--no-review` | | Skip interactive review |
 | `--dry-run` | | Preview without applying changes |
@@ -247,7 +247,7 @@ spectra ai analyze --coverage --verbosity detailed
 |--------|-------------|
 | `--format` | Output format: `text` (default), `json`, `markdown` |
 | `--output` | Write report to file |
-| `--auto-link` | Scan automation code and update `automated_by` fields in test files |
+| `--auto-link` | Scan automation code and update `automated_by` fields in test case files |
 
 See [Coverage](coverage.md) for details on the three coverage types.
 
@@ -266,7 +266,7 @@ spectra dashboard --output ./site --dry-run
 spectra dashboard --output ./site --template ./my-template
 ```
 
-The dashboard reads from `tests/*/_index.json`, `.execution/spectra.db`, and `reports/*.json`.
+The dashboard reads from `test-cases/*/_index.json`, `.execution/spectra.db`, and `reports/*.json`.
 
 Features: Suite overview, execution history, three-section coverage analysis, coverage map (D3.js), test browser, trend analysis.
 
@@ -283,7 +283,7 @@ Create or edit a test generation profile.
 ```bash
 spectra init-profile                                    # Interactive wizard
 spectra init-profile --non-interactive --detail-level detailed --min-negative 3
-spectra init-profile --suite tests/checkout             # Suite-level override
+spectra init-profile --suite test-cases/checkout             # Suite-level override
 spectra init-profile --edit --min-negative 5            # Update existing
 spectra init-profile --force                            # Re-run full wizard
 ```
@@ -296,7 +296,7 @@ View the effective profile.
 spectra profile show
 spectra profile show --json
 spectra profile show --context
-spectra profile show --suite tests/checkout
+spectra profile show --suite test-cases/checkout
 ```
 
 See [Generation Profiles](generation-profiles.md) for details.
@@ -370,7 +370,7 @@ For VS Code Copilot Chat, `spectra init` writes a working `.vscode/mcp.json` tha
 |------|-------------|
 | `find_test_cases` | Cross-suite search and filter by query, priority, tags, component, automation status |
 | `get_test_execution_history` | Per-test execution statistics (pass rate, last status, run count) |
-| `list_saved_selections` | List named selections from config with estimated test counts |
+| `list_saved_selections` | List named selections from config with estimated test case counts |
 
 The `find_test_cases` tool supports free-text search (OR across keywords, matching title + description + tags), metadata filters (AND between types, OR within arrays), and returns results ranked by relevance with total estimated duration.
 
@@ -383,8 +383,8 @@ The `start_execution_run` tool supports three mutually exclusive modes:
 
 | Tool | Description |
 |------|-------------|
-| `validate_tests` | Validate test files |
+| `validate_tests` | Validate test case files |
 | `rebuild_indexes` | Rebuild `_index.json` files |
-| `analyze_coverage_gaps` | Analyze test coverage |
+| `analyze_coverage_gaps` | Analyze test case coverage |
 | `get_run_history` | Get execution history |
 | `get_execution_summary` | Get summary statistics |

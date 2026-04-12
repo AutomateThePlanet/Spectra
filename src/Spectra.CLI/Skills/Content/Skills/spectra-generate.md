@@ -19,18 +19,18 @@ If the user is asking you to **generate, create, add, write, or build test cases
 **These trigger phrases ALL require the analyze-first flow:**
 - "create test cases for {X}"
 - "generate test cases for {X}"
-- "generate tests for {X}"
-- "add tests to {X}"
+- "generate test cases for {X}"
+- "add test cases to {X}"
 - "test the {X} module"
-- "I need tests for {X}"
-- "cover {X} with tests"
-- "write tests for {X}"
+- "I need test cases for {X}"
+- "cover {X} with test cases"
+- "write test cases for {X}"
 
 **Forbidden behaviors when the user names an area:**
 - Do NOT call `spectra ai generate` without `--analyze-only` on the first call.
 - Do NOT invent a `--count` value. There is no default — if the user didn't say a number, you DO NOT pass `--count` at all on the analyze call.
 - Do NOT skip Steps 1–4 below.
-- Do NOT ask the user how many tests they want — the analyze step will recommend a number.
+- Do NOT ask the user how many test cases they want — the analyze step will recommend a number.
 
 The ONLY time you skip analysis is when the user describes a single concrete scenario (see "When the user wants to create a specific test case" further down).
 
@@ -41,16 +41,16 @@ The ONLY time you skip analysis is when the user describes a single concrete sce
 | Flag | Type | Description |
 |------|------|-------------|
 | `--suite {name}` | string | Target suite name (REQUIRED) |
-| `--count {n}` | int | Number of tests to generate. NEVER invent a value — use ONLY a number the user explicitly stated, or the `recommended` field returned by the analyze step. |
+| `--count {n}` | int | Number of test cases to generate. NEVER invent a value — use ONLY a number the user explicitly stated, or the `recommended` field returned by the analyze step. |
 | `--focus {text}` | string | Focus area: "negative", "edge cases", "high priority security", etc. |
 | `--skip-critic` | bool | Skip grounding verification |
 | `--analyze-only` | bool | Only analyze, don't generate |
 | `--dry-run` | bool | Preview without writing |
 
 **There is NO `--priority`, `--type`, or `--category` flag.** Use `--focus` for ALL filtering by type, priority, or category. Capture the user's FULL intent in `--focus` — don't split or drop parts. Examples:
-- "generate 15 negative tests" → `--focus "negative tests"` `--count 15`
+- "generate 15 negative test cases" → `--focus "negative tests"` `--count 15`
 - "generate high priority edge cases" → `--focus "high priority edge cases"`
-- "generate security tests only" → `--focus "security tests"`
+- "generate security test cases only" → `--focus "security tests"`
 - "cover its acceptance criteria" → `--focus "acceptance criteria"`
 - "happy path tests covering acceptance criteria" → `--focus "happy path acceptance criteria"`
 
@@ -59,7 +59,7 @@ The ONLY time you skip analysis is when the user describes a single concrete sce
 **Determine focus**: Extract the user's full intent into a `--focus` value. Include ALL qualifiers (type + topic). If no focus, omit `--focus`.
 
 **Determine count for the LATER generate step**:
-- If the user said an explicit number ("generate 10 tests", "give me 3"), use that.
+- If the user said an explicit number ("generate 10 test cases", "give me 3"), use that.
 - Otherwise leave `count` blank for now — Step 4 will give you `analysis.recommended` to use in Step 5.
 - NEVER fall back to "5". There is no default.
 
@@ -77,7 +77,7 @@ spectra ai generate --suite {suite} --analyze-only [--focus "{focus}"] --no-inte
 - `"analysis_failed"` → DO NOT show a recommendation. The recommended count is a fallback default, NOT a real analysis. Show the `message` field verbatim, and ask the user whether to bump `ai.analysis_timeout_minutes` in `spectra.config.json` and re-run, or proceed with the fallback count anyway. STOP and wait for the user to decide. Do NOT auto-proceed to generation.
 - `"analyzed"` → show this:
 
-**{analysis.already_covered}** tests already exist. I recommend generating **{analysis.recommended}** new test cases:
+**{analysis.already_covered}** test cases already exist. I recommend generating **{analysis.recommended}** new test cases:
 
 Category breakdown (read keys directly from `analysis.breakdown`, e.g. `happy_path`, `boundary`, `negative`, `edge_case`, `security`, `error_handling`, plus any custom categories):
 
@@ -109,14 +109,14 @@ spectra ai generate --suite {suite} --count {count} [--focus "{focus}"] --no-int
 
 **Step 7** — readFile `.spectra-result.json` — check `status`:
 - `"failed"` → tell user the `error`.
-- `"completed"` → "Generated **{generation.tests_written}** test cases." List `files_created`. If tests_written < tests_requested, say "Run again to generate more."
+- `"completed"` → "Generated **{generation.tests_written}** test cases." List `files_created`. If tests_written < tests_requested, say "Run again to generate more test cases."
 - If `token_usage` is present, also include a one-line cost/usage summary from `token_usage.total.total_tokens` and `token_usage.cost_display` (e.g. "Token usage: **89K tokens** in {run_summary.duration_seconds}s. Cost: {token_usage.cost_display}"). Do NOT invent numbers if the field is absent.
 
 ---
 
 ## When the user wants to create a specific test case
 
-Use this flow when the user describes a concrete test scenario — a behavior they want captured as a test case. **Do NOT run analysis. Do NOT ask how many tests to generate. This always produces exactly 1 test.**
+Use this flow when the user describes a concrete test scenario — a behavior they want captured as a test case. **Do NOT run analysis. Do NOT ask how many test cases to generate. This always produces exactly 1 test case.**
 
 **Step 1**: show preview .spectra-progress.html?nocache=1
 
@@ -145,8 +145,8 @@ spectra ai generate --suite {suite} --from-description "{description}" --context
 
 | User intent | Signal | Flow |
 |-------------|--------|------|
-| Explore a feature area | "Generate tests for...", "Test the... module", "Cover... error handling" | Main generation flow (with `--focus`) |
-| Create a specific test | "Add a test for...", "Create a test case where...", "I need a test that verifies..." | From-description flow |
+| Explore a feature area | "Generate test cases for...", "Test the... module", "Cover... error handling" | Main generation flow (with `--focus`) |
+| Create a specific test case | "Add a test case for...", "Create a test case where...", "I need a test case that verifies..." | From-description flow |
 | Generate from previous suggestions | "Generate from suggestions", "Use the previous suggestions" | `--from-suggestions` flow |
 
 **Key rule**: If you can read the user's request as a single test case title, it's `--from-description`. If it's a topic to explore, it's `--focus`. Do NOT ask the user about count or scope to disambiguate — the topic-vs-scenario shape is the only signal you need.

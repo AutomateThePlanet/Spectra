@@ -82,14 +82,14 @@ public sealed partial class AnalyzeCoverageGapsTool : IMcpTool
             ? docsEl.GetString() ?? "docs"
             : "docs";
 
-        var testsDir = Path.Combine(_basePath, "tests");
+        var testsDir = Path.Combine(_basePath, "test-cases");
         var docsDir = Path.Combine(_basePath, docsPath);
 
         if (!Directory.Exists(testsDir))
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "TESTS_DIR_NOT_FOUND",
-                "No tests/ directory found in repository root"));
+                "No test-cases/ directory found in repository root"));
         }
 
         if (!Directory.Exists(docsDir))
@@ -105,7 +105,7 @@ public sealed partial class AnalyzeCoverageGapsTool : IMcpTool
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "SUITE_NOT_FOUND",
-                $"Suite '{suiteName}' not found in tests/ directory"));
+                $"Suite '{suiteName}' not found in test-cases/ directory"));
         }
 
         // Collect all source_refs from test indexes

@@ -20,7 +20,7 @@
     <Authors>Spectra Contributors</Authors>
     <Company>Spectra</Company>
     <Product>Spectra</Product>
-    <Description>AI-native test generation and execution framework</Description>
+    <Description>AI-native test case generation and execution framework</Description>
   </PropertyGroup>
 
   <!-- Shared analyzers for all projects -->

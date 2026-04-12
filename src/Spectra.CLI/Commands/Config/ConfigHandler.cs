@@ -194,7 +194,7 @@ public sealed class ConfigHandler
 
             Console.WriteLine();
             Console.WriteLine("Tests:");
-            Console.WriteLine($"  Directory: {config.Tests?.Dir ?? "tests/"}");
+            Console.WriteLine($"  Directory: {config.Tests?.Dir ?? "test-cases/"}");
             Console.WriteLine($"  ID Prefix: {config.Tests?.IdPrefix ?? "TC"}");
             Console.WriteLine($"  ID Start:  {config.Tests?.IdStart ?? 100}");
 

@@ -132,7 +132,7 @@ public sealed class ProfileShowTests : IDisposable
     public async Task Show_WithSuiteFlag_ShowsSuiteProfile()
     {
         // Arrange
-        var suiteDir = Path.Combine(_testDir, "tests", "checkout");
+        var suiteDir = Path.Combine(_testDir, "test-cases", "checkout");
         Directory.CreateDirectory(suiteDir);
 
         var suiteProfilePath = Path.Combine(suiteDir, ProfileDefaults.SuiteProfileFileName);
@@ -145,7 +145,7 @@ public sealed class ProfileShowTests : IDisposable
             """);
 
         // Act
-        var (exitCode, output) = await RunCommandAsync("profile show --suite tests/checkout");
+        var (exitCode, output) = await RunCommandAsync("profile show --suite test-cases/checkout");
 
         // Assert
         Assert.Equal(0, exitCode);
@@ -167,7 +167,7 @@ public sealed class ProfileShowTests : IDisposable
             ---
             """);
 
-        var suiteDir = Path.Combine(_testDir, "tests", "checkout");
+        var suiteDir = Path.Combine(_testDir, "test-cases", "checkout");
         Directory.CreateDirectory(suiteDir);
 
         var suiteProfilePath = Path.Combine(suiteDir, ProfileDefaults.SuiteProfileFileName);
@@ -180,7 +180,7 @@ public sealed class ProfileShowTests : IDisposable
             """);
 
         // Act
-        var (exitCode, output) = await RunCommandAsync("profile show --suite tests/checkout");
+        var (exitCode, output) = await RunCommandAsync("profile show --suite test-cases/checkout");
 
         // Assert
         Assert.Equal(0, exitCode);

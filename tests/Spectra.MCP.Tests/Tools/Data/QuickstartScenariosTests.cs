@@ -25,8 +25,8 @@ public class QuickstartScenariosTests : IDisposable
 
     private void SetupTestScenario()
     {
-        // Create tests/checkout suite
-        var checkoutDir = Path.Combine(_testDir, "tests", "checkout");
+        // Create test-cases/checkout suite
+        var checkoutDir = Path.Combine(_testDir, "test-cases", "checkout");
         Directory.CreateDirectory(checkoutDir);
 
         // Valid test file
@@ -259,8 +259,8 @@ public class QuickstartScenariosTests : IDisposable
 
         // DOCS_DIR_NOT_FOUND
         var noDocsDir = Path.Combine(Path.GetTempPath(), $"spectra-nodocs-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(Path.Combine(noDocsDir, "tests", "suite"));
-        File.WriteAllText(Path.Combine(noDocsDir, "tests", "suite", "_index.json"), "{\"suite\":\"suite\",\"generated_at\":\"2026-01-01T00:00:00Z\",\"tests\":[]}");
+        Directory.CreateDirectory(Path.Combine(noDocsDir, "test-cases", "suite"));
+        File.WriteAllText(Path.Combine(noDocsDir, "test-cases", "suite", "_index.json"), "{\"suite\":\"suite\",\"generated_at\":\"2026-01-01T00:00:00Z\",\"tests\":[]}");
         try
         {
             var noDocsTool = new AnalyzeCoverageGapsTool(noDocsDir);

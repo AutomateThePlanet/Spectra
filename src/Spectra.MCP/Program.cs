@@ -52,7 +52,7 @@ public static class Program
         // Index and test case loaders
         Func<string, IEnumerable<TestIndexEntry>> indexLoader = suite =>
         {
-            var indexPath = Path.Combine(basePath, "tests", suite, "_index.json");
+            var indexPath = Path.Combine(basePath, "test-cases", suite, "_index.json");
             if (!File.Exists(indexPath)) return [];
             var index = indexWriter.ReadAsync(indexPath).GetAwaiter().GetResult();
             return index?.Tests ?? [];
@@ -73,7 +73,7 @@ public static class Program
                 fileName = fileName.Substring(suite.Length + 1);
             }
 
-            var testPath = Path.Combine(basePath, "tests", suite, fileName);
+            var testPath = Path.Combine(basePath, "test-cases", suite, fileName);
             if (!File.Exists(testPath)) return null;
 
             var parseResult = parser.Parse(File.ReadAllText(testPath), testPath);
@@ -82,7 +82,7 @@ public static class Program
 
         Func<string, IEnumerable<SuiteInfo>> suiteLoader = _ =>
         {
-            var testsDir = Path.Combine(basePath, "tests");
+            var testsDir = Path.Combine(basePath, "test-cases");
             if (!Directory.Exists(testsDir)) return [];
 
             return Directory.GetDirectories(testsDir)
@@ -103,11 +103,11 @@ public static class Program
         // Suite list loader (returns suite names only)
         Func<IEnumerable<string>> suiteListLoader = () =>
         {
-            var testsDir = Path.Combine(basePath, "tests");
+            var testsDir = Path.Combine(basePath, "test-cases");
             if (!Directory.Exists(testsDir)) return [];
             return Directory.GetDirectories(testsDir)
                 .Select(Path.GetFileName)
-                .Where(name => name is not null && File.Exists(Path.Combine(basePath, "tests", name, "_index.json")))
+                .Where(name => name is not null && File.Exists(Path.Combine(basePath, "test-cases", name, "_index.json")))
                 .Cast<string>();
         };
 

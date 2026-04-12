@@ -60,7 +60,7 @@ For optimal results, add the agent prompt to your Claude project:
 
 ## Invocation
 
-Simply ask Claude to run tests:
+Simply ask Claude to run test cases:
 
 ```
 Run the checkout test suite
@@ -84,7 +84,7 @@ Claude can call these SPECTRA tools:
 | `advance_test_case` | Record test result |
 | `skip_test_case` | Skip with reason |
 | `finalize_execution_run` | Complete the run |
-| `validate_tests` | Validate test files |
+| `validate_tests` | Validate test case files |
 | `rebuild_indexes` | Rebuild index files |
 | `analyze_coverage_gaps` | Find uncovered docs |
 
@@ -95,16 +95,16 @@ You: What test suites are available?
 
 Claude: [calls list_available_suites]
 I found 3 test suites:
-- auth (18 tests)
-- checkout (42 tests)
-- orders (7 tests)
+- auth (18 test cases)
+- checkout (42 test cases)
+- orders (7 test cases)
 
 Which suite would you like to run?
 
 You: Run checkout, but only smoke tests
 
 Claude: [calls start_execution_run with tags filter]
-Starting run with 8 smoke tests from checkout suite.
+Starting run with 8 smoke test cases from checkout suite.
 
 [presents first test...]
 ```

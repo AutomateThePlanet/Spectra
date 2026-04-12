@@ -46,7 +46,7 @@ tests/
 ├── Spectra.Core.Tests/    # Core library tests
 └── TestFixtures/          # Sample test data
     ├── docs/              # Sample documentation
-    └── tests/             # Sample test suites with _index.json
+    └── test-cases/        # Sample test case suites with _index.json
 ```
 
 ## Building
@@ -183,7 +183,7 @@ The `tests/TestFixtures/` folder contains ready-to-use sample data:
 dotnet run --project src/Spectra.MCP -- tests/TestFixtures
 ```
 
-Available suites in fixtures: auth (3 tests), checkout (1 test).
+Available suites in fixtures: auth (3 test cases), checkout (1 test case).
 
 ## Troubleshooting
 
@@ -195,7 +195,7 @@ dotnet build -p:NoWarn=CA1062
 
 ### "Suite not found"
 
-Ensure your test folder has `tests/` with suite subdirectories containing valid `_index.json` files.
+Ensure your test case folder has `test-cases/` with suite subdirectories containing valid `_index.json` files.
 
 ### "Index stale"
 

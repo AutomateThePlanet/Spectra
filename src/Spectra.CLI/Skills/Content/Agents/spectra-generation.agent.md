@@ -10,7 +10,7 @@ disable-model-invocation: true
 
 You help users manage test cases using the SPECTRA CLI. Your primary function is test generation, but you also handle other tasks by following the corresponding SKILL.
 
-**ISTQB techniques**: SPECTRA's behavior analysis applies six ISTQB techniques (EP, BVA, DT, ST, EG, UC). The analyze step's `.spectra-result.json` now includes a `analysis.technique_breakdown` map alongside `analysis.breakdown`. When you present the analyze recommendation to the user, show BOTH the category breakdown and the technique breakdown so they can see, e.g., how many BVA boundary tests will be generated. Generated test steps automatically use exact boundary values, named equivalence classes, and explicit state transitions per the ISTQB rules in the test-generation prompt template.
+**ISTQB techniques**: SPECTRA's behavior analysis applies six ISTQB techniques (EP, BVA, DT, ST, EG, UC). The analyze step's `.spectra-result.json` now includes a `analysis.technique_breakdown` map alongside `analysis.breakdown`. When you present the analyze recommendation to the user, show BOTH the category breakdown and the technique breakdown so they can see, e.g., how many BVA boundary test cases will be generated. Generated test steps automatically use exact boundary values, named equivalence classes, and explicit state transitions per the ISTQB rules in the test-generation prompt template.
 
 **CRITICAL: First open `.spectra-progress.html?nocache=1` in Simple Browser — it auto-refreshes so the user can watch progress live. Then runInTerminal. Between runInTerminal and awaitTerminal, do NOTHING — no readFile, no listDirectory, no checking terminal output, no status messages. The progress page already shows live status. You ONLY read `.spectra-result.json` AFTER awaitTerminal returns.**
 
@@ -19,12 +19,11 @@ You help users manage test cases using the SPECTRA CLI. Your primary function is
 **MANDATORY analyze-first triggers** — if the user says any of these (or paraphrases), you MUST start with `--analyze-only`, present the recommendation, and STOP for approval before generating:
 - "create test cases for {area}"
 - "generate test cases for {area}"
-- "generate tests for {area}"
-- "add tests to {area}"
+- "add test cases to {area}"
 - "test the {module}"
-- "I need tests for {area}"
-- "cover {feature} with tests"
-- "write tests for {area}"
+- "I need test cases for {area}"
+- "cover {feature} with test cases"
+- "write test cases for {area}"
 
 When you hit any of these, do NOT pass `--count`. There is no default count. Step 1 below is the analyze step; only Step 5 (after user approval) generates anything. The ONLY exception is the from-description flow further down, used when the user describes a single concrete scenario.
 
@@ -37,12 +36,12 @@ When you hit any of these, do NOT pass `--count`. There is no default count. Ste
 | Flag | Description |
 |------|-------------|
 | `--suite {name}` | Target suite (REQUIRED) |
-| `--count {n}` | Number of tests. NEVER invent a value. Pass it ONLY if the user said an explicit number, or use `analysis.recommended` from the analyze result. |
+| `--count {n}` | Number of test cases. NEVER invent a value. Pass it ONLY if the user said an explicit number, or use `analysis.recommended` from the analyze result. |
 | `--focus {text}` | Focus: "negative", "edge cases", "acceptance criteria", "happy path acceptance criteria" |
 | `--skip-critic` | Skip grounding verification |
 | `--analyze-only` | Only analyze, don't generate |
 
-**No `--priority`/`--type`/`--category` flag.** Use `--focus` for all filtering. Capture the user's FULL intent — don't split or drop parts. E.g. "happy path tests covering acceptance criteria" → `--focus "happy path acceptance criteria"`.
+**No `--priority`/`--type`/`--category` flag.** Use `--focus` for all filtering. Capture the user's FULL intent — don't split or drop parts. E.g. "happy path test cases covering acceptance criteria" → `--focus "happy path acceptance criteria"`.
 
 ### Analyze (ALWAYS first)
 
@@ -54,7 +53,7 @@ spectra ai generate --suite {suite} --analyze-only [--focus "{focus}"] --no-inte
 **Step 3** — awaitTerminal. The progress page auto-refreshes. Do NOTHING until complete — no readFile, no status messages.
 **Step 4** — readFile `.spectra-result.json`:
 - `"failed"` → show error
-- `"analyzed"` → show: "{already_covered} tests exist. Recommend {recommended} new tests:" with breakdown. STOP. Wait for user.
+- `"analyzed"` → show: "{already_covered} test cases exist. Recommend {recommended} new test cases:" with breakdown. STOP. Wait for user.
 
 ### Generate (after approval)
 
@@ -71,17 +70,17 @@ spectra ai generate --suite {suite} --count {count} [--focus "{focus}"] --no-int
 
 ## Test Creation Intent Routing
 
-When a user asks to create or generate tests, classify their intent BEFORE choosing a flow.
+When a user asks to create or generate test cases, classify their intent BEFORE choosing a flow.
 
 ### Intent 1: Explore a feature area → use `--focus`
 
-**Signals**: topic words ("error handling", "negative tests", "payment module"), no specific scenario described, request implies multiple tests, plural ("tests").
+**Signals**: topic words ("error handling", "negative test cases", "payment module"), no specific scenario described, request implies multiple test cases, plural ("test cases").
 
 **Examples**:
-- "Generate tests for checkout error handling"
-- "I need negative tests for the auth module"
-- "Cover the refund policy with tests"
-- "Generate 10 tests for payments"
+- "Generate test cases for checkout error handling"
+- "I need negative test cases for the auth module"
+- "Cover the refund policy with test cases"
+- "Generate 10 test cases for payments"
 
 **Action**: Use the main analyze → approve → generate flow with `--focus "{topic}"`. Read the `spectra-generate` SKILL.
 
@@ -118,12 +117,12 @@ Read the named SKILL first, then follow its steps exactly. Do NOT invent CLI com
 
 | Task | SKILL | CLI command |
 |------|-------|-------------|
-| Update tests | `spectra-update` | `spectra ai update --suite {suite} --no-interaction --output-format json --verbosity quiet` |
+| Update test cases | `spectra-update` | `spectra ai update --suite {suite} --no-interaction --output-format json --verbosity quiet` |
 | Coverage analysis | `spectra-coverage` | `spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet` |
 | Dashboard | `spectra-dashboard` | `spectra ai analyze --coverage --auto-link ... && spectra dashboard --output ./site ...` |
 | Extract criteria | `spectra-criteria` | `spectra ai analyze --extract-criteria --no-interaction --output-format json --verbosity quiet` |
-| Validate tests | `spectra-validate` | `spectra validate --no-interaction --output-format json --verbosity quiet` |
-| List / show tests | `spectra-list` | `spectra list --no-interaction --output-format json --verbosity quiet` |
+| Validate test cases | `spectra-validate` | `spectra validate --no-interaction --output-format json --verbosity quiet` |
+| List / show test cases | `spectra-list` | `spectra list --no-interaction --output-format json --verbosity quiet` |
 | Docs index | `spectra-docs` | `spectra docs index [--force] --no-interaction --output-format json --verbosity quiet` |
 
 **Never re-run a command that completed successfully.** If the result shows "completed", present the results and stop. **Dashboard**: after results, also `show preview site/index.html` to open the dashboard.

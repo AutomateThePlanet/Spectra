@@ -7,7 +7,7 @@
     "exclude_patterns": ["**/CHANGELOG.md"]
   },
   "tests": {
-    "dir": "tests/",
+    "dir": "test-cases/",
     "id_prefix": "TC",
     "id_start": 100
   },

@@ -152,7 +152,7 @@ public class BrandingConfigTests
         var json = """
         {
             "source": { "mode": "local", "local_dir": "docs/" },
-            "tests": { "dir": "tests/" },
+            "tests": { "dir": "test-cases/" },
             "ai": { "providers": [] },
             "dashboard": {
                 "branding": {

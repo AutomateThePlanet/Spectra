@@ -58,7 +58,7 @@ public sealed class ValidateHandler
         var profileValidationErrors = await ValidateProfileAsync(currentDir, cancellationToken);
         var totalProfileErrors = profileValidationErrors.Count;
 
-        var testsDir = config?.Tests?.Dir ?? "tests";
+        var testsDir = config?.Tests?.Dir ?? "test-cases";
         var testsPath = Path.Combine(currentDir, testsDir);
 
         if (!Directory.Exists(testsPath))

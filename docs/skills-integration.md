@@ -25,7 +25,7 @@ User (Copilot Chat) → SKILL file → CLI command → JSON output → Chat resp
 1. User asks: "Generate test cases for the checkout suite"
 2. SKILL matches the request and builds: `spectra ai generate --suite checkout --output-format json --verbosity quiet`
 3. CLI executes and outputs structured JSON
-4. SKILL parses JSON and presents: "Generated 10 tests (8 grounded, 1 partial, 1 rejected)"
+4. SKILL parses JSON and presents: "Generated 10 test cases (8 grounded, 1 partial, 1 rejected)"
 
 ## Bundled SKILLs
 

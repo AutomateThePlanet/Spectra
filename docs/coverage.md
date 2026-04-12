@@ -18,13 +18,13 @@ SPECTRA produces a unified coverage report with three sections:
 
 | Type | What it measures | Data source |
 |------|-----------------|-------------|
-| **Documentation** | Which docs have linked tests | `source_refs` field in test frontmatter matched against `docs/` |
-| **Acceptance Criteria** | Which criteria are covered | `criteria` field in test frontmatter + `_criteria_index.yaml` |
-| **Automation** | Which tests have automation code | `automated_by` field in test frontmatter + code scanning |
+| **Documentation** | Which docs have linked test cases | `source_refs` field in test case frontmatter matched against `docs/` |
+| **Acceptance Criteria** | Which criteria are covered | `criteria` field in test case frontmatter + `_criteria_index.yaml` |
+| **Automation** | Which test cases have automation code | `automated_by` field in test case frontmatter + code scanning |
 
 > **Spec 037 — boundary coverage from ISTQB techniques**: Test generation now
 > applies six ISTQB test design techniques systematically (EP, BVA, DT, ST, EG,
-> UC). Suites generated after spec 037 typically have 50%+ more tests in the
+> UC). Suites generated after spec 037 typically have 50%+ more test cases in the
 > `boundary` and `negative` categories than pre-037 suites on the same docs.
 > The analysis output exposes this via a `technique_breakdown` map alongside
 > the existing category `breakdown`.
@@ -88,21 +88,21 @@ spectra ai analyze --coverage --verbosity detailed
 
 ## Documentation Coverage
 
-Measures which documentation files have at least one test referencing them via `source_refs`.
+Measures which documentation files have at least one test case referencing them via `source_refs`.
 
-For each doc in `docs/`, SPECTRA checks if any test file has it in its `source_refs` frontmatter field.
+For each doc in `docs/`, SPECTRA checks if any test case file has it in its `source_refs` frontmatter field.
 
 ## Acceptance Criteria Coverage
 
-Measures which acceptance criteria are covered by tests.
+Measures which acceptance criteria are covered by test cases.
 
 ### With `_criteria_index.yaml`
 
-When a criteria index file exists, SPECTRA cross-references the defined criteria with `criteria` fields in test frontmatter. This reveals which criteria have no tests.
+When a criteria index file exists, SPECTRA cross-references the defined criteria with `criteria` fields in test case frontmatter. This reveals which criteria have no test cases.
 
 ### Without `_criteria_index.yaml`
 
-When no criteria file exists, SPECTRA discovers criteria from test frontmatter only and reports them as a flat list. `has_criteria_file` is `false`.
+When no criteria file exists, SPECTRA discovers criteria from test case frontmatter only and reports them as a flat list. `has_criteria_file` is `false`.
 
 ### Criteria File Format
 
@@ -128,17 +128,17 @@ The path to this file is configured via `coverage.criteria_file` in [spectra.con
 
 ## Automation Coverage
 
-Measures which tests have linked automation code (via `automated_by` field or code scanning).
+Measures which test cases have linked automation code (via `automated_by` field or code scanning).
 
 Reports include:
 - **By suite**: Per-suite automation percentages
-- **Unlinked tests**: Tests with no automation reference
-- **Orphaned automation**: Automation files referencing non-existent tests
+- **Unlinked test cases**: Test cases with no automation reference
+- **Orphaned automation**: Automation files referencing non-existent test cases
 - **Broken links**: `automated_by` paths pointing to missing files
 
 ## Auto-Link
 
-The `--auto-link` flag scans your automation code for test ID references and writes `automated_by` back into test YAML frontmatter:
+The `--auto-link` flag scans your automation code for test ID references and writes `automated_by` back into test case YAML frontmatter:
 
 ```bash
 spectra ai analyze --coverage --auto-link
@@ -148,7 +148,7 @@ spectra ai analyze --coverage --auto-link
 
 1. Scans files matching `file_extensions` in `automation_dirs`
 2. Matches test IDs using `scan_patterns` templates (e.g., `[TestCase("TC-001")]`)
-3. For each match, updates the test file's `automated_by` frontmatter field
+3. For each match, updates the test case file's `automated_by` frontmatter field
 
 ### Scan Patterns
 
@@ -193,19 +193,19 @@ The [dashboard](cli-reference.md#spectra-dashboard) Coverage tab provides four v
 
 ### Donut Chart
 
-A test health distribution chart at the top of the Coverage tab:
-- **Green** — Automated tests (have `automated_by`)
-- **Yellow** — Manual-only tests (have `source_refs` but no `automated_by`)
-- **Red** — Unlinked tests (neither `source_refs` nor `automated_by`)
-- Center label shows total test count; hover segments for tooltips
+A test case health distribution chart at the top of the Coverage tab:
+- **Green** — Automated test cases (have `automated_by`)
+- **Yellow** — Manual-only test cases (have `source_refs` but no `automated_by`)
+- **Red** — Unlinked test cases (neither `source_refs` nor `automated_by`)
+- Center label shows total test case count; hover segments for tooltips
 
 ### Progress Bars with Drill-Down
 
 Three stacked cards — one per coverage type — with:
 - Percentage and fill bar (green >= 80%, yellow >= 50%, red < 50%)
 - "Show details" toggle that expands a per-item breakdown list
-- Documentation: each doc file with test count and covered/uncovered icon
-- Acceptance Criteria: each criterion ID, title, linked test IDs
+- Documentation: each doc file with test case count and covered/uncovered icon
+- Acceptance Criteria: each criterion ID, title, linked test case IDs
 - Automation: per-suite breakdown (suite name, automated/total, percentage)
 
 ### Empty State Guidance
@@ -213,12 +213,12 @@ Three stacked cards — one per coverage type — with:
 When coverage data is missing or unconfigured, cards show actionable messages:
 - **Acceptance Criteria**: "No acceptance criteria tracked yet" with setup instructions
 - **Automation**: "No automation links detected" with `--auto-link` instructions
-- **Documentation**: "All documents have test coverage!" success message when at 100%
+- **Documentation**: "All documents have test case coverage!" success message when at 100%
 
 ### Treemap
 
-A block visualization below the progress bars showing suites sized by test count and colored by automation coverage:
+A block visualization below the progress bars showing suites sized by test case count and colored by automation coverage:
 - **Green** — >= 50% automated
 - **Yellow** — > 0% but < 50% automated
 - **Red** — 0% automated
-- Hover for suite details; click to navigate to suite test list
+- Hover for suite details; click to navigate to suite test case list

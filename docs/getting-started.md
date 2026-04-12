@@ -5,7 +5,7 @@ nav_order: 1
 
 # Getting Started
 
-Install SPECTRA, authenticate, and generate your first test suite.
+Install SPECTRA, authenticate, and generate your first test case suite.
 
 Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md)
 
@@ -55,7 +55,7 @@ my-project/
 ├── spectra.config.json                          # Configuration
 ├── docs/                                        # Put your documentation here
 │   └── _index.md                                # Document index (auto-built if docs exist)
-├── tests/                                       # Generated tests go here
+├── test-cases/                                  # Generated test cases go here
 ├── docs/criteria/
 │   └── _criteria_index.yaml                     # Acceptance criteria index
 ├── .github/
@@ -104,7 +104,7 @@ Edit `spectra.config.json` to point to your docs. See [Configuration Reference](
     "local_dir": "docs/"
   },
   "tests": {
-    "dir": "tests/"
+    "dir": "test-cases/"
   },
   "ai": {
     "providers": [
@@ -211,7 +211,7 @@ Override the default environment variable name in config:
 
 Open VS Code with Copilot Chat and say:
 - "Generate test cases for the checkout suite"
-- "How's our test coverage?"
+- "How's our test case coverage?"
 - "Validate all test cases"
 
 The bundled SKILLs handle CLI invocation automatically. See [Skills Integration](skills-integration.md).

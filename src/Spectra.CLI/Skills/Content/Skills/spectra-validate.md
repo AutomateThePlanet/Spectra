@@ -21,5 +21,5 @@ spectra validate --no-interaction --output-format json --verbosity quiet
 Parse the JSON result.
 
 **Your response**:
-- If `status` is "success": "All **{totalFiles}** tests are valid."
+- If `status` is "success": "All **{totalFiles}** test cases are valid."
 - If `status` is "failed": list each error from `errors` array with `file` and `message`. Suggest fixes.

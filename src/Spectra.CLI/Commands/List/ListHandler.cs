@@ -45,7 +45,7 @@ public sealed class ListHandler
                 });
             }
 
-            var testsDir = Path.Combine(basePath, config?.Tests?.Dir ?? "tests");
+            var testsDir = Path.Combine(basePath, config?.Tests?.Dir ?? "test-cases");
 
             if (!Directory.Exists(testsDir))
             {

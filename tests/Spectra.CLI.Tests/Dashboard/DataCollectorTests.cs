@@ -121,7 +121,7 @@ public class DataCollectorTests : IDisposable
     public async Task CollectAsync_WithMalformedIndex_SkipsIt()
     {
         // Create a malformed index file
-        var suitePath = Path.Combine(_testDir, "tests", "broken");
+        var suitePath = Path.Combine(_testDir, "test-cases", "broken");
         Directory.CreateDirectory(suitePath);
         await File.WriteAllTextAsync(Path.Combine(suitePath, "_index.json"), "{ invalid json }");
 
@@ -676,7 +676,7 @@ public class DataCollectorTests : IDisposable
 
     private async Task WriteIndexAsync(string suiteName, MetadataIndex index)
     {
-        var suitePath = Path.Combine(_testDir, "tests", suiteName);
+        var suitePath = Path.Combine(_testDir, "test-cases", suiteName);
         Directory.CreateDirectory(suitePath);
 
         var indexPath = Path.Combine(suitePath, "_index.json");

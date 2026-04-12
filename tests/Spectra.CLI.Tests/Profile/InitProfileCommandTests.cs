@@ -195,7 +195,7 @@ public sealed class InitProfileCommandTests : IDisposable
     public async Task Execute_WithSuite_CreatesSuiteProfile()
     {
         // Arrange
-        var suiteDir = Path.Combine(_testDir, "tests", "checkout");
+        var suiteDir = Path.Combine(_testDir, "test-cases", "checkout");
         Directory.CreateDirectory(suiteDir);
 
         var command = new InitProfileCommand();
@@ -203,7 +203,7 @@ public sealed class InitProfileCommandTests : IDisposable
         rootCommand.AddCommand(command);
 
         // Act
-        var exitCode = await rootCommand.InvokeAsync($"init-profile --non-interactive --suite tests/checkout --detail-level very_detailed");
+        var exitCode = await rootCommand.InvokeAsync($"init-profile --non-interactive --suite test-cases/checkout --detail-level very_detailed");
 
         // Assert
         Assert.Equal(0, exitCode);

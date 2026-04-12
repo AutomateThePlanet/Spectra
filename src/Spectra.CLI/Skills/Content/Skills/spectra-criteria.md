@@ -27,7 +27,7 @@ For full re-extraction (ignore cache), add `--force`.
 
 **Step 4** — readFile `.spectra-result.json`
 
-**Step 5** — Show: documents processed, criteria extracted, new/updated/unchanged counts. Suggest next steps: "Run coverage analysis?" or "Generate tests for uncovered criteria?"
+**Step 5** — Show: documents processed, criteria extracted, new/updated/unchanged counts. Suggest next steps: "Run coverage analysis?" or "Generate test cases for uncovered criteria?"
 
 ---
 
@@ -62,4 +62,4 @@ Filter options: `--source-type`, `--component`, `--priority`
 
 **Step 3** — readFile `.spectra-result.json`
 
-**Step 4** — Show criteria grouped by component with coverage status. Suggest: "Generate tests for uncovered criteria?"
+**Step 4** — Show criteria grouped by component with coverage status. Suggest: "Generate test cases for uncovered criteria?"

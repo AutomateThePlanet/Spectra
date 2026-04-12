@@ -33,7 +33,7 @@ public class PerformanceTests : IDisposable
 
         foreach (var suite in suites)
         {
-            var suiteDir = Path.Combine(_testDir, "tests", suite);
+            var suiteDir = Path.Combine(_testDir, "test-cases", suite);
             Directory.CreateDirectory(suiteDir);
 
             var indexEntries = new List<string>();

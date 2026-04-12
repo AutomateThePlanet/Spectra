@@ -49,7 +49,7 @@ public class ValidateCommandTests : IDisposable
         try
         {
             Directory.SetCurrentDirectory(_testDir);
-            Directory.CreateDirectory(Path.Combine(_testDir, "tests"));
+            Directory.CreateDirectory(Path.Combine(_testDir, "test-cases"));
 
             var command = CreateValidateCommand();
             var result = await command.InvokeAsync(["validate"]);
@@ -71,7 +71,7 @@ public class ValidateCommandTests : IDisposable
             Directory.SetCurrentDirectory(_testDir);
 
             // Create valid test file
-            var suitePath = Path.Combine(_testDir, "tests", "checkout");
+            var suitePath = Path.Combine(_testDir, "test-cases", "checkout");
             Directory.CreateDirectory(suitePath);
 
             var testContent =
@@ -110,7 +110,7 @@ Order is placed successfully";
             Directory.SetCurrentDirectory(_testDir);
 
             // Create invalid test file (missing required fields)
-            var suitePath = Path.Combine(_testDir, "tests", "checkout");
+            var suitePath = Path.Combine(_testDir, "test-cases", "checkout");
             Directory.CreateDirectory(suitePath);
 
             var testContent =
@@ -148,8 +148,8 @@ Something happens";
             Directory.SetCurrentDirectory(_testDir);
 
             // Create two suites
-            var suite1Path = Path.Combine(_testDir, "tests", "suite1");
-            var suite2Path = Path.Combine(_testDir, "tests", "suite2");
+            var suite1Path = Path.Combine(_testDir, "test-cases", "suite1");
+            var suite2Path = Path.Combine(_testDir, "test-cases", "suite2");
             Directory.CreateDirectory(suite1Path);
             Directory.CreateDirectory(suite2Path);
 
@@ -201,7 +201,7 @@ Result";
         try
         {
             Directory.SetCurrentDirectory(_testDir);
-            Directory.CreateDirectory(Path.Combine(_testDir, "tests"));
+            Directory.CreateDirectory(Path.Combine(_testDir, "test-cases"));
 
             var command = CreateValidateCommand();
             var result = await command.InvokeAsync(["validate", "--suite", "nonexistent"]);

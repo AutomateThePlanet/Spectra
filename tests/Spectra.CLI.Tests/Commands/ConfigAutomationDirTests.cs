@@ -111,7 +111,7 @@ public class ConfigAutomationDirTests : IDisposable
         var config = new
         {
             source = new { mode = "local", local_dir = "docs/" },
-            tests = new { dir = "tests/" },
+            tests = new { dir = "test-cases/" },
             ai = new { providers = Array.Empty<object>() },
             coverage = new { automation_dirs = new[] { "tests" } }
         };

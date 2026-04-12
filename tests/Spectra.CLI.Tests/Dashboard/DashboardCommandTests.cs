@@ -182,7 +182,7 @@ public class DashboardCommandTests : IDisposable
 
     private async Task CreateSuiteIndexAsync(string suiteName, int testCount)
     {
-        var suitePath = Path.Combine(_testDir, "tests", suiteName);
+        var suitePath = Path.Combine(_testDir, "test-cases", suiteName);
         Directory.CreateDirectory(suitePath);
 
         var index = new MetadataIndex

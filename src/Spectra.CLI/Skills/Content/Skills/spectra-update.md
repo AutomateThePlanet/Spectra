@@ -10,10 +10,10 @@ disable-model-invocation: true
 
 You help users update existing test cases when documentation or acceptance
 criteria have changed. The update command classifies each test as UP_TO_DATE,
-OUTDATED, ORPHANED, or REDUNDANT — then rewrites affected tests to match
+OUTDATED, ORPHANED, or REDUNDANT — then rewrites affected test cases to match
 the current documentation.
 
-## Update tests for a specific suite
+## Update test cases for a specific suite
 
 **Step 1** — Show the live progress page:
 ```
@@ -32,10 +32,10 @@ Replace `<suite>` with the suite name the user mentions (e.g., "checkout", "logi
 **Step 4** — readFile `.spectra-result.json`. **Never re-run the command** — if result shows status "completed", present the results and stop.
 
 From the JSON result, show:
-- Total tests analyzed
+- Total test cases analyzed
 - Classification breakdown: UP_TO_DATE, OUTDATED, ORPHANED, REDUNDANT counts
-- Tests updated (rewritten)
-- Tests flagged for manual review (if any)
+- Test cases updated (rewritten)
+- Test cases flagged for manual review (if any)
 
 **Step 5** — Suggest next steps based on results.
 
@@ -51,7 +51,7 @@ The `--diff` flag shows proposed changes without writing files. Present the diff
 
 ## Update all suites
 
-When the user says "update all tests" or "update everything":
+When the user says "update all test cases" or "update everything":
 
 First, list available suites:
 ```
@@ -65,10 +65,10 @@ Then update each suite sequentially, showing progress for each.
 ## Classification meanings
 
 When presenting results, explain classifications:
-- **UP_TO_DATE** — test matches current documentation, no changes needed
-- **OUTDATED** — documentation or linked acceptance criteria changed, test rewritten
-- **ORPHANED** — source documentation or criteria were removed, test flagged for review
-- **REDUNDANT** — test duplicates another test's coverage, flagged for review
+- **UP_TO_DATE** — test case matches current documentation, no changes needed
+- **OUTDATED** — documentation or linked acceptance criteria changed, test case rewritten
+- **ORPHANED** — source documentation or criteria were removed, test case flagged for review
+- **REDUNDANT** — test case duplicates another test case's coverage, flagged for review
 
 ---
 
@@ -76,19 +76,19 @@ When presenting results, explain classifications:
 
 After updating:
 - "Run coverage analysis?" → use spectra-coverage SKILL
-- "Validate the updated tests?" → use spectra-validate SKILL
-- "Generate additional tests for new coverage gaps?" → use spectra-generate SKILL
-- "View the updated tests?" → use spectra-list SKILL
+- "Validate the updated test cases?" → use spectra-validate SKILL
+- "Generate additional test cases for new coverage gaps?" → use spectra-generate SKILL
+- "View the updated test cases?" → use spectra-list SKILL
 
 ---
 
 ## Example user requests
 
-- "Update tests for the checkout suite"
-- "My docs changed, update the tests"
-- "Check if any tests are outdated"
-- "Preview what would change in the login tests"
+- "Update test cases for the checkout suite"
+- "My docs changed, update the test cases"
+- "Check if any test cases are outdated"
+- "Preview what would change in the login test cases"
 - "Update all test suites"
-- "Are there any orphaned tests?"
-- "Refresh tests after the API docs update"
-- "Show me outdated tests in payments"
+- "Are there any orphaned test cases?"
+- "Refresh test cases after the API docs update"
+- "Show me outdated test cases in payments"

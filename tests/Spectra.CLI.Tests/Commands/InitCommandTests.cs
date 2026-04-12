@@ -44,7 +44,7 @@ public class InitCommandTests : IDisposable
 
         // Verify directories
         Assert.True(Directory.Exists(Path.Combine(_testDir, "docs")), "docs/ should exist");
-        Assert.True(Directory.Exists(Path.Combine(_testDir, "tests")), "tests/ should exist");
+        Assert.True(Directory.Exists(Path.Combine(_testDir, "test-cases")), "test-cases/ should exist");
 
         // Verify skill file
         var skillPath = Path.Combine(_testDir, ".github", "skills", "test-generation", "SKILL.md");

@@ -172,7 +172,7 @@ public class IndexCommandTests : IDisposable
 
     private async Task<string> CreateTestSuiteAsync(string suiteName, params string[] testIds)
     {
-        var suitePath = Path.Combine(_testDir, "tests", suiteName);
+        var suitePath = Path.Combine(_testDir, "test-cases", suiteName);
         Directory.CreateDirectory(suitePath);
 
         foreach (var id in testIds)

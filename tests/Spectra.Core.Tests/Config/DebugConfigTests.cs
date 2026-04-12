@@ -84,7 +84,7 @@ public class DebugConfigTests
         const string json = """
             {
               "source": { "mode": "local", "local_dir": "docs/" },
-              "tests": { "dir": "tests/" },
+              "tests": { "dir": "test-cases/" },
               "ai": {
                 "providers": [
                   { "name": "github-models", "model": "gpt-4o", "enabled": true }

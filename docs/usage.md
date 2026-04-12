@@ -30,28 +30,28 @@ The most common workflow. Three levels of specificity:
 
 **With count and focus:**
 
-> "Generate 15 tests for checkout focusing on error handling"
+> "Generate 15 test cases for checkout focusing on error handling"
 
 **Analysis only (review before generating):**
 
-> "Analyze the checkout docs and tell me what tests you'd generate"
+> "Analyze the checkout docs and tell me what test cases you'd generate"
 
 ### What to expect
 
 1. A live progress page opens in a tab showing analysis status.
 2. Analysis phase: testable behaviors identified, existing coverage shown.
 3. You approve the count → generation begins.
-4. Tests are verified by the critic model and written in batches.
-5. Results show: tests created, verification verdicts, file paths.
+4. Test cases are verified by the critic model and written in batches.
+5. Results show: test cases created, verification verdicts, file paths.
 6. Optional: suggestions for additional coverage areas.
 
 ### Follow-up prompts
 
 After generating, you can continue:
 
-> "Generate the suggested tests"
+> "Generate the suggested test cases"
 > "Generate suggestions 1 and 3"
-> "Create a test for user session timeout after 30 minutes"
+> "Create a test case for user session timeout after 30 minutes"
 
 ---
 
@@ -70,7 +70,7 @@ After generating, you can continue:
 ### Follow-up prompts
 
 > "List the high priority criteria for checkout"
-> "Which MUST criteria don't have tests yet?"
+> "Which MUST criteria don't have test cases yet?"
 
 ---
 
@@ -86,15 +86,15 @@ Supported formats: CSV (with auto-detection of Jira/ADO column layouts), YAML, a
 ## Coverage Analysis
 
 > "Show me coverage gaps"
-> "Analyze coverage and link tests to automation code"
+> "Analyze coverage and link test cases to automation code"
 
 Three dimensions are reported:
 
-- **Documentation coverage** — docs ↔ tests linkage.
-- **Acceptance criteria coverage** — criteria ↔ tests linkage.
-- **Automation coverage** — tests ↔ code via the `automated_by` frontmatter field.
+- **Documentation coverage** — docs ↔ test cases linkage.
+- **Acceptance criteria coverage** — criteria ↔ test cases linkage.
+- **Automation coverage** — test cases ↔ code via the `automated_by` frontmatter field.
 
-The optional auto-link mode writes `automated_by` back into your test files when it can resolve a match.
+The optional auto-link mode writes `automated_by` back into your test case files when it can resolve a match.
 
 ---
 
@@ -107,20 +107,20 @@ Opens an interactive HTML dashboard with suite stats, coverage visualizations, a
 
 ---
 
-## Validating Tests
+## Validating Test Cases
 
-> "Validate my test files"
+> "Validate my test case files"
 > "Validate the checkout suite"
 
 Checks: required frontmatter fields, unique test IDs, valid priority enum values, valid tags, dependency resolution.
 
 ---
 
-## Updating Tests After Doc Changes
+## Updating Test Cases After Doc Changes
 
-> "Update tests for checkout — the payment docs changed"
+> "Update test cases for checkout — the payment docs changed"
 
-Classifies every test in the suite as **UP_TO_DATE**, **OUTDATED**, **ORPHANED**, or **REDUNDANT**. You approve which tests to rewrite and the assistant updates them in place with diffs you can review.
+Classifies every test case in the suite as **UP_TO_DATE**, **OUTDATED**, **ORPHANED**, or **REDUNDANT**. You approve which test cases to rewrite and the assistant updates them in place with diffs you can review.
 
 ---
 
@@ -189,9 +189,9 @@ Run a coverage analysis first, then re-generate the dashboard. The dashboard rea
 
 Index the documentation first, then extract criteria. The order matters because extraction reads the index.
 
-### Tests aren't linked to acceptance criteria
+### Test cases aren't linked to acceptance criteria
 
-Re-generate after extracting criteria. Generation auto-loads related criteria as prompt context and writes the linkage into the test frontmatter.
+Re-generate after extracting criteria. Generation auto-loads related criteria as prompt context and writes the linkage into the test case frontmatter.
 
 ---
 
@@ -202,10 +202,10 @@ For a brand-new project, the recommended sequence is:
 1. **Initialize SPECTRA** — `spectra init` (bootstraps config, SKILLs, agents, profiles).
 2. **Index the documentation** — builds the doc catalog.
 3. **Extract acceptance criteria** — pulls testable criteria out of the docs.
-4. **Generate tests** — for each suite, ask the assistant to generate and review.
-5. **Validate the tests** — catches frontmatter and ID issues.
+4. **Generate test cases** — for each suite, ask the assistant to generate and review.
+5. **Validate the test cases** — catches frontmatter and ID issues.
 6. **Show me coverage** — identifies gaps across docs, criteria, and automation.
 7. **Generate a dashboard** — visual report.
 8. **Execute a suite** — interactive run with PASS/FAIL/SKIP/BLOCKED reporting.
 
-Each step is independent and can be re-run as the underlying docs and tests evolve.
+Each step is independent and can be re-run as the underlying docs and test cases evolve.

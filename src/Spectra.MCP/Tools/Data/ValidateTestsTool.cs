@@ -46,12 +46,12 @@ public sealed class ValidateTestsTool : IMcpTool
             ? suiteEl.GetString()
             : null;
 
-        var testsDir = Path.Combine(_basePath, "tests");
+        var testsDir = Path.Combine(_basePath, "test-cases");
         if (!Directory.Exists(testsDir))
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "TESTS_DIR_NOT_FOUND",
-                "No tests/ directory found in repository root"));
+                "No test-cases/ directory found in repository root"));
         }
 
         var suites = GetSuitesToValidate(testsDir, suiteName);
@@ -59,7 +59,7 @@ public sealed class ValidateTestsTool : IMcpTool
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
                 "SUITE_NOT_FOUND",
-                $"Suite '{suiteName}' not found in tests/ directory"));
+                $"Suite '{suiteName}' not found in test-cases/ directory"));
         }
 
         var allErrors = new List<ValidationError>();

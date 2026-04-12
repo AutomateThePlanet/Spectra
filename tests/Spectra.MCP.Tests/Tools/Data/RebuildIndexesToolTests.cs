@@ -32,7 +32,7 @@ public class RebuildIndexesToolTests : IDisposable
     [Fact]
     public async Task Execute_SuiteNotFound_ReturnsError()
     {
-        Directory.CreateDirectory(Path.Combine(_testDir, "tests"));
+        Directory.CreateDirectory(Path.Combine(_testDir, "test-cases"));
 
         var tool = new RebuildIndexesTool(_testDir);
 
@@ -45,7 +45,7 @@ public class RebuildIndexesToolTests : IDisposable
     [Fact]
     public async Task Execute_CreatesIndexFile()
     {
-        var suiteDir = Path.Combine(_testDir, "tests", "auth");
+        var suiteDir = Path.Combine(_testDir, "test-cases", "auth");
         Directory.CreateDirectory(suiteDir);
 
         var testContent = """
@@ -85,7 +85,7 @@ public class RebuildIndexesToolTests : IDisposable
     [Fact]
     public async Task Execute_ReturnsCorrectAddedCount()
     {
-        var suiteDir = Path.Combine(_testDir, "tests", "auth");
+        var suiteDir = Path.Combine(_testDir, "test-cases", "auth");
         Directory.CreateDirectory(suiteDir);
 
         var testContent = """
@@ -119,8 +119,8 @@ public class RebuildIndexesToolTests : IDisposable
     [Fact]
     public async Task Execute_RebuildsAllSuites_WhenNoSuiteSpecified()
     {
-        var auth = Path.Combine(_testDir, "tests", "auth");
-        var checkout = Path.Combine(_testDir, "tests", "checkout");
+        var auth = Path.Combine(_testDir, "test-cases", "auth");
+        var checkout = Path.Combine(_testDir, "test-cases", "checkout");
         Directory.CreateDirectory(auth);
         Directory.CreateDirectory(checkout);
 
@@ -156,7 +156,7 @@ public class RebuildIndexesToolTests : IDisposable
     [Fact]
     public async Task Execute_ReturnsIndexPaths()
     {
-        var suiteDir = Path.Combine(_testDir, "tests", "auth");
+        var suiteDir = Path.Combine(_testDir, "test-cases", "auth");
         Directory.CreateDirectory(suiteDir);
 
         var testContent = """

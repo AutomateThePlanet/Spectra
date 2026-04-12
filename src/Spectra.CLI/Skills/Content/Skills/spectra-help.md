@@ -16,21 +16,21 @@ When the user asks for help, what they can do, or what commands are available, r
 
 | What you want | What to type |
 |--------------|-------------|
-| Generate tests for a suite | "generate test cases for payments" |
+| Generate test cases for a suite | "generate test cases for payments" |
 | Generate for a new suite | "generate test cases for search" |
-| Generate more tests | "generate more tests for authentication" |
+| Generate more test cases | "generate more test cases for authentication" |
 | Generate specific count | "generate 50 test cases for gdpr-compliance" |
-| Generate focused tests | "generate negative tests for payments" |
-| Generate edge case tests | "generate edge case tests for citizen-registration" |
-| Generate security tests | "generate security tests for authentication" |
+| Generate focused test cases | "generate negative test cases for payments" |
+| Generate edge case test cases | "generate edge case test cases for citizen-registration" |
+| Generate security test cases | "generate security test cases for authentication" |
 
 ## Test Execution (SPECTRA Execution agent)
 
 | What you want | What to type |
 |--------------|-------------|
-| Run a test suite | "run tests for notification" |
-| Run high priority tests | "run high priority tests" |
-| Run smoke tests | "run the smoke tests" |
+| Run a test suite | "run test cases for notification" |
+| Run high priority test cases | "run high priority test cases" |
+| Run smoke test cases | "run the smoke test cases" |
 | Resume a paused run | "resume the last run" |
 | Check active runs | "what runs are active?" |
 | Cancel all runs | "cancel all runs" |
@@ -42,7 +42,7 @@ When the user asks for help, what they can do, or what commands are available, r
 | What you want | What to type |
 |--------------|-------------|
 | Full coverage report | "show test coverage" |
-| Find uncovered areas | "what areas don't have tests?" |
+| Find uncovered areas | "what areas don't have test cases?" |
 | Check specific area | "show coverage for payments" |
 | Find untested acceptance criteria | "which acceptance criteria aren't tested?" |
 
@@ -73,23 +73,23 @@ When the user asks for help, what they can do, or what commands are available, r
 
 | What you want | What to type |
 |--------------|-------------|
-| Validate all tests | "validate all test cases" |
+| Validate all test cases | "validate all test cases" |
 | Check for errors | "are there any test case errors?" |
 
-## List & Browse Tests
+## List & Browse Test Cases
 
 | What you want | What to type |
 |--------------|-------------|
 | List all suites | "list all test suites" |
-| Show a test | "show me TC-100" |
-| Find tests by topic | "what tests do we have for payments?" |
+| Show a test case | "show me TC-100" |
+| Find test cases by topic | "what test cases do we have for payments?" |
 
 ## Test Updates
 
 | What you want | What to type |
 |--------------|-------------|
-| Update tests after doc changes | "update tests for notification" |
-| Preview changes | "show diff for notification tests" |
+| Update test cases after doc changes | "update test cases for notification" |
+| Preview changes | "show diff for notification test cases" |
 
 ## ISTQB Test Design Techniques
 

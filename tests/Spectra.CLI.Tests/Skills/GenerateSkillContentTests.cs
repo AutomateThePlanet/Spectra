@@ -75,7 +75,7 @@ public class GenerateSkillContentTests
     {
         var content = AgentContentText;
         Assert.Contains("--focus", content);
-        Assert.Contains("Generate tests for", content);
+        Assert.Contains("Generate test cases for", content);
     }
 
     [Fact]

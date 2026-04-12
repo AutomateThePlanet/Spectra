@@ -48,11 +48,11 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 | `include_patterns` | string[] | `["**/*.md"]` | Glob patterns for files to include |
 | `exclude_patterns` | string[] | `["**/CHANGELOG.md"]` | Glob patterns for files to exclude |
 
-## `tests` — Test Output
+## `tests` — Test Case Output
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `dir` | string | `"tests/"` | Test output directory |
+| `dir` | string | `"test-cases/"` | Test case output directory |
 | `id_prefix` | string | `"TC"` | Prefix for test IDs |
 | `id_start` | int | `100` | Starting number for first generated ID |
 
@@ -131,7 +131,7 @@ budget is too small.
 > **Spec 040 note:** the former `ai.debug_log_enabled` setting has moved to a
 > new top-level [`debug`](#debug) section and defaults to **off**. See below.
 
-**Critic timeout**: `ai.critic.timeout_seconds` (default 120, was 30 prior to v1.43.0) controls the per-test verification timeout. Pre-v1.43.0 the runtime ignored the config and used a hardcoded 2 minutes. v1.43.0 honors the field; the default was bumped to 120 to preserve existing behavior. Slow critic models (Claude Sonnet, GPT-4 Turbo) on long tests may need 180–300 seconds.
+**Critic timeout**: `ai.critic.timeout_seconds` (default 120, was 30 prior to v1.43.0) controls the per-test-case verification timeout. Pre-v1.43.0 the runtime ignored the config and used a hardcoded 2 minutes. v1.43.0 honors the field; the default was bumped to 120 to preserve existing behavior. Slow critic models (Claude Sonnet, GPT-4 Turbo) on long test cases may need 180–300 seconds.
 
 **Why a separate analysis timeout?** Behavior analysis runs once before generation and tends to be a single big call (no tool-calling loop). With slow / reasoning models on multi-doc suites it often takes 3–7 minutes — well over the 2-minute default — and fails silently. The symptom is `behaviors_found: 0` with a `recommended` count that looks plausible but is actually a hardcoded fallback default. v1.42.0+ surfaces this clearly: when analysis fails, the result file's `status` is set to `"analysis_failed"` (not `"analyzed"`) and the `message` field explains the cause and remediation. The bundled `spectra-generate` SKILL recognizes the new status and stops the agent from confidently presenting fallback numbers as a real recommendation.
 
@@ -156,7 +156,7 @@ lines to `.spectra-debug.log`. Example session:
 **Component prefixes** (v1.43.0+):
 - `[analyze ]` — behavior analysis (one START + OK/TIMEOUT/PARSE_FAIL/EMPTY/ERROR per run)
 - `[generate]` — test generation (one BATCH START + BATCH OK/TIMEOUT per batch, plus TESTIMIZE lifecycle lines)
-- `[critic ]` — grounding verification (one CRITIC START + OK/TIMEOUT/ERROR per test verified)
+- `[critic ]` — grounding verification (one CRITIC START + OK/TIMEOUT/ERROR per test case verified)
 
 **Testimize lifecycle lines** (always emitted, even when disabled, so you can verify what actually ran):
 
@@ -173,7 +173,7 @@ lines to `.spectra-debug.log`. Example session:
 provider. To estimate cost for a run, count the lines:
 - `ANALYSIS START` lines × analyzer model input cost
 - `BATCH START` lines × generator model input cost
-- `CRITIC START` lines × critic model input cost (typically dominant — one per generated test)
+- `CRITIC START` lines × critic model input cost (typically dominant — one per generated test case)
 - `TESTIMIZE *` lines have zero AI cost (local MCP child process, not an API call)
 
 Lines starting with `BATCH START` mark the beginning of an AI call (model,
@@ -259,7 +259,7 @@ Grounding verification configuration. See [Grounding Verification](grounding-ver
 #### Critic concurrency tuning (Spec 043)
 
 The critic phase is typically the dominant cost on large generate runs (one
-sequential API call per test). Setting `max_concurrent` higher parallelizes
+sequential API call per test case). Setting `max_concurrent` higher parallelizes
 those calls without changing any output. Test files, verdicts, and indexes
 are written in the original input order regardless of completion order.
 
@@ -309,14 +309,14 @@ and re-run.
 }
 ```
 
-## `generation` — Test Generation Settings
+## `generation` — Test Case Generation Settings
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `default_count` | int | `15` | Default number of tests to generate |
+| `default_count` | int | `15` | Default number of test cases to generate |
 | `require_review` | bool | `true` | Require interactive review before writing |
 | `duplicate_threshold` | double | `0.6` | Similarity threshold for duplicate detection |
-| `categories` | string[] | `["happy_path", "negative", "boundary", "integration"]` | Test categories to generate |
+| `categories` | string[] | `["happy_path", "negative", "boundary", "integration"]` | Test case categories to generate |
 
 ## `analysis` — Behavior Analysis Categories
 
@@ -348,11 +348,11 @@ Default categories:
 }
 ```
 
-## `update` — Test Update Settings
+## `update` — Test Case Update Settings
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `chunk_size` | int | `30` | Number of tests to process per AI call |
+| `chunk_size` | int | `30` | Number of test cases to process per AI call |
 | `require_review` | bool | `true` | Require interactive review before applying |
 
 ## `suites` — Per-Suite Configuration
@@ -372,10 +372,10 @@ Default categories:
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `component` | string | — | Default component for tests in this suite |
+| `component` | string | — | Default component for test cases in this suite |
 | `relevant_docs` | string[] | `[]` | Documentation files relevant to this suite |
-| `default_tags` | string[] | `[]` | Default tags for generated tests |
-| `default_priority` | string | `"medium"` | Default priority for generated tests |
+| `default_tags` | string[] | `[]` | Default tags for generated test cases |
+| `default_priority` | string | `"medium"` | Default priority for generated test cases |
 
 ## `coverage` — Coverage Analysis
 
@@ -412,7 +412,7 @@ See [Coverage](coverage.md) for how these settings are used.
 | `attribute_patterns` | string[] | (framework defaults) | Regex patterns for test attributes (legacy, use `scan_patterns` instead) |
 | `test_id_pattern` | string | `"TC-\\d{3,}"` | Regex for matching test IDs |
 | `requirements_file` | string | `"docs/requirements/_requirements.yaml"` | Path to requirements YAML index for requirements coverage analysis |
-| `report_orphans` | bool | `true` | Report automation files not linked to any test |
+| `report_orphans` | bool | `true` | Report automation files not linked to any test case |
 | `report_broken_links` | bool | `true` | Report tests referencing non-existent files |
 | `report_mismatches` | bool | `true` | Report inconsistencies between index and files |
 | `criteria_import.default_source_type` | string | `"manual"` | Default source type for imported acceptance criteria |
@@ -422,13 +422,13 @@ See [Coverage](coverage.md) for how these settings are used.
 
 ## `selections` — Saved Test Selections
 
-Named test selections for quick execution. Each selection defines filters that are evaluated across all suites at runtime.
+Named test case selections for quick execution. Each selection defines filters that are evaluated across all suites at runtime.
 
 ```json
 {
   "selections": {
     "smoke": {
-      "description": "Quick smoke test — high priority tests only",
+      "description": "Quick smoke test — high priority test cases only",
       "priorities": ["high"]
     },
     "regression": {
@@ -450,11 +450,11 @@ Named test selections for quick execution. Each selection defines filters that a
 | `tags` | string[] | Filter by tags (OR within array) |
 | `priorities` | string[] | Filter by priority (OR within array) |
 | `components` | string[] | Filter by component (OR within array) |
-| `has_automation` | bool | `true` = only automated tests, `false` = only manual tests |
+| `has_automation` | bool | `true` = only automated test cases, `false` = only manual test cases |
 
-Filters are combined with AND logic between types. Use the `list_saved_selections` MCP tool to preview how many tests each selection matches, or start a run with `start_execution_run` using the `selection` parameter.
+Filters are combined with AND logic between types. Use the `list_saved_selections` MCP tool to preview how many test cases each selection matches, or start a run with `start_execution_run` using the `selection` parameter.
 
-The default configuration includes a `smoke` selection that matches all high-priority tests.
+The default configuration includes a `smoke` selection that matches all high-priority test cases.
 
 ---
 
@@ -471,9 +471,9 @@ When configured, the execution agent uses the specified Copilot Space to answer 
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `required_fields` | string[] | `["id", "priority"]` | Fields required in test frontmatter |
+| `required_fields` | string[] | `["id", "priority"]` | Fields required in test case frontmatter |
 | `allowed_priorities` | string[] | `["high", "medium", "low"]` | Valid priority values |
-| `max_steps` | int | `20` | Maximum test steps allowed |
+| `max_steps` | int | `20` | Maximum test case steps allowed |
 | `id_pattern` | string | `"^TC-\\d{3,}$"` | Regex pattern for valid test IDs |
 
 ## `git` — Git Operations
@@ -482,7 +482,7 @@ When configured, the execution agent uses the specified Copilot Space to answer 
 |----------|------|---------|-------------|
 | `auto_branch` | bool | `true` | Create feature branches for generated tests |
 | `branch_prefix` | string | `"spectra/"` | Branch name prefix |
-| `auto_commit` | bool | `true` | Automatically commit generated tests |
+| `auto_commit` | bool | `true` | Automatically commit generated test cases |
 | `auto_pr` | bool | `false` | Automatically create pull requests |
 
 ## `dashboard` — Dashboard Generation

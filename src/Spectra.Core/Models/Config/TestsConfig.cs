@@ -8,7 +8,7 @@ namespace Spectra.Core.Models.Config;
 public sealed class TestsConfig
 {
     [JsonPropertyName("dir")]
-    public string Dir { get; init; } = "tests/";
+    public string Dir { get; init; } = "test-cases/";
 
     [JsonPropertyName("id_prefix")]
     public string IdPrefix { get; init; } = "TC";

@@ -60,7 +60,7 @@ public sealed class ProfileLoaderTests : IDisposable
     public async Task LoadAsync_WithSuiteProfile_OverridesRepository()
     {
         // Arrange
-        var suiteDir = Path.Combine(_testDir, "tests", "checkout");
+        var suiteDir = Path.Combine(_testDir, "test-cases", "checkout");
         Directory.CreateDirectory(suiteDir);
 
         var repoProfilePath = Path.Combine(_testDir, ProfileDefaults.RepositoryProfileFileName);
@@ -96,7 +96,7 @@ public sealed class ProfileLoaderTests : IDisposable
     public async Task LoadAsync_OnlySuiteProfile_UsesDefaults()
     {
         // Arrange
-        var suiteDir = Path.Combine(_testDir, "tests", "checkout");
+        var suiteDir = Path.Combine(_testDir, "test-cases", "checkout");
         Directory.CreateDirectory(suiteDir);
 
         var suiteProfilePath = Path.Combine(suiteDir, ProfileDefaults.SuiteProfileFileName);
@@ -202,7 +202,7 @@ public sealed class ProfileLoaderTests : IDisposable
     public async Task LoadAsync_InheritanceChain_TracksAllSources()
     {
         // Arrange
-        var suiteDir = Path.Combine(_testDir, "tests", "checkout");
+        var suiteDir = Path.Combine(_testDir, "test-cases", "checkout");
         Directory.CreateDirectory(suiteDir);
 
         var repoProfilePath = Path.Combine(_testDir, ProfileDefaults.RepositoryProfileFileName);
@@ -279,7 +279,7 @@ public sealed class ProfileLoaderTests : IDisposable
         var config = new Core.Models.Config.ProfileConfig { SuiteFile = "custom.suite.md" };
         var loader = new ProfileLoader(config);
 
-        var suiteDir = Path.Combine(_testDir, "tests", "checkout");
+        var suiteDir = Path.Combine(_testDir, "test-cases", "checkout");
         Directory.CreateDirectory(suiteDir);
 
         var customSuiteProfilePath = Path.Combine(suiteDir, "custom.suite.md");

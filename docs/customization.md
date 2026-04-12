@@ -6,7 +6,7 @@ nav_order: 10
 
 # SPECTRA Customization Guide
 
-This guide covers every way you can customize SPECTRA's behavior, from test
+This guide covers every way you can customize SPECTRA's behavior, from test case
 output format to AI reasoning strategy.
 
 > **Looking for workflow how-tos instead of customization?** See [`USAGE.md`](USAGE.md) — the workflow guide for using SPECTRA from VS Code Copilot Chat.
@@ -31,7 +31,7 @@ output format to AI reasoning strategy.
 ## 1. Test Case Format — `profiles/_default.yaml`
 
 **What it controls**: The JSON schema the AI must follow when producing test
-cases. This determines what fields appear in YAML frontmatter and how
+cases. This determines what fields appear in YAML frontmatter and how test case
 steps/expected results are structured.
 
 **File**: `profiles/_default.yaml`
@@ -40,7 +40,7 @@ steps/expected results are structured.
 
 1. Open `profiles/_default.yaml`.
 2. Edit the `format` field — this is the JSON template the AI receives.
-3. Re-run `spectra ai generate` — new tests follow the new schema.
+3. Re-run `spectra ai generate` — new test cases follow the new schema.
 
 **Common modifications**:
 
@@ -79,7 +79,7 @@ default — generation never crashes due to a profile error.
 
 ## 2. AI Reasoning — Root Prompt Templates
 
-**What it controls**: How the AI thinks — analysis strategy, test writing
+**What it controls**: How the AI thinks — analysis strategy, test case writing
 approach, verification rigor, criteria extraction depth.
 
 **Files**: `.spectra/prompts/*.md`
@@ -89,8 +89,8 @@ approach, verification rigor, criteria extraction depth.
 | `behavior-analysis.md` | How docs are read, what counts as "testable" | `spectra ai generate` (analysis phase) |
 | `test-generation.md` | How test cases are written from analyzed behaviors | `spectra ai generate` (generation phase) |
 | `criteria-extraction.md` | How acceptance criteria are pulled from docs | `spectra ai analyze --extract-criteria` |
-| `critic-verification.md` | How generated tests are verified against sources | Grounding verification |
-| `test-update.md` | How existing tests are classified and rewritten | `spectra ai update` |
+| `critic-verification.md` | How generated test cases are verified against sources | Grounding verification |
+| `test-update.md` | How existing test cases are classified and rewritten | `spectra ai update` |
 
 **How to customize**: Edit any `.md` file directly. The prompt body uses
 `{{placeholders}}` for dynamic content injected at runtime. Available
@@ -118,7 +118,7 @@ the latest version. Modified templates are preserved. Use
 ## 3. Behavior Categories
 
 **What it controls**: The classification taxonomy for analyzed behaviors.
-Categories appear in test frontmatter as tags and drive coverage distribution.
+Categories appear in test case frontmatter as tags and drive coverage distribution.
 
 **File**: `spectra.config.json` → `analysis.categories`
 
@@ -215,7 +215,7 @@ match, and where acceptance criteria live.
 
 ## 5. AI Provider & Model
 
-**What it controls**: Which AI model generates tests and verifies them.
+**What it controls**: Which AI model generates test cases and verifies them.
 
 **File**: `spectra.config.json` → `ai`
 
@@ -324,16 +324,16 @@ All user files are created by `spectra init` and tracked by
 
 ## Common Workflows
 
-### "I want better test quality for my domain"
+### "I want better test case quality for my domain"
 
 1. Edit `.spectra/prompts/behavior-analysis.md` — add domain-specific focus.
 2. Add domain categories to `spectra.config.json` → `analysis.categories`.
 3. Run `spectra ai generate --suite {name} --count 5` and evaluate.
 
-### "I want to change the test output format"
+### "I want to change the test case output format"
 
 1. Edit `profiles/_default.yaml` → `format` field directly.
-2. Re-run generation. New tests follow the new schema.
+2. Re-run generation. New test cases follow the new schema.
 
 ### "I want stricter verification"
 

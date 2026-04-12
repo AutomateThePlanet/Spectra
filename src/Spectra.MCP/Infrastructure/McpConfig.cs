@@ -19,9 +19,9 @@ public sealed class McpConfig
 
     /// <summary>
     /// Path to test suite directories.
-    /// Defaults to "tests" subdirectory.
+    /// Defaults to "test-cases" subdirectory.
     /// </summary>
-    public string TestsPath { get; set; } = "tests";
+    public string TestsPath { get; set; } = "test-cases";
 
     /// <summary>
     /// Path for generated reports.

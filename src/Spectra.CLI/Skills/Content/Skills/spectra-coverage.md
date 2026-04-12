@@ -29,6 +29,6 @@ spectra ai analyze --coverage --auto-link --no-interaction --output-format json 
 **Step 5** — Show the three coverage sections from the result:
 - **Documentation coverage**: X% (N/M documents) — list uncovered docs
 - **Acceptance criteria coverage**: X% (N/M criteria) — list untested acceptance criteria
-- **Automation coverage**: X% (N/M tests) — list unlinked tests
+- **Automation coverage**: X% (N/M test cases) — list unlinked test cases
 
-If the user asks to improve coverage, suggest generating tests for uncovered areas.
+If the user asks to improve coverage, suggest generating test cases for uncovered areas.

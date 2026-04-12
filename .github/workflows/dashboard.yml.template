@@ -21,7 +21,7 @@ on:
       - main
     paths:
       # Trigger on test file changes
-      - 'tests/**'
+      - 'test-cases/**'
       # Trigger on execution report changes
       - 'reports/**'
       # Trigger on index changes

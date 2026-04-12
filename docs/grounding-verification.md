@@ -14,14 +14,14 @@ Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md) |
 
 ## Overview
 
-When AI generates test cases, it can hallucinate — invent steps, expected results, or behaviors that don't exist in your documentation. SPECTRA's grounding verification uses a second AI model (the "critic") to verify each test against the source documentation.
+When AI generates test cases, it can hallucinate — invent steps, expected results, or behaviors that don't exist in your documentation. SPECTRA's grounding verification uses a second AI model (the "critic") to verify each test case against the source documentation.
 
 ## How It Works
 
 1. **Generator** creates draft test cases from your documentation
-2. **Critic** (different model) verifies each test against the same docs
-3. Tests receive a verdict: `grounded`, `partial`, or `hallucinated`
-4. Only grounded and partial tests are written to disk
+2. **Critic** (different model) verifies each test case against the same docs
+3. Test cases receive a verdict: `grounded`, `partial`, or `hallucinated`
+4. Only grounded and partial test cases are written to disk
 
 ## Verdicts
 
@@ -33,7 +33,7 @@ When AI generates test cases, it can hallucinate — invent steps, expected resu
 
 ## Grounding Metadata
 
-Verified tests include grounding metadata in their frontmatter:
+Verified test cases include grounding metadata in their frontmatter:
 
 ```yaml
 grounding:
@@ -61,21 +61,21 @@ grounding:
 After generation, SPECTRA displays verification results:
 
 ```
-Generating tests...
-✓ Generated 10 tests
+Generating test cases...
+✓ Generated 10 test cases
 
   ✓ 7 grounded
   ⚠ 2 partial — written with grounding warnings
   ✗ 1 hallucinated — rejected
 
-✓ 9 tests written to tests/checkout/
+✓ 9 test cases written to test-cases/checkout/
 ✓ Index updated
 
-ℹ Partial tests (review recommended):
+ℹ Partial test cases (review recommended):
    TC-209  Assumes refund email is sent within 5 minutes — not confirmed in docs
    TC-212  Navigation path to currency settings not documented
 
-ℹ Rejected tests:
+ℹ Rejected test cases:
    TC-220  References "fraud detection API" — not mentioned in any documentation
 ```
 

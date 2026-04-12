@@ -283,7 +283,7 @@ public class CoverageDataTests : IDisposable
             Tests = tests.ToList()
         };
 
-        var suitePath = Path.Combine(_testDir, "tests", suiteName);
+        var suitePath = Path.Combine(_testDir, "test-cases", suiteName);
         Directory.CreateDirectory(suitePath);
 
         var indexPath = Path.Combine(suitePath, "_index.json");

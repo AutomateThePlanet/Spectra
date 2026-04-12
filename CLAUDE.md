@@ -9,7 +9,7 @@ Auto-generated from all feature plans. Last updated: 2026-04-12
 - System.CommandLine (CLI), Spectre.Console (terminal UX), System.Text.Json (serialization)
 - ASP.NET Core (MCP server), Microsoft.Data.Sqlite (state storage)
 - SQLite database (`.execution/spectra.db`) for execution state; file system for reports
-- File-based (tests/, docs/, spectra.config.json, _index.json, _index.md, profiles, .spectra/prompts/)
+- File-based (test-cases/, docs/, spectra.config.json, _index.json, _index.md, profiles, .spectra/prompts/)
 - CsvHelper (CSV import for acceptance criteria)
 - Dual-model verification: Generator (any provider) + Critic (any provider) via Copilot SDK
 - Document index (`docs/_index.md`) for pre-built documentation metadata with incremental updates
@@ -282,3 +282,6 @@ Report features:
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
+
+## Recent Changes
+- 043-terminology-folder-landing: Added C# 12, .NET 8+ + System.CommandLine, Spectre.Console, System.Text.Json

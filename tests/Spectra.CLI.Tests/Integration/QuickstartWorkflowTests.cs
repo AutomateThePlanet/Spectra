@@ -46,7 +46,7 @@ public class QuickstartWorkflowTests : IDisposable
         Assert.Equal(0, result);
         Assert.True(File.Exists(Path.Combine(_testDir, "spectra.config.json")));
         Assert.True(Directory.Exists(Path.Combine(_testDir, "docs")));
-        Assert.True(Directory.Exists(Path.Combine(_testDir, "tests")));
+        Assert.True(Directory.Exists(Path.Combine(_testDir, "test-cases")));
     }
 
     [Fact]
@@ -78,7 +78,7 @@ public class QuickstartWorkflowTests : IDisposable
             "# Checkout\n\nUsers can checkout and pay for items.");
 
         // Create a test suite with test
-        var suiteDir = Path.Combine(_testDir, "tests", "checkout");
+        var suiteDir = Path.Combine(_testDir, "test-cases", "checkout");
         Directory.CreateDirectory(suiteDir);
 
         var testContent = @"---
@@ -110,7 +110,7 @@ Order is placed successfully";
         await command.InvokeAsync(["init"]);
 
         // Create a test
-        var suiteDir = Path.Combine(_testDir, "tests", "checkout");
+        var suiteDir = Path.Combine(_testDir, "test-cases", "checkout");
         Directory.CreateDirectory(suiteDir);
 
         var testContent = @"---
@@ -142,7 +142,7 @@ Result";
         var command = CreateRootCommand();
         await command.InvokeAsync(["init"]);
 
-        var suiteDir = Path.Combine(_testDir, "tests", "checkout");
+        var suiteDir = Path.Combine(_testDir, "test-cases", "checkout");
         Directory.CreateDirectory(suiteDir);
 
         var testContent = @"---
@@ -174,7 +174,7 @@ Result";
         var command = CreateRootCommand();
         await command.InvokeAsync(["init"]);
 
-        var suiteDir = Path.Combine(_testDir, "tests", "checkout");
+        var suiteDir = Path.Combine(_testDir, "test-cases", "checkout");
         Directory.CreateDirectory(suiteDir);
 
         var testContent = @"---
@@ -232,7 +232,7 @@ Result";
         var config = new
         {
             source = new { local_dir = "docs/", include_patterns = new[] { "**/*.md" } },
-            tests = new { dir = "tests/" },
+            tests = new { dir = "test-cases/" },
             ai = new { providers = new[] { new { name = "test", model = "test", enabled = true, priority = 1 } } }
         };
         await File.WriteAllTextAsync(configPath, JsonSerializer.Serialize(config));
@@ -244,7 +244,7 @@ Result";
             "# Feature\n\nFeature description.");
 
         // Create suite with test
-        var suiteDir = Path.Combine(_testDir, "tests", "checkout");
+        var suiteDir = Path.Combine(_testDir, "test-cases", "checkout");
         Directory.CreateDirectory(suiteDir);
 
         var testContent = @"---
@@ -298,7 +298,7 @@ Success";
             "# Authentication\n\nUsers can log in with email and password.");
 
         // Step 3: Create test
-        var suiteDir = Path.Combine(_testDir, "tests", "auth");
+        var suiteDir = Path.Combine(_testDir, "test-cases", "auth");
         Directory.CreateDirectory(suiteDir);
         await File.WriteAllTextAsync(
             Path.Combine(suiteDir, "TC-001.md"),

@@ -30,15 +30,15 @@ Present this overview, then ask which workflow they'd like to try.
 
 **SPECTRA Workflows — What You Can Say:**
 
-1. **Generate test cases** — "Generate 10 tests for the checkout docs"
+1. **Generate test cases** — "Generate 10 test cases for the checkout docs"
 2. **Extract acceptance criteria** — "Extract acceptance criteria from my documentation"
 3. **Import criteria from external tools** — "Import acceptance criteria from jira-export.csv"
 4. **Check coverage** — "Show me coverage gaps across all suites"
 5. **Generate a coverage dashboard** — "Generate a coverage dashboard"
-6. **Validate tests** — "Validate my test files"
-7. **Browse tests** — "List all test suites" or "Show me TC-101"
-8. **Update tests after doc changes** — "Update tests for the checkout suite"
-9. **Execute tests** — "Run the smoke test selection"
+6. **Validate test cases** — "Validate my test case files"
+7. **Browse test cases** — "List all test suites" or "Show me TC-101"
+8. **Update test cases after doc changes** — "Update test cases for the checkout suite"
+9. **Execute test cases** — "Run the smoke test selection"
 10. **Create a generation profile** — "Create a test generation profile for my API team"
 11. **Index documentation** — "Index all documentation"
 12. **Customize prompts and settings** — "How do I customize test generation quality?"
@@ -57,33 +57,33 @@ This is the most common workflow. It runs as multi-phase analyze → approve →
 
 Or more specific:
 
-> "Generate 15 tests for checkout focusing on payment validation and error handling"
+> "Generate 15 test cases for checkout focusing on payment validation and error handling"
 
 **What happens behind the scenes:**
 
 - **Phase 1 — Analysis (automatic)**: SPECTRA reads the documentation, identifies testable behaviors, and shows a breakdown before generating anything. A progress page opens in a tab so the user can watch live status.
-- **Phase 2 — Generation (after approval)**: Tests are generated in batches (default batch size 30) and each test is verified by the critic model for grounding accuracy.
+- **Phase 2 — Generation (after approval)**: Test cases are generated in batches (default batch size 30) and each test case is verified by the critic model for grounding accuracy.
 - **Phase 3 — Review (optional)**: After generation, the system suggests additional test areas. The user can pick suggestions or describe new ones.
 
 **Example conversation:**
 
 ```
-User: Generate 10 tests for checkout focusing on payment validation
+User: Generate 10 test cases for checkout focusing on payment validation
 Bot:  [opens .spectra-progress.html, runs analysis]
 Bot:  Found 23 testable behaviors in checkout docs.
-      8 already covered. Recommending 15 new tests.
+      8 already covered. Recommending 15 new test cases.
       Want me to generate 10 as requested?
 User: Yes, go ahead
 Bot:  [generates, shows results]
-Bot:  Created 10 tests (9 grounded, 1 partial).
-      Files: tests/checkout/TC-201.md through TC-210.md
+Bot:  Created 10 test cases (9 grounded, 1 partial).
+      Files: test-cases/checkout/TC-201.md through TC-210.md
       Suggestions: 3 additional areas identified.
 User: Show me the suggestions
 Bot:  1. Concurrent checkout sessions (edge case)
       2. Payment timeout after 30s (error handling)
       3. Currency conversion rounding (boundary)
 User: Generate suggestion 2
-Bot:  [generates single test for payment timeout]
+Bot:  [generates single test case for payment timeout]
 ```
 
 ---
@@ -167,15 +167,15 @@ Bot:  checkout: 15 criteria
 
 Or with auto-linking:
 
-> "Analyze coverage and link tests to automation code"
+> "Analyze coverage and link test cases to automation code"
 
 **What happens:**
 
 Three coverage dimensions are reported:
 
-1. **Documentation coverage** — which docs have linked tests.
+1. **Documentation coverage** — which docs have linked test cases.
 2. **Acceptance criteria coverage** — which criteria are tested.
-3. **Automation coverage** — which tests link to automation code via `automated_by`.
+3. **Automation coverage** — which test cases link to automation code via `automated_by`.
 
 **Example conversation:**
 
@@ -183,11 +183,11 @@ Three coverage dimensions are reported:
 User: Show me coverage gaps
 Bot:  Coverage Report:
       Documentation: 78% (7/9 docs covered)
-        ! docs/notifications.md — no linked tests
-        ! docs/audit-log.md — no linked tests
+        ! docs/notifications.md — no linked test cases
+        ! docs/audit-log.md — no linked test cases
       Acceptance Criteria: 65% (42/65 criteria covered)
         23 uncovered criteria (12 MUST, 8 SHOULD, 3 MAY)
-      Automation: 45% (115/256 tests have automated_by)
+      Automation: 45% (115/256 test cases have automated_by)
 User: Which MUST criteria are uncovered?
 Bot:  [lists uncovered MUST criteria with source docs]
 ```
@@ -210,7 +210,7 @@ Or with branding preview:
 User: Generate a coverage dashboard
 Bot:  [generates dashboard]
 Bot:  Dashboard generated at ./site/index.html
-      - 4 test suites (259 total tests)
+      - 4 test suites (259 total test cases)
       - Coverage: 78% documentation, 65% criteria, 45% automation
       [opens dashboard in browser]
 User: Preview with our branding
@@ -236,7 +236,7 @@ Or for a specific suite:
 ```
 User: Validate the checkout suite
 Bot:  Validation results for checkout:
-      OK 25 tests valid
+      OK 25 test cases valid
       FAIL 2 errors:
         TC-203: Missing required field 'priority'
         TC-207: Duplicate test ID (also in TC-107)
@@ -244,50 +244,50 @@ Bot:  Validation results for checkout:
 
 ---
 
-## Workflow 7: Browse Tests
+## Workflow 7: Browse Test Cases
 
 **Tell the user to say:**
 
 > "List all test suites"
 > "Show me TC-101"
-> "Find tests tagged smoke in the checkout suite"
+> "Find test cases tagged smoke in the checkout suite"
 
 The corresponding SKILL (`spectra-list`) handles search/filter/show commands.
 
 ---
 
-## Workflow 8: Update Tests After Doc Changes
+## Workflow 8: Update Test Cases After Doc Changes
 
 **Tell the user to say:**
 
-> "Update tests for checkout — the payment docs changed"
+> "Update test cases for checkout — the payment docs changed"
 
 **What happens:**
 
-The system compares current documentation against test sources and classifies each test:
+The system compares current documentation against test case sources and classifies each test case:
 
-- **UP_TO_DATE** — test still matches source
-- **OUTDATED** — source changed, test needs update
+- **UP_TO_DATE** — test case still matches source
+- **OUTDATED** — source changed, test case needs update
 - **ORPHANED** — source section was removed
-- **REDUNDANT** — duplicate of another test
+- **REDUNDANT** — duplicate of another test case
 
 **Example conversation:**
 
 ```
-User: Update tests for checkout
-Bot:  Classification results for 25 checkout tests:
+User: Update test cases for checkout
+Bot:  Classification results for 25 checkout test cases:
       OK 18 UP_TO_DATE
       ~  4 OUTDATED (source changed)
       X  2 ORPHANED (source removed)
       ~  1 REDUNDANT (duplicate of TC-205)
-      Want me to rewrite the 4 outdated tests?
+      Want me to rewrite the 4 outdated test cases?
 User: Yes, update them
-Bot:  [rewrites 4 tests, shows diff for each]
+Bot:  [rewrites 4 test cases, shows diff for each]
 ```
 
 ---
 
-## Workflow 9: Execute Tests via MCP
+## Workflow 9: Execute Test Cases via MCP
 
 **Tell the user to say:**
 
@@ -299,13 +299,13 @@ Or:
 
 **What happens:**
 
-This uses the MCP execution server (a different agent — the SPECTRA Execution agent — handles it). The agent presents each test to the user, the user marks it PASSED/FAILED/BLOCKED/SKIPPED, and a report is generated at the end.
+This uses the MCP execution server (a different agent — the SPECTRA Execution agent — handles it). The agent presents each test case to the user, the user marks it PASSED/FAILED/BLOCKED/SKIPPED, and a report is generated at the end.
 
 **Example conversation:**
 
 ```
 User: Run the checkout suite
-Bot:  Starting execution run for checkout (25 tests).
+Bot:  Starting execution run for checkout (25 test cases).
 
       Test 1/25: TC-201 — Verify valid credit card accepted
       Priority: high | Component: checkout | Est: 5min
@@ -401,7 +401,7 @@ The bundled SKILLs always pass `--no-interaction`. If a command is hanging, the 
 **No acceptance criteria found**
 First index the docs (Workflow 11), then extract criteria (Workflow 2). The order matters because extraction reads the index.
 
-**Tests aren't linked to acceptance criteria**
+**Test cases aren't linked to acceptance criteria**
 Re-generate after criteria are extracted — generation auto-loads related criteria as prompt context.
 
 **Dashboard looks empty or coverage tab is broken**
@@ -413,7 +413,7 @@ Re-run coverage analysis (Workflow 4) followed by dashboard generation (Workflow
 
 - "Help me get started"
 - "What can I do with SPECTRA?"
-- "How do I generate tests?"
+- "How do I generate test cases?"
 - "Show me the workflows"
 - "What should I do first?"
 - "Walk me through the process"

@@ -6,7 +6,7 @@ tools: {{READONLY_TOOLS}}
 
 # SPECTRA Prompts SKILL
 
-You help users view, customize, and manage the prompt templates that control how SPECTRA's AI analyzes documentation, generates tests, extracts criteria, and verifies quality.
+You help users view, customize, and manage the prompt templates that control how SPECTRA's AI analyzes documentation, generates test cases, extracts criteria, and verifies quality.
 
 Prompt templates are markdown files in `.spectra/prompts/` with `{{placeholders}}` for dynamic content.
 
@@ -48,7 +48,7 @@ Each template controls one AI operation:
 - `behavior-analysis` — How docs are analyzed for testable behaviors
 - `test-generation` — How test cases are written from behaviors
 - `criteria-extraction` — How acceptance criteria are pulled from docs
-- `critic-verification` — How tests are verified against sources
-- `test-update` — How tests are classified when docs change
+- `critic-verification` — How test cases are verified against sources
+- `test-update` — How test cases are classified when docs change
 
 Users edit `.spectra/prompts/{template-id}.md` directly. Changes take effect on next run.

@@ -83,16 +83,16 @@ spectra profile show --suite tests/checkout  # Show profile for a specific suite
 Create a profile that only applies to a specific test suite:
 
 ```bash
-spectra init-profile --suite tests/checkout
+spectra init-profile --suite test-cases/checkout
 ```
 
-This creates `tests/checkout/_profile.md` that inherits from and overrides the repository profile.
+This creates `test-cases/checkout/_profile.md` that inherits from and overrides the repository profile.
 
 ## Profile Resolution Order
 
 When running `spectra ai generate checkout --count 10`:
 
-1. `tests/checkout/_profile.md` (suite override)
+1. `test-cases/checkout/_profile.md` (suite override)
 2. `spectra.profile.md` (repository profile)
 3. Built-in defaults
 

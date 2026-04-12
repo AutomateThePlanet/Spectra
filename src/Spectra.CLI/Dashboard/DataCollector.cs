@@ -29,7 +29,7 @@ public sealed class DataCollector
     public DataCollector(string basePath)
     {
         _basePath = basePath;
-        _testsPath = Path.Combine(basePath, "tests");
+        _testsPath = Path.Combine(basePath, "test-cases");
         _reportsPath = Path.Combine(basePath, ".execution", "reports");
         _dbReader = new ExecutionDbReader(basePath);
     }

@@ -17,8 +17,8 @@ Related: [CLI Reference](../cli-reference.md) | [Copilot Spaces](../copilot-spac
 SPECTRA's MCP execution engine provides a deterministic state machine that any LLM orchestrator can drive without holding state. The AI navigates; the engine enforces.
 
 1. **Start a run** — Select a suite and optional filters (priority, tags, component)
-2. **Present tests** — The engine serves tests one at a time with full details
-3. **Record results** — Mark each test as passed, failed, skipped, or blocked
+2. **Present test cases** — The engine serves test cases one at a time with full details
+3. **Record results** — Mark each test case as passed, failed, skipped, or blocked
 4. **Finalize** — Generate reports in JSON, Markdown, and HTML
 
 The engine runs as an MCP server on stdio transport (JSON-RPC 2.0).
@@ -56,12 +56,12 @@ dotnet run --project src/Spectra.MCP -- /path/to/project
 
 | Tool | Description |
 |------|-------------|
-| `get_test_case_details` | Get full test content (steps, expected result, preconditions) |
+| `get_test_case_details` | Get full test case content (steps, expected result, preconditions) |
 | `advance_test_case` | Record PASSED/FAILED result |
 | `skip_test_case` | Skip test with reason (supports `--blocked` flag) |
-| `bulk_record_results` | Bulk record results for multiple tests |
+| `bulk_record_results` | Bulk record results for multiple test cases |
 | `add_test_note` | Add notes to a test |
-| `retest_test_case` | Re-queue a completed test |
+| `retest_test_case` | Re-queue a completed test case |
 | `save_screenshot` | Save screenshot attachment |
 
 ### Reporting
@@ -75,13 +75,13 @@ dotnet run --project src/Spectra.MCP -- /path/to/project
 
 | Tool | Description |
 |------|-------------|
-| `validate_tests` | Validate test files against schema |
+| `validate_tests` | Validate test case files against schema |
 | `rebuild_indexes` | Rebuild `_index.json` files |
 | `analyze_coverage_gaps` | Find uncovered documentation |
 
 ## Bulk Operations
 
-The `bulk_record_results` tool allows processing multiple tests at once:
+The `bulk_record_results` tool allows processing multiple test cases at once:
 
 ```json
 // Skip all remaining tests
@@ -121,7 +121,7 @@ On error:
 
 | Code | Description |
 |------|-------------|
-| `TESTS_DIR_NOT_FOUND` | No tests/ directory exists |
+| `TESTS_DIR_NOT_FOUND` | No test-cases/ directory exists |
 | `SUITE_NOT_FOUND` | Specified suite not found |
 | `DOCS_DIR_NOT_FOUND` | No docs/ directory exists |
 | `MISSING_ID` | Test file missing required ID |
@@ -137,17 +137,17 @@ Reports are generated in three formats:
 - **HTML** — Professional styled report with expandable test details
 
 Report features:
-- Test titles from `_index.json` (not just IDs)
+- Test case titles from `_index.json` (not just IDs)
 - Human-readable durations ("1h 23m 45s")
 - UTC-normalized timestamps
-- Expandable non-passing tests with failure reasons
+- Expandable non-passing test cases with failure reasons
 
 ## Example Execution Flow
 
 ```
 User: What test suites are available?
 AI: [calls list_available_suites]
-Available suites: checkout (10 tests), auth (18 tests)
+Available suites: checkout (10 test cases), auth (18 test cases)
 
 User: Start a test run for checkout
 
