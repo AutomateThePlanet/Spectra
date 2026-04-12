@@ -63,7 +63,7 @@ public class TestimizeRunnerTests
     }
 
     [Fact]
-    public void Generate_SingleField_SkipsWithInsufficientFieldsReason()
+    public void Generate_SingleField_UsesDirectBvaEpExtraction()
     {
         var specs = new List<FieldSpec>
         {
@@ -76,9 +76,45 @@ public class TestimizeRunnerTests
             fallbackDocs: null,
             suiteName: "registration");
 
-        // Testimize's generators require ≥ 2 parameters. Runner skips
-        // cleanly rather than letting the library throw.
-        Assert.Null(result);
+        // Single-field path bypasses generators and reads pre-computed
+        // BVA boundary values directly from the parameter's TestValues.
+        Assert.NotNull(result);
+        Assert.Equal(1, result!.FieldCount);
+        Assert.StartsWith("SingleField", result.Strategy);
+        Assert.NotEmpty(result.TestCases);
+        Assert.All(result.TestCases, row => Assert.Single(row.Values));
+        Assert.All(result.TestCases, row => Assert.Equal("age", row.Values[0].FieldName));
+        // Must include boundary values: 17 (BoundaryInvalid), 18 (BoundaryValid),
+        // 100 (BoundaryValid), 101 (BoundaryInvalid) at minimum.
+        var categories = result.TestCases.Select(r => r.Values[0].Category).ToHashSet();
+        Assert.Contains("BoundaryValid", categories);
+        Assert.Contains("BoundaryInvalid", categories);
+    }
+
+    [Fact]
+    public void BuildParameter_Integer_HasPrecomputedBoundaryValues()
+    {
+        var param = TestimizeRunner.BuildParameter(
+            new FieldSpec { Name = "age", Type = "Integer", Min = 18, Max = 100 });
+
+        Assert.NotEmpty(param.TestValues);
+        var values = param.TestValues.Select(tv => tv.Value).ToList();
+        // BVA: min-1, min, max, max+1
+        Assert.Contains(17, values);
+        Assert.Contains(18, values);
+        Assert.Contains(100, values);
+        Assert.Contains(101, values);
+    }
+
+    [Fact]
+    public void BuildParameter_Date_HasPrecomputedBoundaryValues()
+    {
+        var param = TestimizeRunner.BuildParameter(
+            new FieldSpec { Name = "birth", Type = "Date", MinDate = "2000-01-01", MaxDate = "2020-12-31" });
+
+        Assert.NotEmpty(param.TestValues);
+        var categories = param.TestValues.Select(tv => tv.Category.ToString()).ToHashSet();
+        Assert.Contains("BoundaryValid", categories);
     }
 
     [Fact]

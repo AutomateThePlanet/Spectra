@@ -5,6 +5,7 @@ using Spectra.CLI.Infrastructure;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Testimize;
+using Testimize.Contracts;
 using Testimize.OutputGenerators;
 using Testimize.Parameters.Core;
 using Testimize.Usage;
@@ -67,21 +68,19 @@ public static class TestimizeRunner
             return null;
         }
 
-        // Testimize's generators (Pairwise, Hybrid-ABC via Pairwise seeding,
-        // Combinatorial) all require ≥ 2 parameters to run — single-field
-        // input raises ArgumentException("Pairwise testing requires at
-        // least two parameters.") deep in the strategy. Skip cleanly; the
-        // AI still generates normal tests for that suite without embedded
-        // algorithmic data.
-        if (usable.Count < 2)
-        {
-            DebugLogger.Append("generate", $"TESTIMIZE SKIP reason=insufficient_fields fields={usable.Count} suite={suiteName}");
-            return null;
-        }
-
         var sw = Stopwatch.StartNew();
         var mode = MapStrategy(config.Strategy);
         var category = MapMode(config.Mode);
+
+        // Single-field path: Testimize's generators (Pairwise, Hybrid-ABC)
+        // require ≥ 2 parameters. But each field's strategy already computes
+        // BVA boundary values + EP equivalence classes at construction time,
+        // stored in parameter.TestValues. For a single field we bypass the
+        // generator entirely and read those pre-computed values directly.
+        if (usable.Count == 1)
+        {
+            return GenerateSingleField(usable[0], mode, suiteName, sw, onStatus);
+        }
 
         try
         {
@@ -170,6 +169,153 @@ public static class TestimizeRunner
         "multiselect" => spec.AllowedValues is { Count: > 0 },
         _ => false,
     };
+
+    /// <summary>
+    /// Handles the single-field case by constructing the parameter directly
+    /// and reading its pre-computed <c>TestValues</c> (BVA boundaries + EP
+    /// equivalence classes). No generator needed — the strategy populates
+    /// these at construction time inside <c>InitializeTestValues()</c>.
+    /// </summary>
+    private static TestimizeDataset? GenerateSingleField(
+        FieldSpec spec,
+        TestGenerationMode mode,
+        string suiteName,
+        Stopwatch sw,
+        Action<string>? onStatus)
+    {
+        try
+        {
+            onStatus?.Invoke($"Running Testimize single-field BVA/EP for '{spec.Name}'...");
+
+            var origOut = Console.Out;
+            IInputParameter param;
+            try
+            {
+                Console.SetOut(TextWriter.Null);
+                param = BuildParameter(spec);
+            }
+            finally
+            {
+                Console.SetOut(origOut);
+            }
+
+            var testValues = param.TestValues;
+            if (testValues.Count == 0)
+            {
+                sw.Stop();
+                DebugLogger.Append("generate", $"TESTIMIZE SKIP reason=no_test_values fields=1 suite={suiteName}");
+                return null;
+            }
+
+            // Each TestValue becomes its own single-cell row.
+            var rows = new List<TestimizeRow>(testValues.Count);
+            foreach (var tv in testValues)
+            {
+                rows.Add(new TestimizeRow
+                {
+                    Values =
+                    [
+                        new TestimizeCell
+                        {
+                            FieldName = string.IsNullOrWhiteSpace(spec.Name) ? "field1" : spec.Name,
+                            Value = tv.Value,
+                            Category = tv.Category.ToString(),
+                            ExpectedInvalidMessage = tv.ExpectedInvalidMessage,
+                        }
+                    ],
+                    Score = 0
+                });
+            }
+
+            sw.Stop();
+            var dataset = new TestimizeDataset
+            {
+                Strategy = $"SingleField-{mode}",
+                FieldCount = 1,
+                Fields = [spec],
+                TestCases = rows,
+            };
+
+            DebugLogger.Append(
+                "generate",
+                $"TESTIMIZE OK strategy=SingleField fields=1 test_data_sets={rows.Count} elapsed={sw.Elapsed.TotalSeconds.ToString("F1", CultureInfo.InvariantCulture)}s suite={suiteName}");
+
+            return dataset;
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            DebugLogger.Append(
+                "generate",
+                $"TESTIMIZE ERROR exception={ex.GetType().Name} message=\"{ex.Message}\" elapsed={sw.Elapsed.TotalSeconds.ToString("F1", CultureInfo.InvariantCulture)}s");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Constructs a single Testimize <see cref="IInputParameter"/> from a
+    /// <see cref="FieldSpec"/>. The parameter's <c>TestValues</c> list is
+    /// populated at construction time by the strategy's
+    /// <c>InitializeTestValues</c> chain — BVA boundaries + EP equivalence
+    /// classes are ready to read immediately.
+    /// </summary>
+    internal static IInputParameter BuildParameter(FieldSpec spec)
+    {
+        switch (spec.Type?.ToLowerInvariant())
+        {
+            case "integer":
+            case "int":
+            case "number":
+                return new global::Testimize.Parameters.IntegerDataParameter(
+                    minBoundary: (int)(spec.Min ?? 0),
+                    maxBoundary: (int)(spec.Max ?? ((int)(spec.Min ?? 0) + 100)));
+
+            case "text":
+            case "string":
+                return new global::Testimize.Parameters.TextDataParameter(
+                    minBoundary: spec.MinLength ?? 1,
+                    maxBoundary: spec.MaxLength ?? 100);
+
+            case "email":
+                return new global::Testimize.Parameters.EmailDataParameter(
+                    minBoundary: spec.MinLength ?? 6,
+                    maxBoundary: spec.MaxLength ?? 254);
+
+            case "phone":
+                return new global::Testimize.Parameters.PhoneDataParameter(
+                    minBoundary: spec.MinLength ?? 7,
+                    maxBoundary: spec.MaxLength ?? 15);
+
+            case "password":
+                return new global::Testimize.Parameters.PasswordDataParameter(
+                    minBoundary: spec.MinLength ?? 8,
+                    maxBoundary: spec.MaxLength ?? 64);
+
+            case "url":
+                return new global::Testimize.Parameters.UrlDataParameter(
+                    minBoundary: spec.MinLength ?? 10,
+                    maxBoundary: spec.MaxLength ?? 2048);
+
+            case "username":
+                return new global::Testimize.Parameters.UsernameDataParameter(
+                    minBoundary: spec.MinLength ?? 3,
+                    maxBoundary: spec.MaxLength ?? 32);
+
+            case "date":
+                return new global::Testimize.Parameters.DateDataParameter(
+                    minBoundary: ParseDate(spec.MinDate, DateTime.Parse("1900-01-01", CultureInfo.InvariantCulture)),
+                    maxBoundary: ParseDate(spec.MaxDate, DateTime.Parse("2100-12-31", CultureInfo.InvariantCulture)));
+
+            case "boolean":
+            case "bool":
+                return new global::Testimize.Parameters.BooleanDataParameter();
+
+            default:
+                return new global::Testimize.Parameters.TextDataParameter(
+                    minBoundary: spec.MinLength ?? 1,
+                    maxBoundary: spec.MaxLength ?? 100);
+        }
+    }
 
     private static void ApplySpec(TestimizeInputBuilder parameters, FieldSpec spec)
     {
