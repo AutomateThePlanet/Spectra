@@ -17,7 +17,7 @@ Related: [Configuration](configuration.md) | [Grounding Verification](grounding-
 SPECTRA uses two AI models per run: a **generator** (behavior analysis + test
 creation) and a **critic** (grounding verification). Choosing the right
 combination determines quality, speed, and cost. This guide is based on real
-production data from April 11, 2026.
+production data — 1,261 test cases generated across 7 suites for $0.00.
 
 ---
 
@@ -89,7 +89,7 @@ verification, zero critic cost.
 ```
 
 Cost per `--count 20` run: ~4 PRs (analysis + generation batches). Critic is
-free. ~26,000 tests/month on Pro+.
+free. Real-world result: 1,261 tests across 7 suites = 75 PRs total.
 
 ### Preset 2: Zero Cost
 
@@ -139,24 +139,35 @@ Cost per `--count 20` run: ~7 PRs (critic only). Generation is free.
 
 ## Real Production Run Data
 
-Actual results from April 11, 2026. Generator: Claude Sonnet 4.5. Critic:
-GPT-4.1. Both via `github-models` provider on Copilot Pro+.
+Actual results from a full production run. Generator: Claude Sonnet 4.5. Critic:
+GPT-4.1 (parallel, `max_concurrent: 5`). Both via `github-models` provider
+on Copilot Pro+. Some suites were regenerated multiple times during testing.
 
 ### Run Results
 
-| Suite | Tests | Batches | Gen Time | Critic Time | Total | PRs Used |
-|-------|-------|---------|----------|-------------|-------|----------|
-| Standard Calculator | 238 | 12 | 22m26s | 23m02s | 46m19s | 13 |
-| Unit Converter | 178 (163 written, 15 rejected) | 9 | 18m03s | 17m43s | 36m25s | 10 |
-| **Total** | **416** | **21** | **40m29s** | **40m45s** | **82m44s** | **24** |
+| Suite | Tests Generated | Gen Time | Critic Time | Total | PRs Used |
+|-------|----------------|----------|-------------|-------|----------|
+| Standard Calculator | 238 | 22m26s | 23m02s | 46m19s | 13 |
+| Unit Converter | 181 | 18m34s | 17m58s | 37m20s | 11 |
+| Date Calculation | 398 (2 runs) | 36m07s | 43m08s | 47m49s | 23 |
+| General App Features | 100 | 12m49s | 10m22s | 23m37s | 7 |
+| Scientific Calculator | 135 | 11m31s | 13m19s | 18m15s | 8 |
+| Programmer Calculator | 117 | 12m20s | 14m57s | 16m02s | 7 |
+| Graphing Calculator | 92 | 11m06s | 10m08s | 13m44s | 6 |
+| **Total** | **1,261** | **~2h05m** | **~2h13m** | **~3h23m** | **~75** |
 
 ### Token Consumption
 
 | Suite | Input Tokens | Output Tokens | Total |
 |-------|-------------|--------------|-------|
 | Standard Calculator | 5,898,939 | 184,274 | 6,083,213 |
-| Unit Converter | 3,940,480 | 162,342 | 4,102,822 |
-| **Total** | **9,839,419** | **346,616** | **10,186,035** |
+| Unit Converter | 4,157,801 | 164,090 | 4,321,891 |
+| Date Calculation | 9,191,320 | 341,179 | 9,532,499 |
+| General App Features | 2,447,233 | 101,976 | 2,549,209 |
+| Scientific Calculator | 3,319,320 | 101,543 | 3,420,863 |
+| Programmer Calculator | 2,819,811 | 111,662 | 2,931,473 |
+| Graphing Calculator | 2,376,626 | 85,621 | 2,462,247 |
+| **Total** | **30,211,050** | **1,090,345** | **31,301,395** |
 
 ### Per-Phase Timing
 
@@ -164,20 +175,20 @@ GPT-4.1. Both via `github-models` provider on Copilot Pro+.
 |-------|-------------|-------|
 | Analysis (Sonnet) | 25–148s | Varies by doc complexity. Sonnet finds 200+ behaviors; GPT-4.1 finds ~40 |
 | Generation batch (Sonnet, 20 tests) | ~110s | ~5.5s per test |
-| Critic call (GPT-4.1) | ~5.5s | Sequential; parallelizable to ~1s with `max_concurrent: 5` |
+| Critic call (GPT-4.1, parallel ×5) | ~6s per call, ~1.2s effective | 5 concurrent calls reduces wall time by ~80% |
 
 ---
 
 ## Cost Comparison
 
-### Same workload: 416 tests, April 11, 2026
+### Full workload: 1,261 tests across 7 suites
 
 | Provider | Input Cost | Output Cost | Total |
 |----------|-----------|-------------|-------|
-| **Copilot Pro+ (github-models)** | included | included | **$0.00** (24 of 1,500 PRs) |
-| Copilot Pro overage ($0.04/PR) | — | — | **$0.96** |
-| Azure AI Foundry (Sonnet 4.5) | $29.52 | $5.20 | **$34.72** |
-| Anthropic API direct | $29.52 | $5.20 | **$34.72** |
+| **Copilot Pro+ (github-models)** | included | included | **$0.00** (~75 of 1,500 PRs) |
+| Copilot Pro overage ($0.04/PR) | — | — | **$3.00** |
+| Azure AI Foundry (Sonnet 4.5) | $90.63 | $16.36 | **$106.99** |
+| Anthropic API direct | $90.63 | $16.36 | **$106.99** |
 
 ### Full monthly capacity at Pro+ (1,500 PRs)
 
@@ -186,6 +197,18 @@ GPT-4.1. Both via `github-models` provider on Copilot Pro+.
 | **Copilot Pro+** | **$39** (subscription) |
 | Azure AI Foundry equivalent | **~$2,169** |
 | Copilot overage equivalent | **$60** (1,500 × $0.04) |
+
+### Premium Request Budget
+
+After generating 1,261 tests across all 7 suites (within a single billing cycle):
+
+| Metric | Value |
+|--------|-------|
+| PRs consumed (total account) | 191.52 of 1,500 |
+| PRs from SPECTRA runs | ~75 (Sonnet generation + analysis only) |
+| PRs from VS Code / other usage | ~116 |
+| PRs remaining | 1,308 (19 days left in cycle) |
+| Billed amount | $0.00 |
 
 > The 55× price difference between Copilot Pro+ and Azure pay-per-token exists
 > because Copilot is a subscription model — Microsoft subsidizes heavy users
