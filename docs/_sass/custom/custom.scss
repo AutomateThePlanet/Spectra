@@ -2,14 +2,10 @@
 // SPECTRA — additional overrides on top of the spectra color scheme
 // =============================================================
 
-// Sidebar header / logo area: the dashboard banner already has a navy
-// background, so let it sit flush on the navy sidebar — no backdrop,
-// no border, just a full-width banner that bleeds to the edges.
-
 .side-bar {
   .site-header {
     background-color: transparent;
-    padding: 0;
+    padding: 0.75rem 1rem;
     height: auto;
     min-height: 0;
     border-bottom: none;
@@ -28,12 +24,11 @@
     }
   }
 
-  // The logo itself (Just the Docs renders it as a background image
-  // on .site-logo). Force it to display as a block-level image and
-  // bleed full-width so the banner reads as a proper header.
+  // Banner logo — scale to sidebar width, auto height
   .site-logo {
     width: 100%;
-    height: 9rem;
+    height: auto;
+    max-height: 5rem;
     background-size: contain;
     background-position: center center;
     background-repeat: no-repeat;
@@ -43,13 +38,6 @@
   // Hide the duplicate text title (logo already says "SPECTRA")
   .site-title.lh-tight {
     display: block;
-  }
-}
-
-// Larger sidebar logo on bigger screens
-@media (min-width: 50rem) {
-  .side-bar .site-logo {
-    height: 11rem;
   }
 }
 
