@@ -1356,13 +1356,17 @@ function renderCoverageSection(label, sectionData, unit, renderDetailsFn) {
         // Expandable detail list
         const detailCount = sectionData.details.length;
         html += `<button class="coverage-toggle-btn" onclick="toggleCoverageDetails('${sectionId}')">Show details (${detailCount})</button>`;
-        // Add search filter for large lists
+        // Add search filter and uncovered toggle
+        const uncoveredCount = sectionData.details.filter(d => d.covered === false || (d.percentage !== undefined && d.percentage < 100)).length;
+        html += `<div class="coverage-detail-filter collapsed" id="filter-${sectionId}">`;
         if (detailCount > 20) {
-            html += `<div class="coverage-detail-filter collapsed" id="filter-${sectionId}">
-                <input type="text" placeholder="Filter by ID or text..." oninput="filterCoverageDetails('${sectionId}', this.value)" />
-                <span class="filter-count" id="filter-count-${sectionId}">${detailCount} items</span>
-            </div>`;
+            html += `<input type="text" placeholder="Filter by ID or text..." oninput="filterCoverageDetails('${sectionId}', this.value)" />`;
         }
+        if (uncoveredCount > 0 && uncoveredCount < detailCount) {
+            html += `<button class="uncovered-filter-btn" id="uncovered-btn-${sectionId}" onclick="toggleUncoveredFilter('${sectionId}')" title="Show only uncovered items">Show uncovered only (${uncoveredCount})</button>`;
+        }
+        html += `<span class="filter-count" id="filter-count-${sectionId}">${detailCount} items</span>
+        </div>`;
         html += `<ul class="coverage-detail-list collapsed" id="details-${sectionId}">`;
         html += renderDetailsFn(sectionData);
         html += '</ul>';
@@ -1459,6 +1463,44 @@ function filterCoverageDetails(sectionId, query) {
 }
 
 /**
+ * Toggle showing only uncovered items in a coverage detail list.
+ */
+function toggleUncoveredFilter(sectionId) {
+    const list = document.getElementById('details-' + sectionId);
+    const btn = document.getElementById('uncovered-btn-' + sectionId);
+    const countEl = document.getElementById('filter-count-' + sectionId);
+    if (!list || !btn) return;
+
+    const isActive = btn.classList.toggle('active');
+
+    let visible = 0;
+    for (const li of list.children) {
+        const isCovered = li.getAttribute('data-covered') === 'true';
+        if (isActive && isCovered) {
+            li.style.display = 'none';
+        } else if (li.style.display === 'none' && !isCovered) {
+            // Already hidden by text filter — leave it
+        } else if (!isActive) {
+            li.style.display = '';
+            visible++;
+        } else {
+            visible++;
+        }
+    }
+
+    // Recount visible items
+    visible = 0;
+    for (const li of list.children) {
+        if (li.style.display !== 'none') visible++;
+    }
+
+    if (countEl) {
+        countEl.textContent = isActive ? `${visible} uncovered` : `${list.children.length} items`;
+    }
+    btn.textContent = isActive ? 'Show all' : `Show uncovered only (${list.querySelectorAll('[data-covered="false"]').length})`;
+}
+
+/**
  * Render documentation detail list items.
  */
 function renderDocDetails(section) {
@@ -1467,7 +1509,7 @@ function renderDocDetails(section) {
         const icon = d.covered
             ? '<span class="detail-icon coverage-green">&#10003;</span>'
             : '<span class="detail-icon coverage-red">&#10007;</span>';
-        html += `<li>
+        html += `<li data-covered="${d.covered ? 'true' : 'false'}">
             <span class="detail-name" title="${escapeHtml(d.doc)}">${escapeHtml(d.doc)}</span>
             <span class="detail-meta">${d.test_count} test${d.test_count !== 1 ? 's' : ''}</span>
             ${icon}
@@ -1490,7 +1532,7 @@ function renderCriteriaDetails(section) {
         const displayName = titleText
             ? `<strong>${escapeHtml(d.id)}</strong> ${escapeHtml(titleText)}`
             : `<strong>${escapeHtml(d.id)}</strong>`;
-        html += `<li title="${escapeHtml(titleText)}">
+        html += `<li data-covered="${d.covered ? 'true' : 'false'}" title="${escapeHtml(titleText)}">
             <span class="detail-name">${displayName}</span>
             <span class="detail-meta">${testList}</span>
             ${icon}
@@ -1506,7 +1548,8 @@ function renderAutoDetails(section) {
     let html = '';
     for (const d of section.details) {
         const suiteColor = d.percentage >= 80 ? 'coverage-green' : d.percentage >= 50 ? 'coverage-yellow' : 'coverage-red';
-        html += `<li>
+        const fullyCovered = d.percentage >= 100;
+        html += `<li data-covered="${fullyCovered ? 'true' : 'false'}">
             <span class="detail-name">${escapeHtml(d.suite)}</span>
             <span class="detail-meta ${suiteColor}">${d.automated}/${d.total} (${d.percentage.toFixed(1)}%)</span>
         </li>`;
