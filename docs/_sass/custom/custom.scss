@@ -24,11 +24,12 @@
     }
   }
 
-  // Banner logo — scale to sidebar width, auto height
+  // Banner logo — rendered as background-image on an empty div,
+  // so we must set an explicit height via aspect-ratio (1246x389 image).
   .site-logo {
     width: 100%;
-    height: auto;
-    max-height: 5rem;
+    height: 0;
+    padding-bottom: 31.2%; // 389/1246 ≈ 31.2% — preserves aspect ratio
     background-size: contain;
     background-position: center center;
     background-repeat: no-repeat;
