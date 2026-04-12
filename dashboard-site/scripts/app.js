@@ -1476,6 +1476,17 @@ function scrollToCoverageSection(sectionId) {
             toggleCoverageDetails(sectionId);
         }
         section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+    }
+    // Fallback: no detail list (e.g. 100% coverage shows success state).
+    // Find the section by matching the label text.
+    const allSections = document.querySelectorAll('.coverage-section');
+    for (const sec of allSections) {
+        const label = sec.querySelector('.coverage-section-label');
+        if (label && label.textContent.toLowerCase().replace(/\s+/g, '-') === sectionId) {
+            sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+        }
     }
 }
 
