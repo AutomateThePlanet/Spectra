@@ -42,15 +42,16 @@
   }
 }
 
-// Hide "Just the Docs" theme attribution in footer
+// Sidebar footer sits on the dark navy sidebar, so the default dark
+// "This site uses Just the Docs" credits are invisible. Force a light
+// color (and matching link color) so the attribution stays readable.
 .site-footer {
-  // The theme renders two elements: custom footer_content + theme credits paragraph.
-  // Hide everything after the first child (our custom content).
-  p:last-child {
-    display: none !important;
-  }
+  color: rgba(255, 255, 255, 0.78) !important;
 
-  .site-footer-credits {
-    display: none !important;
+  a,
+  a:link,
+  a:visited {
+    color: $spectra-teal-light !important;
+    text-decoration: underline;
   }
 }
