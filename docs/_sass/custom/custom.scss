@@ -45,13 +45,19 @@
 // Sidebar footer sits on the dark navy sidebar, so the default dark
 // "This site uses Just the Docs" credits are invisible. Force a light
 // color (and matching link color) so the attribution stays readable.
-.site-footer {
-  color: rgba(255, 255, 255, 0.78) !important;
+.site-footer,
+.site-footer p,
+.site-footer .text-grey-dk-000,
+.site-footer .text-grey-dk-100,
+.site-footer .text-grey-dk-200,
+.site-footer .text-grey-dk-300 {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
 
-  a,
-  a:link,
-  a:visited {
-    color: $spectra-teal-light !important;
-    text-decoration: underline;
-  }
+.site-footer a,
+.site-footer a:link,
+.site-footer a:visited,
+.site-footer a:hover {
+  color: $spectra-teal-light !important;
+  text-decoration: underline !important;
 }
