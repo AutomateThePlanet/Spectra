@@ -170,6 +170,20 @@ Scan patterns are templates where `{id}` is replaced with the test ID regex. Exa
 
 If `scan_patterns` is empty, SPECTRA falls back to the legacy `attribute_patterns` regex list.
 
+## Coverage-Aware Generation
+
+When running `spectra ai generate`, the analysis step is coverage-aware for existing suites. Before identifying testable behaviors, the analyzer builds a coverage snapshot from:
+
+- **`_index.json`**: Existing test titles, criteria links, and source refs
+- **`.criteria.yaml` files**: All acceptance criteria, cross-referenced against tests
+- **`docs/_index.md`**: Documentation sections, cross-referenced against test source refs
+
+The AI receives this coverage context and only recommends tests for genuine gaps — uncovered criteria and undocumented sections. For a mature suite with 231 tests covering 38/41 criteria, the analysis recommends ~8 new tests (the actual gap) instead of 139.
+
+For suites with more than 500 tests, the analyzer switches to summary mode to conserve prompt tokens: only coverage statistics and uncovered items are sent, not the full title list.
+
+New suites with no `_index.json` or criteria files work exactly as before — the coverage context is simply omitted.
+
 ## Coverage Configuration
 
 Full coverage settings in `spectra.config.json`:

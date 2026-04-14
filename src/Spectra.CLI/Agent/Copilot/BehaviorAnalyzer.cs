@@ -54,7 +54,8 @@ public sealed class BehaviorAnalyzer
         IReadOnlyList<SourceDocument> documents,
         IReadOnlyList<TestCase> existingTests,
         string? focusArea,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        CoverageSnapshot? snapshot = null)
     {
         if (documents.Count == 0)
             return null;
@@ -70,7 +71,10 @@ public sealed class BehaviorAnalyzer
         // provider-reported token counts. If no usage event arrives within
         // the grace window, falls back to TokenEstimator(prompt, response).
         var observer = new CopilotUsageObserver();
-        var prompt = BuildAnalysisPrompt(documents, focusArea, _config, _templateLoader);
+        var coverageContext = snapshot is not null && snapshot.HasData
+            ? CoverageContextFormatter.Format(snapshot)
+            : null;
+        var prompt = BuildAnalysisPrompt(documents, focusArea, _config, _templateLoader, coverageContext);
         DebugLogAi($"ANALYSIS START documents={documents.Count} timeout={timeoutMinutes}min", null, null, estimated: false);
 
         try
@@ -149,8 +153,11 @@ public sealed class BehaviorAnalyzer
                 behaviors = FilterByFocus(behaviors, focusArea);
             }
 
-            // Compute dedup against existing tests
-            var coveredCount = CountCoveredBehaviors(behaviors, existingTests);
+            // Compute dedup: use snapshot's accurate count when available,
+            // fall back to title-similarity heuristic otherwise
+            var coveredCount = snapshot is not null && snapshot.HasData
+                ? snapshot.ExistingTestCount
+                : CountCoveredBehaviors(behaviors, existingTests);
 
             // Build breakdown — bucket empty/null/whitespace categories under "uncategorized"
             var breakdown = behaviors
@@ -232,7 +239,8 @@ public sealed class BehaviorAnalyzer
         IReadOnlyList<SourceDocument> documents,
         string? focusArea,
         SpectraConfig? config = null,
-        PromptTemplateLoader? templateLoader = null)
+        PromptTemplateLoader? templateLoader = null,
+        string? coverageContext = null)
     {
         // Try template-driven prompt
         if (templateLoader is not null)
@@ -251,7 +259,9 @@ public sealed class BehaviorAnalyzer
                 ["suite_name"] = "",
                 ["existing_tests"] = "",
                 ["focus_areas"] = focusArea ?? "",
-                ["acceptance_criteria"] = ""
+                ["acceptance_criteria"] = "",
+                // Spec 044: coverage-aware analysis context
+                ["coverage_context"] = coverageContext ?? ""
             };
 
             var listValues = new Dictionary<string, IReadOnlyList<IReadOnlyDictionary<string, string>>>

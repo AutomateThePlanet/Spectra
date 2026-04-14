@@ -134,7 +134,9 @@ techniques (Equivalence Partitioning, Boundary Value Analysis, Decision
 Table, State Transition, Error Guessing, Use Case). The analysis output
 includes both a category breakdown (`happy_path`, `boundary`, `negative`, …)
 and a technique breakdown (`BVA`, `EP`, `DT`, `ST`, `EG`, `UC`) — see spec
-037. Supports multiple modes.
+037. The analysis step is **coverage-aware** (spec 044): for existing suites,
+it considers test coverage from `_index.json`, acceptance criteria, and
+doc sections to recommend only gap tests. Supports multiple modes.
 
 **Interactive Session** — four-phase guided session:
 

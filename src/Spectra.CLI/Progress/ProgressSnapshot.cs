@@ -35,6 +35,19 @@ public sealed class ProgressSnapshot
     [JsonPropertyName("lastVerdict")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? LastVerdict { get; set; }
+
+    // Spec 044: Coverage snapshot for progress page display
+    [JsonPropertyName("existingTestCount")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int ExistingTestCount { get; set; }
+
+    [JsonPropertyName("criteriaCoverage")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CriteriaCoverage { get; set; }
+
+    [JsonPropertyName("analysisMode")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? AnalysisMode { get; set; }
 }
 
 public enum ProgressPhase
