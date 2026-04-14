@@ -1085,6 +1085,11 @@ public static class ProgressPageWriter
         var lastTestId = progress.TryGetProperty("lastTestId", out var lti) ? lti.GetString() : null;
         var lastVerdict = progress.TryGetProperty("lastVerdict", out var lv) ? lv.GetString() : null;
 
+        // Spec 044: coverage snapshot fields
+        var existingTestCount = progress.TryGetProperty("existingTestCount", out var etc) ? etc.GetInt32() : 0;
+        var criteriaCoverage = progress.TryGetProperty("criteriaCoverage", out var cc) ? cc.GetString() : null;
+        var analysisMode = progress.TryGetProperty("analysisMode", out var am) ? am.GetString() : null;
+
         if (target <= 0) return "";
 
         var sb = new StringBuilder();
@@ -1102,6 +1107,18 @@ public static class ProgressPageWriter
                 sb.Append($"""<div class="progress-detail">{Escape(detail)}</div>""");
             sb.Append("</div>");
             return sb.ToString();
+        }
+
+        // Spec 044: Coverage snapshot summary cards
+        if (existingTestCount > 0)
+        {
+            sb.Append("""<div class="summary-cards">""");
+            sb.Append($"""<div class="summary-card"><div class="summary-number">{existingTestCount}</div><div class="summary-label">Existing Tests</div></div>""");
+            if (!string.IsNullOrEmpty(criteriaCoverage))
+                sb.Append($"""<div class="summary-card"><div class="summary-number">{Escape(criteriaCoverage)}</div><div class="summary-label">Criteria Coverage</div></div>""");
+            if (!string.IsNullOrEmpty(analysisMode))
+                sb.Append($"""<div class="summary-card"><div class="summary-number">{Escape(analysisMode)}</div><div class="summary-label">Analysis Mode</div></div>""");
+            sb.Append("</div>");
         }
 
         // Generate flow: two bars (generation + verification).

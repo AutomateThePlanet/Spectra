@@ -321,6 +321,27 @@ public sealed class GenerateHandler
         var profileLoader = new ProfileLoader();
         var effectiveProfile = await profileLoader.LoadAsync(currentDir, suitePath, ct);
 
+        // Spec 044: Build coverage snapshot for coverage-aware analysis
+        CoverageSnapshot? coverageSnapshot = null;
+        if (existingTests.Count > 0)
+        {
+            var criteriaDir = Path.Combine(currentDir, config.Coverage?.CriteriaDir ?? "docs/criteria");
+            var criteriaIndexFile = Path.Combine(criteriaDir, "_criteria_index.yaml");
+            var docIndexFile = Path.Combine(currentDir, "docs", "_index.md");
+            var snapshotBuilder = new CoverageSnapshotBuilder(currentDir);
+            coverageSnapshot = await snapshotBuilder.BuildAsync(
+                suite, testsPath, criteriaDir, criteriaIndexFile, docIndexFile, ct);
+
+            // Populate progress snapshot with coverage data for progress page
+            if (coverageSnapshot.HasData && _currentProgress is not null)
+            {
+                _currentProgress.ExistingTestCount = coverageSnapshot.ExistingTestCount;
+                if (coverageSnapshot.TotalCriteriaCount > 0)
+                    _currentProgress.CriteriaCoverage = $"{coverageSnapshot.CoveredCriteriaIds.Count}/{coverageSnapshot.TotalCriteriaCount}";
+                _currentProgress.AnalysisMode = "gap-only";
+            }
+        }
+
         // Smart test count: analyze documentation when --count is not specified
         BehaviorAnalysisResult? analysisResult = null;
         int effectiveCount;
@@ -345,32 +366,23 @@ public sealed class GenerateHandler
                         _progress.Info($"  {status}");
                         UpdateProgress(suite, progressStatus, status);
                     }, config, loader, _tokenTracker, _errorTracker);
-                    return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct);
+                    return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct, coverageSnapshot);
                 });
 
             if (analysisResult is not null)
             {
-                AnalysisPresenter.DisplayBreakdown(analysisResult, _outputFormat);
+                AnalysisPresenter.DisplayBreakdown(analysisResult, _outputFormat, coverageSnapshot);
 
                 if (analysisResult.RecommendedCount == 0)
                 {
-                    AnalysisPresenter.DisplayAllCovered(analysisResult.TotalBehaviors, _outputFormat);
+                    AnalysisPresenter.DisplayAllCovered(analysisResult.TotalBehaviors, _outputFormat, coverageSnapshot);
                     var allCoveredResult = new GenerateResult
                     {
                         Command = "generate",
                         Status = "completed",
                         Suite = suite,
                         Message = "All behaviors already covered by existing tests",
-                        Analysis = new GenerateAnalysis
-                        {
-                            TotalBehaviors = analysisResult.TotalBehaviors,
-                            AlreadyCovered = analysisResult.AlreadyCovered,
-                            Recommended = 0,
-                            Breakdown = analysisResult.Breakdown?.ToDictionary(
-                                kvp => kvp.Key, kvp => kvp.Value),
-                            TechniqueBreakdown = analysisResult.TechniqueBreakdown.ToDictionary(
-                                kvp => kvp.Key, kvp => kvp.Value)
-                        },
+                        Analysis = BuildGenerateAnalysis(analysisResult, coverageSnapshot),
                         Generation = new GenerateGeneration
                         {
                             TestsGenerated = 0,
@@ -404,12 +416,12 @@ public sealed class GenerateHandler
                         {
                             UpdateProgress(suite, progressStatus, status);
                         }, config, loader, _tokenTracker, _errorTracker);
-                        return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct);
+                        return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct, coverageSnapshot);
                     });
 
                 if (analysisResult is not null)
                 {
-                    AnalysisPresenter.DisplayBreakdown(analysisResult, _outputFormat);
+                    AnalysisPresenter.DisplayBreakdown(analysisResult, _outputFormat, coverageSnapshot);
                     effectiveCount = analysisResult.RecommendedCount;
                 }
                 else
@@ -440,21 +452,19 @@ public sealed class GenerateHandler
                 Message = analysisFailed
                     ? $"Behavior analysis did not return results (model: {generatorModelName}, configured timeout: {configuredAnalysisTimeout} min). Recommended count of {effectiveCount} is a fallback default — NOT a real analysis. Inspect .spectra-debug.log to see the actual elapsed time and failure reason. Common causes: (1) ai.analysis_timeout_minutes too low (current: {configuredAnalysisTimeout} min) — bump it; (2) the model truncated its JSON response by hitting its max-output-token limit — split the suite into fewer documents or switch to a model with a larger output budget; (3) the model produced text that does not match the expected behaviors schema. The tolerant parser (v1.43.0+) recovers what it can from truncated responses, so recurring failures here usually mean the model output is unusable, not just truncated."
                     : null,
-                Analysis = analysisResult is not null ? new GenerateAnalysis
-                {
-                    TotalBehaviors = analysisResult.TotalBehaviors,
-                    AlreadyCovered = analysisResult.AlreadyCovered,
-                    Recommended = analysisResult.RecommendedCount,
-                    Breakdown = analysisResult.Breakdown?.ToDictionary(
-                        kvp => kvp.Key, kvp => kvp.Value),
-                    TechniqueBreakdown = analysisResult.TechniqueBreakdown.ToDictionary(
-                        kvp => kvp.Key, kvp => kvp.Value)
-                } : new GenerateAnalysis
-                {
-                    TotalBehaviors = 0,
-                    AlreadyCovered = existingTests.Count,
-                    Recommended = effectiveCount
-                },
+                Analysis = analysisResult is not null
+                    ? BuildGenerateAnalysis(analysisResult, coverageSnapshot)
+                    : new GenerateAnalysis
+                    {
+                        TotalBehaviors = 0,
+                        AlreadyCovered = existingTests.Count,
+                        Recommended = effectiveCount,
+                        ExistingTestCount = coverageSnapshot?.ExistingTestCount ?? 0,
+                        TotalCriteria = coverageSnapshot?.TotalCriteriaCount ?? 0,
+                        CoveredCriteria = coverageSnapshot?.CoveredCriteriaIds.Count ?? 0,
+                        UncoveredCriteria = coverageSnapshot?.UncoveredCriteria.Count ?? 0,
+                        UncoveredCriteriaIds = coverageSnapshot?.UncoveredCriteria.Select(c => c.Id).ToList()
+                    },
                 Generation = new GenerateGeneration
                 {
                     TestsGenerated = 0,
@@ -895,16 +905,9 @@ public sealed class GenerateHandler
             Status = "completed",
             Suite = suite,
             Message = completionMessage,
-            Analysis = analysisResult is not null ? new GenerateAnalysis
-            {
-                TotalBehaviors = analysisResult.TotalBehaviors,
-                AlreadyCovered = analysisResult.AlreadyCovered,
-                Recommended = analysisResult.RecommendedCount,
-                Breakdown = analysisResult.Breakdown?.ToDictionary(
-                    kvp => kvp.Key, kvp => kvp.Value),
-                TechniqueBreakdown = analysisResult.TechniqueBreakdown.ToDictionary(
-                    kvp => kvp.Key, kvp => kvp.Value)
-            } : null,
+            Analysis = analysisResult is not null
+                ? BuildGenerateAnalysis(analysisResult, coverageSnapshot)
+                : null,
             Generation = new GenerateGeneration
             {
                 TestsRequested = effectiveCount,
@@ -1108,6 +1111,18 @@ public sealed class GenerateHandler
             _gapPresenter.ShowUncoveredAreas(gaps);
         }
 
+        // Spec 044: Build coverage snapshot for coverage-aware analysis
+        CoverageSnapshot? coverageSnapshot2 = null;
+        if (existingTests.Count > 0)
+        {
+            var criteriaDir = Path.Combine(currentDir, config.Coverage?.CriteriaDir ?? "docs/criteria");
+            var criteriaIndexFile = Path.Combine(criteriaDir, "_criteria_index.yaml");
+            var docIndexFile = Path.Combine(currentDir, "docs", "_index.md");
+            var snapshotBuilder = new CoverageSnapshotBuilder(currentDir);
+            coverageSnapshot2 = await snapshotBuilder.BuildAsync(
+                suiteName, testsPath, criteriaDir, criteriaIndexFile, docIndexFile, ct);
+        }
+
         // Smart test count: analyze documentation when --count is not specified
         BehaviorAnalysisResult? analysisResult = null;
         int effectiveCount;
@@ -1127,16 +1142,16 @@ public sealed class GenerateHandler
                     var provider = config.Ai.Providers?.FirstOrDefault(p => p.Enabled);
                     var loader = new PromptTemplateLoader(currentDir);
                     var analyzer = new BehaviorAnalyzer(provider, null, config, loader, _tokenTracker, _errorTracker);
-                    return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct);
+                    return await analyzer.AnalyzeAsync(documents, existingTests, focus, ct, coverageSnapshot2);
                 });
 
             if (analysisResult is not null)
             {
-                AnalysisPresenter.DisplayBreakdown(analysisResult, _outputFormat);
+                AnalysisPresenter.DisplayBreakdown(analysisResult, _outputFormat, coverageSnapshot2);
 
                 if (analysisResult.RecommendedCount == 0)
                 {
-                    AnalysisPresenter.DisplayAllCovered(analysisResult.TotalBehaviors, _outputFormat);
+                    AnalysisPresenter.DisplayAllCovered(analysisResult.TotalBehaviors, _outputFormat, coverageSnapshot2);
                     session.Complete();
                     WriteResultFile(new GenerateResult
                     {
@@ -1520,16 +1535,9 @@ public sealed class GenerateHandler
             Message = allGeneratedTests.Count == 0
                 ? $"No tests generated (requested: {effectiveCount})"
                 : null,
-            Analysis = analysisResult is not null ? new GenerateAnalysis
-            {
-                TotalBehaviors = analysisResult.TotalBehaviors,
-                AlreadyCovered = analysisResult.AlreadyCovered,
-                Recommended = analysisResult.RecommendedCount,
-                Breakdown = analysisResult.Breakdown?.ToDictionary(
-                    kvp => kvp.Key, kvp => kvp.Value),
-                TechniqueBreakdown = analysisResult.TechniqueBreakdown.ToDictionary(
-                    kvp => kvp.Key, kvp => kvp.Value)
-            } : null,
+            Analysis = analysisResult is not null
+                ? BuildGenerateAnalysis(analysisResult, coverageSnapshot2)
+                : null,
             Generation = new GenerateGeneration
             {
                 TestsGenerated = allGeneratedTests.Count + totalRejected,
@@ -1770,6 +1778,28 @@ public sealed class GenerateHandler
             _progress.Error($"Error reading config: {ex.Message}");
             return null;
         }
+    }
+
+    /// <summary>
+    /// Spec 044: Builds a GenerateAnalysis from analysis result + optional coverage snapshot.
+    /// </summary>
+    private static GenerateAnalysis BuildGenerateAnalysis(
+        BehaviorAnalysisResult result,
+        CoverageSnapshot? snapshot = null)
+    {
+        return new GenerateAnalysis
+        {
+            TotalBehaviors = result.TotalBehaviors,
+            AlreadyCovered = result.AlreadyCovered,
+            Recommended = result.RecommendedCount,
+            Breakdown = result.Breakdown?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+            TechniqueBreakdown = result.TechniqueBreakdown.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+            ExistingTestCount = snapshot?.ExistingTestCount ?? 0,
+            TotalCriteria = snapshot?.TotalCriteriaCount ?? 0,
+            CoveredCriteria = snapshot?.CoveredCriteriaIds.Count ?? 0,
+            UncoveredCriteria = snapshot?.UncoveredCriteria.Count ?? 0,
+            UncoveredCriteriaIds = snapshot?.UncoveredCriteria.Select(c => c.Id).ToList()
+        };
     }
 
     private async Task<List<TestCase>> LoadExistingTestsAsync(

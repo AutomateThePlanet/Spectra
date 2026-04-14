@@ -78,6 +78,27 @@ public sealed class GenerateAnalysis
     /// </summary>
     [JsonPropertyName("technique_breakdown")]
     public Dictionary<string, int> TechniqueBreakdown { get; init; } = new();
+
+    // Spec 044: Coverage-aware analysis fields
+    [JsonPropertyName("existing_test_count")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int ExistingTestCount { get; init; }
+
+    [JsonPropertyName("total_criteria")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int TotalCriteria { get; init; }
+
+    [JsonPropertyName("covered_criteria")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int CoveredCriteria { get; init; }
+
+    [JsonPropertyName("uncovered_criteria")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int UncoveredCriteria { get; init; }
+
+    [JsonPropertyName("uncovered_criteria_ids")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? UncoveredCriteriaIds { get; init; }
 }
 
 public sealed class GenerateGeneration

@@ -17,6 +17,8 @@ placeholders:
     description: "Related acceptance criteria from .criteria.yaml files"
   - name: categories
     description: "Configured behavior categories with descriptions (from config)"
+  - name: coverage_context
+    description: "Coverage snapshot context block (existing tests, criteria, source refs) for gap-only analysis"
 ---
 
 <!-- Pattern: Persona + Boundaries + Chain-of-thought + Structured output -->
@@ -98,6 +100,10 @@ Return ONLY a JSON object in this exact format (no other text):
 - Distribute behaviors across ALL configured categories — no category should have 0 behaviors unless the documentation genuinely has no content matching that category
 
 Count only DISTINCT testable behaviors — do not duplicate similar scenarios.
+
+{{#if coverage_context}}
+{{coverage_context}}
+{{/if}}
 
 {{#if testimize_enabled}}
 ## STRUCTURED FIELD SPECIFICATIONS

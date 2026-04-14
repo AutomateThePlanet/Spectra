@@ -109,6 +109,12 @@ When analyzing documentation, pay special attention to:
 - Rate limiting and abuse prevention on public APIs
 ```
 
+**Coverage-aware analysis**: The `behavior-analysis.md` template includes a
+`{{coverage_context}}` placeholder (spec 044). When an existing suite has
+coverage data, this resolves to a markdown block listing covered/uncovered
+criteria and doc sections, directing the AI to focus on gaps. If your custom
+template omits this placeholder, coverage context is simply not injected.
+
 **Safe updates**: `spectra update-skills` refreshes unmodified templates to
 the latest version. Modified templates are preserved. Use
 `spectra prompts reset {template}` to restore a template to default.

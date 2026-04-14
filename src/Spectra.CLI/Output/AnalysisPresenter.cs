@@ -45,11 +45,41 @@ public static class AnalysisPresenter
     /// <summary>
     /// Displays the categorized behavior breakdown from analysis.
     /// </summary>
-    public static void DisplayBreakdown(BehaviorAnalysisResult result, OutputFormat outputFormat = OutputFormat.Human)
+    public static void DisplayBreakdown(
+        BehaviorAnalysisResult result,
+        OutputFormat outputFormat = OutputFormat.Human,
+        Agent.Analysis.CoverageSnapshot? snapshot = null)
     {
         if (outputFormat == OutputFormat.Json) return;
         if (Console.IsOutputRedirected)
             return;
+
+        // Spec 044: Show coverage summary when snapshot data is available
+        if (snapshot is not null && snapshot.HasData)
+        {
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine($"  Suite: [bold]{snapshot.ExistingTestCount}[/] existing tests");
+
+            if (snapshot.TotalCriteriaCount > 0)
+            {
+                var coveredCount = snapshot.CoveredCriteriaIds.Count;
+                var pct = snapshot.TotalCriteriaCount > 0
+                    ? (double)coveredCount / snapshot.TotalCriteriaCount * 100
+                    : 0;
+                AnsiConsole.MarkupLine(
+                    $"  Acceptance criteria: [bold]{coveredCount}/{snapshot.TotalCriteriaCount}[/] covered ({pct:F1}%)");
+            }
+
+            if (snapshot.CoveredSourceRefs.Count > 0 || snapshot.UncoveredSourceRefs.Count > 0)
+            {
+                var totalRefs = snapshot.CoveredSourceRefs.Count + snapshot.UncoveredSourceRefs.Count;
+                var pct = totalRefs > 0
+                    ? (double)snapshot.CoveredSourceRefs.Count / totalRefs * 100
+                    : 0;
+                AnsiConsole.MarkupLine(
+                    $"  Documentation sections: [bold]{snapshot.CoveredSourceRefs.Count}/{totalRefs}[/] covered ({pct:F1}%)");
+            }
+        }
 
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine(
@@ -140,15 +170,26 @@ public static class AnalysisPresenter
     /// <summary>
     /// Displays a message when all behaviors are already covered.
     /// </summary>
-    public static void DisplayAllCovered(int totalBehaviors, OutputFormat outputFormat = OutputFormat.Human)
+    public static void DisplayAllCovered(
+        int totalBehaviors,
+        OutputFormat outputFormat = OutputFormat.Human,
+        Agent.Analysis.CoverageSnapshot? snapshot = null)
     {
         if (outputFormat == OutputFormat.Json) return;
         if (Console.IsOutputRedirected)
             return;
 
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine(
-            $"  {OutputSymbols.SuccessMarkup} All {totalBehaviors} identified behaviors are already covered by existing tests.");
+        if (snapshot is not null && snapshot.HasData && snapshot.UncoveredCriteria.Count == 0)
+        {
+            AnsiConsole.MarkupLine(
+                $"  {OutputSymbols.SuccessMarkup} Suite fully covered: all {snapshot.TotalCriteriaCount} criteria and {totalBehaviors} behaviors are covered.");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine(
+                $"  {OutputSymbols.SuccessMarkup} All {totalBehaviors} identified behaviors are already covered by existing tests.");
+        }
         AnsiConsole.MarkupLine(
             $"  [grey]Consider running: spectra ai update    # Update existing tests[/]");
         AnsiConsole.WriteLine();

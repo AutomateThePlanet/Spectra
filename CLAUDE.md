@@ -130,3 +130,10 @@ Generated in JSON, Markdown, HTML. Features: test titles from `_index.json`, hum
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
+
+## Active Technologies
+- C# 12, .NET 8+ + GitHub Copilot SDK, System.CommandLine, Spectre.Console, System.Text.Json, YamlDotNet (044-coverage-aware-analysis)
+- File-based (Markdown/YAML/JSON in `test-cases/`, `docs/criteria/`, `_index.json`, `_criteria_index.yaml`) (044-coverage-aware-analysis)
+
+## Recent Changes
+- 044-coverage-aware-analysis: Added C# 12, .NET 8+ + GitHub Copilot SDK, System.CommandLine, Spectre.Console, System.Text.Json, YamlDotNet
