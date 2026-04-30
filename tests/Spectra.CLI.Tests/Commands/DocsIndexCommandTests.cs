@@ -80,14 +80,21 @@ public class DocsIndexCommandTests : IDisposable
 
             Assert.Equal(0, result);
 
-            // Verify index was created
-            var indexPath = DocumentIndexService.ResolveIndexPath(_testDir, config.Source);
-            Assert.True(File.Exists(indexPath));
+            // Spec 040: indexer now writes the v2 layout under
+            // docs/_index/ rather than a single docs/_index.md. Verify all
+            // three artifacts.
+            var indexDir = Path.Combine(_testDir, "docs", "_index");
+            Assert.True(Directory.Exists(indexDir));
+            Assert.True(File.Exists(Path.Combine(indexDir, "_manifest.yaml")));
+            Assert.True(File.Exists(Path.Combine(indexDir, "_checksums.json")));
+            Assert.True(Directory.Exists(Path.Combine(indexDir, "groups")));
 
-            var content = await File.ReadAllTextAsync(indexPath);
-            Assert.Contains("# Documentation Index", content);
+            // The "feature.md" doc lives directly in docs/ → assigned to suite
+            // _root → its content rendered into groups/_root.index.md.
+            var rootSuiteFile = Path.Combine(indexDir, "groups", "_root.index.md");
+            Assert.True(File.Exists(rootSuiteFile));
+            var content = await File.ReadAllTextAsync(rootSuiteFile);
             Assert.Contains("Feature", content);
-            Assert.Contains("SPECTRA_INDEX_CHECKSUMS", content);
         }
         finally
         {

@@ -176,7 +176,7 @@ When running `spectra ai generate`, the analysis step is coverage-aware for exis
 
 - **`_index.json`**: Existing test titles, criteria links, and source refs
 - **`.criteria.yaml` files**: All acceptance criteria, cross-referenced against tests
-- **`docs/_index.md`**: Documentation sections, cross-referenced against test source refs
+- **`docs/_index/_manifest.yaml` + `groups/{suite}.index.md`** (Spec 040 v2 layout): Documentation sections, cross-referenced against test source refs. The coverage path reads ALL suites regardless of `skip_analysis` flag — coverage considers every indexed document.
 
 The AI receives this coverage context and only recommends tests for genuine gaps — uncovered criteria and undocumented sections. For a mature suite with 231 tests covering 38/41 criteria, the analysis recommends ~8 new tests (the actual gap) instead of 139.
 

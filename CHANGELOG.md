@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.51.0] - 2026-04-30
+
+### Changed — Spec 040: Document Index Restructure (bug fix for the 204K-token analyzer overflow)
+
+The single-file `docs/_index.md` is replaced by a per-suite layout under `docs/_index/`:
+
+- `_manifest.yaml` — small (~2-5K tokens), always loaded into AI prompts.
+- `groups/{suite}.index.md` — per-suite index files, lazy-loaded.
+- `_checksums.json` — content-hash table; never sent to AI; decoupled from index content.
+
+Migration is automatic on first `spectra docs index` run. The legacy file is preserved as `docs/_index.md.bak`. See [`docs/migration-040.md`](docs/migration-040.md) for the full guide.
+
+### Fixed
+
+- **204K-token analyzer overflow on large projects.** Running `spectra ai generate` against a 500+ document corpus no longer fails with `400 prompt token count of 204224 exceeds the limit of 128000`. The analyzer now (a) reads the manifest first, (b) filters to the relevant doc-suite via the new `--suite` semantics (the test-suite arg doubles as a doc-suite filter per FR-028), (c) runs a pre-flight token-budget check before any AI call. Overflow now exits cleanly with code `4` and an actionable message naming every candidate suite + token cost, rather than the raw model-side 400.
+
+### Added
+
+- **Pre-flight budget check** at `Spectra.CLI/Index/PreFlightTokenChecker.cs`. Configurable via `ai.analysis.max_prompt_tokens` (default 96,000 — leaves a 32K margin under the 128K context window).
+- **`AnalyzerInputBuilder`** at `Spectra.CLI/Agent/Copilot/AnalyzerInputBuilder.cs` — bridges manifest reading, suite selection, document filtering, and pre-flight enforcement upstream of `BehaviorAnalyzer`.
+- **`DocSuiteSelector`** with priority-ordered selection (`--suite` exact match → `--focus` keyword packing to 70% of budget → no-filter highest-tokens-first).
+- **Real glob matcher** at `Spectra.CLI/Source/ExclusionPatternMatcher.cs` wrapping `Microsoft.Extensions.FileSystemGlobbing`.
+- **Per-doc spillover writer** in `DocumentIndexService.EnsureNewLayoutAsync` — when a single suite exceeds `coverage.max_suite_tokens` (default 80,000), per-doc files land at `docs/_index/docs/{sanitized}.index.md` and the manifest entry gains a `spillover_files` list (Spec 041 prep).
+- **`--include-archived` flag** on `spectra docs index`, `spectra ai generate`, and `spectra ai analyze` — re-includes pattern-excluded suites in the AI input.
+- **`--no-migrate` flag** on `spectra docs index` — errors out when a legacy file is present rather than auto-migrating.
+- **`--suites <ids>` flag** on `spectra docs index` — re-indexes only the named suites.
+- **`spectra docs list-suites`** — table or JSON listing of every suite with doc count, tokens, and analysis status.
+- **`spectra docs show-suite <id>`** — prints a single suite's index file.
+- **Frontmatter `suite:` override** — per-document override of the directory-default suite assignment.
+- **Default exclusion patterns** under `coverage.analysis_exclude_patterns`: `**/Old/**`, `**/old/**`, `**/legacy/**`, `**/archive/**`, `**/release-notes/**`, `**/CHANGELOG*`, `**/SUMMARY.md`. Documents matching these patterns are still indexed and counted in coverage but their suites are flagged `skip_analysis: true` and excluded from analyzer prompts by default.
+- **`MigrationRecord`** in `DocsIndexResult` — surfaces the one-time migration's stats (suites created, docs migrated, largest suite, warnings).
+- **`Suites` and `Manifest` fields** in `DocsIndexResult` — per-suite breakdown and manifest path in JSON output.
+- **`PreFlightBudget = 4`** exit code in `Spectra.CLI/Infrastructure/ExitCodes.cs`.
+
+### Removed
+
+- **`Spectra.Core/Index/DocumentIndexWriter.cs`** — legacy single-file writer. Deleted outright.
+- **`DocumentIndexService.EnsureIndexAsync`** — replaced by `EnsureNewLayoutAsync`. All three top-level entry points (`Generate`, `Init`, `Analyze`) flipped to the v2 method.
+- **Phase-3 transition shim** that briefly wrote both layouts side-by-side. The legacy `docs/_index.md` is no longer produced; only the manifest + per-suite + checksum store.
+- `tests/Spectra.Core.Tests/Index/DocumentIndexWriterTests.cs` and `DocumentIndexReaderTests.cs` — superseded by the v2 round-trip tests.
+
+### Internal
+
+- `Spectra.Core/Index/DocumentIndexReader.cs` is now `internal sealed`. Used only by `LegacyIndexMigrator` for the one-time migration parse. `InternalsVisibleTo` declared for `Spectra.CLI` and `Spectra.Core.Tests` in `Spectra.Core.csproj`.
+- `CoverageSnapshotBuilder.ReadDocSectionRefsAsync` reads the manifest first, falls back to legacy parsing only when the manifest is absent (transitional safety net for already-migrated repos that haven't re-indexed yet).
+
+### Tests
+
+- ≈30+ new test methods across `DocSuiteSelectorTests`, `AnalyzerInputBuilderTests`, `ManifestDocumentFilterTests`, `ExclusionPatternMatcherTests`, `SpilloverWriterTests`, `DocsListSuitesHandlerTests`, `DocsShowSuiteHandlerTests`, plus rewritten `DocumentIndexServiceTests` and `LegacyIndexMigratorTests`.
+- 0 regressions across `Spectra.Core.Tests`, `Spectra.CLI.Tests`, and `Spectra.MCP.Tests`.
+
 ## [1.48.3] - 2026-04-12
 
 ### Changed — Testimize migrated from MCP child process to in-process NuGet

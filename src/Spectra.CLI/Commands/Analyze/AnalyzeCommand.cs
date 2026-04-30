@@ -74,6 +74,10 @@ public sealed class AnalyzeCommand : Command
             ["--priority"],
             "Filter criteria by priority (e.g. high, medium, low)");
 
+        var includeArchivedOption = new Option<bool>(
+            ["--include-archived"],
+            "Include suites flagged skip_analysis: true (Old/, legacy/, archive/, release-notes/) when extracting criteria");
+
         AddOption(outputOption);
         AddOption(formatOption);
         AddOption(coverageOption);
@@ -89,6 +93,7 @@ public sealed class AnalyzeCommand : Command
         AddOption(sourceTypeOption);
         AddOption(componentOption);
         AddOption(priorityOption);
+        AddOption(includeArchivedOption);
 
         this.SetHandler(async (context) =>
         {
@@ -110,8 +115,9 @@ public sealed class AnalyzeCommand : Command
             var sourceType = context.ParseResult.GetValueForOption(sourceTypeOption);
             var component = context.ParseResult.GetValueForOption(componentOption);
             var priority = context.ParseResult.GetValueForOption(priorityOption);
+            var includeArchived = context.ParseResult.GetValueForOption(includeArchivedOption);
 
-            var handler = new AnalyzeHandler(verbosity, outputFormat);
+            var handler = new AnalyzeHandler(verbosity, outputFormat, includeArchived);
 
             if (listCriteria)
             {

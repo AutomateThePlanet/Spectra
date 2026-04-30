@@ -6,23 +6,38 @@ nav_order: 7
 
 # Document Index
 
-Pre-built documentation index for efficient AI test generation.
+Pre-built per-suite documentation index for efficient AI test generation.
 
-Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md)
+Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md) | [Migration Spec 040](migration-040.md)
 
 ---
 
 ## Overview
 
-The `spectra docs index` command builds a persistent `docs/_index.md` file — a pre-built index with per-document metadata. The AI agent reads this lightweight index (~1-2K tokens) instead of scanning all documentation files at generation time.
+The `spectra docs index` command builds a structured layout under `docs/_index/` that the AI agent reads instead of scanning all documentation at generation time:
+
+```
+docs/_index/
+├── _manifest.yaml          # Always loaded into AI prompts (~2-5K tokens)
+├── _checksums.json         # Hash table for incremental detection (NEVER sent to AI)
+└── groups/
+    ├── checkout.index.md   # Per-suite index files, lazy-loaded
+    ├── payments.index.md
+    └── ...
+```
+
+The manifest is small and always loaded; per-suite files are lazy-loaded only for the suite the user is working with. This is what unblocks `spectra ai generate` on large corpora — the analyzer no longer carries every document's preview into every prompt.
 
 ## How It Works
 
-1. **Discovery** — Scans `docs/` (or configured `local_dir`) for Markdown files using include/exclude patterns
-2. **Extraction** — For each file, extracts: title, H2/H3 sections with 200-char summaries, key entities (code spans, capitalized phrases, API paths, quoted strings), word count, token estimate (`words × 1.3`), file size, SHA-256 content hash
-3. **Incremental Updates** — On subsequent runs, only re-indexes files whose content hash has changed. Unchanged entries are reused from the existing index.
-4. **Output** — Writes `docs/_index.md` in Markdown format with a hidden `<!-- SPECTRA_INDEX_CHECKSUMS {...} -->` comment for fast hash lookups
-5. **Acceptance Criteria Extraction** — After indexing, automatically extracts testable acceptance criteria from the indexed documents using the configured AI provider and writes them to `_criteria_index.yaml`. Use `--skip-criteria` to skip this step. If no AI provider is configured, this step is silently skipped.
+1. **Migration check** — On first run after upgrading from a release that wrote a single-file `docs/_index.md`, the indexer auto-migrates: parses the legacy file, groups entries by suite, writes the new layout, and renames the legacy file to `docs/_index.md.bak` for safekeeping. No flag required.
+2. **Discovery** — Scans the configured `source.local_dir` for Markdown files (default `docs/`) using `source.include_patterns` / `source.exclude_patterns`.
+3. **Extraction** — For each changed file, extracts: title, H2/H3 sections with 200-char summaries, key entities (code spans, capitalized phrases, API paths, quoted strings), word count, token estimate (`words × 1.3`), file size, SHA-256 content hash.
+4. **Suite resolution** — Assigns each document to a suite by priority: per-doc frontmatter `suite:` override → `source.group_overrides` config → first directory segment under `local_dir` → `_root` fallback.
+5. **Exclusion patterns** — Documents matching `coverage.analysis_exclude_patterns` (default `**/Old/**`, `**/legacy/**`, `**/archive/**`, `**/release-notes/**`, `**/CHANGELOG*`, `**/SUMMARY.md`) are still indexed and counted in coverage but their suites are flagged `skip_analysis: true` so the AI analyzer skips them by default.
+6. **Spillover** — When a single suite's `tokens_estimated` exceeds `coverage.max_suite_tokens` (default 80,000), per-doc spillover files land at `docs/_index/docs/{sanitized}.index.md` and the suite's manifest entry gains a `spillover_files` list.
+7. **Incremental updates** — Subsequent runs reuse entries whose checksum is unchanged. Only modified files re-extract their metadata.
+8. **Acceptance criteria extraction** — After indexing, `spectra docs index` automatically extracts testable acceptance criteria from the analyzable documents using the configured AI provider and writes to `_criteria_index.yaml`. Use `--skip-criteria` to skip.
 
 ## Usage
 
@@ -30,62 +45,201 @@ The `spectra docs index` command builds a persistent `docs/_index.md` file — a
 # Build or incrementally update the index
 spectra docs index
 
-# Force a full rebuild (re-indexes all files regardless of changes)
+# Force a full rebuild
 spectra docs index --force
+
+# Re-index only specific suites
+spectra docs index --suites checkout,payments
+
+# Refuse to migrate a legacy file (errors instead of auto-migrating)
+spectra docs index --no-migrate
+
+# Include skip-analysis suites in the criteria-extraction step
+spectra docs index --include-archived
+
+# Skip the auto-criteria step
+spectra docs index --skip-criteria
 ```
 
-## Auto-Refresh
+### Introspection commands
 
-The document index is automatically refreshed (incremental) before every `spectra ai generate` run. During `spectra init`, an initial full index build is performed if documentation files exist.
+```bash
+# List every suite with doc counts, token estimates, and analysis status
+spectra docs list-suites
+spectra docs list-suites --output-format json
 
-## Acceptance Criteria Extraction
+# Print one suite's index file
+spectra docs show-suite checkout
+```
 
-After building or updating the index, `spectra docs index` automatically extracts testable acceptance criteria from the documentation using the configured AI provider. Extracted criteria are merged into `_criteria_index.yaml` (configured via `coverage.criteria_file`), with duplicate detection to avoid re-extracting existing entries.
+## Auto-refresh
 
-This removes the need to run `spectra ai analyze --extract-criteria` as a separate step — criteria stay in sync with the documentation index. Use `--skip-criteria` to skip this step. The `--extract-criteria` flag on `spectra ai analyze` is still available for on-demand extraction.
+The document index is automatically refreshed (incremental) before every `spectra ai generate` and `spectra ai analyze` run. During `spectra init`, an initial full index build is performed if documentation files exist.
 
-If no AI provider is configured, the extraction step is skipped silently and the command completes with the index only.
+## Manifest format (`_manifest.yaml`)
 
-## Index Format
+The manifest is the only index artifact that is always loaded into AI prompts. It must stay small and structured.
 
-The generated `docs/_index.md` looks like:
+```yaml
+# Auto-generated by `spectra docs index`. Do not edit by hand.
+version: 2
+generated_at: 2026-04-30T15:00:00Z
+total_documents: 541
+total_words: 158516
+total_tokens_estimated: 205825
+groups:
+  - id: checkout
+    title: Checkout
+    path: docs/checkout
+    document_count: 12
+    tokens_estimated: 4500
+    skip_analysis: false
+    excluded_by: none
+    index_file: groups/checkout.index.md
+  - id: Old
+    title: Old
+    path: docs/Old
+    document_count: 30
+    tokens_estimated: 3200
+    skip_analysis: true
+    excluded_by: pattern
+    excluded_pattern: "**/Old/**"
+    index_file: groups/Old.index.md
+```
+
+| Field | Meaning |
+|---|---|
+| `version` | Schema version. v1 = legacy single-file. v2 = current layout. |
+| `id` | Stable suite identifier. Sanitized; no slashes/spaces; preserves original casing. |
+| `title` | Human-readable label, derived from the directory name. |
+| `path` | Repo-relative path to the suite directory, forward slashes. |
+| `document_count` | Number of docs assigned to this suite. |
+| `tokens_estimated` | Sum of per-doc token estimates for the suite. |
+| `skip_analysis` | True if this suite is excluded from AI analyzer prompts by default. |
+| `excluded_by` | One of `pattern`, `config`, `frontmatter`, `none`. |
+| `excluded_pattern` | When `excluded_by == "pattern"`, the matched glob. Omitted otherwise. |
+| `index_file` | Relative path within `_index/` to the suite's index file. |
+| `spillover_files` | Optional. Lists per-doc spillover files for suites that exceed `coverage.max_suite_tokens`. |
+
+## Per-suite index file format (`groups/{id}.index.md`)
+
+Same per-document entry shape as the legacy single-file index, scoped to one suite, with no checksum block:
 
 ```markdown
-# Documentation Index
+# checkout
 
-> Auto-generated by Spectra. Last updated: 2026-03-20T14:30:00Z
-> Total: 5 documents | 12,000 words | ~15,600 tokens
+> Group: checkout | 12 documents | ~4,500 tokens
+> Last indexed: 2026-04-30T15:00:00Z
 
 ---
 
-### docs/features/checkout.md
-- **Title:** Checkout Flow
-- **Size:** 12 KB | **Words:** 3,450 | **Tokens:** ~4,485
-- **Last Modified:** 2026-03-18
-- **Key Entities:** Payment Gateway, Cart, Discount Code
+### docs/checkout/process.md
+- **Title:** Checkout process
+- **Size:** 4 KB | **Words:** 312 | **Tokens:** ~406
+- **Last Modified:** 2026-04-15
+- **Key Entities:** Cart, Payment, Receipt
 
 | Section | Summary |
 |---------|---------|
-| Payment Methods | Three payment methods are supported: credit card... |
-|   ↳ Credit Card | Card details are validated client-side before... |
+| Overview | The standard sale flow from item scan through tender to receipt. |
 
 ---
 
-<!-- SPECTRA_INDEX_CHECKSUMS
-{"docs/features/checkout.md":"a1b2c3d4..."}
--->
+### docs/checkout/refunds.md
+...
 ```
 
-## Configuration
+## Checksum store format (`_checksums.json`)
 
-The index path can be customized in `spectra.config.json`:
+Read every `spectra docs index` run for incremental detection but **never** sent to the AI:
 
 ```json
 {
-  "source": {
-    "doc_index": "docs/_index.md"
+  "version": 2,
+  "generated_at": "2026-04-30T15:00:00Z",
+  "checksums": {
+    "docs/checkout/process.md": "a1b2c3d4e5f6...",
+    "docs/checkout/refunds.md": "0123456789abcdef..."
   }
 }
 ```
 
-If `doc_index` is not set, defaults to `{local_dir}/_index.md`.
+Updating this file does not rewrite any per-suite Markdown content — incremental updates touch only the files whose hashes changed.
+
+## Frontmatter overrides
+
+Per-document YAML frontmatter recognised by the indexer:
+
+```yaml
+---
+suite: my-custom-suite
+---
+```
+
+| Field | Effect |
+|---|---|
+| `suite: <id>` | Overrides the directory-default suite assignment. ID must match `^[A-Za-z0-9._-]+$` and not start with `.` or `-`. Invalid IDs are rejected with an error pointing to the offending file. |
+
+## Configuration
+
+```json
+{
+  "source": {
+    "doc_index_dir": "docs/_index",
+    "group_overrides": {
+      "docs/some/special.md": "my-suite"
+    }
+  },
+  "coverage": {
+    "analysis_exclude_patterns": [
+      "**/Old/**",
+      "**/legacy/**",
+      "**/archive/**",
+      "**/release-notes/**",
+      "**/CHANGELOG*",
+      "**/SUMMARY.md"
+    ],
+    "max_suite_tokens": 80000
+  },
+  "ai": {
+    "analysis": {
+      "max_prompt_tokens": 96000
+    }
+  }
+}
+```
+
+Setting `coverage.analysis_exclude_patterns: []` disables all default exclusions. The list **replaces** rather than merges with defaults — explicit `[]` means "exclude nothing".
+
+## Migrating from a legacy `docs/_index.md`
+
+Just run `spectra docs index`. Migration is automatic, atomic, and reversible:
+
+- The legacy file is parsed into per-suite groups.
+- Default exclusion patterns are applied.
+- The new layout is written under `docs/_index/`.
+- The legacy file is renamed to `docs/_index.md.bak` for safekeeping.
+- A summary is logged.
+
+Subsequent runs skip migration (the legacy file is gone) and do incremental updates.
+
+See [Migration: Spec 040](migration-040.md) for the full migration guide.
+
+## Pre-flight token budget
+
+When running `spectra ai generate` (or any AI command that loads documentation context), Spectra estimates the prompt size before sending it to the model. If the estimate exceeds `ai.analysis.max_prompt_tokens` (default 96,000), the command fails fast with exit code `4` and an actionable message:
+
+```
+Analyzer prompt would be ~187,234 tokens, exceeding the configured 96,000-token budget.
+Candidate suites (sorted by token cost):
+  SM_GSG_Topics       10,877 tokens
+  RD_Topics            9,911 tokens
+  POS_UG_Topics        7,400 tokens
+  ... 9 more ...
+Suggested:
+  spectra ai generate --suite SM_GSG_Topics
+  spectra ai generate --analyze-only
+Or raise ai.analysis.max_prompt_tokens in spectra.config.json.
+```
+
+This replaces the raw `400 prompt token count exceeds the limit of 128000` error from the model on large corpora.

@@ -154,6 +154,42 @@ public sealed class CoverageSnapshotBuilder
 
         try
         {
+            // Spec 040 Phase 4: prefer the v2 manifest layout. Walk every
+            // suite's index file (regardless of skip_analysis — coverage
+            // considers all documents per FR-018). Falls back to the legacy
+            // single-file path when the manifest is absent.
+            var indexDir = Path.GetDirectoryName(docIndexFile);
+            var v2Manifest = string.IsNullOrEmpty(indexDir)
+                ? null
+                : Path.Combine(indexDir, "_index", "_manifest.yaml");
+
+            if (!string.IsNullOrEmpty(v2Manifest) && File.Exists(v2Manifest))
+            {
+                var manifest = await new DocIndexManifestReader().ReadAsync(v2Manifest, ct);
+                if (manifest is not null)
+                {
+                    var v2IndexDir = Path.GetDirectoryName(v2Manifest)!;
+                    var suiteReader = new SuiteIndexFileReader();
+                    foreach (var group in manifest.Groups)
+                    {
+                        var suiteFile = await suiteReader.ReadAsync(
+                            Path.Combine(v2IndexDir, group.IndexFile),
+                            group.Id,
+                            ct);
+                        if (suiteFile is null) continue;
+                        foreach (var entry in suiteFile.Entries)
+                        {
+                            refs.Add(entry.Path);
+                            foreach (var section in entry.Sections)
+                            {
+                                refs.Add($"{entry.Path}#{section.Heading}");
+                            }
+                        }
+                    }
+                    return refs;
+                }
+            }
+
             if (!File.Exists(docIndexFile))
                 return refs;
 

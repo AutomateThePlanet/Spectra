@@ -1,13 +1,15 @@
 # Spectra Development Guidelines
 
-Last updated: 2026-04-13 | Version history in `CHANGELOG.md`
+Last updated: 2026-04-30 | Version history in `CHANGELOG.md`
 
 ## Tech Stack
 - C# 12, .NET 8+, GitHub Copilot SDK (sole AI runtime), System.CommandLine, Spectre.Console, System.Text.Json
 - ASP.NET Core (MCP server), Microsoft.Data.Sqlite, SQLite (`.execution/spectra.db`)
+- YamlDotNet (manifest serialization), Microsoft.Extensions.FileSystemGlobbing (exclusion patterns)
 - CsvHelper (CSV import), dual-model verification (Generator + Critic) via Copilot SDK
-- File-based: test-cases/, docs/, spectra.config.json, _index.json, _index.md, profiles, .spectra/prompts/
-- Doc index: `docs/_index.md`; Criteria index: `docs/criteria/_criteria_index.yaml` + per-doc `.criteria.yaml`
+- File-based: test-cases/, docs/, spectra.config.json, _index.json, profiles, .spectra/prompts/
+- **Doc index v2 (Spec 040)**: `docs/_index/_manifest.yaml` + `docs/_index/groups/{suite}.index.md` + `docs/_index/_checksums.json` (manifest always loaded; per-suite files lazy-loaded; checksums never AI-visible)
+- Criteria index: `docs/criteria/_criteria_index.yaml` + per-doc `.criteria.yaml`
 
 ## Project Structure
 
@@ -71,6 +73,7 @@ dotnet run --project src/Spectra.CLI -- <command>   # Run CLI
 spectra ai generate [suite] [--focus "..."] [--no-interaction] [--dry-run] [--skip-critic]
 spectra ai generate --suite X --analyze-only          # Analysis only (SKILL two-step)
 spectra ai generate --suite X --count 80              # Batch (auto-groups of 30)
+spectra ai generate --suite X --include-archived      # Include skip_analysis suites (Spec 040)
 spectra ai generate X --auto-complete --output-format json  # CI: all phases, no prompts
 spectra ai generate X --from-suggestions [1,3]        # From previous suggestions
 spectra ai generate X --from-description "..." --context "..."  # User-described test
@@ -82,7 +85,9 @@ spectra ai update [suite] [--no-interaction] [--diff]
 spectra dashboard --output ./site [--title "..."] [--dry-run] [--preview]
 
 # Docs Index
-spectra docs index [--force] [--skip-criteria] [--no-interaction --output-format json]
+spectra docs index [--force] [--skip-criteria] [--no-migrate] [--include-archived] [--suites a,b]
+spectra docs list-suites [--output-format json]       # Spec 040: list manifest suites
+spectra docs show-suite <id>                          # Spec 040: print one suite's index file
 
 # Coverage & Criteria
 spectra ai analyze --coverage [--format json|markdown --output FILE] [--auto-link]
@@ -132,8 +137,9 @@ Generated in JSON, Markdown, HTML. Features: test titles from `_index.json`, hum
 <!-- MANUAL ADDITIONS END -->
 
 ## Active Technologies
-- C# 12, .NET 8+ + GitHub Copilot SDK, System.CommandLine, Spectre.Console, System.Text.Json, YamlDotNet (044-coverage-aware-analysis)
-- File-based (Markdown/YAML/JSON in `test-cases/`, `docs/criteria/`, `_index.json`, `_criteria_index.yaml`) (044-coverage-aware-analysis)
+- C# 12, .NET 8+ + GitHub Copilot SDK, System.CommandLine, Spectre.Console, System.Text.Json, YamlDotNet, Microsoft.Extensions.FileSystemGlobbing (045-doc-index-restructure)
+- File-based (Markdown/YAML/JSON in `test-cases/`, `docs/_index/`, `docs/criteria/`, `_index.json`, `_manifest.yaml`, `_checksums.json`, `_criteria_index.yaml`) (045-doc-index-restructure)
 
 ## Recent Changes
+- **045-doc-index-restructure (Spec 040, v1.51.0)**: Replaced single-file `docs/_index.md` with v2 layout under `docs/_index/` (manifest + per-suite + checksums). Pre-flight token-budget check at `ai.analysis.max_prompt_tokens` (default 96K) fails fast with exit code 4 instead of model-side 400 overflow. New flags: `--suite` (doc-suite filter on `ai generate`), `--include-archived`, `--no-migrate`, `--suites`. New commands: `spectra docs list-suites`, `spectra docs show-suite`. Auto-migration on first run preserves legacy file as `.bak`.
 - 044-coverage-aware-analysis: Added C# 12, .NET 8+ + GitHub Copilot SDK, System.CommandLine, Spectre.Console, System.Text.Json, YamlDotNet

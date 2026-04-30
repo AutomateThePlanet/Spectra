@@ -440,8 +440,12 @@ public sealed class InitHandler
             if (!hasFiles) return;
 
             var indexService = new DocumentIndexService();
-            var index = await indexService.EnsureIndexAsync(_workingDirectory, config.Source, forceRebuild: true, ct);
-            _logger.LogInformation("  - docs/_index.md ({Count} documents indexed)", index.TotalDocuments);
+            var newLayout = await indexService.EnsureNewLayoutAsync(
+                _workingDirectory, config.Source, config.Coverage, forceRebuild: true, suiteFilter: null, ct);
+            _logger.LogInformation(
+                "  - docs/_index/_manifest.yaml ({Count} documents indexed across {Suites} suite(s))",
+                newLayout.Manifest.TotalDocuments,
+                newLayout.Manifest.Groups.Count);
         }
         catch (Exception ex)
         {

@@ -1,7 +1,9 @@
+using Spectra.CLI.Index;
 using Spectra.CLI.Source;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
+using Spectra.Core.Models.Index;
 
 namespace Spectra.CLI.Agent.Tools;
 
@@ -42,36 +44,39 @@ public sealed class GetDocumentMapTool
 
         try
         {
-            // Prefer reading from the document index if available
+            // Spec 040 Phase 4: prefer the v2 manifest layout. Reconstructs the
+            // legacy DocumentIndex shape from manifest + per-suite files for
+            // callers that consume the enriched view (DocumentTools).
             if (_sourceConfig is not null)
             {
-                var indexPath = DocumentIndexService.ResolveIndexPath(basePath, _sourceConfig);
-                if (File.Exists(indexPath))
+                var manifestPath = LegacyIndexMigrator.ResolveManifestPath(basePath, _sourceConfig);
+                var indexDir = LegacyIndexMigrator.ResolveIndexDir(basePath, _sourceConfig);
+                if (File.Exists(manifestPath))
                 {
-                    var reader = new DocumentIndexReader();
-                    var index = await reader.ReadFullAsync(indexPath, ct);
-                    if (index is not null)
+                    var manifest = await new DocIndexManifestReader().ReadAsync(manifestPath, ct);
+                    if (manifest is not null)
                     {
+                        var index = await BuildLegacyIndexFromManifestAsync(
+                            manifest, indexDir, ct);
                         var map = DocumentIndexService.ToDocumentMap(index);
                         return new GetDocumentMapResult
                         {
                             Success = true,
                             DocumentMap = map,
                             DocumentIndex = index,
-                            Summary = DocumentMapBuilder.GetSummary(map)
+                            Summary = DocumentMapBuilder.GetSummary(map),
                         };
                     }
                 }
             }
 
-            // Fall back to building from scratch
+            // Fall back to building from scratch via filesystem walk.
             var fallbackMap = await _mapBuilder.BuildAsync(basePath, ct);
-
             return new GetDocumentMapResult
             {
                 Success = true,
                 DocumentMap = fallbackMap,
-                Summary = DocumentMapBuilder.GetSummary(fallbackMap)
+                Summary = DocumentMapBuilder.GetSummary(fallbackMap),
             };
         }
         catch (Exception ex)
@@ -82,6 +87,36 @@ public sealed class GetDocumentMapTool
                 Error = ex.Message
             };
         }
+    }
+
+    /// <summary>
+    /// Reconstructs a legacy <see cref="DocumentIndex"/> by reading every
+    /// suite's index file under <paramref name="indexDir"/>. Used to feed the
+    /// enriched view in <c>DocumentTools</c> without regressing the AI agent's
+    /// observability when the legacy single-file index is gone.
+    /// </summary>
+    private static async Task<DocumentIndex> BuildLegacyIndexFromManifestAsync(
+        DocIndexManifest manifest,
+        string indexDir,
+        CancellationToken ct)
+    {
+        var entries = new List<DocumentIndexEntry>();
+        var suiteReader = new SuiteIndexFileReader();
+        foreach (var group in manifest.Groups)
+        {
+            var suiteFilePath = Path.Combine(indexDir, group.IndexFile);
+            var suiteFile = await suiteReader.ReadAsync(suiteFilePath, group.Id, ct);
+            if (suiteFile is null) continue;
+            entries.AddRange(suiteFile.Entries);
+        }
+
+        return new DocumentIndex
+        {
+            GeneratedAt = manifest.GeneratedAt,
+            TotalWordCount = entries.Sum(e => e.WordCount),
+            TotalEstimatedTokens = manifest.TotalTokensEstimated,
+            Entries = entries,
+        };
     }
 }
 
