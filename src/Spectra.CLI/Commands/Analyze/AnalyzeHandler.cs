@@ -24,11 +24,16 @@ public sealed class AnalyzeHandler
 {
     private readonly VerbosityLevel _verbosity;
     private readonly OutputFormat _outputFormat;
+    private readonly bool _includeArchived;
 
-    public AnalyzeHandler(VerbosityLevel verbosity = VerbosityLevel.Normal, OutputFormat outputFormat = OutputFormat.Human)
+    public AnalyzeHandler(
+        VerbosityLevel verbosity = VerbosityLevel.Normal,
+        OutputFormat outputFormat = OutputFormat.Human,
+        bool includeArchived = false)
     {
         _verbosity = verbosity;
         _outputFormat = outputFormat;
+        _includeArchived = includeArchived;
     }
 
     private static Progress.ProgressManager CreateCoverageProgress() =>
@@ -298,13 +303,21 @@ public sealed class AnalyzeHandler
             if (!dryRun)
                 Directory.CreateDirectory(criteriaDir);
 
-            // Auto-refresh document index
+            // Auto-refresh document index (writes the v2 manifest layout AND the
+            // legacy _index.md transition shim).
             var indexService = new DocumentIndexService();
-            await indexService.EnsureIndexAsync(currentDir, config.Source, forceRebuild: false, ct);
+            await indexService.EnsureNewLayoutAsync(
+                currentDir, config.Source, config.Coverage, forceRebuild: false, suiteFilter: null, ct);
 
-            // Build document map
+            // Build document map and apply skip-analysis filter for AI-facing
+            // criteria extraction (Spec 040 §3.7 / FR-015).
             var docBuilder = new DocumentMapBuilder(config.Source);
             var documentMap = await docBuilder.BuildAsync(currentDir, ct);
+
+            var manifestPath = Spectra.CLI.Index.LegacyIndexMigrator.ResolveManifestPath(currentDir, config.Source);
+            var indexDir = Spectra.CLI.Index.LegacyIndexMigrator.ResolveIndexDir(currentDir, config.Source);
+            documentMap = await ManifestDocumentFilter.FilterAsync(
+                documentMap, manifestPath, indexDir, _includeArchived, ct);
 
             if (documentMap.Documents.Count == 0)
             {

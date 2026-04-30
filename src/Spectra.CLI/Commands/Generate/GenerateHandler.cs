@@ -6,6 +6,7 @@ using Spectra.CLI.Agent.Critic;
 using Spectra.CLI.Agent.Testimize;
 using Spectra.CLI.Commands.Auth;
 using Spectra.CLI.Coverage;
+using Spectra.CLI.Index;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Interactive;
 using Spectra.CLI.IO;
@@ -41,6 +42,8 @@ public sealed class GenerateHandler
     private readonly bool _noReview;
     private readonly bool _noInteraction;
     private readonly bool _skipCritic;
+    private readonly bool _includeArchived;
+    private readonly string? _docSuite;
     private readonly OutputFormat _outputFormat;
     private readonly ProgressReporter _progress;
     private readonly ResultPresenter _results;
@@ -70,13 +73,17 @@ public sealed class GenerateHandler
         bool noReview = false,
         bool noInteraction = false,
         bool skipCritic = false,
-        OutputFormat outputFormat = OutputFormat.Human)
+        OutputFormat outputFormat = OutputFormat.Human,
+        bool includeArchived = false,
+        string? docSuite = null)
     {
         _verbosity = verbosity;
         _dryRun = dryRun;
         _noReview = noReview;
         _noInteraction = noInteraction;
         _skipCritic = skipCritic;
+        _includeArchived = includeArchived;
+        _docSuite = docSuite;
         _outputFormat = outputFormat;
         _progress = new ProgressReporter(outputFormat: outputFormat, verbosity: verbosity);
         _results = new ResultPresenter(outputFormat: outputFormat);
@@ -259,9 +266,11 @@ public sealed class GenerateHandler
         // Open progress page in browser
         Progress.ProgressPageWriter.OpenInBrowser(_progressManager.ProgressPath);
 
-        // Auto-refresh document index before generation
+        // Auto-refresh document index before generation (writes the v2 manifest
+        // layout AND the legacy _index.md transition shim).
         var indexService = new DocumentIndexService();
-        await indexService.EnsureIndexAsync(currentDir, config.Source, forceRebuild: false, ct);
+        await indexService.EnsureNewLayoutAsync(
+            currentDir, config.Source, config.Coverage, forceRebuild: false, suiteFilter: null, ct);
 
         // Load source documents with full content for grounded generation
         UpdateProgress(suite, progressStatus, $"Loading {suite} documentation...");
@@ -280,6 +289,49 @@ public sealed class GenerateHandler
             Console.Error.WriteLine("Please add documentation files or check your spectra.config.json.");
             WriteErrorResultFile("No source documentation found in docs/. Add documentation files or check spectra.config.json.", suite);
             return ExitCodes.Error;
+        }
+
+        // Spec 040 Phase 4: filter documents by doc-suite (matched against the
+        // CLI --suite arg) and run the pre-flight token-budget check before any
+        // AI call. This is the actual fix for the 204K-token error: when the
+        // user passes `--suite POS_UG_Topics`, only that suite's docs reach the
+        // analyzer prompt instead of the full corpus.
+        try
+        {
+            var inputBuilder = new AnalyzerInputBuilder();
+            var manifestPath = LegacyIndexMigrator.ResolveManifestPath(currentDir, config.Source);
+            var indexDir = LegacyIndexMigrator.ResolveIndexDir(currentDir, config.Source);
+            var inputResult = await inputBuilder.BuildAsync(
+                basePath: currentDir,
+                manifestPath: manifestPath,
+                indexDir: indexDir,
+                allDocuments: documents,
+                // Spec 040 1.51.1: --doc-suite explicitly overrides the test-
+                // suite name as the analyzer filter. Falls back to the test-
+                // suite name when --doc-suite is not set.
+                suiteFilter: _docSuite ?? suite,
+                focusFilter: focus,
+                budgetTokens: config.Analysis.MaxPromptTokens,
+                includeArchived: _includeArchived,
+                ct: ct);
+
+            foreach (var w in inputResult.Warnings) _progress.Warning(w);
+            documents = inputResult.FilteredDocuments;
+
+            if (documents.Count == 0)
+            {
+                _progress.Error("No documents remained after suite filtering.");
+                WriteErrorResultFile(
+                    $"No documents matched suite '{suite}'. Run 'spectra docs index' and check available suites.",
+                    suite);
+                return ExitCodes.Error;
+            }
+        }
+        catch (PreFlightBudgetExceededException ex)
+        {
+            _progress.Error(ex.Message);
+            WriteErrorResultFile(ex.Message, suite);
+            return ExitCodes.PreFlightBudget;
         }
 
         // Also create document map for gap analysis (uses previews)
@@ -978,9 +1030,11 @@ public sealed class GenerateHandler
         Spectra.CLI.Infrastructure.DebugLogger.Mode = config.Debug.Mode;
         Spectra.CLI.Infrastructure.DebugLogger.BeginRun();
 
-        // Auto-refresh document index before generation
+        // Auto-refresh document index before generation (writes the v2 manifest
+        // layout AND the legacy _index.md transition shim).
         var indexService = new DocumentIndexService();
-        await indexService.EnsureIndexAsync(currentDir, config.Source, forceRebuild: false, ct);
+        await indexService.EnsureNewLayoutAsync(
+            currentDir, config.Source, config.Coverage, forceRebuild: false, suiteFilter: null, ct);
 
         // Initialize session
         var session = new InteractiveSession { Mode = SessionMode.Generate };
@@ -1050,6 +1104,33 @@ public sealed class GenerateHandler
                 var docLoader = new SourceDocumentLoader(config.Source);
                 return await docLoader.LoadAllAsync(currentDir, ct: ct);
             });
+
+        // Spec 040 Phase 4: filter by doc-suite (test suite name doubles as
+        // doc-suite filter per FR-028) and run pre-flight token-budget check.
+        try
+        {
+            var inputBuilder = new AnalyzerInputBuilder();
+            var manifestPath = LegacyIndexMigrator.ResolveManifestPath(currentDir, config.Source);
+            var indexDir = LegacyIndexMigrator.ResolveIndexDir(currentDir, config.Source);
+            var inputResult = await inputBuilder.BuildAsync(
+                basePath: currentDir,
+                manifestPath: manifestPath,
+                indexDir: indexDir,
+                allDocuments: documents,
+                suiteFilter: _docSuite ?? suiteName,
+                focusFilter: focus,
+                budgetTokens: config.Analysis.MaxPromptTokens,
+                includeArchived: _includeArchived,
+                ct: ct);
+
+            foreach (var w in inputResult.Warnings) _progress.Warning(w);
+            documents = inputResult.FilteredDocuments;
+        }
+        catch (PreFlightBudgetExceededException ex)
+        {
+            _progress.Error(ex.Message);
+            return ExitCodes.PreFlightBudget;
+        }
 
         if (documents.Count == 0)
         {

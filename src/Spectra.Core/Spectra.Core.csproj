@@ -27,6 +27,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Spec 040: legacy DocumentIndexReader is internal and used only by
+         LegacyIndexMigrator (one-time legacy → v2 migration). -->
+    <InternalsVisibleTo Include="Spectra.CLI" />
+    <InternalsVisibleTo Include="Spectra.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
 

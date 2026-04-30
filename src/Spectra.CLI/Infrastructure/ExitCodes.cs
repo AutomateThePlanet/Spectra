@@ -26,6 +26,14 @@ public static class ExitCodes
     public const int MissingArguments = 3;
 
     /// <summary>
+    /// Pre-flight token budget exceeded (Spec 040). The analyzer prompt would
+    /// have overflowed the configured <c>ai.analysis.max_prompt_tokens</c>
+    /// limit. The error message names the candidate suites and suggests
+    /// narrowing with <c>--suite</c>.
+    /// </summary>
+    public const int PreFlightBudget = 4;
+
+    /// <summary>
     /// Operation was cancelled by user (SIGINT).
     /// </summary>
     public const int Cancelled = 130;

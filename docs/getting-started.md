@@ -54,7 +54,10 @@ This creates:
 my-project/
 ├── spectra.config.json                          # Configuration
 ├── docs/                                        # Put your documentation here
-│   └── _index.md                                # Document index (auto-built if docs exist)
+│   └── _index/                                  # Document index v2 (Spec 040, auto-built)
+│       ├── _manifest.yaml                       # Always loaded into AI prompts (~2-5K tokens)
+│       ├── _checksums.json                      # Hash table; never sent to AI
+│       └── groups/{suite}.index.md              # Per-suite index files, lazy-loaded
 ├── test-cases/                                  # Generated test cases go here
 ├── docs/criteria/
 │   └── _criteria_index.yaml                     # Acceptance criteria index

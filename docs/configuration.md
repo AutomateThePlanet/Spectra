@@ -43,10 +43,12 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 | `mode` | string | `"local"` | Source mode (`local` or `spaces`) |
 | `local_dir` | string | `"docs/"` | Path to documentation directory |
 | `space_name` | string | — | Copilot Space name (when `mode: "spaces"`) |
-| `doc_index` | string | — | Path to document index file (defaults to `{local_dir}/_index.md`) |
+| `doc_index_dir` | string | `"docs/_index"` | **Spec 040** Directory containing the v2 index layout (`_manifest.yaml`, `_checksums.json`, `groups/{suite}.index.md`). |
+| `doc_index` | string | — | Legacy single-file path. Used only by the auto-migrator on first run after upgrading. New writes always use `doc_index_dir`. |
+| `group_overrides` | object | `{}` | **Spec 040** Per-document suite overrides: `{ "docs/path.md": "suite-id" }`. Consulted after frontmatter overrides and before the directory-default rule. |
 | `max_file_size_kb` | int | `50` | Maximum file size to process |
 | `include_patterns` | string[] | `["**/*.md"]` | Glob patterns for files to include |
-| `exclude_patterns` | string[] | `["**/CHANGELOG.md"]` | Glob patterns for files to exclude |
+| `exclude_patterns` | string[] | `["**/CHANGELOG.md"]` | Glob patterns for files to exclude (does NOT touch the analyzer-input filter — see `coverage.analysis_exclude_patterns` for that) |
 
 ## `tests` — Test Case Output
 
@@ -330,6 +332,7 @@ for domain-specific examples.
 | `categories` | object[] | (6 built-in) | Behavior classification taxonomy injected into the analysis prompt. |
 | `categories[].name` | string | — | Category identifier (used in tags and breakdown). |
 | `categories[].description` | string | — | One-line description injected into the AI prompt to guide classification. |
+| `max_prompt_tokens` | int | `96000` | **Spec 040** Pre-flight budget for the behavior-analysis prompt. When the estimated prompt exceeds this, the command exits cleanly with code `4` and an actionable error naming every candidate suite + token cost. Set to 0 to disable the check. Default leaves a 32K margin under the 128K context window for response + prompt template + ancillary content. |
 
 Default categories:
 
@@ -419,6 +422,28 @@ See [Coverage](coverage.md) for how these settings are used.
 | `criteria_import.auto_split` | bool | `true` | Automatically split compound criteria into atomic ones during import |
 | `criteria_import.normalize_rfc2119` | bool | `true` | Normalize RFC 2119 keywords (MUST, SHALL, SHOULD) in imported criteria |
 | `criteria_import.id_prefix` | string | `"AC"` | Prefix for auto-generated acceptance criteria IDs |
+| `analysis_exclude_patterns` | string[] | see below | **Spec 040** Glob patterns whose matched documents are still indexed and counted in coverage but whose suites are flagged `skip_analysis: true` and excluded from AI analyzer prompts by default. Pass `--include-archived` on `spectra ai generate` / `spectra ai analyze` / `spectra docs index` to override. The list **replaces** rather than merges with defaults — set to `[]` to disable all default exclusions. |
+| `max_suite_tokens` | int | `80000` | **Spec 040** Spillover threshold. When a single suite's `tokens_estimated` exceeds this, the indexer additionally writes per-doc files at `docs/_index/docs/{sanitized}.index.md` so finer-grained loading is possible (Spec 041 prep). |
+
+### Default `analysis_exclude_patterns`
+
+```json
+{
+  "coverage": {
+    "analysis_exclude_patterns": [
+      "**/Old/**",
+      "**/old/**",
+      "**/legacy/**",
+      "**/archive/**",
+      "**/release-notes/**",
+      "**/CHANGELOG*",
+      "**/SUMMARY.md"
+    ]
+  }
+}
+```
+
+Documents matching these patterns are still counted in coverage reports — the exclusion only removes them from analyzer-facing prompts. To opt a single document back in despite a pattern match, add `analyze: true` to its frontmatter (planned for a future release; see Spec 040 §3.6).
 
 ## `selections` — Saved Test Selections
 

@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spectra/specs/045/docs-index-result.schema.json",
+  "title": "DocsIndexResult v2",
+  "type": "object",
+  "required": ["command", "status"],
+  "properties": {
+    "command": { "const": "docs-index" },
+    "status": {
+      "enum": ["scanning", "grouping", "writing-suites", "writing-manifest", "extracting-criteria", "completed", "failed"]
+    },
+    "message": { "type": "string" },
+    "totalDocuments": { "type": "integer", "minimum": 0 },
+    "newDocuments": { "type": "integer", "minimum": 0 },
+    "changedDocuments": { "type": "integer", "minimum": 0 },
+    "unchangedDocuments": { "type": "integer", "minimum": 0 },
+    "skippedDocuments": { "type": "integer", "minimum": 0, "description": "Documents in skip_analysis suites" },
+    "documentsIndexed": { "type": "integer", "minimum": 0, "deprecated": true, "description": "Legacy alias for totalDocuments; kept for backward-compat readers." },
+    "documentsUpdated": { "type": "integer", "minimum": 0, "deprecated": true },
+    "documentsTotal": { "type": "integer", "minimum": 0, "deprecated": true },
+    "indexPath": { "type": "string", "deprecated": true, "description": "Legacy single-file path; null when v2 layout is used." },
+    "manifest": { "type": "string", "description": "Repo-relative path to _manifest.yaml" },
+    "suites": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "documentCount", "tokensEstimated", "skipAnalysis", "indexFile"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+          "documentCount": { "type": "integer", "minimum": 0 },
+          "tokensEstimated": { "type": "integer", "minimum": 0 },
+          "skipAnalysis": { "type": "boolean" },
+          "excludedBy": { "enum": ["pattern", "config", "frontmatter", "none"] },
+          "excludedPattern": { "type": ["string", "null"] },
+          "indexFile": { "type": "string", "pattern": "^docs/_index/groups/.+\\.index\\.md$" },
+          "spilloverFiles": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "migration": {
+      "type": "object",
+      "required": ["performed"],
+      "properties": {
+        "performed": { "type": "boolean" },
+        "legacyFile": { "type": ["string", "null"] },
+        "suitesCreated": { "type": "integer", "minimum": 0 },
+        "documentsMigrated": { "type": "integer", "minimum": 0 },
+        "largestSuiteId": { "type": ["string", "null"] },
+        "largestSuiteTokens": { "type": "integer", "minimum": 0 },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "criteria": {
+      "type": "object",
+      "description": "Unchanged from Spec 024 / DocsIndexResult v1.",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "examples": [
+    {
+      "command": "docs-index",
+      "status": "completed",
+      "message": "Documentation index updated",
+      "totalDocuments": 541,
+      "newDocuments": 0,
+      "changedDocuments": 0,
+      "unchangedDocuments": 541,
+      "skippedDocuments": 30,
+      "manifest": "docs/_index/_manifest.yaml",
+      "suites": [
+        {
+          "id": "SM_GSG_Topics",
+          "documentCount": 145,
+          "tokensEstimated": 10877,
+          "skipAnalysis": false,
+          "excludedBy": "none",
+          "indexFile": "docs/_index/groups/SM_GSG_Topics.index.md"
+        }
+      ],
+      "migration": {
+        "performed": true,
+        "legacyFile": "docs/_index.md.bak",
+        "suitesCreated": 12,
+        "documentsMigrated": 541,
+        "largestSuiteId": "SM_GSG_Topics",
+        "largestSuiteTokens": 10877,
+        "warnings": []
+      }
+    }
+  ]
+}

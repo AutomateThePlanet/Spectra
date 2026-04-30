@@ -113,6 +113,42 @@ public sealed class CoverageConfig
     /// </summary>
     [JsonPropertyName("criteria_import")]
     public CriteriaImportConfig CriteriaImport { get; init; } = new();
+
+    /// <summary>
+    /// Glob patterns whose matched documents are still indexed but whose suites
+    /// are flagged <c>skip_analysis: true</c> (Spec 040 §3.6). The list
+    /// REPLACES the defaults rather than merging — set to <c>[]</c> to disable
+    /// all default exclusions.
+    /// </summary>
+    /// <remarks>
+    /// Phase 3 evaluates patterns via naive segment-matching (good enough for
+    /// the default patterns, all of which take the form <c>**/segment/**</c>
+    /// or <c>**/segment*</c>). Phase 5 swaps in
+    /// <see cref="Microsoft.Extensions.FileSystemGlobbing"/> for full glob
+    /// semantics.
+    /// </remarks>
+    [JsonPropertyName("analysis_exclude_patterns")]
+    public IReadOnlyList<string> AnalysisExcludePatterns { get; init; } =
+    [
+        "**/Old/**",
+        "**/old/**",
+        "**/legacy/**",
+        "**/archive/**",
+        "**/release-notes/**",
+        "**/CHANGELOG*",
+        "**/SUMMARY.md",
+    ];
+
+    /// <summary>
+    /// Spillover threshold for per-doc index files (Spec 040 §3.7 Phase 5).
+    /// When a single suite's <c>tokens_estimated</c> exceeds this value, the
+    /// indexer additionally writes per-doc files under
+    /// <c>docs/_index/docs/{sanitized-path}.index.md</c>. Default 80,000 leaves
+    /// a 16,000-token margin under the default
+    /// <c>ai.analysis.max_prompt_tokens</c> (96,000).
+    /// </summary>
+    [JsonPropertyName("max_suite_tokens")]
+    public int MaxSuiteTokens { get; init; } = 80_000;
 }
 
 /// <summary>

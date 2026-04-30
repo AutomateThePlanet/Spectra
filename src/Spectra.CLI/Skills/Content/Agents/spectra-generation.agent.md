@@ -35,20 +35,34 @@ When you hit any of these, do NOT pass `--count`. There is no default count. Ste
 
 | Flag | Description |
 |------|-------------|
-| `--suite {name}` | Target suite (REQUIRED) |
+| `--suite {name}` | Target test suite (REQUIRED) — directory name under `test-cases/` where new tests will land. |
+| `--doc-suite {id}` | **Spec 040** Doc-suite ID from the manifest. Used to filter which documentation feeds the analyzer. **Pass this whenever the test suite name does not match a doc-suite ID.** Run `spectra docs list-suites --output-format json` first to discover available doc-suite IDs. |
 | `--count {n}` | Number of test cases. NEVER invent a value. Pass it ONLY if the user said an explicit number, or use `analysis.recommended` from the analyze result. |
 | `--focus {text}` | Focus: "negative", "edge cases", "acceptance criteria", "happy path acceptance criteria" |
 | `--skip-critic` | Skip grounding verification |
 | `--analyze-only` | Only analyze, don't generate |
+| `--include-archived` | Include suites flagged `skip_analysis: true` (Old/, legacy/, archive/, release-notes/) in analyzer input |
 
 **No `--priority`/`--type`/`--category` flag.** Use `--focus` for all filtering. Capture the user's FULL intent — don't split or drop parts. E.g. "happy path test cases covering acceptance criteria" → `--focus "happy path acceptance criteria"`.
+
+### Resolving `--doc-suite` (Spec 040 / pre-flight budget check)
+
+When the user says "generate test cases for `{some-test-suite}` from `{some-area}` documentation", the test suite name often does NOT match a doc-suite ID. If you skip `--doc-suite`, the analyzer will fall back to loading every non-archived suite and likely fail with exit code `4` (pre-flight budget exceeded).
+
+**Step 0 (BEFORE the analyze step) when working with a v2 manifest project**:
+1. `runInTerminal`: `spectra docs list-suites --output-format json` (or check existing `.spectra-result.json` from a recent `docs index` run).
+2. Inspect the doc-suite IDs and their token estimates.
+3. Pick the doc-suite that matches the user's intent. Heuristics: prefix/keyword match against the test-suite name (e.g., `central-manager-department` ↔ `cm_ug_topics`, `point-of-sale` ↔ `POS_UG_Topics`), or ask the user to confirm if ambiguous.
+4. Pass it as `--doc-suite {id}` on every `spectra ai generate` invocation.
+
+If `spectra ai generate` exits with code `4` (pre-flight budget exceeded), the error message lists candidate suites with token costs. Pick one whose cost fits under the budget and re-run with `--doc-suite`.
 
 ### Analyze (ALWAYS first)
 
 **Step 1**: show preview .spectra-progress.html?nocache=1
 **Step 2** — runInTerminal (include `--focus` if user specified any filtering):
 ```
-spectra ai generate --suite {suite} --analyze-only [--focus "{focus}"] --no-interaction --output-format json
+spectra ai generate --suite {suite} --doc-suite {docSuite} --analyze-only [--focus "{focus}"] --no-interaction --output-format json
 ```
 **Step 3** — awaitTerminal. The progress page auto-refreshes. Do NOTHING until complete — no readFile, no status messages.
 **Step 4** — readFile `.spectra-result.json`:
@@ -57,9 +71,9 @@ spectra ai generate --suite {suite} --analyze-only [--focus "{focus}"] --no-inte
 
 ### Generate (after approval)
 
-**Step 5** — runInTerminal (keep the SAME `--focus` from analysis):
+**Step 5** — runInTerminal. **CRITICAL**: pass the SAME `--doc-suite` and `--focus` you used in the analyze step. Dropping `--doc-suite` between analyze and generate is the #1 cause of pre-flight budget failures (exit code 4) — Spectra has no session memory for this; if you don't pass it, the analyzer falls back to loading every doc-suite and overflows.
 ```
-spectra ai generate --suite {suite} --count {count} [--focus "{focus}"] --no-interaction --output-format json
+spectra ai generate --suite {suite} --doc-suite {docSuite} --count {count} [--focus "{focus}"] --no-interaction --output-format json
 ```
 **Step 6** — awaitTerminal. The progress page auto-refreshes. Do NOTHING until complete — no readFile, no status messages.
 **Step 7** — readFile `.spectra-result.json`:
@@ -96,7 +110,7 @@ When a user asks to create or generate test cases, classify their intent BEFORE 
 
 **Action**: Use the from-description flow described in the `spectra-generate` SKILL ("When the user wants to create a specific test case"). **Produces exactly 1 test. No analysis needed. No count question.** Command:
 ```
-spectra ai generate --suite {suite} --from-description "{description}" --context "{context}" --no-interaction --output-format json --verbosity quiet
+spectra ai generate --suite {suite} --doc-suite {docSuite} --from-description "{description}" --context "{context}" --no-interaction --output-format json --verbosity quiet
 ```
 
 ### Intent 3: Create from previous suggestions → use `--from-suggestions`

@@ -20,102 +20,97 @@ public class DocumentIndexServiceTests : IDisposable
     {
         if (Directory.Exists(_tempDir))
         {
-            Directory.Delete(_tempDir, recursive: true);
+            try { Directory.Delete(_tempDir, recursive: true); } catch { }
         }
     }
 
+    private static (SourceConfig Source, CoverageConfig Coverage) Configs() =>
+        (new SourceConfig { LocalDir = "docs/" }, new CoverageConfig());
+
     [Fact]
-    public async Task EnsureIndexAsync_CreatesIndexFromDocs()
+    public async Task EnsureNewLayoutAsync_CreatesManifestFromDocs()
     {
         var docsDir = Path.Combine(_tempDir, "docs");
         Directory.CreateDirectory(docsDir);
         await File.WriteAllTextAsync(Path.Combine(docsDir, "test.md"), "# Test Doc\n\n## Section One\n\nSome content here.");
 
-        var config = new SourceConfig();
-        var index = await _service.EnsureIndexAsync(_tempDir, config, forceRebuild: true);
+        var (source, coverage) = Configs();
+        var result = await _service.EnsureNewLayoutAsync(_tempDir, source, coverage, forceRebuild: true);
 
-        Assert.Equal(1, index.TotalDocuments);
-        Assert.Equal("Test Doc", index.Entries[0].Title);
-
-        // Verify file was written
-        var indexPath = DocumentIndexService.ResolveIndexPath(_tempDir, config);
-        Assert.True(File.Exists(indexPath));
+        Assert.Equal(1, result.Manifest.TotalDocuments);
+        Assert.True(File.Exists(result.ManifestPath));
+        Assert.True(File.Exists(result.ChecksumsPath));
     }
 
     [Fact]
-    public async Task EnsureIndexAsync_IncrementalSkipsUnchangedFiles()
+    public async Task EnsureNewLayoutAsync_IncrementalSkipsUnchangedFiles()
     {
         var docsDir = Path.Combine(_tempDir, "docs");
         Directory.CreateDirectory(docsDir);
         await File.WriteAllTextAsync(Path.Combine(docsDir, "a.md"), "# Doc A\n\nContent A.");
         await File.WriteAllTextAsync(Path.Combine(docsDir, "b.md"), "# Doc B\n\nContent B.");
 
-        var config = new SourceConfig();
+        var (source, coverage) = Configs();
 
-        // Initial build
-        var index1 = await _service.EnsureIndexAsync(_tempDir, config, forceRebuild: true);
-        Assert.Equal(2, index1.TotalDocuments);
+        var first = await _service.EnsureNewLayoutAsync(_tempDir, source, coverage, forceRebuild: true);
+        Assert.Equal(2, first.Manifest.TotalDocuments);
 
-        // Incremental - no changes
-        var index2 = await _service.EnsureIndexAsync(_tempDir, config, forceRebuild: false);
-        Assert.Equal(2, index2.TotalDocuments);
+        var second = await _service.EnsureNewLayoutAsync(_tempDir, source, coverage, forceRebuild: false);
+        Assert.Equal(2, second.Manifest.TotalDocuments);
+        Assert.Equal(0, second.NewDocuments);
+        Assert.Equal(0, second.ChangedDocuments);
 
         // Modify one file
-        var updatedContent = "# Doc A Updated\n\nNew content here.";
-        await File.WriteAllTextAsync(Path.Combine(docsDir, "a.md"), updatedContent);
+        await File.WriteAllTextAsync(Path.Combine(docsDir, "a.md"), "# Doc A Updated\n\nNew content here.");
 
-        var index3 = await _service.EnsureIndexAsync(_tempDir, config, forceRebuild: false);
-        Assert.Equal(2, index3.TotalDocuments);
-
-        var updatedEntry = index3.Entries.First(e => e.Path == "docs/a.md");
-        Assert.Equal("Doc A Updated", updatedEntry.Title);
+        var third = await _service.EnsureNewLayoutAsync(_tempDir, source, coverage, forceRebuild: false);
+        Assert.Equal(2, third.Manifest.TotalDocuments);
+        Assert.Equal(1, third.ChangedDocuments);
     }
 
     [Fact]
-    public async Task EnsureIndexAsync_HandlesNoDocs()
+    public async Task EnsureNewLayoutAsync_HandlesNoDocs()
     {
         var docsDir = Path.Combine(_tempDir, "docs");
         Directory.CreateDirectory(docsDir);
 
-        var config = new SourceConfig();
-        var index = await _service.EnsureIndexAsync(_tempDir, config, forceRebuild: true);
+        var (source, coverage) = Configs();
+        var result = await _service.EnsureNewLayoutAsync(_tempDir, source, coverage, forceRebuild: true);
 
-        Assert.Equal(0, index.TotalDocuments);
+        Assert.Equal(0, result.Manifest.TotalDocuments);
     }
 
     [Fact]
-    public async Task EnsureIndexAsync_ForceRebuild()
+    public async Task EnsureNewLayoutAsync_ForceRebuildRewritesAll()
     {
         var docsDir = Path.Combine(_tempDir, "docs");
         Directory.CreateDirectory(docsDir);
         await File.WriteAllTextAsync(Path.Combine(docsDir, "test.md"), "# Test\n\nContent.");
 
-        var config = new SourceConfig();
+        var (source, coverage) = Configs();
+        await _service.EnsureNewLayoutAsync(_tempDir, source, coverage, forceRebuild: false);
+        var result = await _service.EnsureNewLayoutAsync(_tempDir, source, coverage, forceRebuild: true);
 
-        // Build once
-        await _service.EnsureIndexAsync(_tempDir, config, forceRebuild: false);
-
-        // Force rebuild
-        var index = await _service.EnsureIndexAsync(_tempDir, config, forceRebuild: true);
-        Assert.Equal(1, index.TotalDocuments);
+        Assert.Equal(1, result.Manifest.TotalDocuments);
+        // Force rebuild treats every file as new (no reuse).
+        Assert.Equal(1, result.NewDocuments);
     }
 
     [Fact]
-    public async Task EnsureIndexAsync_HandlesRemovedFiles()
+    public async Task EnsureNewLayoutAsync_HandlesRemovedFiles()
     {
         var docsDir = Path.Combine(_tempDir, "docs");
         Directory.CreateDirectory(docsDir);
         var filePath = Path.Combine(docsDir, "temp.md");
         await File.WriteAllTextAsync(filePath, "# Temp\n\nContent.");
 
-        var config = new SourceConfig();
-        var index1 = await _service.EnsureIndexAsync(_tempDir, config, forceRebuild: true);
-        Assert.Equal(1, index1.TotalDocuments);
+        var (source, coverage) = Configs();
+        var first = await _service.EnsureNewLayoutAsync(_tempDir, source, coverage, forceRebuild: true);
+        Assert.Equal(1, first.Manifest.TotalDocuments);
 
-        // Remove file
         File.Delete(filePath);
-        var index2 = await _service.EnsureIndexAsync(_tempDir, config, forceRebuild: false);
-        Assert.Equal(0, index2.TotalDocuments);
+        var second = await _service.EnsureNewLayoutAsync(_tempDir, source, coverage, forceRebuild: false);
+        Assert.Equal(0, second.Manifest.TotalDocuments);
     }
 
     [Fact]
@@ -159,20 +154,13 @@ public class DocumentIndexServiceTests : IDisposable
     }
 
     [Fact]
-    public void ResolveIndexPath_UsesDocIndexFromConfig()
+    public void ResolveIndexPath_StillReturnsLegacyPath()
     {
-        var config = new SourceConfig { DocIndex = "custom/_index.md" };
+        // ResolveIndexPath is still used by a few callers (e.g., GetDocumentMapTool
+        // for fallback paths). It returns the legacy path even though the legacy
+        // file is no longer written by EnsureNewLayoutAsync.
+        var config = new SourceConfig { LocalDir = "docs/" };
         var path = DocumentIndexService.ResolveIndexPath("/base", config);
-        Assert.Contains("custom", path);
-        Assert.Contains("_index.md", path);
-    }
-
-    [Fact]
-    public void ResolveIndexPath_DefaultsToLocalDir()
-    {
-        var config = new SourceConfig();
-        var path = DocumentIndexService.ResolveIndexPath("/base", config);
-        Assert.Contains("docs", path);
         Assert.Contains("_index.md", path);
     }
 
@@ -184,18 +172,18 @@ public class DocumentIndexServiceTests : IDisposable
         await File.WriteAllTextAsync(Path.Combine(docsDir, "a.md"), "# A\n\nContent.");
         await File.WriteAllTextAsync(Path.Combine(docsDir, "b.md"), "# B\n\nContent.");
 
-        var config = new SourceConfig();
+        var (source, coverage) = Configs();
 
         // No index yet - all files are new
-        var (total1, changed1) = await _service.GetUpdateStatsAsync(_tempDir, config);
+        var (total1, changed1) = await _service.GetUpdateStatsAsync(_tempDir, source);
         Assert.Equal(2, total1);
         Assert.Equal(2, changed1);
 
-        // Build index
-        await _service.EnsureIndexAsync(_tempDir, config, forceRebuild: true);
+        // Build the v2 layout
+        await _service.EnsureNewLayoutAsync(_tempDir, source, coverage, forceRebuild: true);
 
         // Now all files are up to date
-        var (total2, changed2) = await _service.GetUpdateStatsAsync(_tempDir, config);
+        var (total2, changed2) = await _service.GetUpdateStatsAsync(_tempDir, source);
         Assert.Equal(2, total2);
         Assert.Equal(0, changed2);
     }

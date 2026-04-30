@@ -5,9 +5,11 @@ using Spectra.Core.Models;
 namespace Spectra.Core.Index;
 
 /// <summary>
-/// Reads document index files in Markdown format.
+/// Reads legacy single-file <c>docs/_index.md</c> documents (Spec 010 format).
+/// Internal — only <see cref="Spectra.CLI.Index.LegacyIndexMigrator"/> consumes
+/// this during one-time migration to the v2 layout.
 /// </summary>
-public sealed partial class DocumentIndexReader
+internal sealed partial class DocumentIndexReader
 {
     [GeneratedRegex(@"<!--\s*SPECTRA_INDEX_CHECKSUMS\s*\n(.+?)\n\s*-->", RegexOptions.Singleline)]
     private static partial Regex ChecksumCommentRegex();

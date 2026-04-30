@@ -24,6 +24,13 @@ public sealed class GenerateCommand : Command
             ["--suite", "-s"],
             "Target suite name for generated tests (alternative to positional argument)");
 
+        var docSuiteOption = new Option<string?>(
+            ["--doc-suite"],
+            "Doc-suite ID (from 'spectra docs list-suites') to filter analyzer input. " +
+            "Defaults to the test suite name. Use this when your test-suite name differs " +
+            "from the documentation directory it should pull from " +
+            "(e.g., test suite 'central-manager-department' but docs in 'cm_ug_topics').");
+
         var countOption = new Option<int?>(
             ["--count", "-n"],
             "Number of tests to generate (default: 5)");
@@ -59,6 +66,10 @@ public sealed class GenerateCommand : Command
             "--analyze-only",
             "Only analyze documentation and output recommended test count (no generation)");
 
+        var includeArchivedOption = new Option<bool>(
+            "--include-archived",
+            "Include suites flagged skip_analysis: true (Old/, legacy/, archive/, release-notes/) in analyzer input");
+
         AddArgument(suiteArgument);
         AddOption(suiteOption);
         AddOption(countOption);
@@ -69,12 +80,15 @@ public sealed class GenerateCommand : Command
         AddOption(contextOption);
         AddOption(autoCompleteOption);
         AddOption(analyzeOnlyOption);
+        AddOption(includeArchivedOption);
+        AddOption(docSuiteOption);
 
         this.SetHandler(async (context) =>
         {
             // --suite option takes priority over positional argument
             var suite = context.ParseResult.GetValueForOption(suiteOption)
                         ?? context.ParseResult.GetValueForArgument(suiteArgument);
+            var docSuite = context.ParseResult.GetValueForOption(docSuiteOption);
             var count = context.ParseResult.GetValueForOption(countOption);
             var focus = context.ParseResult.GetValueForOption(focusOption);
             var skipCritic = context.ParseResult.GetValueForOption(skipCriticOption);
@@ -83,13 +97,16 @@ public sealed class GenerateCommand : Command
             var descContext = context.ParseResult.GetValueForOption(contextOption);
             var autoComplete = context.ParseResult.GetValueForOption(autoCompleteOption);
             var analyzeOnly = context.ParseResult.GetValueForOption(analyzeOnlyOption);
+            var includeArchived = context.ParseResult.GetValueForOption(includeArchivedOption);
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
             var dryRun = context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption);
             var noReview = context.ParseResult.GetValueForOption(GlobalOptions.NoReviewOption);
             var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
             var noInteraction = context.ParseResult.GetValueForOption(GlobalOptions.NoInteractionOption);
 
-            var handler = new GenerateHandler(verbosity, dryRun, noReview, noInteraction, skipCritic, outputFormat);
+            var handler = new GenerateHandler(
+                verbosity, dryRun, noReview, noInteraction, skipCritic, outputFormat, includeArchived,
+                docSuite);
             context.ExitCode = await handler.ExecuteAsync(
                 suite, count, focus,
                 fromSuggestions, fromDescription, descContext, autoComplete, analyzeOnly,

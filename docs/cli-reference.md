@@ -104,24 +104,57 @@ Reports a summary of updated, unchanged, and skipped files.
 
 ### `spectra docs index`
 
-Build or incrementally update the documentation index (`docs/_index.md`), then automatically extract acceptance criteria.
+Build or incrementally update the v2 documentation index (manifest + per-suite files + checksum store under `docs/_index/`), then automatically extract acceptance criteria.
 
 ```bash
 spectra docs index                # Incremental update + auto-extract acceptance criteria
 spectra docs index --force        # Full rebuild + auto-extract acceptance criteria
 spectra docs index --skip-criteria  # Index only, skip criteria extraction
 spectra docs index --no-interaction --output-format json  # SKILL/CI mode
+spectra docs index --suites checkout,payments  # Re-index only the named suites
+spectra docs index --no-migrate  # Refuse to migrate a legacy _index.md (errors if found)
+spectra docs index --include-archived  # Include skip_analysis suites in criteria extraction
 ```
 
-The index contains per-document metadata (title, sections with summaries, key entities, word/token counts, content hashes). The AI agent reads this lightweight index (~1-2K tokens) instead of scanning all files.
+The index now lives at `docs/_index/`:
 
-Content hashes enable incremental updates — only changed files are re-indexed. The index is also auto-refreshed before `spectra ai generate` runs.
+- **`_manifest.yaml`** — small (~2-5K tokens), always loaded into AI prompts.
+- **`groups/{suite}.index.md`** — per-suite index files, lazy-loaded only for the suite the user is working with.
+- **`_checksums.json`** — hash table for incremental detection. NEVER sent to the AI.
 
-After indexing, acceptance criteria are automatically extracted from the documentation using the configured AI provider and merged into `_criteria_index.yaml`. If no provider is configured, the extraction step is skipped. Use `--skip-criteria` to skip extraction entirely.
+On first run after upgrading from a release that used the single-file `docs/_index.md`, the indexer automatically migrates: parses the legacy file, splits entries by suite, writes the new layout, and renames the legacy file to `docs/_index.md.bak` for safekeeping. No flag required.
 
-In SKILL/CI mode, the command writes `.spectra-result.json` (structured result) and `.spectra-progress.html` (live progress page with auto-refresh).
+After indexing, acceptance criteria are automatically extracted from the analyzable documents (skip-analysis suites are excluded by default; pass `--include-archived` to override). Merged into `_criteria_index.yaml`. Use `--skip-criteria` to skip extraction entirely.
 
-See [Document Index](document-index.md) for full details.
+In SKILL/CI mode, the command writes `.spectra-result.json` (structured result with per-suite breakdown and migration metadata) and `.spectra-progress.html` (live progress page).
+
+See [Document Index](document-index.md) and [Migration Spec 040](migration-040.md) for full details.
+
+---
+
+### `spectra docs list-suites`
+
+List every suite in the manifest with document count, token estimate, and analysis status.
+
+```bash
+spectra docs list-suites
+spectra docs list-suites --output-format json
+```
+
+Useful when the pre-flight token-budget check on `spectra ai generate` fails — the error message tells you to narrow with `--suite <id>`, and `list-suites` shows the available IDs and their token costs.
+
+---
+
+### `spectra docs show-suite <suite-id>`
+
+Print one suite's index file content to stdout.
+
+```bash
+spectra docs show-suite checkout
+spectra docs show-suite SM_GSG_Topics
+```
+
+Errors with exit code 1 + the available-suites list if `<suite-id>` is unknown.
 
 ---
 
@@ -187,6 +220,11 @@ spectra ai generate checkout --no-interaction --output-format json    # CI pipel
 | `--context` | | Additional context for `--from-description` |
 | `--auto-complete` | | Run all phases without prompts (analyze → generate → suggestions → finalize) |
 | `--dry-run` | | Preview without writing files |
+| `--include-archived` | | **Spec 040** Include suites flagged `skip_analysis: true` (Old/, legacy/, archive/, release-notes/) in analyzer input |
+
+**Spec 040: doc-suite filtering and pre-flight budget check.** When `--suite <id>` is passed, the analyzer loads ONLY the matching doc-suite's documents into its prompt (instead of the full corpus). On large projects this is the difference between a 200K-token overflow and a comfortable ~10K-token analysis call. If `<id>` doesn't match any doc-suite in the manifest, the command warns and falls back to no-filter behavior — still subject to the pre-flight budget check.
+
+**Pre-flight budget violation** — exit code `4`. When the estimated analyzer prompt exceeds `ai.analysis.max_prompt_tokens` (default 96,000), the command exits cleanly with this code and an actionable message naming every candidate suite + token cost + suggested narrowing flags. Replaces the raw `400 prompt token count exceeds the limit of 128000` from the model. To diagnose: `spectra docs list-suites` shows available doc-suites and their token estimates.
 
 Session state is stored in `.spectra/session.json` and expires after 1 hour.
 
@@ -205,7 +243,7 @@ When a project has documentation in `docs/` and acceptance criteria in `docs/cri
 
 Duplicate detection warns when a new test case has >80% title similarity to an existing test case.
 
-**Exit codes:** `0` = success, `1` = error, `3` = missing required args with `--no-interaction`.
+**Exit codes:** `0` = success, `1` = error, `3` = missing required args with `--no-interaction`, `4` = pre-flight token-budget exceeded (Spec 040 — narrow with `--suite` or raise `ai.analysis.max_prompt_tokens`).
 
 **Speeding up the critic phase** (Spec 043, v1.48.0+): on a large generate run, the critic verifies test cases one at a time and is typically the dominant cost (~6s/call × N tests). Set `ai.critic.max_concurrent: 5` (or higher, max 20) in `spectra.config.json` to run multiple critic calls in parallel — this typically cuts critic phase time to ~1/N of sequential without changing any output. The Run Summary panel shows the active `Critic concurrency` along with `Errors` and `Rate limits` counts. If you see `Rate limits > 0`, drop `max_concurrent` and re-run.
 

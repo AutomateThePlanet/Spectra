@@ -16,7 +16,7 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 
     <!-- Versioning -->
-    <Version>1.50.0</Version>
+    <Version>1.51.4</Version>
     <Authors>Spectra Contributors</Authors>
     <Company>Spectra</Company>
     <Product>Spectra</Product>

@@ -40,12 +40,21 @@ The ONLY time you skip analysis is when the user describes a single concrete sce
 
 | Flag | Type | Description |
 |------|------|-------------|
-| `--suite {name}` | string | Target suite name (REQUIRED) |
+| `--suite {name}` | string | Target test suite (REQUIRED) — directory under `test-cases/` where new tests will land. |
+| `--doc-suite {id}` | string | **Spec 040 (1.51.2+)** Doc-suite ID from the manifest (`spectra docs list-suites`). Filters which documentation feeds the analyzer. **Required when `--suite` does not match a doc-suite ID** — otherwise the pre-flight budget check (default 96K tokens) will reject the run. |
 | `--count {n}` | int | Number of test cases to generate. NEVER invent a value — use ONLY a number the user explicitly stated, or the `recommended` field returned by the analyze step. |
 | `--focus {text}` | string | Focus area: "negative", "edge cases", "high priority security", etc. |
 | `--skip-critic` | bool | Skip grounding verification |
 | `--analyze-only` | bool | Only analyze, don't generate |
+| `--include-archived` | bool | **Spec 040** Include suites flagged `skip_analysis: true` (Old/, legacy/, archive/, release-notes/) in analyzer input |
 | `--dry-run` | bool | Preview without writing |
+
+### Pre-flight token-budget check (Spec 040, exit code 4)
+
+Before any AI call, Spectra estimates the analyzer prompt size against `ai.analysis.max_prompt_tokens` (default 96K). If the estimate exceeds the budget, the command exits with code 4 and an actionable message naming every candidate doc-suite + token cost. Two recovery paths:
+
+1. **Narrow with `--doc-suite {id}`** — re-run targeting one doc-suite that fits the budget. Run `spectra docs list-suites` to discover IDs.
+2. **Raise the budget** — bump `ai.analysis.max_prompt_tokens` in `spectra.config.json` (within the model's context-window capacity).
 
 **There is NO `--priority`, `--type`, or `--category` flag.** Use `--focus` for ALL filtering by type, priority, or category. Capture the user's FULL intent in `--focus` — don't split or drop parts. Examples:
 - "generate 15 negative test cases" → `--focus "negative tests"` `--count 15`
@@ -67,7 +76,7 @@ The ONLY time you skip analysis is when the user describes a single concrete sce
 
 **Step 2** — runInTerminal (include `--focus` if user specified any filtering):
 ```
-spectra ai generate --suite {suite} --analyze-only [--focus "{focus}"] --no-interaction --output-format json
+spectra ai generate --suite {suite} --doc-suite {docSuite} --analyze-only [--focus "{focus}"] --no-interaction --output-format json
 ```
 
 **Step 3** — awaitTerminal. Do NOTHING else until this completes. Do NOT type anything into the terminal.
@@ -102,7 +111,7 @@ STOP. Wait for user.
 
 **Step 5** — runInTerminal (keep the SAME `--focus` from analysis):
 ```
-spectra ai generate --suite {suite} --count {count} [--focus "{focus}"] --no-interaction --output-format json
+spectra ai generate --suite {suite} --doc-suite {docSuite} --count {count} [--focus "{focus}"] --no-interaction --output-format json
 ```
 
 **Step 6** — awaitTerminal. Do NOTHING else until this completes. Do NOT type anything into the terminal.
@@ -122,7 +131,7 @@ Use this flow when the user describes a concrete test scenario — a behavior th
 
 **Step 2** — runInTerminal:
 ```
-spectra ai generate --suite {suite} --from-description "{description}" --context "{context}" --no-interaction --output-format json --verbosity quiet
+spectra ai generate --suite {suite} --doc-suite {docSuite} --from-description "{description}" --context "{context}" --no-interaction --output-format json --verbosity quiet
 ```
 
 - `{suite}` — target suite name (ask the user only if not obvious from context)
