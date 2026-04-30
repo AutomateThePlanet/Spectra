@@ -19,4 +19,8 @@ public static class SkillContent
     public static string DocsIndex => All["spectra-docs"];
     public static string Prompts => All["spectra-prompts"];
     public static string Quickstart => All["spectra-quickstart"];
+
+    // Spec 040 lifecycle (v1.52.0)
+    public static string Delete => All["spectra-delete"];
+    public static string Suite => All["spectra-suite"];
 }

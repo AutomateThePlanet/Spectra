@@ -41,3 +41,23 @@ Report: "Dashboard generated." Show suite count and test case count from the res
 show preview site/index.html
 
 Report: "Say 'regenerate dashboard' to rebuild with latest data."
+
+---
+
+## Cancel the current run
+
+If the user says "stop", "cancel", "kill it", "stop the analysis", "stop generating":
+
+**Step 1** — runInTerminal:
+```
+spectra cancel --no-interaction --output-format json --verbosity quiet
+```
+
+**Step 2** — awaitTerminal, readFile `.spectra-result.json`.
+
+**Step 3** — Report what happened:
+- `status: completed` with `shutdown_path: cooperative` → "Cancelled at phase {phase}. Tests/files written before stopping are preserved."
+- `status: completed` with `shutdown_path: forced` → "Force-killed after grace window."
+- `status: no_active_run` → "Nothing was running."
+
+If the original command's progress page is still open, point the user at it — it now shows the "Cancelled" terminal phase.

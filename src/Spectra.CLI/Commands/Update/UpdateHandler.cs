@@ -64,6 +64,12 @@ public sealed class UpdateHandler
         bool deleteOrphaned = false,
         CancellationToken ct = default)
     {
+        // Spec 040: register with CancellationManager for cooperative
+        // cross-process cancellation via .spectra/.cancel sentinel.
+        using var cancelRegistration = await Cancellation.CancellationManager.Instance
+            .RegisterCommandAsync("ai update", ct).ConfigureAwait(false);
+        ct = Cancellation.CancellationManager.Instance.Token;
+
         _progressManager.Reset();
 
         // Detect mode: direct if suite provided, interactive otherwise
@@ -84,13 +90,21 @@ public sealed class UpdateHandler
             return ExitCodes.Error;
         }
 
-        if (isDirectMode)
+        try
         {
-            return await ExecuteDirectModeAsync(suite!, showDiff, deleteOrphaned, ct);
+            if (isDirectMode)
+            {
+                return await ExecuteDirectModeAsync(suite!, showDiff, deleteOrphaned, ct);
+            }
+            else
+            {
+                return await ExecuteInteractiveModeAsync(showDiff, deleteOrphaned, ct);
+            }
         }
-        else
+        catch (OperationCanceledException)
         {
-            return await ExecuteInteractiveModeAsync(showDiff, deleteOrphaned, ct);
+            Cancellation.CancelledResultWriter.WriteMinimal("ai update", "update");
+            return ExitCodes.Cancelled;
         }
     }
 

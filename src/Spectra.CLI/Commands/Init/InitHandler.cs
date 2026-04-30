@@ -716,18 +716,26 @@ public sealed class InitHandler
     {
         var gitIgnorePath = Path.Combine(_workingDirectory, ".gitignore");
         const string spectraSection = "# SPECTRA";
-        const string executionDb = ".execution/*.db";
-        const string executionDbJournal = ".execution/*.db-*";
-        const string lockPattern = ".spectra.lock";
 
-        var patterns = new[] { executionDb, executionDbJournal, lockPattern };
+        // Spec 040 lifecycle: PID/sentinel/lock/HWM are workspace-local
+        // derived state; never committed. Per FR-010, FR-020.
+        var patterns = new[]
+        {
+            ".execution/*.db",
+            ".execution/*.db-*",
+            ".spectra.lock",
+            ".spectra/.pid",
+            ".spectra/.cancel",
+            ".spectra/id-allocator.lock",
+            ".spectra/id-allocator.json"
+        };
         var newEntries = new List<string>();
 
         if (File.Exists(gitIgnorePath))
         {
             var content = await File.ReadAllTextAsync(gitIgnorePath, ct);
 
-            // Check which patterns are missing
+            // Check which patterns are missing (idempotent)
             foreach (var pattern in patterns)
             {
                 if (!content.Contains(pattern))
@@ -762,9 +770,10 @@ public sealed class InitHandler
             // Create new .gitignore
             var sb = new System.Text.StringBuilder();
             sb.AppendLine(spectraSection);
-            sb.AppendLine(executionDb);
-            sb.AppendLine(executionDbJournal);
-            sb.AppendLine(lockPattern);
+            foreach (var pattern in patterns)
+            {
+                sb.AppendLine(pattern);
+            }
 
             await File.WriteAllTextAsync(gitIgnorePath, sb.ToString(), ct);
             _logger.LogDebug("Created .gitignore with SPECTRA patterns");

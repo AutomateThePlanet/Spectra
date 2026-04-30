@@ -2,9 +2,13 @@ using System.CommandLine;
 using Spectra.CLI.Commands;
 using Spectra.CLI.Commands.Ai;
 using Spectra.CLI.Commands.Auth;
+using Spectra.CLI.Commands.Cancel;
 using Spectra.CLI.Commands.Config;
+using Spectra.CLI.Commands.Delete;
+using Spectra.CLI.Commands.Suite;
 using Spectra.CLI.Commands.Dashboard;
 using Spectra.CLI.Commands.Docs;
+using Spectra.CLI.Commands.Doctor;
 using Spectra.CLI.Commands.Index;
 using Spectra.CLI.Commands.Init;
 using Spectra.CLI.Commands.List;
@@ -57,6 +61,10 @@ public class Program
         rootCommand.AddCommand(new UpdateSkillsCommand());
         rootCommand.AddCommand(new PromptsCommand());
         rootCommand.AddCommand(new TestimizeCommand());
+        rootCommand.AddCommand(new DoctorCommand());
+        rootCommand.AddCommand(new CancelCommand());
+        rootCommand.AddCommand(new DeleteCommand());
+        rootCommand.AddCommand(new SuiteCommand());
 
         return rootCommand;
     }
