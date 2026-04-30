@@ -111,6 +111,37 @@ public sealed class GenerateHandler
         bool analyzeOnly = false,
         CancellationToken ct = default)
     {
+        // Spec 040: register with CancellationManager so a peer
+        // `spectra cancel` invocation can trigger cooperative shutdown
+        // via the .spectra/.cancel sentinel.
+        using var cancelRegistration = await Cancellation.CancellationManager.Instance
+            .RegisterCommandAsync("ai generate", ct).ConfigureAwait(false);
+        var cancelToken = Cancellation.CancellationManager.Instance.Token;
+        ct = cancelToken;
+        try
+        {
+            return await ExecuteCoreAsync(suite, count, focus, fromSuggestions, fromDescription, descContext, autoComplete, analyzeOnly, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Spec 040: convert cancellation to a structured result so SKILLs
+            // can report "N of M tests written" cleanly.
+            Cancellation.CancelledResultWriter.WriteMinimal("ai generate", "generation");
+            return ExitCodes.Cancelled;
+        }
+    }
+
+    private async Task<int> ExecuteCoreAsync(
+        string? suite,
+        int? count,
+        string? focus,
+        string? fromSuggestions,
+        string? fromDescription,
+        string? descContext,
+        bool autoComplete,
+        bool analyzeOnly,
+        CancellationToken ct)
+    {
         // Handle --from-suggestions mode
         if (fromSuggestions is not null)
         {

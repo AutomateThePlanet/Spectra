@@ -16,7 +16,7 @@ public static class ProgressPageWriter
     /// </summary>
     /// <param name="htmlPath">Path to write the HTML file.</param>
     /// <param name="jsonData">Current result JSON to embed inline.</param>
-    /// <param name="isTerminal">True if status is completed/failed — omits auto-refresh.</param>
+    /// <param name="isTerminal">True if status is completed/failed/cancelled — omits auto-refresh.</param>
     public static void WriteProgressPage(string htmlPath, string jsonData, bool isTerminal, string? title = null)
     {
         try
@@ -181,6 +181,9 @@ public static class ProgressPageWriter
                     .status-badge.generating, .status-badge.indexing, .status-badge.extracting-criteria, .status-badge.extracting, .status-badge.updating, .status-badge.verifying, .status-badge.analyzing-docs, .status-badge.analyzing-criteria, .status-badge.analyzing-automation, .status-badge.building-index, .status-badge.collecting-data, .status-badge.generating-html { background: var(--color-warning-bg); color: var(--color-warning); }
                     .status-badge.completed, .status-badge.success { background: var(--color-passed-bg); color: var(--color-passed); }
                     .status-badge.failed { background: var(--color-failed-bg); color: var(--color-failed); }
+                    .status-badge.cancelled { background: #fef3c7; color: #b45309; }
+                    .step.cancelled { color: #b45309; }
+                    .step.cancelled .step-dot { background: #f59e0b; background-image: repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 6px); }
                     .suite-name { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
                     .status-message {
                         color: var(--color-text-muted);

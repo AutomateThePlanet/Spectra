@@ -136,3 +136,51 @@ Each suite directory contains an `_index.json` with metadata for all tests:
 ```
 
 The `description`, `estimated_duration`, `criteria`, and `automated_by` fields are only included when populated.
+
+---
+
+## Test ID allocation and the high-water-mark (Spec 040, v1.52.0+)
+
+Test IDs are **globally unique across all suites**. Concurrent generation runs and stale `_index.json` files cannot produce overlapping ID ranges.
+
+### How it works
+
+`spectra ai generate` (and any other path that allocates new IDs) goes through `Spectra.Core.IdAllocation.PersistentTestIdAllocator`, which:
+
+1. Acquires an exclusive cross-process lock at `.spectra/id-allocator.lock` (10 s timeout).
+2. Reads the persisted high-water-mark from `.spectra/id-allocator.json`.
+3. Computes the effective starting point as the maximum of:
+   - The high-water-mark.
+   - The largest ID in any suite's `_index.json`.
+   - The largest ID found by walking `test-cases/**/*.md` frontmatter directly.
+   - The configured `tests.id_start` (minus 1) as a floor.
+4. Allocates `[effective+1 ... effective+count]`.
+5. Writes the new HWM atomically (temp+rename).
+6. Releases the lock.
+
+### Persistent state
+
+Both files are workspace-local, gitignored, and regenerable:
+
+- **`.spectra/id-allocator.json`** — schema:
+  ```json
+  {
+    "version": 1,
+    "high_water_mark": 247,
+    "last_allocated_at": "2026-04-30T14:30:00Z",
+    "last_allocated_command": "ai generate"
+  }
+  ```
+  If corrupted, missing, or recorded by an unknown future version, the allocator treats it as "absent" and re-seeds from the index + filesystem scan. The "deleted IDs never reused" guarantee is restored on the next allocation.
+
+- **`.spectra/id-allocator.lock`** — empty file used as the cross-process mutex. Released automatically on process exit (including crash).
+
+### Diagnosing problems
+
+```bash
+spectra doctor ids                                  # read-only audit
+spectra doctor ids --fix                            # renumber duplicates
+```
+
+The audit reports duplicates with file paths and mtimes, mismatches between `_index.json` and on-disk frontmatter, the current HWM, and the next ID that would be allocated. Under `--fix`, the older file (by mtime) keeps the duplicated ID; later occurrences are renumbered at HWM+1, HWM+2, etc. `depends_on` references inside test files are updated; in-source `[TestCase("TC-NNN")]` literals are reported as `unfixable_references` for manual review.
+

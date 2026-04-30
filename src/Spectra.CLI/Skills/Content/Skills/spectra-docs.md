@@ -58,7 +58,7 @@ When the user asks "what suites are available?" or "list doc suites", or you nee
 
 **Step 1** — runInTerminal:
 ```
-spectra docs list-suites --output-format json
+spectra docs list-suites --output-format json --no-interaction --verbosity quiet
 ```
 
 **Step 2** — awaitTerminal, then read the JSON output:
@@ -78,7 +78,7 @@ Use this to pick the right `--doc-suite` for a generate run. Token estimates sho
 
 For human display:
 ```
-spectra docs list-suites
+spectra docs list-suites --output-format json --no-interaction --verbosity quiet
 ```
 
 ---
@@ -88,7 +88,7 @@ spectra docs list-suites
 When the user asks "show me the index for suite X" or wants to inspect a specific suite's documents:
 
 ```
-spectra docs show-suite {suite-id}
+spectra docs show-suite {suite-id} --output-format json --no-interaction --verbosity quiet
 ```
 
 Returns the per-suite Markdown index file content. Errors with exit 1 + the available-suites list if `{suite-id}` is unknown.
@@ -112,3 +112,23 @@ After indexing:
 - "Update the documentation index"
 - "Refresh the doc catalog"
 - "Index again the docs"
+
+---
+
+## Cancel the current run
+
+If the user says "stop", "cancel", "kill it", "stop the analysis", "stop generating":
+
+**Step 1** — runInTerminal:
+```
+spectra cancel --no-interaction --output-format json --verbosity quiet
+```
+
+**Step 2** — awaitTerminal, readFile `.spectra-result.json`.
+
+**Step 3** — Report what happened:
+- `status: completed` with `shutdown_path: cooperative` → "Cancelled at phase {phase}. Tests/files written before stopping are preserved."
+- `status: completed` with `shutdown_path: forced` → "Force-killed after grace window."
+- `status: no_active_run` → "Nothing was running."
+
+If the original command's progress page is still open, point the user at it — it now shows the "Cancelled" terminal phase.

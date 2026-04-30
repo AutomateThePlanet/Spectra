@@ -57,7 +57,9 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void SkillContent_HasAllSkills()
     {
-        Assert.Equal(12, SkillContent.All.Count);
+        // Spec 040 lifecycle (v1.52.0) added spectra-delete and spectra-suite
+        // → bundled SKILL count went from 12 to 14.
+        Assert.Equal(14, SkillContent.All.Count);
         Assert.True(SkillContent.All.ContainsKey("spectra-generate"));
         Assert.True(SkillContent.All.ContainsKey("spectra-update"));
         Assert.True(SkillContent.All.ContainsKey("spectra-coverage"));
@@ -67,6 +69,8 @@ public class SkillsManifestTests : IDisposable
         Assert.True(SkillContent.All.ContainsKey("spectra-init-profile"));
         Assert.True(SkillContent.All.ContainsKey("spectra-help"));
         Assert.True(SkillContent.All.ContainsKey("spectra-criteria"));
+        Assert.True(SkillContent.All.ContainsKey("spectra-delete"));
+        Assert.True(SkillContent.All.ContainsKey("spectra-suite"));
         Assert.True(SkillContent.All.ContainsKey("spectra-docs"));
         Assert.True(SkillContent.All.ContainsKey("spectra-prompts"));
         Assert.True(SkillContent.All.ContainsKey("spectra-quickstart"));
@@ -99,13 +103,14 @@ public class SkillsManifestTests : IDisposable
     }
 
     [Fact]
-    public void GenerationAgent_LineCount_Within140()
+    public void GenerationAgent_LineCount_Within160()
     {
         // Spec 033 added the Test Creation Intent Routing section (~40 lines).
-        // The limit was raised from 100 → 140 to accommodate the routing rules.
+        // Spec 040 lifecycle adds 4 new delegation entries for delete / suite /
+        // cancel / doctor — bound bumped 140 → 160 to accommodate.
         var content = AgentContent.GenerationAgent;
         var lineCount = content.Split('\n').Length;
-        Assert.True(lineCount <= 140, $"Generation agent is {lineCount} lines, expected ≤140");
+        Assert.True(lineCount <= 160, $"Generation agent is {lineCount} lines, expected ≤160");
     }
 
     [Fact]

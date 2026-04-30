@@ -426,3 +426,23 @@ Re-run coverage analysis (Workflow 4) followed by dashboard generation (Workflow
 - "How to use SPECTRA from Copilot Chat"
 - "Step by step guide"
 - "Onboarding"
+
+---
+
+## Workflow: Stop a running operation
+
+**Tell the user to say:** "Stop", "cancel", "kill the generation", "stop the analysis"
+
+**What happens:** Cooperative cancellation triggers within ~5 seconds. Tests and files written so far are kept on disk. The progress page transitions to a terminal "Cancelled" phase.
+
+**Step 1** — runInTerminal:
+```
+spectra cancel --no-interaction --output-format json --verbosity quiet
+```
+
+**Step 2** — awaitTerminal, readFile `.spectra-result.json`.
+
+**Step 3** — Report:
+- `target_command` — what was running
+- `shutdown_path` — `cooperative` (under 5s) or `forced` (kill-required)
+- `elapsed_seconds`

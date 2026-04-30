@@ -123,7 +123,8 @@ public sealed class ProgressManager
             var json = SerializeTyped(result);
             FlushWriteFile(_resultPath, json);
 
-            var isTerminal = result.Status is "completed" or "failed";
+            // Spec 040: "cancelled" is a terminal state alongside completed/failed.
+            var isTerminal = result.Status is "completed" or "failed" or "cancelled";
             ProgressPageWriter.WriteProgressPage(_progressPath, json, isTerminal, _title);
         }
         catch
@@ -139,6 +140,26 @@ public sealed class ProgressManager
         {
             // Spec 041: clear in-flight progress snapshot so the final result
             // file shows runSummary instead of stale progress data.
+            ClearProgressSnapshot(result);
+            var json = SerializeTyped(result);
+            FlushWriteFile(_resultPath, json);
+            ProgressPageWriter.WriteProgressPage(_progressPath, json, isTerminal: true, _title);
+        }
+        catch
+        {
+            // Non-critical
+        }
+    }
+
+    /// <summary>
+    /// Spec 040: write final result with cancelled status and mark progress
+    /// as a terminal "Cancelled" phase. Auto-refresh stops; the page becomes
+    /// static and shows the survivor count and last-active phase.
+    /// </summary>
+    public void Cancel(CommandResult result)
+    {
+        try
+        {
             ClearProgressSnapshot(result);
             var json = SerializeTyped(result);
             FlushWriteFile(_resultPath, json);

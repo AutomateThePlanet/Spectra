@@ -51,6 +51,24 @@ public sealed class DocsIndexHandler
 
     public async Task<int> ExecuteAsync(bool force, CancellationToken ct = default)
     {
+        // Spec 040: cooperative cancellation via .spectra/.cancel sentinel.
+        using var cancelRegistration = await Cancellation.CancellationManager.Instance
+            .RegisterCommandAsync("docs index", ct).ConfigureAwait(false);
+        ct = Cancellation.CancellationManager.Instance.Token;
+
+        try
+        {
+            return await ExecuteCoreAsync(force, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            Cancellation.CancelledResultWriter.WriteMinimal("docs index", "indexing");
+            return ExitCodes.Cancelled;
+        }
+    }
+
+    private async Task<int> ExecuteCoreAsync(bool force, CancellationToken ct)
+    {
         var currentDir = Directory.GetCurrentDirectory();
         var configPath = Path.Combine(currentDir, "spectra.config.json");
 

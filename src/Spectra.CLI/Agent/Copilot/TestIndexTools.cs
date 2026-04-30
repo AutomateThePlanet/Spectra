@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Spectra.CLI.Agent.Tools;
+using Spectra.Core.IdAllocation;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
@@ -17,18 +18,21 @@ public sealed class TestIndexTools
 {
     private readonly ToolRegistry _registry;
     private readonly string _testsPath;
-    private readonly TestIdAllocator _idAllocator;
+    private readonly PersistentTestIdAllocator _idAllocator;
+    private readonly int _idStart;
     private readonly IReadOnlyList<TestCase> _existingTests;
 
     public TestIndexTools(
         ToolRegistry registry,
         string testsPath,
-        TestIdAllocator idAllocator,
+        PersistentTestIdAllocator idAllocator,
+        int idStart,
         IReadOnlyList<TestCase> existingTests)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _testsPath = testsPath ?? throw new ArgumentNullException(nameof(testsPath));
         _idAllocator = idAllocator ?? throw new ArgumentNullException(nameof(idAllocator));
+        _idStart = idStart;
         _existingTests = existingTests ?? throw new ArgumentNullException(nameof(existingTests));
     }
 
@@ -153,27 +157,31 @@ public sealed class TestIndexTools
     /// Allocates the next available test IDs.
     /// </summary>
     [Description("Allocates the next available test IDs in TC-XXX format.")]
-    public Task<string> GetNextTestIds(
+    public async Task<string> GetNextTestIds(
         [Description("Number of IDs to allocate (1-100)")] int count = 1,
         CancellationToken ct = default)
     {
         if (count < 1 || count > 100)
         {
-            return Task.FromResult(JsonSerializer.Serialize(new
+            return JsonSerializer.Serialize(new
             {
                 success = false,
                 error = "Count must be between 1 and 100"
-            }));
+            });
         }
 
-        var ids = _idAllocator.AllocateIds(count);
+        // Spec 040: persistent allocator owns the cross-process file lock and
+        // high-water-mark, so two concurrent generation runs cannot allocate
+        // overlapping ID ranges. The lock is held only for the duration of
+        // this call, not the whole generation pass.
+        var ids = await _idAllocator.AllocateAsync(count, "TC", _idStart, "ai generate", ct).ConfigureAwait(false);
 
-        return Task.FromResult(JsonSerializer.Serialize(new
+        return JsonSerializer.Serialize(new
         {
             success = true,
             allocated_ids = ids,
             count = ids.Count
-        }, new JsonSerializerOptions { WriteIndented = true }));
+        }, new JsonSerializerOptions { WriteIndented = true });
     }
 
     /// <summary>
@@ -218,16 +226,21 @@ public sealed class TestIndexTools
     /// <summary>
     /// Factory method to create TestIndexTools with required dependencies.
     /// </summary>
+    /// <remarks>
+    /// Spec 040: <paramref name="basePath"/> is the workspace root. The
+    /// persistent allocator owns the cross-process file lock and HWM so two
+    /// concurrent generation runs cannot allocate overlapping ID ranges.
+    /// </remarks>
     public static TestIndexTools Create(
         string basePath,
         string testsPath,
         SpectraConfig config,
         IReadOnlyList<TestCase> existingTests,
-        IReadOnlyCollection<string> allExistingIds)
+        Action<string>? logInfo = null)
     {
         var registry = new ToolRegistry(basePath, config);
-        var idAllocator = new TestIdAllocator(allExistingIds);
-        return new TestIndexTools(registry, testsPath, idAllocator, existingTests);
+        var idAllocator = new PersistentTestIdAllocator(basePath, logInfo);
+        return new TestIndexTools(registry, testsPath, idAllocator, config.Tests.IdStart, existingTests);
     }
 
     /// <summary>
@@ -260,56 +273,7 @@ public sealed class TestIndexTools
     }
 }
 
-/// <summary>
-/// Allocates unique test IDs across all suites.
-/// </summary>
-public sealed class TestIdAllocator
-{
-    private readonly HashSet<string> _usedIds;
-    private int _nextNumber;
-
-    public TestIdAllocator(IReadOnlyCollection<string> existingIds)
-    {
-        _usedIds = new HashSet<string>(existingIds, StringComparer.OrdinalIgnoreCase);
-
-        // Find the highest existing ID number
-        _nextNumber = existingIds
-            .Select(id => ExtractNumber(id))
-            .Where(n => n > 0)
-            .DefaultIfEmpty(99)
-            .Max() + 1;
-    }
-
-    /// <summary>
-    /// Allocates the specified number of unique IDs.
-    /// </summary>
-    public IReadOnlyList<string> AllocateIds(int count)
-    {
-        var ids = new List<string>(count);
-
-        for (int i = 0; i < count; i++)
-        {
-            string id;
-            do
-            {
-                id = $"TC-{_nextNumber:D3}";
-                _nextNumber++;
-            } while (_usedIds.Contains(id));
-
-            _usedIds.Add(id);
-            ids.Add(id);
-        }
-
-        return ids;
-    }
-
-    private static int ExtractNumber(string id)
-    {
-        if (string.IsNullOrEmpty(id))
-            return 0;
-
-        // Extract number from TC-XXX format
-        var match = System.Text.RegularExpressions.Regex.Match(id, @"TC-(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        return match.Success && int.TryParse(match.Groups[1].Value, out var num) ? num : 0;
-    }
-}
+// Spec 040: legacy in-file `TestIdAllocator` removed — replaced by
+// Spectra.Core.IdAllocation.PersistentTestIdAllocator which owns the
+// cross-process file lock and high-water-mark so concurrent generation
+// runs cannot allocate overlapping ID ranges.

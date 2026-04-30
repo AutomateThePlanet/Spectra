@@ -138,5 +138,9 @@ Read the named SKILL first, then follow its steps exactly. Do NOT invent CLI com
 | Validate test cases | `spectra-validate` | `spectra validate --no-interaction --output-format json --verbosity quiet` |
 | List / show test cases | `spectra-list` | `spectra list --no-interaction --output-format json --verbosity quiet` |
 | Docs index | `spectra-docs` | `spectra docs index [--force] --no-interaction --output-format json --verbosity quiet` |
+| Delete test case(s) | `spectra-delete` | `spectra delete {id...} --dry-run/--force --no-interaction --output-format json --verbosity quiet` |
+| Suite list/rename/delete | `spectra-suite` | `spectra suite list/rename/delete ... --no-interaction --output-format json --verbosity quiet` |
+| Stop a running operation | (this agent) | `spectra cancel --no-interaction --output-format json --verbosity quiet` |
+| Diagnose test ID issues | `spectra-help` | `spectra doctor ids [--fix] --no-interaction --output-format json --verbosity quiet` |
 
 **Never re-run a command that completed successfully.** If the result shows "completed", present the results and stop. **Dashboard**: after results, also `show preview site/index.html` to open the dashboard.

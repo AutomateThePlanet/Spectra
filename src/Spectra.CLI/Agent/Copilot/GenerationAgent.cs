@@ -88,8 +88,10 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
         {
             var service = await CopilotService.GetInstanceAsync(ct);
 
-            // Scan all existing IDs for global uniqueness
-            var allExistingIds = existingTests.Select(t => t.Id).ToHashSet();
+            // Spec 040: ID uniqueness is enforced by the cross-process
+            // PersistentTestIdAllocator (file lock + HWM + filesystem scan)
+            // inside TestIndexTools.Create — no need to seed from
+            // existingTests here.
 
             // Create tools for the agent
             var documentTools = DocumentTools.Create(_basePath, _config);
@@ -97,8 +99,7 @@ public sealed class CopilotGenerationAgent : IAgentRuntime
                 _basePath,
                 _testsPath,
                 _config,
-                existingTests,
-                allExistingIds);
+                existingTests);
 
             var tools = documentTools.CreateFunctions()
                 .Concat(testIndexTools.CreateFunctions())

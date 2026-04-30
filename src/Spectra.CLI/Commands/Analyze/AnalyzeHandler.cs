@@ -55,6 +55,11 @@ public sealed class AnalyzeHandler
         bool autoLink = false,
         CancellationToken ct = default)
     {
+        // Spec 040: cooperative cross-process cancellation via .spectra/.cancel
+        using var cancelRegistration = await Cancellation.CancellationManager.Instance
+            .RegisterCommandAsync("ai analyze --coverage", ct).ConfigureAwait(false);
+        ct = Cancellation.CancellationManager.Instance.Token;
+
         var progress = CreateCoverageProgress();
         progress.Reset();
         try
@@ -235,8 +240,9 @@ public sealed class AnalyzeHandler
         }
         catch (OperationCanceledException)
         {
+            // Spec 040: structured cancelled result for SKILL/CI consumers.
+            Cancellation.CancelledResultWriter.WriteMinimal("ai analyze --coverage", "coverage");
             progress.Fail("Operation cancelled");
-            Console.WriteLine("\nOperation cancelled.");
             return ExitCodes.Cancelled;
         }
         catch (Exception ex)

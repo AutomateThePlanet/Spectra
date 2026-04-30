@@ -118,3 +118,25 @@ spectra show TC-100
 spectra docs index --force
 spectra ai update --suite notification --diff
 ```
+
+---
+
+## Diagnose test ID issues
+
+If duplicate test IDs are reported, or you suspect ID drift:
+
+**Step 1** — runInTerminal:
+```
+spectra doctor ids --no-interaction --output-format json --verbosity quiet
+```
+
+**Step 2** — awaitTerminal, readFile `.spectra-result.json`.
+
+**Step 3** — If `duplicates` is non-empty, show the duplicate groups (id, file paths, mtimes). Ask the user to confirm before fixing.
+
+**Step 4** (only after confirmation) — runInTerminal:
+```
+spectra doctor ids --fix --no-interaction --output-format json --verbosity quiet
+```
+
+The fix renumbers later occurrences (oldest by mtime keeps the original ID). Hardcoded `[TestCase("TC-NNN")]` references in automation files are reported as `unfixable_references` for manual review.

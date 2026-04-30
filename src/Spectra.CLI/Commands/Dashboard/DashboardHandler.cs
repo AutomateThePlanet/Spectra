@@ -34,6 +34,11 @@ public sealed class DashboardHandler
         bool preview = false,
         CancellationToken ct = default)
     {
+        // Spec 040: cooperative cancellation via .spectra/.cancel sentinel.
+        using var cancelRegistration = await Cancellation.CancellationManager.Instance
+            .RegisterCommandAsync("dashboard", ct).ConfigureAwait(false);
+        ct = Cancellation.CancellationManager.Instance.Token;
+
         _progressManager.Reset();
         var currentDir = Directory.GetCurrentDirectory();
 
@@ -181,6 +186,13 @@ public sealed class DashboardHandler
 
             NextStepHints.Print("dashboard", true, _verbosity, new HintContext { OutputPath = Path.GetRelativePath(currentDir, outputPath) }, _outputFormat);
             return ExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            // Spec 040: structured cancelled result for SKILL/CI consumers.
+            Cancellation.CancelledResultWriter.WriteMinimal("dashboard", "dashboard");
+            _progressManager.Fail("Operation cancelled");
+            return ExitCodes.Cancelled;
         }
         catch (Exception ex)
         {

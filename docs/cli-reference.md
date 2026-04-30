@@ -428,3 +428,76 @@ The `start_execution_run` tool supports three mutually exclusive modes:
 | `analyze_coverage_gaps` | Analyze test case coverage |
 | `get_run_history` | Get execution history |
 | `get_execution_summary` | Get summary statistics |
+
+---
+
+## Spec 040 lifecycle commands (v1.52.0)
+
+### `spectra delete <test-id>...`
+
+Delete one or more test cases atomically with automation and dependency safety checks.
+
+```bash
+spectra delete TC-142                                # single
+spectra delete TC-142 TC-150 TC-151                  # bulk
+spectra delete --suite legacy                        # alias for `spectra suite delete legacy`
+spectra delete TC-142 --dry-run                      # preview, no filesystem changes
+spectra delete TC-142 --force                        # skip confirmation + automation guard
+spectra delete TC-142 --no-automation-check          # override automation guard but still confirm
+spectra delete TC-142 --no-interaction --output-format json
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--suite <name>` | — | Alias for `spectra suite delete <name>` |
+| `--dry-run` | off | Preview only |
+| `--force` | off | Skip confirmation; override automation guard |
+| `--no-automation-check` | off | Override automation guard without forcing past confirmation |
+
+**Exit codes**: 0 success, 1 generic, 3 missing args, 4 `TEST_NOT_FOUND`, 5 `AUTOMATION_LINKED`, 130 SIGINT.
+
+### `spectra suite list|rename|delete`
+
+Suite management.
+
+```bash
+spectra suite list                                          # list all with test/automated counts
+spectra suite rename <old> <new>                            # atomic rename + reference cleanup
+spectra suite rename <old> <new> --dry-run                  # preview
+spectra suite rename <old> <new> --force                    # skip confirmation
+spectra suite delete <name>                                 # recursive delete + cascade
+spectra suite delete <name> --dry-run                       # preview
+spectra suite delete <name> --force                         # skip automation/external-deps guards
+```
+
+**Exit codes** for `rename`/`delete`: 0 success, 4 `SUITE_NOT_FOUND`, 5 `AUTOMATION_LINKED`, 6 `SUITE_ALREADY_EXISTS`, 7 `INVALID_SUITE_NAME` (must match `^[a-z0-9][a-z0-9_-]*$`), 8 `EXTERNAL_DEPENDENCIES`, 130 SIGINT.
+
+### `spectra cancel [--force]`
+
+Cancel an in-progress SPECTRA operation. Cooperative shutdown via `.spectra/.cancel` sentinel; force-kills `Process.Kill(entireProcessTree: true)` after a 5 s grace.
+
+```bash
+spectra cancel                                              # cooperative + escalate after 5s
+spectra cancel --force                                      # immediate kill
+spectra cancel --no-interaction --output-format json
+```
+
+Result: `target_pid`, `target_command`, `shutdown_path` (`cooperative` / `forced` / `none`), `elapsed_seconds`. Exit `0` whether the run was cancelled or there was nothing running (`no_active_run` is not an error).
+
+### `spectra doctor ids [--fix]`
+
+Audit and repair test ID uniqueness across suites.
+
+```bash
+spectra doctor ids                                          # read-only audit
+spectra doctor ids --fix                                    # renumber later occurrences
+spectra doctor ids --no-interaction --output-format json
+```
+
+Reports: `total_tests`, `unique_ids`, `duplicates[]` (with file paths and mtimes), `index_mismatches[]`, `high_water_mark`, `next_id`. Under `--fix`: also `renumbered[]` and `unfixable_references[]` (in-source `[TestCase("TC-NNN")]` literals that need manual review).
+
+**Exit codes**: 0 success, 9 `DUPLICATES_FOUND` (only when `--no-interaction` and duplicates reported without `--fix` — CI-friendly regression gate), 130 SIGINT.
+
+### Cancellation behavior on long-running commands
+
+`ai generate`, `ai update`, `ai analyze --coverage`, `dashboard`, and `docs index` register with the process-level `CancellationManager` at startup. A peer `spectra cancel` (or Ctrl+C) triggers cooperative shutdown at the next batch boundary; partial results already on disk are preserved. The result artifact reports `status: cancelled` and the progress page transitions to a terminal "Cancelled" phase. Exit code is **130** (standard SIGINT convention).

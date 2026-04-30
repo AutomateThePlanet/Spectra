@@ -159,3 +159,23 @@ spectra ai generate --suite {suite} --doc-suite {docSuite} --from-description "{
 | Generate from previous suggestions | "Generate from suggestions", "Use the previous suggestions" | `--from-suggestions` flow |
 
 **Key rule**: If you can read the user's request as a single test case title, it's `--from-description`. If it's a topic to explore, it's `--focus`. Do NOT ask the user about count or scope to disambiguate — the topic-vs-scenario shape is the only signal you need.
+
+---
+
+## Cancel the current run
+
+If the user says "stop", "cancel", "kill it", "stop the analysis", "stop generating":
+
+**Step 1** — runInTerminal:
+```
+spectra cancel --no-interaction --output-format json --verbosity quiet
+```
+
+**Step 2** — awaitTerminal, readFile `.spectra-result.json`.
+
+**Step 3** — Report what happened:
+- `status: completed` with `shutdown_path: cooperative` → "Cancelled at phase {phase}. Tests/files written before stopping are preserved."
+- `status: completed` with `shutdown_path: forced` → "Force-killed after grace window."
+- `status: no_active_run` → "Nothing was running."
+
+If the original command's progress page is still open, point the user at it — it now shows the "Cancelled" terminal phase.

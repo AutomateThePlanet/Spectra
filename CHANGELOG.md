@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.52.0] - 2026-04-30
+
+### Added — Spec 040 lifecycle: Test Lifecycle & Process Control
+
+Four day-to-day Copilot Chat workflow gaps closed in one branch:
+
+- **`spectra delete <test-id>...`** — safely delete one or more test cases. Refuses by default if the test has `automated_by` entries (use `--force` to override) and cascades `depends_on` cleanup across the workspace atomically. `--dry-run` previews everything without touching the filesystem. Hard delete; Git is the undo.
+- **`spectra suite list|rename|delete`** — manage test suites. Rename is atomic with rollback on partial failure (directory move → suite-index rewrite → `spectra.config.json` rewrite of selections + per-suite block). Delete cascades cross-suite `depends_on` cleanup before recursive directory removal. Test IDs are global and unchanged by suite renames.
+- **`spectra cancel [--force]`** — stop a long-running operation. Three-layer cancellation: cooperative `CancellationToken` → `.spectra/.cancel` sentinel polled by every long-running handler at batch boundaries → `Process.Kill(entireProcessTree: true)` after a 5 s grace window. Result reports `target_pid`, `target_command`, `shutdown_path` (cooperative/forced), and `elapsed_seconds`. Long-running commands now exit `130` on cancellation and write their result with `status: "cancelled"`.
+- **`spectra doctor ids [--fix]`** — audit and repair test ID uniqueness across suites. Reads frontmatter directly (defends against stale `_index.json`), reports duplicates with file paths and mtimes, and `--fix` renumbers later occurrences (oldest by mtime keeps the original ID). Returns exit `9` (`DUPLICATES_FOUND`) when duplicates are reported under `--no-interaction` without `--fix` — CI-friendly regression gate.
+
+#### Cross-process ID-collision fix (the silent-correctness bug)
+
+New `Spectra.Core.IdAllocation.PersistentTestIdAllocator` wraps the existing in-memory `Spectra.Core.Index.TestIdAllocator` with:
+
+- A cross-process `FileShare.None` lock at `.spectra/id-allocator.lock` (10 s timeout, exponential backoff).
+- A monotonic high-water-mark in `.spectra/id-allocator.json` — once allocated, an ID is never reused, even if its test is later deleted.
+- A union-of-sources seed: HWM ∪ index scan ∪ filesystem frontmatter scan ∪ `tests.id_start - 1`.
+
+The duplicate `Spectra.CLI.Agent.Copilot.TestIdAllocator` class (which had no cross-process awareness) is removed. The `GetNextTestIds` AI tool now allocates through the persistent allocator on every call, holding the file lock only for the duration of the allocation.
+
+#### Cancellation infrastructure
+
+- `Spectra.CLI.Cancellation.CancellationManager` (singleton) owns the process `CancellationTokenSource`, watches the sentinel via a 200 ms polling `SentinelWatcher`, and writes/cleans `.spectra/.pid` via `PidFileManager`. Each long-running handler calls `await CancellationManager.Instance.RegisterCommandAsync(name, ct)` at start and disposes the registration in `finally`.
+- Wired into: `ai generate`, `ai update`, `ai analyze --coverage`, `dashboard`, `docs index`. Each translates `OperationCanceledException` into a structured cancelled result via `CancelledResultWriter.WriteMinimal()`.
+- `ProgressManager.Cancel()` and `ProgressPageWriter` extended: `cancelled` is a terminal phase alongside `completed`/`failed`, with its own striped/yellow CSS class.
+
+#### New SKILLs
+
+- `spectra-delete` (13th SKILL) — preview-then-confirm flow for single and bulk deletion.
+- `spectra-suite` (14th SKILL) — list, rename, delete recipes.
+
+The six existing long-running SKILLs (`spectra-generate`, `spectra-update`, `spectra-coverage`, `spectra-criteria`, `spectra-docs`, `spectra-dashboard`) gain a "Cancel the current run" recipe. `spectra-quickstart` adds a "Stop a running operation" workflow. `spectra-help` adds a "Diagnose test ID issues" recipe. The `spectra-generation.agent.md` delegation table routes `delete`/`suite`/`cancel`/`doctor` user phrases to the new SKILLs.
+
+### Migration
+
+After upgrading:
+
+1. **First run rebuilds the ID allocator state** automatically — you'll see one info-level log line like `[INFO] Initialized ID allocator: high water mark = TC-NNN`.
+2. **Audit existing duplicates** (no automatic renumbering on upgrade — Spec 040 deliberately preserves IDs that may be referenced externally):
+   ```
+   spectra doctor ids
+   ```
+3. **Repair duplicates** if and only if you've decided to change the IDs:
+   ```
+   spectra doctor ids --fix
+   ```
+   `--fix` may invalidate references in external trackers (Jira/ADO), CI configs that hardcode IDs, and `[TestCase("TC-NNN")]` automation attributes. The fix updates literal-string `depends_on` references in test files; in-source automation refs are reported under `unfixable_references` for manual review.
+4. **`spectra update-skills`** to install `spectra-delete` and `spectra-suite` if you've customized your existing SKILL files.
+5. **`.gitignore`** auto-extended on next `spectra init` to include `.spectra/.pid`, `.spectra/.cancel`, `.spectra/id-allocator.lock`, `.spectra/id-allocator.json`. If you're not running `init` again, add them manually.
+
+### Status string additions
+
+`CommandResult.Status` (free-form string per existing convention, no code-level enum) gains two stable values: `cancelled` and `no_active_run`. Existing values are unchanged.
+
+---
+
 ## [1.51.0] - 2026-04-30
 
 ### Changed — Spec 040: Document Index Restructure (bug fix for the 204K-token analyzer overflow)
