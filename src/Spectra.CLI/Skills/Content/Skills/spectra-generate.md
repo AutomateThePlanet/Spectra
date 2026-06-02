@@ -120,6 +120,7 @@ spectra ai generate --suite {suite} --doc-suite {docSuite} --count {count} [--fo
 - `"failed"` → tell user the `error`.
 - `"completed"` → "Generated **{generation.tests_written}** test cases." List `files_created`. If tests_written < tests_requested, say "Run again to generate more test cases."
 - If `token_usage` is present, also include a one-line cost/usage summary from `token_usage.total.total_tokens` and `token_usage.cost_display` (e.g. "Token usage: **89K tokens** in {run_summary.duration_seconds}s. Cost: {token_usage.cost_display}"). Do NOT invent numbers if the field is absent.
+- **Notes surfacing (Spec 048)**: if `notes` is present and non-empty, render each entry verbatim as a short note immediately after the results summary. Notes describe situations the user should know about (e.g. no acceptance criteria matched the suite, so generated tests will not contribute to acceptance-criteria coverage) but are NOT failures — `status` will still be `completed`. Do NOT prompt or block on a note.
 
 ---
 
@@ -147,6 +148,7 @@ spectra ai generate --suite {suite} --doc-suite {docSuite} --from-description "{
 - Suite it was added to
 - Grounding verdict (will be `manual`)
 - Any duplicate warnings
+- **Notes (Spec 048)**: if the JSON includes a `notes` array, render each entry verbatim as a short non-blocking note after the result. Notes are informational (e.g. "no acceptance criteria matched suite '{suite}'"); they do not signal failure.
 
 ---
 

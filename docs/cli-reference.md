@@ -128,6 +128,8 @@ After indexing, acceptance criteria are automatically extracted from the analyza
 
 **Per-document timeouts (Spec 047)**: extraction iterates documents one at a time with a 2-minute per-document deadline. A single slow document no longer aborts the whole corpus. On a per-document timeout the command emits a scoped warning naming the document and suggesting `spectra ai analyze --extract-criteria` as a retry path for that document specifically. Previously, a 60-second corpus-wide deadline silently truncated extraction on large projects.
 
+**Zero-criteria warning (Spec 048)**: when the run indexes at least one document but extracts zero acceptance criteria across the whole corpus, the command emits a prominent non-blocking warning naming the recovery command and writes a matching `criteria_warning` field into the JSON result. The exit code remains success. Suppressed when `--skip-criteria` is passed.
+
 In SKILL/CI mode, the command writes `.spectra-result.json` (structured result with per-suite breakdown and migration metadata) and `.spectra-progress.html` (live progress page).
 
 See [Document Index](document-index.md) and [Migration Spec 040](migration-040.md) for full details.
@@ -227,6 +229,8 @@ spectra ai generate checkout --no-interaction --output-format json    # CI pipel
 **Spec 040: doc-suite filtering and pre-flight budget check.** When `--suite <id>` is passed, the analyzer loads ONLY the matching doc-suite's documents into its prompt (instead of the full corpus). On large projects this is the difference between a 200K-token overflow and a comfortable ~10K-token analysis call. If `<id>` doesn't match any doc-suite in the manifest, the command warns and falls back to no-filter behavior — still subject to the pre-flight budget check.
 
 **Pre-flight budget violation** — exit code `4`. When the estimated analyzer prompt exceeds `ai.analysis.max_prompt_tokens` (default 96,000), the command exits cleanly with this code and an actionable message naming every candidate suite + token cost + suggested narrowing flags. Replaces the raw `400 prompt token count exceeds the limit of 128000` from the model. To diagnose: `spectra docs list-suites` shows available doc-suites and their token estimates.
+
+**No-match note (Spec 048)**: when a generation run (batch or from-description) finds no acceptance criteria matching the target suite by component, source-doc, or file-name, the result's `notes` array carries a non-blocking note explaining that generated tests will not contribute to acceptance-criteria coverage. The note is present in the JSON regardless of console verbosity; only the human-facing console echo is suppressed under `--verbosity quiet`. The run still exits success.
 
 Session state is stored in `.spectra/session.json` and expires after 1 hour.
 

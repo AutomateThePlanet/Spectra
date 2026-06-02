@@ -50,6 +50,12 @@ public sealed class AnalyzeHandler
     internal static readonly TimeSpan ExtractionRetryBackoff = TimeSpan.FromMilliseconds(1500);
     internal static readonly TimeSpan ExtractionPerAttemptDeadline = TimeSpan.FromMinutes(2);
 
+    // Spec 048: the only outcome value written by current code paths. Spec 047
+    // guarantees the cache-write gate (IsCacheable on the typed result) is only
+    // crossed by genuine extraction results, so every persisted CriteriaSource
+    // is affirmed-extracted.
+    internal const string OutcomeExtracted = "extracted";
+
     /// <summary>
     /// Spec 047: wraps a single extraction attempt in a hard 2-minute deadline.
     /// The Copilot SDK doesn't always honor <see cref="CancellationToken"/>, so we use
@@ -635,13 +641,17 @@ public sealed class AnalyzeHandler
                     // Write per-doc criteria file
                     await fileWriter.WriteAsync(criteriaFilePath, extracted, doc.Path, docHash, ct);
 
-                    // Update or add source in index
+                    // Update or add source in index. Spec 048: cacheable upsert
+                    // always records outcome=extracted; the cache-write gate
+                    // upstream (IsCacheable on the typed result from Spec 047)
+                    // guarantees we only land here on a genuine extraction.
                     if (existingSource is not null)
                     {
                         existingSource.DocHash = docHash;
                         existingSource.CriteriaCount = extracted.Count;
                         existingSource.LastExtracted = DateTime.UtcNow;
                         existingSource.File = criteriaFileName;
+                        existingSource.Outcome = OutcomeExtracted;
                     }
                     else
                     {
@@ -652,7 +662,8 @@ public sealed class AnalyzeHandler
                             SourceType = "document",
                             DocHash = docHash,
                             CriteriaCount = extracted.Count,
-                            LastExtracted = DateTime.UtcNow
+                            LastExtracted = DateTime.UtcNow,
+                            Outcome = OutcomeExtracted
                         });
                     }
                 }
@@ -1148,7 +1159,8 @@ public sealed class AnalyzeHandler
                         SourceDoc = importPath,
                         SourceType = "import",
                         CriteriaCount = mergeResult.Criteria.Count,
-                        ImportedAt = DateTime.UtcNow
+                        ImportedAt = DateTime.UtcNow,
+                        Outcome = OutcomeExtracted
                     });
                 }
 

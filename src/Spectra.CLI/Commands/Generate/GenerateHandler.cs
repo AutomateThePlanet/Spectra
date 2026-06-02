@@ -668,8 +668,10 @@ public sealed class GenerateHandler
             return ExitCodes.Error;
         }
 
-        // Load criteria context for the suite
-        var criteriaContext = await LoadCriteriaContextAsync(currentDir, suite, config, ct);
+        // Load criteria context for the suite (Spec 048: capture suite-match
+        // count so the no-match note can fire when zero criteria match).
+        var criteriaResult = await LoadCriteriaContextAsync(currentDir, suite, config, ct);
+        var criteriaContext = criteriaResult.Context;
 
         // v1.48.3: run Testimize in-process once per suite, BEFORE the batch
         // loop. Feeds field specs from behavior analysis (AI) or falls back
@@ -982,6 +984,17 @@ public sealed class GenerateHandler
             ? TokenUsageReport.FromTracker(_tokenTracker)
             : null;
 
+        // Spec 048: attach the non-blocking no-match note when zero suite-relevant
+        // acceptance criteria were found. Note rides on the structured result so
+        // SKILLs/CI consumers see it regardless of console verbosity. The human-
+        // facing console echo below is suppressed under quiet.
+        var noCriteriaNote = BuildNoCriteriaNote(criteriaResult.SuiteMatchedCount, suite);
+        IReadOnlyList<string>? notes = noCriteriaNote is null ? null : new[] { noCriteriaNote };
+        if (noCriteriaNote is not null && _verbosity >= VerbosityLevel.Normal)
+        {
+            _progress.Info(noCriteriaNote);
+        }
+
         var generateResult = new GenerateResult
         {
             Command = "generate",
@@ -1009,7 +1022,8 @@ public sealed class GenerateHandler
             RejectedTests = allRejectedTests.Count > 0 ? allRejectedTests : null,
             FilesCreated = allFilesCreated,
             RunSummary = runSummary,
-            TokenUsage = tokenUsage
+            TokenUsage = tokenUsage,
+            Notes = notes,
         };
 
         WriteResultFile(generateResult);
@@ -1360,8 +1374,10 @@ public sealed class GenerateHandler
                 return ExitCodes.Error;
             }
 
-            // Load criteria context for the suite
-            var criteriaContext = await LoadCriteriaContextAsync(currentDir, suiteName, config, ct);
+            // Load criteria context for the suite. Interactive flow is out of
+            // scope for the Spec 048 no-match note (per research.md D5); we
+            // discard SuiteMatchedCount here but still call the new signature.
+            var criteriaContext = (await LoadCriteriaContextAsync(currentDir, suiteName, config, ct)).Context;
 
             // v1.48.3: run Testimize once per suite before generation. See
             // the detailed comment at the equivalent call site in
@@ -1788,9 +1804,14 @@ public sealed class GenerateHandler
 
         // Best-effort: load matching acceptance criteria as formatting context.
         string? criteriaContext = null;
+        // Spec 048: default to "no match found" so we attach the note when
+        // criteria loading fails (the user still got no criteria linkage).
+        int criteriaSuiteMatchedCount = 0;
         try
         {
-            criteriaContext = await LoadCriteriaContextAsync(currentDir, suite, config, ct);
+            var criteriaResult = await LoadCriteriaContextAsync(currentDir, suite, config, ct);
+            criteriaContext = criteriaResult.Context;
+            criteriaSuiteMatchedCount = criteriaResult.SuiteMatchedCount;
         }
         catch
         {
@@ -1849,6 +1870,15 @@ public sealed class GenerateHandler
             await sessionStore.SaveAsync(session, ct);
         }
 
+        // Spec 048: attach the non-blocking no-match note when zero suite-relevant
+        // criteria were found (or criteria loading failed; defaulted to 0 upstream).
+        var fromDescNote = BuildNoCriteriaNote(criteriaSuiteMatchedCount, suite);
+        IReadOnlyList<string>? fromDescNotes = fromDescNote is null ? null : new[] { fromDescNote };
+        if (fromDescNote is not null && _verbosity >= VerbosityLevel.Normal)
+        {
+            _progress.Info(fromDescNote);
+        }
+
         if (_outputFormat == OutputFormat.Json)
         {
             JsonResultWriter.Write(new GenerateResult
@@ -1862,7 +1892,8 @@ public sealed class GenerateHandler
                     TestsWritten = 1,
                     TestsRejectedByCritic = 0
                 },
-                FilesCreated = [Path.GetRelativePath(currentDir, filePath)]
+                FilesCreated = [Path.GetRelativePath(currentDir, filePath)],
+                Notes = fromDescNotes,
             });
         }
 
@@ -2421,10 +2452,23 @@ public sealed class GenerateHandler
     }
 
     /// <summary>
-    /// Loads acceptance criteria relevant to the target suite from .criteria.yaml files.
-    /// Matches by document name and by component field.
+    /// Spec 048: result of loading acceptance-criteria context for a suite.
+    /// <see cref="Context"/> is today's <c>string?</c> return; the suite-match
+    /// count is exposed separately so the no-match note can fire on a true
+    /// "nothing matched this suite" condition (not on the last-resort
+    /// "use all criteria" fallback).
     /// </summary>
-    private static async Task<string?> LoadCriteriaContextAsync(
+    internal sealed record CriteriaContextResult(
+        string? Context,
+        int SuiteMatchedCount,
+        int TotalCriteriaCount);
+
+    /// <summary>
+    /// Loads acceptance criteria relevant to the target suite from .criteria.yaml files.
+    /// Matches by document name and by component field. Spec 048: returns a record
+    /// carrying the formatted context AND the suite-match count.
+    /// </summary>
+    internal static async Task<CriteriaContextResult> LoadCriteriaContextAsync(
         string basePath,
         string suiteName,
         SpectraConfig config,
@@ -2432,7 +2476,7 @@ public sealed class GenerateHandler
     {
         var criteriaDir = Path.Combine(basePath, config.Coverage?.CriteriaDir ?? "docs/criteria");
         if (!Directory.Exists(criteriaDir))
-            return null;
+            return new CriteriaContextResult(null, 0, 0);
 
         var reader = new CriteriaFileReader();
         var allCriteria = new List<AcceptanceCriterion>();
@@ -2446,7 +2490,7 @@ public sealed class GenerateHandler
         }
 
         if (allCriteria.Count == 0)
-            return null;
+            return new CriteriaContextResult(null, 0, 0);
 
         // Filter: criteria matching suite name (exact or partial match on component, source doc, or file name)
         var relevant = allCriteria.Where(c =>
@@ -2461,6 +2505,12 @@ public sealed class GenerateHandler
                 .Contains(suiteName, StringComparison.OrdinalIgnoreCase))
         ).ToList();
 
+        // Spec 048: capture the suite-match count BEFORE the last-resort fallback.
+        // The file-name fallback below is also a legitimate match (file named after
+        // the suite) and contributes; the last-resort "use all criteria" pass at
+        // the bottom is NOT a match and is excluded from this count.
+        var suiteMatchedCount = relevant.Count;
+
         // Also include criteria from files whose name starts with the suite name
         if (relevant.Count == 0)
         {
@@ -2470,7 +2520,6 @@ public sealed class GenerateHandler
 
             if (matchingFiles.Count > 0)
             {
-                var matchingFileSet = new HashSet<string>(matchingFiles, StringComparer.OrdinalIgnoreCase);
                 // Reload only from matching files
                 relevant = new List<AcceptanceCriterion>();
                 foreach (var file in matchingFiles)
@@ -2478,10 +2527,13 @@ public sealed class GenerateHandler
                     var fileCriteria = await reader.ReadAsync(file, ct);
                     relevant.AddRange(fileCriteria);
                 }
+                suiteMatchedCount = relevant.Count;
             }
         }
 
-        // Last resort: use all criteria (better than none, but may be noisy)
+        // Last resort: use all criteria (better than none, but may be noisy).
+        // Spec 048: this path does NOT contribute to suiteMatchedCount — a no-match
+        // condition that lands here still triggers the no-match note upstream.
         if (relevant.Count == 0)
             relevant = allCriteria;
 
@@ -2499,7 +2551,23 @@ public sealed class GenerateHandler
                 sb.AppendLine($"  Technique hint: {criterion.TechniqueHint}");
         }
 
-        return sb.Length > 0 ? sb.ToString() : null;
+        var context = sb.Length > 0 ? sb.ToString() : null;
+        return new CriteriaContextResult(context, suiteMatchedCount, allCriteria.Count);
+    }
+
+    /// <summary>
+    /// Spec 048: format the non-blocking note that fires when generation runs
+    /// against a suite with zero matching acceptance criteria. Returns null
+    /// when matched count is &gt; 0 (no note needed). Extracted as an internal
+    /// static so the formatting and the gating logic are testable in isolation.
+    /// </summary>
+    internal static string? BuildNoCriteriaNote(int suiteMatchedCount, string suite)
+    {
+        if (suiteMatchedCount > 0)
+            return null;
+        return $"No acceptance criteria matched suite '{suite}'. " +
+               "Generated tests have no criteria linkage; acceptance-criteria coverage will not include them. " +
+               "Run 'spectra ai analyze --extract-criteria' if criteria are expected.";
     }
 
     /// <summary>

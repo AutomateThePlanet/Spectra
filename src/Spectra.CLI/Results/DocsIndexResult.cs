@@ -57,6 +57,17 @@ public sealed class DocsIndexResult : CommandResult
     [JsonPropertyName("criteria_file")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? CriteriaFile { get; init; }
+
+    /// <summary>
+    /// Spec 048: present when <c>documents_indexed &gt; 0</c> and the run
+    /// produced 0 acceptance criteria across the whole corpus. Names the
+    /// recovery command (<c>spectra ai analyze --extract-criteria</c>) so
+    /// SKILLs and CI consumers can surface it. Absent when criteria were
+    /// produced or when <c>--skip-criteria</c> was passed.
+    /// </summary>
+    [JsonPropertyName("criteria_warning")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CriteriaWarning { get; init; }
 }
 
 /// <summary>

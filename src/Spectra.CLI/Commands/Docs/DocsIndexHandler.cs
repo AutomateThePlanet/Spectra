@@ -190,13 +190,14 @@ public sealed class DocsIndexHandler
         // ── Criteria extraction phase ──
         int? criteriaExtracted = null;
         string? criteriaFile = null;
+        string? criteriaWarning = null;
         if (!_skipCriteria)
         {
             WriteProgressResult("extracting-criteria", "Extracting acceptance criteria...", currentDir, manifestPath,
                 documentsIndexed: newLayout.Manifest.TotalDocuments,
                 documentsTotal: newLayout.Manifest.TotalDocuments);
 
-            (criteriaExtracted, criteriaFile) = await TryExtractCriteriaAsync(currentDir, config, ct);
+            (criteriaExtracted, criteriaFile, criteriaWarning) = await TryExtractCriteriaAsync(currentDir, config, ct);
         }
 
         // ── Final result ──
@@ -231,6 +232,7 @@ public sealed class DocsIndexHandler
             Migration = migrationRecord,
             CriteriaExtracted = criteriaExtracted,
             CriteriaFile = criteriaFile,
+            CriteriaWarning = criteriaWarning,
         };
 
         WriteResultFile(result, isTerminal: true);
@@ -245,12 +247,12 @@ public sealed class DocsIndexHandler
         return ExitCodes.Success;
     }
 
-    private async Task<(int? criteriaCount, string? criteriaFile)> TryExtractCriteriaAsync(
+    private async Task<(int? criteriaCount, string? criteriaFile, string? criteriaWarning)> TryExtractCriteriaAsync(
         string currentDir, SpectraConfig config, CancellationToken ct)
     {
         var provider = config.Ai.Providers.FirstOrDefault(p => p.Enabled);
         if (provider is null)
-            return (null, null);
+            return (null, null, null);
 
         var reqsPath = Path.Combine(currentDir, config.Coverage.RequirementsFile);
 
@@ -273,7 +275,7 @@ public sealed class DocsIndexHandler
             documentMap, manifestPath, indexDir, _includeArchived, ct);
 
         if (documentMap.Documents.Count == 0)
-            return (0, null);
+            return (0, null, null);
 
         if (_verbosity >= VerbosityLevel.Normal)
             _progress.Info($"Extracting acceptance criteria from {documentMap.Documents.Count} document(s)...");
@@ -305,17 +307,26 @@ public sealed class DocsIndexHandler
 
             var extracted = loopResult.Aggregated;
 
+            // Spec 048: corpus-wide zero-criteria gate. Fires when we indexed
+            // documents but extraction produced nothing across the whole corpus
+            // (commonly seen on large projects where every per-doc extraction
+            // came back inconclusive; Spec 047 leaves those uncached/uncounted).
+            // Suppressed when --skip-criteria gates this method off entirely.
+            var corpusWarning = ComputeCriteriaWarning(documentMap.Documents.Count, extracted.Count);
+            if (corpusWarning is not null)
+                _progress.Warning(corpusWarning);
+
             if (extracted.Count == 0)
             {
-                if (_verbosity >= VerbosityLevel.Normal)
+                if (_verbosity >= VerbosityLevel.Normal && corpusWarning is null)
                     _progress.Info("No new acceptance criteria found in documentation.");
-                return (0, null);
+                return (0, null, corpusWarning);
             }
 
             if (_dryRun)
             {
                 _progress.Info($"Would extract {extracted.Count} acceptance criteria (dry run).");
-                return (extracted.Count, null);
+                return (extracted.Count, null, null);
             }
 
             var writer = new RequirementsWriter();
@@ -324,7 +335,7 @@ public sealed class DocsIndexHandler
             _progress.Success($"Acceptance criteria extracted: {writeResult.Merged.Count} new, " +
                               $"{writeResult.SkippedCount} duplicates skipped, {writeResult.TotalInFile} total");
 
-            return (writeResult.TotalInFile, Path.GetRelativePath(currentDir, reqsPath));
+            return (writeResult.TotalInFile, Path.GetRelativePath(currentDir, reqsPath), null);
         }
         catch (OperationCanceledException)
         {
@@ -335,8 +346,23 @@ public sealed class DocsIndexHandler
             _progress.Warning($"Acceptance criteria extraction failed: {ex.Message}");
             if (_verbosity >= VerbosityLevel.Detailed)
                 Console.Error.WriteLine(ex.StackTrace);
-            return (null, null);
+            return (null, null, null);
         }
+    }
+
+    /// <summary>
+    /// Spec 048: pure projection from the corpus-level counts to the zero-criteria
+    /// warning string. Returns the warning when documents were indexed but zero
+    /// criteria were extracted; null otherwise. Extracted as an internal static so
+    /// the gate is testable in isolation without standing up the full handler.
+    /// </summary>
+    internal static string? ComputeCriteriaWarning(int documentsIndexed, int criteriaExtractedTotal)
+    {
+        if (documentsIndexed <= 0 || criteriaExtractedTotal > 0)
+            return null;
+        return $"Indexed {documentsIndexed} document(s) but extracted 0 acceptance criteria. " +
+               "Test generation will not be able to link criteria. " +
+               "Run: spectra ai analyze --extract-criteria";
     }
 
     /// <summary>Spec 047: per-document deadline (mirrors <c>AnalyzeHandler</c>).</summary>
