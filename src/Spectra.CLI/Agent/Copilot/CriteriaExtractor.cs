@@ -48,15 +48,21 @@ public sealed class CriteriaExtractor
 
     /// <summary>
     /// Extracts acceptance criteria from a single document.
+    /// Spec 047: returns a typed <see cref="CriteriaExtractionResult"/> so the
+    /// caller can distinguish a genuine extraction (cacheable) from a
+    /// transport-class empty response or a parse-class failure (not cacheable).
     /// </summary>
-    public async Task<IReadOnlyList<AcceptanceCriterion>> ExtractFromDocumentAsync(
+    public async Task<CriteriaExtractionResult> ExtractFromDocumentAsync(
         string documentPath,
         string documentContent,
         string? component,
         CancellationToken ct = default)
     {
+        // Spec 047: empty/whitespace source content is a genuine "nothing to
+        // extract" result. Cacheable so we don't re-read an empty file on
+        // every run.
         if (string.IsNullOrWhiteSpace(documentContent))
-            return [];
+            return new CriteriaExtractionResult(ExtractionOutcome.Extracted, []);
 
         var service = await CopilotService.GetInstanceAsync(ct);
         await using var session = await service.CreateGenerationSessionAsync(_provider, ct: ct);
@@ -89,10 +95,12 @@ public sealed class CriteriaExtractor
             $"CRITERIA OK doc={Path.GetFileName(documentPath)} response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s",
             sw.Elapsed, tokensIn, tokensOut, estimated);
 
-        if (string.IsNullOrWhiteSpace(responseText))
-            return [];
-
-        return ParseResponse(responseText, documentPath, component);
+        return ClassifyResponse(
+            responseText,
+            documentPath,
+            component,
+            ex => Spectra.CLI.Infrastructure.ErrorLogger.Write(
+                "criteria", $"doc={documentPath}", ex));
     }
 
     /// <summary>
@@ -135,10 +143,11 @@ public sealed class CriteriaExtractor
             $"CRITERIA SPLIT source={sourceKey ?? "?"} response_chars={responseText.Length} elapsed={sw.Elapsed.TotalSeconds:F1}s",
             sw.Elapsed, tokensIn, tokensOut, estimated);
 
-        if (string.IsNullOrWhiteSpace(responseText))
-            return [];
-
-        return ParseResponse(responseText, sourceKey, component);
+        // Split/normalize is the import-flow path (not cached); we still
+        // collapse non-Extracted outcomes to an empty list here because the
+        // caller (`ai analyze --import-criteria`) doesn't use the cache gate.
+        var result = ClassifyResponse(responseText, sourceKey, component);
+        return result.Criteria;
     }
 
     internal static string BuildExtractionPrompt(string docPath, string content, string? component,
@@ -206,15 +215,28 @@ public sealed class CriteriaExtractor
             """;
     }
 
-    private static IReadOnlyList<AcceptanceCriterion> ParseResponse(
-        string responseText, string? source, string? component)
+    /// <summary>
+    /// Spec 047: classify a raw AI response into one of three outcomes.
+    /// Pure function — exposed as <c>internal</c> so tests can drive each
+    /// branch of the 7-row mapping table without an AI provider.
+    /// The <paramref name="onException"/> callback fires for parse-time
+    /// exceptions and lets the caller log via <c>ErrorLogger</c>.
+    /// </summary>
+    internal static CriteriaExtractionResult ClassifyResponse(
+        string? responseText,
+        string? source,
+        string? component,
+        Action<Exception>? onException = null)
     {
+        if (string.IsNullOrWhiteSpace(responseText))
+            return new CriteriaExtractionResult(ExtractionOutcome.EmptyResponse, []);
+
         try
         {
             var jsonStart = responseText.IndexOf('[');
             var jsonEnd = responseText.LastIndexOf(']');
             if (jsonStart < 0 || jsonEnd <= jsonStart)
-                return [];
+                return new CriteriaExtractionResult(ExtractionOutcome.ParseFailure, []);
 
             var jsonText = responseText[jsonStart..(jsonEnd + 1)];
 
@@ -224,13 +246,13 @@ public sealed class CriteriaExtractor
             });
 
             if (items is null)
-                return [];
+                return new CriteriaExtractionResult(ExtractionOutcome.ParseFailure, []);
 
-            return items
-                .Where(i => !string.IsNullOrWhiteSpace(i.Text))
+            var criteria = items
+                .Where(i => !string.IsNullOrWhiteSpace(i!.Text))
                 .Select(i => new AcceptanceCriterion
                 {
-                    Text = i.Text!.Trim(),
+                    Text = i!.Text!.Trim(),
                     Rfc2119 = i.Rfc2119?.Trim().ToUpperInvariant(),
                     SourceDoc = source,
                     SourceSection = i.SourceSection?.Trim(),
@@ -240,10 +262,13 @@ public sealed class CriteriaExtractor
                     TechniqueHint = NormalizeTechniqueHint(i.TechniqueHint)
                 })
                 .ToList();
+
+            return new CriteriaExtractionResult(ExtractionOutcome.Extracted, criteria);
         }
-        catch
+        catch (Exception ex)
         {
-            return [];
+            onException?.Invoke(ex);
+            return new CriteriaExtractionResult(ExtractionOutcome.ParseFailure, []);
         }
     }
 

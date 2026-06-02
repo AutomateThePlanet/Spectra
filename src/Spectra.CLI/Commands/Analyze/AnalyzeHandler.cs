@@ -45,6 +45,75 @@ public sealed class AnalyzeHandler
     private static Progress.ProgressManager CreateResultOnlyProgress(string command) =>
         new(command, [], title: command);
 
+    // Spec 047: retry policy constants for the criteria extraction path.
+    internal const int ExtractionRetryAttempts = 2;
+    internal static readonly TimeSpan ExtractionRetryBackoff = TimeSpan.FromMilliseconds(1500);
+    internal static readonly TimeSpan ExtractionPerAttemptDeadline = TimeSpan.FromMinutes(2);
+
+    /// <summary>
+    /// Spec 047: wraps a single extraction attempt in a hard 2-minute deadline.
+    /// The Copilot SDK doesn't always honor <see cref="CancellationToken"/>, so we use
+    /// <see cref="Task.WhenAny"/> as a belt-and-braces guard. A deadline hit throws
+    /// <see cref="TimeoutException"/>, which the caller maps to a non-retried "skipped" outcome.
+    /// </summary>
+    internal static async Task<CriteriaExtractionResult> ExtractWithDeadlineAsync(
+        CriteriaExtractor extractor,
+        string documentPath,
+        string documentContent,
+        string? component,
+        CancellationToken ct)
+    {
+        var extractTask = extractor.ExtractFromDocumentAsync(documentPath, documentContent, component, ct);
+        var deadlineTask = Task.Delay(ExtractionPerAttemptDeadline, ct);
+        var completed = await Task.WhenAny(extractTask, deadlineTask);
+        if (completed == deadlineTask)
+            throw new TimeoutException($"Extraction timed out for {documentPath}");
+        return await extractTask;
+    }
+
+    /// <summary>
+    /// Spec 047: exit-code policy for <see cref="RunExtractCriteriaAsync"/>.
+    /// 0 = all docs succeeded (or there were no docs), 2 = partial failure
+    /// (some docs failed; includes new non-cacheable extraction outcomes),
+    /// 1 = every doc failed. Extracted so the policy is testable in isolation.
+    /// </summary>
+    internal static int ComputeExtractionExitCode(int totalDocs, int failedDocs)
+    {
+        if (totalDocs > 0 && failedDocs == totalDocs)
+            return ExitCodes.Error;
+        if (failedDocs > 0)
+            return ExitCodes.ValidationError;
+        return ExitCodes.Success;
+    }
+
+    /// <summary>
+    /// Spec 047: bounded retry on non-cacheable extraction outcomes
+    /// (<see cref="ExtractionOutcome.EmptyResponse"/> and <see cref="ExtractionOutcome.ParseFailure"/>).
+    /// <see cref="ExtractionOutcome.Extracted"/> returns immediately; thrown exceptions and
+    /// timeouts propagate without retry. <paramref name="maxAttempts"/> is the total
+    /// attempt count (not the retry count) — typical value is 2 (one initial + one retry).
+    /// </summary>
+    internal static async Task<CriteriaExtractionResult> ExtractWithRetryAsync(
+        Func<CancellationToken, Task<CriteriaExtractionResult>> extractAttempt,
+        int maxAttempts,
+        TimeSpan backoff,
+        IExtractionDelayProvider delayProvider,
+        CancellationToken ct)
+    {
+        if (maxAttempts < 1) throw new ArgumentOutOfRangeException(nameof(maxAttempts));
+
+        CriteriaExtractionResult? lastResult = null;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            lastResult = await extractAttempt(ct).ConfigureAwait(false);
+            if (lastResult.IsCacheable)
+                return lastResult;
+            if (attempt < maxAttempts)
+                await delayProvider.DelayAsync(backoff, ct).ConfigureAwait(false);
+        }
+        return lastResult!;
+    }
+
     /// <summary>
     /// Executes the analyze command.
     /// </summary>
@@ -459,26 +528,31 @@ public sealed class AnalyzeHandler
                     .Replace(' ', '-')
                     .ToLowerInvariant();
 
-                // Extract criteria via AI
-                IReadOnlyList<AcceptanceCriterion> extracted;
+                // Extract criteria via AI (Spec 047: typed result + bounded retry on
+                // non-cacheable outcomes; timeouts and thrown exceptions are NOT retried).
+                CriteriaExtractionResult result;
                 try
                 {
-                    var extractTask = extractor.ExtractFromDocumentAsync(doc.Path, content, component, ct);
-                    var deadlineTask = Task.Delay(TimeSpan.FromMinutes(2), ct);
-                    var completed = await Task.WhenAny(extractTask, deadlineTask);
-
-                    if (completed == deadlineTask)
-                    {
-                        if (_verbosity >= VerbosityLevel.Normal)
-                            Console.Error.WriteLine($"  Timeout extracting from {doc.Path}, skipping.");
-                        documentsFailed++;
-                        failedDocuments.Add(doc.Path);
-                        continue;
-                    }
-
-                    extracted = await extractTask;
+                    result = await ExtractWithRetryAsync(
+                        token => ExtractWithDeadlineAsync(extractor, doc.Path, content, component, token),
+                        maxAttempts: ExtractionRetryAttempts,
+                        backoff: ExtractionRetryBackoff,
+                        delayProvider: TaskDelayProvider.Instance,
+                        ct);
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (TimeoutException)
+                {
+                    if (_verbosity >= VerbosityLevel.Normal)
+                        Console.Error.WriteLine($"  Timeout extracting from {doc.Path}, skipping.");
+                    documentsFailed++;
+                    failedDocuments.Add(doc.Path);
+                    continue;
+                }
+                catch (Exception ex)
                 {
                     // Spec 043: full exception context to error log.
                     Spectra.CLI.Infrastructure.ErrorLogger.Write(
@@ -490,6 +564,19 @@ public sealed class AnalyzeHandler
                     continue;
                 }
 
+                // Spec 047: don't cache transport/parse failures — leave hash unrecorded
+                // so the next non-`--force` run re-attempts the document.
+                if (!result.IsCacheable)
+                {
+                    documentsFailed++;
+                    failedDocuments.Add(doc.Path);
+                    if (_verbosity >= VerbosityLevel.Normal)
+                        Console.Error.WriteLine(
+                            $"  Extraction inconclusive for {doc.Path} ({result.Outcome}); will retry on next run.");
+                    continue;
+                }
+
+                var extracted = result.Criteria;
                 criteriaExtracted += extracted.Count;
 
                 // Read existing per-doc criteria file for ID comparison
@@ -685,12 +772,7 @@ public sealed class AnalyzeHandler
                 }
             }
 
-            // Exit codes: 0 all success, 2 some failed, 1 all failed
-            if (documentsFailed == documentMap.Documents.Count && documentMap.Documents.Count > 0)
-                return ExitCodes.Error;
-            if (documentsFailed > 0)
-                return ExitCodes.ValidationError;
-            return ExitCodes.Success;
+            return ComputeExtractionExitCode(documentMap.Documents.Count, documentsFailed);
         }
         catch (OperationCanceledException)
         {

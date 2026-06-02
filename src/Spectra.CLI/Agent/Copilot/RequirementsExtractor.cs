@@ -25,6 +25,9 @@ public sealed class RequirementsExtractor
 
     /// <summary>
     /// Extracts testable requirements from source documents.
+    /// Spec 047: now iterates documents and delegates to the per-document method;
+    /// the caller in <see cref="Commands.Docs.DocsIndexHandler"/> uses the per-doc
+    /// entry point directly so a per-document deadline can be applied.
     /// </summary>
     /// <exception cref="InvalidOperationException">Thrown when the AI extraction call fails.</exception>
     public async Task<IReadOnlyList<RequirementDefinition>> ExtractAsync(
@@ -35,18 +38,37 @@ public sealed class RequirementsExtractor
         if (documents.Count == 0)
             return [];
 
+        var aggregated = new List<RequirementDefinition>();
+        foreach (var doc in documents)
+        {
+            var perDoc = await ExtractFromDocumentAsync(doc, existingRequirements, ct);
+            aggregated.AddRange(perDoc);
+        }
+        return aggregated;
+    }
+
+    /// <summary>
+    /// Spec 047: per-document variant. Sends one prompt containing a single
+    /// document so the caller can apply a per-document deadline instead of a
+    /// corpus-wide one. Behaviour for a single document matches the legacy
+    /// batched path (same prompt template, same internal 2-min SDK guard).
+    /// </summary>
+    public async Task<IReadOnlyList<RequirementDefinition>> ExtractFromDocumentAsync(
+        Spectra.Core.Models.DocumentEntry document,
+        IReadOnlyList<RequirementDefinition> existingRequirements,
+        CancellationToken ct = default)
+    {
         var service = await CopilotService.GetInstanceAsync(ct);
 
-        _onStatus?.Invoke("Creating extraction session...");
+        _onStatus?.Invoke($"Creating extraction session for {document.Path}...");
         await using var session = await service.CreateGenerationSessionAsync(
             _provider,
             ct: ct);
 
-        var prompt = await BuildExtractionPromptAsync(documents, existingRequirements, ct);
+        var prompt = await BuildExtractionPromptAsync(new[] { document }, existingRequirements, ct);
 
-        _onStatus?.Invoke("Extracting acceptance criteria from documentation...");
+        _onStatus?.Invoke($"Extracting acceptance criteria from {document.Path}...");
 
-        // Use Task.WhenAny as a hard timeout — the SDK doesn't always honor CancellationToken
         var sendTask = session.SendAndWaitAsync(
             new MessageOptions { Prompt = prompt },
             timeout: TimeSpan.FromMinutes(2),
@@ -57,7 +79,7 @@ public sealed class RequirementsExtractor
         if (completedTask == delayTask)
         {
             throw new TimeoutException(
-                "AI provider did not respond within 2 minutes. Check your provider configuration and connectivity.");
+                $"AI provider did not respond within 2 minutes for {document.Path}. Check your provider configuration and connectivity.");
         }
 
         var response = await sendTask;
@@ -65,16 +87,16 @@ public sealed class RequirementsExtractor
 
         if (string.IsNullOrWhiteSpace(responseText))
             throw new InvalidOperationException(
-                "AI provider returned an empty response. Check your provider configuration and connectivity.");
+                $"AI provider returned an empty response for {document.Path}. Check your provider configuration and connectivity.");
 
         var results = ParseResponse(responseText);
         if (results.Count == 0)
         {
-            _onStatus?.Invoke("Warning: AI response could not be parsed into acceptance criteria.");
+            _onStatus?.Invoke($"Warning: AI response for {document.Path} could not be parsed into acceptance criteria.");
         }
         else
         {
-            _onStatus?.Invoke($"Extracted {results.Count} acceptance criteria from AI response.");
+            _onStatus?.Invoke($"Extracted {results.Count} acceptance criteria from {document.Path}.");
         }
 
         return results;

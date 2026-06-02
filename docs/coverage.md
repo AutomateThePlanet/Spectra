@@ -126,6 +126,15 @@ criteria:
 
 The path to this file is configured via `coverage.criteria_file` in [spectra.config.json](configuration.md).
 
+### Resilience (Spec 047)
+
+`ai analyze --extract-criteria` runs per-document with bounded retries on inconclusive AI responses:
+
+- A genuine empty result (the AI returns a valid empty list, or the source document is empty) is cached normally — the next run skips the document.
+- An empty AI response or unparseable response triggers a single retry (1.5 s backoff). If still inconclusive, the document is reported under `failed_documents` and re-attempted on the next run — no cache hash is written, so the next non-`--force` run will not skip it.
+- A thrown exception or per-document timeout is logged to `.spectra-errors.log` and the document is reported as failed; no retry is performed.
+- `--force` bypasses the cache and re-extracts every document, regardless of any prior cache entry.
+
 ## Automation Coverage
 
 Measures which test cases have linked automation code (via `automated_by` field or code scanning).

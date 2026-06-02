@@ -1,3 +1,4 @@
+#pragma warning disable CS0618 // RequirementDefinition is obsolete — Spec 047 keeps the legacy extractor; full merge is out of scope.
 using System.Text.Json;
 using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Index;
@@ -284,18 +285,25 @@ public sealed class DocsIndexHandler
                 currentDir,
                 _verbosity >= VerbosityLevel.Normal ? s => _progress.Info(s) : null);
 
-            // Hard timeout via Task.WhenAny — Copilot SDK may not honor CancellationToken
-            var extractTask = extractor.ExtractAsync(documentMap.Documents, existing, ct);
-            var deadlineTask = Task.Delay(TimeSpan.FromSeconds(60), ct);
-            var completed = await Task.WhenAny(extractTask, deadlineTask);
+            // Spec 047: per-document deadline (matching AnalyzeHandler) replaces the
+            // 60s corpus deadline. One slow doc no longer aborts the whole corpus.
+            var loopResult = await ExtractCriteriaLoopAsync(
+                documents: documentMap.Documents,
+                existing: existing,
+                extractPerDoc: (doc, token) => extractor.ExtractFromDocumentAsync(doc, existing, token),
+                perDocDeadline: PerDocumentDeadline,
+                onSlowDoc: path => _progress.Warning(
+                    $"Acceptance criteria extraction timed out for {path}. " +
+                    "Run 'spectra ai analyze --extract-criteria' separately for this document."),
+                onDocFailure: (path, ex) =>
+                {
+                    _progress.Warning($"Acceptance criteria extraction failed for {path}: {ex.Message}");
+                    if (_verbosity >= VerbosityLevel.Detailed)
+                        Console.Error.WriteLine(ex.StackTrace);
+                },
+                ct: ct);
 
-            if (completed == deadlineTask)
-            {
-                _progress.Warning("Acceptance criteria extraction timed out. Run 'spectra ai analyze --extract-criteria' separately.");
-                return (0, null);
-            }
-
-            var extracted = await extractTask;
+            var extracted = loopResult.Aggregated;
 
             if (extracted.Count == 0)
             {
@@ -329,6 +337,70 @@ public sealed class DocsIndexHandler
                 Console.Error.WriteLine(ex.StackTrace);
             return (null, null);
         }
+    }
+
+    /// <summary>Spec 047: per-document deadline (mirrors <c>AnalyzeHandler</c>).</summary>
+    internal static readonly TimeSpan PerDocumentDeadline = TimeSpan.FromMinutes(2);
+
+    internal sealed record CriteriaLoopResult(
+        IReadOnlyList<Spectra.Core.Models.Coverage.RequirementDefinition> Aggregated,
+        IReadOnlyList<string> TimedOutDocuments,
+        IReadOnlyList<string> FailedDocuments);
+
+    /// <summary>
+    /// Spec 047: per-document extraction loop with an injectable per-doc deadline
+    /// and extractor delegate. Extracted as <c>internal static</c> so tests can
+    /// drive the loop without standing up a real Copilot session.
+    ///
+    /// One slow document is reported via <paramref name="onSlowDoc"/> and skipped;
+    /// other documents continue. An exception in one document is reported via
+    /// <paramref name="onDocFailure"/> and that document is skipped; remaining
+    /// documents continue. Cancellation propagates.
+    /// </summary>
+    internal static async Task<CriteriaLoopResult> ExtractCriteriaLoopAsync(
+        IReadOnlyList<Spectra.Core.Models.DocumentEntry> documents,
+        IReadOnlyList<Spectra.Core.Models.Coverage.RequirementDefinition> existing,
+        Func<Spectra.Core.Models.DocumentEntry, CancellationToken, Task<IReadOnlyList<Spectra.Core.Models.Coverage.RequirementDefinition>>> extractPerDoc,
+        TimeSpan perDocDeadline,
+        Action<string>? onSlowDoc,
+        Action<string, Exception>? onDocFailure,
+        CancellationToken ct)
+    {
+        var aggregated = new List<Spectra.Core.Models.Coverage.RequirementDefinition>();
+        var timedOut = new List<string>();
+        var failed = new List<string>();
+
+        foreach (var doc in documents)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                var extractTask = extractPerDoc(doc, ct);
+                var deadlineTask = Task.Delay(perDocDeadline, ct);
+                var completed = await Task.WhenAny(extractTask, deadlineTask);
+
+                if (completed == deadlineTask)
+                {
+                    timedOut.Add(doc.Path);
+                    onSlowDoc?.Invoke(doc.Path);
+                    continue;
+                }
+
+                var perDoc = await extractTask;
+                aggregated.AddRange(perDoc);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                failed.Add(doc.Path);
+                onDocFailure?.Invoke(doc.Path, ex);
+            }
+        }
+
+        return new CriteriaLoopResult(aggregated, timedOut, failed);
     }
 
     private static async Task<SpectraConfig?> LoadConfigAsync(string configPath, CancellationToken ct)
