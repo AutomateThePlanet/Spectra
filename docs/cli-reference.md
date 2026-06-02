@@ -66,7 +66,7 @@ spectra validate --path test-cases/checkout
 
 ### `spectra index`
 
-Rebuild `_index.json` files for all suites.
+Rebuild `_index.json` files for all suites. `--rebuild` reconstructs each suite's index from the `.md` files of record (parsing every `*.md` under `test-cases/{suite}/` and regenerating the index from the parsed set). Use it to recover from any state where the index has drifted from the on-disk files — for example, recovering tests created by `--from-description` runs from versions before Spec 049 (v1.52.3) wired that path into the index automatically.
 
 ```bash
 spectra index

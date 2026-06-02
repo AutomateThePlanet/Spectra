@@ -137,6 +137,12 @@ Each suite directory contains an `_index.json` with metadata for all tests:
 
 The `description`, `estimated_duration`, `criteria`, and `automated_by` fields are only included when populated.
 
+### Index population invariant (Spec 049, v1.52.3+)
+
+Every generation path — batch (`spectra ai generate <suite> [--count N]`), interactive (gap-driven), and `--from-description` — registers each new test in the suite's `_index.json` as part of the generation command itself. No separate `spectra index` step is required after generation. All three flows route through a single `TestPersistenceService` so the write-file + update-index sequence is one operation by construction.
+
+If you have on-disk `.md` files that are missing from `_index.json` (e.g. from a workspace generated before this guarantee landed), run `spectra index --rebuild` to reconstruct the index from the files of record.
+
 ---
 
 ## Test ID allocation and the high-water-mark (Spec 040, v1.52.0+)
