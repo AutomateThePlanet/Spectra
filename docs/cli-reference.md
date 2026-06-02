@@ -126,6 +126,8 @@ On first run after upgrading from a release that used the single-file `docs/_ind
 
 After indexing, acceptance criteria are automatically extracted from the analyzable documents (skip-analysis suites are excluded by default; pass `--include-archived` to override). Merged into `_criteria_index.yaml`. Use `--skip-criteria` to skip extraction entirely.
 
+**Per-document timeouts (Spec 047)**: extraction iterates documents one at a time with a 2-minute per-document deadline. A single slow document no longer aborts the whole corpus. On a per-document timeout the command emits a scoped warning naming the document and suggesting `spectra ai analyze --extract-criteria` as a retry path for that document specifically. Previously, a 60-second corpus-wide deadline silently truncated extraction on large projects.
+
 In SKILL/CI mode, the command writes `.spectra-result.json` (structured result with per-suite breakdown and migration metadata) and `.spectra-progress.html` (live progress page).
 
 See [Document Index](document-index.md) and [Migration Spec 040](migration-040.md) for full details.

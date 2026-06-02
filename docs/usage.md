@@ -66,6 +66,8 @@ After generating, you can continue:
 2. SHA-256 hashing skips documents that haven't changed since the last extraction.
 3. Results are reported per document with criteria counts grouped by RFC 2119 level (MUST/SHOULD/MAY).
 4. Files created: `docs/criteria/{docname}.criteria.yaml` and a master `docs/criteria/_criteria_index.yaml`.
+5. **Inconclusive extractions are retried, not cached** (Spec 047). If the AI returns an unparseable or empty response, the extractor retries up to one more time with a short backoff. Documents that remain inconclusive after retries are reported under `failed_documents` and re-attempted on the next run instead of being silently skipped. A genuine "no criteria found" result (the AI returns a valid empty list) is cached normally.
+6. `--force` remains the full re-extraction escape hatch — it ignores the hash cache and re-extracts every document.
 
 ### Follow-up prompts
 

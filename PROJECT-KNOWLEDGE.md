@@ -184,6 +184,11 @@ criteria:
 - **AI splitting**: Compound criteria split into individual entries
 - **RFC 2119 normalization**: Informal language → MUST/SHOULD/MAY
 - **Merge/Replace**: `--merge` (default) matches by ID/source, `--replace` overwrites target file only
+- **Resilient extraction (Spec 047)**: typed `CriteriaExtractionResult` distinguishes genuine extraction (cacheable) from parse-class / empty-response failures (not cacheable, retried up to 2 attempts with 1.5 s backoff). The cache hash is recorded only on a genuine result, so a transient AI hiccup no longer poisons the cache. `docs index` uses a 2-minute per-document deadline (was a single 60-second corpus deadline) — one slow doc no longer aborts the whole run.
+
+### Spec 047 — narrowed defect surface
+- **Cache poisoning channel**: poisoning occurred **only** when `ParseResponse` collapsed a returned response into `[]` — the per-doc loop's hash-compute failure, per-doc timeout, and thrown-exception branches `continue`d before the hash write and were already correct. The narrow fix replaces the `IReadOnlyList<AcceptanceCriterion>` return with a typed result and gates the hash write on `IsCacheable`.
+- **Two extractor implementations**: the `docs index` path uses `RequirementsExtractor` (output: `RequirementDefinition`); the `ai analyze --extract-criteria` path uses `CriteriaExtractor` (output: `AcceptanceCriterion`). Their downstream writers and YAML schemas differ. Full unification was deferred to a future spec because it expands the regression surface across both commands; Spec 047 only adds a per-doc method on `RequirementsExtractor` and rewires `DocsIndexHandler` to call it in a loop.
 
 ## VS Code Copilot Chat Integration
 
