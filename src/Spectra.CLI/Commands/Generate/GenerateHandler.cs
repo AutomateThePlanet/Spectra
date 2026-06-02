@@ -693,7 +693,11 @@ public sealed class GenerateHandler
         // always "copilot-sdk (github-models)" since the unification under
         // the Copilot SDK runtime. The critic field already does this.
         var generatorModel = config.Ai.Providers?.FirstOrDefault(p => p.Enabled)?.Model ?? agent.ProviderName;
-        var writer = new TestFileWriter();
+        // Spec 049: route batch writes through TestPersistenceService so the
+        // per-batch index update is a single centralized operation shared with
+        // the from-description flow.
+        var persistence = new TestPersistenceService(
+            new TestFileWriter(), new IndexGenerator(), new IndexWriter());
         var allWrittenTests = new List<TestCase>();
         var allFilesCreated = new List<string>();
         var allVerificationResults = new List<(TestCase Test, VerificationResult Result)>();
@@ -861,33 +865,35 @@ public sealed class GenerateHandler
                 _verification.ShowSkippedNotice();
             }
 
-            // Per-batch write
+            // Per-batch write + index update (Spec 049: single centralized
+            // operation via TestPersistenceService).
             UpdateProgress(suite, "generating",
                 $"Writing batch {batchNum}: {batchTestsToWrite.Count} test files...");
 
+            var groundedBatch = new List<TestCase>(batchTestsToWrite.Count);
             foreach (var test in batchTestsToWrite)
             {
                 var filePath = TestFileWriter.GetFilePath(testsPath, suite, test.Id);
                 var verification = batchVerificationResults.FirstOrDefault(r => r.Test.Id == test.Id);
-                var testWithPath = CreateTestWithGrounding(
+                var testWithGrounding = CreateTestWithGrounding(
                     test, verification.Result, generatorModel, filePath, testsPath);
-                await writer.WriteAsync(filePath, testWithPath, ct);
+                groundedBatch.Add(testWithGrounding);
 
                 allFilesCreated.Add(Path.GetRelativePath(currentDir, filePath));
                 mutableExistingIds.Add(test.Id);
             }
 
+            // Preserve pre-refactor index shape: the index sees the
+            // generator-shaped tests (FilePath = "{id}.md"), not the grounded
+            // versions whose FilePath was rewritten to a relative path during
+            // the disk write. The disk-side file content is unchanged.
             allWrittenTests.AddRange(batchTestsToWrite);
             mutableExistingTests.AddRange(batchTestsToWrite);
             batchesCompleted++;
 
-            // Per-batch index update
             var allTestsForIndex = new List<TestCase>(existingTests);
             allTestsForIndex.AddRange(allWrittenTests);
-            var indexGenerator = new IndexGenerator();
-            var batchIndex = indexGenerator.Generate(suite, allTestsForIndex);
-            var indexWriter = new IndexWriter();
-            await indexWriter.WriteAsync(Path.Combine(suitePath, "_index.json"), batchIndex, ct);
+            await persistence.PersistAsync(testsPath, suite, groundedBatch, allTestsForIndex, ct);
 
             _progress.Success($"Progress: {allWrittenTests.Count}/{effectiveCount} tests written to disk");
         }
@@ -1492,13 +1498,14 @@ public sealed class GenerateHandler
                     _verification.ShowSkippedNotice();
                 }
 
-                var writer = new TestFileWriter();
-
+                // Spec 049: route interactive-mode writes through TestPersistenceService
+                // so the per-iteration index update is a single centralized operation.
+                var interactivePersistence = new TestPersistenceService(
+                    new TestFileWriter(), new IndexGenerator(), new IndexWriter());
+                var interactiveGrounded = new List<TestCase>(testsToWrite.Count);
                 foreach (var test in testsToWrite)
                 {
                     var filePath = TestFileWriter.GetFilePath(testsPath, suiteName, test.Id);
-
-                    // Get verification result for this test if available
                     var verification = verificationResults.FirstOrDefault(r => r.Test.Id == test.Id);
                     var testWithPath = CreateTestWithGrounding(
                         test,
@@ -1507,10 +1514,13 @@ public sealed class GenerateHandler
                         filePath,
                         testsPath);
 
-                    await writer.WriteAsync(filePath, testWithPath, ct);
+                    interactiveGrounded.Add(testWithPath);
                     existingTests = [.. existingTests, testWithPath];
                     allExistingIds.Add(testWithPath.Id);
                 }
+
+                await interactivePersistence.PersistAsync(
+                    testsPath, suiteName, interactiveGrounded, existingTests.ToList(), ct);
 
                 allGeneratedTests.AddRange(testsToWrite);
 
@@ -1555,15 +1565,10 @@ public sealed class GenerateHandler
             }
         }
 
-        // Update index if we wrote any tests
-        if (allGeneratedTests.Count > 0 && !_dryRun)
-        {
-            var indexGenerator = new IndexGenerator();
-            var index = indexGenerator.Generate(suiteName, existingTests.ToList());
-
-            var indexWriter = new IndexWriter();
-            await indexWriter.WriteAsync(Path.Combine(suitePath, "_index.json"), index, ct);
-        }
+        // Spec 049: the per-iteration TestPersistenceService.PersistAsync call
+        // above already regenerates the suite index from the full existingTests
+        // set after every interactive iteration, so no trailing index update is
+        // required.
 
         // Track session stats
         var sessionSuites = new List<string> { suiteName };
@@ -1833,8 +1838,9 @@ public sealed class GenerateHandler
             return ExitCodes.Error;
         }
 
-        // Write the test
-        var writer = new TestFileWriter();
+        // Write the test and update the suite index (Spec 049: route through
+        // TestPersistenceService so from-description tests are immediately
+        // discoverable by every MCP tool that reads _index.json).
         var filePath = TestFileWriter.GetFilePath(testsPath, suite, test.Id);
         var testWithPath = new TestCase
         {
@@ -1858,7 +1864,14 @@ public sealed class GenerateHandler
             Grounding = test.Grounding
         };
 
-        await writer.WriteAsync(filePath, testWithPath, ct);
+        var existingForIndex = await LoadExistingTestsAsync(suitePath, testsPath, ct);
+        var allForIndex = existingForIndex
+            .Where(t => t.Id != testWithPath.Id)
+            .Append(testWithPath)
+            .ToList();
+        var persistence = new TestPersistenceService(
+            new TestFileWriter(), new IndexGenerator(), new IndexWriter());
+        await persistence.PersistAsync(testsPath, suite, [testWithPath], allForIndex, ct);
         _progress.Success($"{test.Id} written to tests/{suite}/");
 
         // Update session
