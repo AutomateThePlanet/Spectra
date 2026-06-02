@@ -54,6 +54,18 @@ public sealed class GenerateResult : CommandResult
     [JsonPropertyName("token_usage")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TokenUsageReport? TokenUsage { get; init; }
+
+    /// <summary>
+    /// Spec 048: non-blocking notes attached to the run's result. Present when
+    /// situations the user should know about applied (e.g., no acceptance
+    /// criteria matched the target suite, so generated tests have no criteria
+    /// linkage). Never indicates a failure — <c>status</c> remains <c>completed</c>.
+    /// Always present in the JSON when applicable, regardless of console
+    /// verbosity (only the human-facing console echo is suppressed under quiet).
+    /// </summary>
+    [JsonPropertyName("notes")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? Notes { get; init; }
 }
 
 public sealed class GenerateAnalysis

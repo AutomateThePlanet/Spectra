@@ -68,6 +68,13 @@ After generating, you can continue:
 4. Files created: `docs/criteria/{docname}.criteria.yaml` and a master `docs/criteria/_criteria_index.yaml`.
 5. **Inconclusive extractions are retried, not cached** (Spec 047). If the AI returns an unparseable or empty response, the extractor retries up to one more time with a short backoff. Documents that remain inconclusive after retries are reported under `failed_documents` and re-attempted on the next run instead of being silently skipped. A genuine "no criteria found" result (the AI returns a valid empty list) is cached normally.
 6. `--force` remains the full re-extraction escape hatch — it ignores the hash cache and re-extracts every document.
+7. **Coverage guards (Spec 048)**: `spectra docs index` emits a prominent non-blocking warning when it indexed documents but produced 0 criteria across the corpus, naming the recovery command (`spectra ai analyze --extract-criteria`). Similarly, `spectra ai generate` attaches a non-blocking note to the result when the target suite has no matching acceptance criteria, so you know generated tests will not contribute to acceptance-criteria coverage. Neither guard blocks; both surface in the JSON result.
+
+### Troubleshooting
+
+**"Indexed but 0 criteria"** — `spectra docs index` finished but the corpus produced no acceptance criteria. This usually means every per-document extraction came back inconclusive (transient model glitches, rate limits, or output truncation). Run `spectra ai analyze --extract-criteria` to retry just the extraction phase on the documents that need it. The exit code on `docs index` is still success — the warning is informational, not a failure.
+
+**"No acceptance criteria matched suite 'X'"** — `spectra ai generate` completed but no criteria matched the suite by component, source-doc, or file-name. Generated tests have no criteria linkage; acceptance-criteria coverage will not include them. If criteria are expected for this suite, run `spectra ai analyze --extract-criteria`. If criteria intentionally don't apply (e.g., a quick `--from-description` test), the note is just informational.
 
 ### Follow-up prompts
 

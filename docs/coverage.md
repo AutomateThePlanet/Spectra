@@ -135,6 +135,15 @@ The path to this file is configured via `coverage.criteria_file` in [spectra.con
 - A thrown exception or per-document timeout is logged to `.spectra-errors.log` and the document is reported as failed; no retry is performed.
 - `--force` bypasses the cache and re-extracts every document, regardless of any prior cache entry.
 
+### Coverage guards (Spec 048)
+
+Each persisted entry in `_criteria_index.yaml` carries an `outcome` field that distinguishes a genuine extraction outcome from inconclusive states. Today the only value written is `extracted` — Spec 047's cache-write gate guarantees only genuine extraction results are persisted. The field exists so future guards can distinguish affirmed-empty entries (`criteria_count: 0` with `outcome: extracted`, meaning the AI legitimately found nothing) from inconclusive ones without re-deriving the distinction heuristically. **An entry with `criteria_count: 0` and `outcome: extracted` is an affirmed empty — not a failure.** Legacy entries written before Spec 048 lack the field and deserialize as `extracted` by default; no migration step is required.
+
+Two non-blocking guards surface coverage-linkage gaps:
+
+- **`spectra docs index` zero-criteria warning** — when the run indexed at least one document but extracted zero acceptance criteria across the whole corpus, the command emits a prominent warning naming the recovery command (`spectra ai analyze --extract-criteria`) and writes a matching `criteria_warning` string into the JSON result. The command still exits success; the warning is suppressed when `--skip-criteria` is passed.
+- **`spectra ai generate` no-match note** — when a generation run targets a suite for which no acceptance criteria match by component, source-doc, or file-name, the run completes normally but attaches a non-blocking note to the result's `notes` array (e.g. `"No acceptance criteria matched suite 'checkout' …"`). The note is present in the JSON regardless of console verbosity; only the human-facing console echo is suppressed under `--verbosity quiet`. No interactive prompts are introduced anywhere.
+
 ## Automation Coverage
 
 Measures which test cases have linked automation code (via `automated_by` field or code scanning).

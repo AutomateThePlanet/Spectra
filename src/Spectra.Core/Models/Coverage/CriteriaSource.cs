@@ -27,4 +27,15 @@ public sealed class CriteriaSource
 
     [YamlMember(Alias = "imported_at")]
     public DateTime? ImportedAt { get; set; }
+
+    /// <summary>
+    /// Spec 048: extraction outcome that produced this entry. Always
+    /// <c>"extracted"</c> for entries written by Spec 047+ code paths
+    /// (only genuine extraction outcomes reach the cache). Reserved
+    /// future values: <c>"empty_response"</c>, <c>"parse_failure"</c>.
+    /// Legacy entries without this field deserialize as <c>"extracted"</c>
+    /// via this property default — no migration step required.
+    /// </summary>
+    [YamlMember(Alias = "outcome")]
+    public string Outcome { get; set; } = "extracted";
 }
