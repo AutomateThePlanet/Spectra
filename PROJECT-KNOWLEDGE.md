@@ -194,6 +194,18 @@ criteria:
 - **Cache poisoning channel**: poisoning occurred **only** when `ParseResponse` collapsed a returned response into `[]` — the per-doc loop's hash-compute failure, per-doc timeout, and thrown-exception branches `continue`d before the hash write and were already correct. The narrow fix replaces the `IReadOnlyList<AcceptanceCriterion>` return with a typed result and gates the hash write on `IsCacheable`.
 - **Two extractor implementations**: the `docs index` path uses `RequirementsExtractor` (output: `RequirementDefinition`); the `ai analyze --extract-criteria` path uses `CriteriaExtractor` (output: `AcceptanceCriterion`). Their downstream writers and YAML schemas differ. Full unification was deferred to a future spec because it expands the regression surface across both commands; Spec 047 only adds a per-doc method on `RequirementsExtractor` and rewires `DocsIndexHandler` to call it in a loop.
 
+### Spec 052 — the silent-failure pattern (cross-cutting learning)
+
+Specs 047–051 were, at root, five instances of **one class of defect: code that swallows a failure and hands back a plausible-looking value instead of surfacing it.** Spec 052 is the ship-readiness pass (cross-spec integration tests, named regression guards, a large-corpus scale guard, and this documentation consolidation) that hardens the whole block. The recurring shapes to watch for in future development:
+
+- **Lenient deserialization that drops unknown fields.** A misspelled or misshapen request field (`priority` instead of `priorities`, or a plural nested under legacy `filters`) was silently ignored, so `start_execution_run` ran the *whole suite* instead of the filtered subset. Fix pattern: opt into `JsonUnmappedMemberHandling.Disallow` on the params options and return an actionable, field-naming error (Spec 051). Watch for: any `JsonSerializerOptions` used for request binding that does not reject unmapped members.
+- **Returning a value for a "required" outcome instead of failing.** `UserDescribedGenerator` passed `criteriaContext: null` onward, so the mandatory criteria-mapping block never reached the model and the `criteria` field came back empty but *valid-looking* (Spec 050). Watch for: optional parameters that silently default away a behavior the caller assumed was on.
+- **`catch { return []; }` (or `=> []`) that masks a transient failure.** A parse-class extraction failure collapsed to an empty list that was then *cached*, permanently poisoning the document (Spec 047). Fix pattern: a typed result (`Extracted | EmptyResponse | ParseFailure` with `IsCacheable`) so callers gate side effects on a real outcome, plus bounded retry. Watch for: any `catch { return Enumerable.Empty<…>(); }` whose empty return is indistinguishable from a genuine empty result.
+- **Write-without-register.** From-description tests were written to disk but never added to `_index.json`, so every discovery tool was blind to them (Spec 049). Fix pattern: a single write-then-index entry point (`TestPersistenceService`) so a file can never be persisted without its index row.
+- **Missing-but-silent corpus deadline.** A single corpus-wide 60s budget killed extraction for the whole document set with no per-document signal (Spec 047). Fix pattern: per-item deadlines + explicit `timed-out`/`failed` lists surfaced in the result.
+
+**Guard discipline going forward:** when a function can fail, prefer a typed/explicit outcome over a default value; reject unknown request fields rather than ignoring them; and never cache or register on a path that swallowed an exception.
+
 ## VS Code Copilot Chat Integration
 
 ### 12 Bundled SKILLs
@@ -357,6 +369,12 @@ Three-section unified coverage with distinct semantics:
 
 | # | Feature | Key Changes |
 |---|---------|-------------|
+| 052 | Test Hardening & Documentation Audit (047–051) | Ship-readiness pass for the 047–051 block: new `Spectra.Integration.Tests` project with cross-spec `EndToEndScenarios` (7) + named `OriginalBugRegression` guards (5, display-named after the original user symptoms); `ScaleTests` (`[Trait Category=Scale]`) proving per-document extraction deadlines; full doc/SKILL audit (`docs/specs/052-doc-audit-report.md`, `052-skill-transcripts.md`); consolidated CHANGELOG entry; silent-failure-pattern learning. No production code change. |
+| 051 | Filter Schema Alignment & Strict Deserialization | `start_execution_run` accepts top-level plural `priorities`/`tags`/`components` (same shape as `find_test_cases`); legacy nested `filters` deprecated but honored; `UnmappedMemberHandling.Disallow` + actionable field-naming error replaces silent property drops. |
+| 050 | From-Description Criteria Injection | From-description generation forwards loaded criteria as the mandatory mapping instruction so the `criteria:` field is populated; `agentFactory` test seam on `UserDescribedGenerator.GenerateAsync`; verdict stays `manual` by design. |
+| 049 | From-Description Index Parity | `TestPersistenceService` single write-file + regenerate-index entry point; from-description tests registered in `_index.json` and discoverable by all MCP tools; `spectra index --rebuild` backfill. |
+| 048 | Acceptance Criteria Coverage Guards | `CriteriaSource.outcome` field (default `extracted`); `docs index` non-blocking `criteria_warning` on zero-criteria corpus; `ai generate` `notes` entry when no criteria match the suite; `CriteriaContextResult` exposes suite-match count. |
+| 047 | Resilient Criteria Extraction | Typed `CriteriaExtractionResult` (Extracted/EmptyResponse/ParseFailure) gates the cache on `IsCacheable`; bounded retry with `IExtractionDelayProvider`; per-document 2-min deadline (was a single 60s corpus deadline). |
 | 039 | Unified Critic Provider List | Critic provider validation now matches the generator provider list (`github-models`, `azure-openai`, `azure-anthropic`, `openai`, `anthropic`). Legacy `github` is a soft alias with deprecation warning; legacy `google` is hard-rejected. New `ResolveProvider` helper in `CriticFactory`. Enables Azure-only billing setups. |
 | 038 | Testimize Integration | Optional MCP integration with the external `Testimize.MCP.Server` global tool for algorithmic test data optimization (BVA, EP, pairwise, ABC). New `testimize` config section (disabled by default), `TestimizeMcpClient` (process lifecycle, JSON-RPC, 30s/5s timeouts, idempotent disposal), two new conditionally-registered AI tools (`GenerateTestData`, `AnalyzeFieldSpec`), `{{#if testimize_enabled}}` blocks in behavior-analysis and test-generation templates, new `spectra testimize check` CLI command, full graceful degradation. No NuGet dependency. |
 | 037 | ISTQB Test Design Techniques | All five built-in prompt templates rewritten to teach the AI six ISTQB techniques (EP, BVA, DT, ST, EG, UC). New `IdentifiedBehavior.Technique` field, `BehaviorAnalysisResult.TechniqueBreakdown` map, `AcceptanceCriterion.TechniqueHint` field. Analysis output includes `technique_breakdown` alongside `breakdown`. Terminal and progress page render a Technique Breakdown section in fixed display order. Distribution guideline caps any single category at 40%. Existing user-edited templates preserved; opt in via `spectra prompts reset --all`. |
@@ -382,12 +400,14 @@ Three-section unified coverage with distinct semantics:
 | 008 | Grounding Verification | Dual-model critic, grounded/partial/hallucinated verdicts |
 | 006 | Conversational Generation | Direct/interactive modes, test updates, classification |
 
-## Test Counts (as of 2026-04-11)
+## Test Counts (as of 2026-06-03, Spec 052)
 
 | Project | Tests |
 |---------|-------|
-| Spectra.Core.Tests | 491 |
-| Spectra.CLI.Tests | 709 |
-| Spectra.MCP.Tests | 351 |
-| **Total** | **1551** |
-| **Total** | **1279** |
+| Spectra.Core.Tests | 550 |
+| Spectra.CLI.Tests | 1054 |
+| Spectra.MCP.Tests | 368 |
+| Spectra.Integration.Tests | 12 |
+| **Total** | **1984** |
+
+`Spectra.CLI.Tests` includes the 2 `[Trait("Category","Scale")]` scale-guard tests; exclude them in fast-feedback runs with `dotnet test --filter "Category!=Scale"`.
