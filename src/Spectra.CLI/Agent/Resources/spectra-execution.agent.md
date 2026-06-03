@@ -36,8 +36,12 @@ interactively using SPECTRA MCP tools.
    - If user wants a **new run**: Call `cancel_all_active_runs` first, then proceed to step 2
    - If no active runs exist: proceed to step 2
 2. Call `list_available_suites` to show available suites
-3. Ask which suite and any filters (priority, tags, component)
-4. Call `start_execution_run` with chosen suite and filters
+3. Ask which suite and any filters (priorities, tags, components)
+4. Call `start_execution_run` with the chosen suite and filters, e.g.:
+   ```
+   start_execution_run({ suite: "checkout", priorities: ["high"], name: "Checkout high-priority smoke" })
+   ```
+   > The same filter shape (`priorities`/`tags`/`components`) works on both `find_test_cases` and `start_execution_run`. No nested `filters` object.
 5. For each test:
    a. Call `get_test_case_details` with current test handle
    b. Present: title, preconditions, steps, expected result, test data

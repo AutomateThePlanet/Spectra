@@ -1,20 +1,38 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace Spectra.MCP.Server;
 
 /// <summary>
 /// JSON-RPC 2.0 protocol handling for MCP.
 /// </summary>
-public static class McpProtocol
+public static partial class McpProtocol
 {
     public const string JsonRpcVersion = "2.0";
 
+    /// <summary>
+    /// Options for the JSON-RPC envelope and outgoing responses. Stays lenient:
+    /// clients may add envelope-level fields and must not be rejected (Spec 051 D2).
+    /// </summary>
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         WriteIndented = false
+    };
+
+    /// <summary>
+    /// Options for tool-parameter deserialization. Strict: unmapped members are
+    /// rejected (Spec 051) so misplaced/misspelled fields surface as actionable
+    /// errors instead of being silently dropped.
+    /// </summary>
+    private static readonly JsonSerializerOptions ParamsSerializerOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        WriteIndented = false,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
     };
 
     /// <summary>
@@ -68,17 +86,93 @@ public static class McpProtocol
     }
 
     /// <summary>
-    /// Serializes parameters to JSON element for tool dispatch.
+    /// Deserializes tool parameters with strict unmapped-member handling.
+    /// An unmapped (misplaced/misspelled) property throws
+    /// <see cref="McpInvalidParamsException"/> with an actionable message naming
+    /// the offending property and, for known filter confusions, the correct
+    /// field to use (Spec 051). The <paramref name="toolName"/> drives the
+    /// suggestion.
     /// </summary>
-    public static T? DeserializeParams<T>(JsonElement? paramsElement)
+    public static T? DeserializeParams<T>(JsonElement? paramsElement, string toolName)
     {
         if (paramsElement is null || paramsElement.Value.ValueKind == JsonValueKind.Null)
         {
             return default;
         }
 
-        return JsonSerializer.Deserialize<T>(paramsElement.Value.GetRawText(), SerializerOptions);
+        try
+        {
+            return JsonSerializer.Deserialize<T>(paramsElement.Value.GetRawText(), ParamsSerializerOptions);
+        }
+        catch (JsonException ex) when (TryExtractUnmappedMember(ex.Message, out var property, out var declaringType))
+        {
+            var suggestion = SuggestFilterField(toolName, property, declaringType);
+            throw new McpInvalidParamsException(
+                $"Property '{property}' is not valid on '{toolName}'. "
+                + (suggestion ?? "Check the tool schema."));
+        }
     }
+
+    private static readonly Regex UnmappedMemberRegex = BuildUnmappedMemberRegex();
+
+    [GeneratedRegex(@"The JSON property '([^']+)' could not be mapped to any \.NET member contained in type '([^']+)'")]
+    private static partial Regex BuildUnmappedMemberRegex();
+
+    /// <summary>
+    /// Extracts the offending property name and its declaring .NET type from the
+    /// System.Text.Json unmapped-member exception message.
+    /// </summary>
+    private static bool TryExtractUnmappedMember(string message, out string property, out string declaringType)
+    {
+        property = "";
+        declaringType = "";
+        var match = UnmappedMemberRegex.Match(message);
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        property = match.Groups[1].Value;
+        // Keep only the short type name (strip namespace/generic decoration).
+        var fullType = match.Groups[2].Value;
+        var lastDot = fullType.LastIndexOf('.');
+        declaringType = lastDot >= 0 ? fullType[(lastDot + 1)..] : fullType;
+        return true;
+    }
+
+    /// <summary>
+    /// Closed suggestion map for the known filter-field confusions (Spec 051 D4).
+    /// Returns null for anything outside the map (caller emits a generic message).
+    /// </summary>
+    private static string? SuggestFilterField(string toolName, string property, string declaringType)
+    {
+        // A plural filter field nested inside the legacy filters object — point to the top level.
+        if (declaringType.Contains("Filters", StringComparison.Ordinal)
+            && property is "priorities" or "components" or "tags")
+        {
+            return $"Use top-level '{property}', not nested under 'filters'.";
+        }
+
+        return (toolName, property) switch
+        {
+            ("start_execution_run", "priority") => "Use 'priorities' (array) at the top level.",
+            ("start_execution_run", "component") => "Use 'components' (array) at the top level.",
+            ("start_execution_run", "tag") => "Use 'tags' (array) at the top level.",
+            ("find_test_cases", "filters") =>
+                "find_test_cases uses top-level 'priorities'/'tags'/'components', not a nested 'filters' object.",
+            _ => null
+        };
+    }
+}
+
+/// <summary>
+/// Thrown when tool parameters contain an unmapped (misplaced or misspelled)
+/// property. Caught at the registry boundary and rendered as a structured
+/// INVALID_PARAMS error (Spec 051).
+/// </summary>
+public sealed class McpInvalidParamsException : Exception
+{
+    public McpInvalidParamsException(string message) : base(message) { }
 }
 
 /// <summary>

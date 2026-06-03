@@ -41,7 +41,7 @@ public sealed class AdvanceTestCaseTool : IMcpTool
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<AdvanceTestCaseRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<AdvanceTestCaseRequest>(parameters, "advance_test_case");
 
         // Resolve test_handle: if omitted, auto-detect from active run's in-progress test,
         // or fall back to the next pending test in the queue (resilience after context compaction).

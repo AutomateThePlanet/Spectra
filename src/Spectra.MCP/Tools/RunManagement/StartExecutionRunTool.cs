@@ -32,9 +32,17 @@ public sealed class StartExecutionRunTool : IMcpTool
             selection = new { type = "string", description = "Run a saved selection by name (mutually exclusive with suite and test_ids)" },
             name = new { type = "string", description = "Run name (required for test_ids and selection modes)" },
             environment = new { type = "string", description = "Target environment" },
+
+            // Canonical top-level filter shape — identical to find_test_cases.
+            priorities = new { type = "array", items = new { type = "string" }, description = "Filter by priority (OR within array). Same shape as find_test_cases." },
+            tags = new { type = "array", items = new { type = "string" }, description = "Filter by tags (OR within array). Same shape as find_test_cases." },
+            components = new { type = "array", items = new { type = "string" }, description = "Filter by component (OR within array). Same shape as find_test_cases." },
+
             filters = new
             {
                 type = "object",
+                deprecated = true,
+                description = "DEPRECATED — use top-level priorities/tags/components instead. Still honored this release.",
                 properties = new
                 {
                     priority = new { type = "string" },
@@ -66,7 +74,7 @@ public sealed class StartExecutionRunTool : IMcpTool
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<StartExecutionRunRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<StartExecutionRunRequest>(parameters, "start_execution_run");
 
         // Determine mode
         var hasSuite = !string.IsNullOrEmpty(request?.Suite);
@@ -135,15 +143,8 @@ public sealed class StartExecutionRunTool : IMcpTool
                 $"Suite '{request.Suite}' not found or has no tests"));
         }
 
-        var filters = request.Filters is not null ? new RunFilters
-        {
-            Priority = request.Filters.Priority is not null
-                ? Enum.Parse<Priority>(request.Filters.Priority, true)
-                : null,
-            Tags = request.Filters.Tags,
-            Component = request.Filters.Component,
-            TestIds = request.Filters.TestIds
-        } : null;
+        var warnings = new List<string>();
+        var filters = NormalizeFilters(request, warnings);
 
         var (run, queue) = await _engine.StartRunAsync(
             request.Suite,
@@ -151,7 +152,50 @@ public sealed class StartExecutionRunTool : IMcpTool
             request.Environment,
             filters);
 
-        return FormatRunResponse(run, queue);
+        return FormatRunResponse(run, queue, warnings);
+    }
+
+    /// <summary>
+    /// Spec 051: resolves whichever filter shape arrived into one <see cref="RunFilters"/>.
+    /// Top-level plural fields (matching find_test_cases) are canonical and win when
+    /// both shapes are present; the legacy nested <c>filters</c> object is honored
+    /// (deprecated) as a fallback and lifted singular→plural.
+    /// </summary>
+    private static RunFilters? NormalizeFilters(StartExecutionRunRequest request, List<string> warnings)
+    {
+        var hasTopLevel = request.Priorities is { Count: > 0 }
+            || request.Tags is { Count: > 0 }
+            || request.Components is { Count: > 0 };
+
+#pragma warning disable CS0618 // legacy nested shape intentionally honored (deprecated)
+        var legacy = request.Filters;
+#pragma warning restore CS0618
+
+        if (hasTopLevel)
+        {
+            if (legacy is not null)
+            {
+                warnings.Add("Both top-level and nested 'filters' provided; using the top-level priorities/tags/components.");
+            }
+
+            return RunFilters.From(request.Priorities, request.Tags, request.Components);
+        }
+
+        if (legacy is not null)
+        {
+            // Lift the singular legacy shape into the unified plural model.
+            return new RunFilters
+            {
+                Priority = legacy.Priority is not null
+                    ? Enum.Parse<Priority>(legacy.Priority, true)
+                    : null,
+                Tags = legacy.Tags,
+                Component = legacy.Component,
+                TestIds = legacy.TestIds
+            };
+        }
+
+        return null;
     }
 
     private async Task<string> ExecuteWithTestIdsAsync(StartExecutionRunRequest request)
@@ -249,7 +293,7 @@ public sealed class StartExecutionRunTool : IMcpTool
         return FormatRunResponse(run, queue);
     }
 
-    private static string FormatRunResponse(Run run, TestQueue queue)
+    private static string FormatRunResponse(Run run, TestQueue queue, List<string>? warnings = null)
     {
         var firstTest = queue.GetNext();
 
@@ -263,7 +307,8 @@ public sealed class StartExecutionRunTool : IMcpTool
                 test_handle = firstTest.TestHandle,
                 test_id = firstTest.TestId,
                 title = firstTest.Title
-            } : null
+            } : null,
+            warnings = warnings is { Count: > 0 } ? warnings : null
         };
 
         return JsonSerializer.Serialize(McpToolResponse<object>.Success(
@@ -291,6 +336,18 @@ internal sealed class StartExecutionRunRequest
     [JsonPropertyName("environment")]
     public string? Environment { get; set; }
 
+    // Spec 051: canonical top-level filter shape (matches find_test_cases).
+    [JsonPropertyName("priorities")]
+    public List<string>? Priorities { get; set; }
+
+    [JsonPropertyName("tags")]
+    public List<string>? Tags { get; set; }
+
+    [JsonPropertyName("components")]
+    public List<string>? Components { get; set; }
+
+    // Spec 051: legacy nested shape — deprecated, still honored this release.
+    [Obsolete("Use top-level priorities/tags/components instead.")]
     [JsonPropertyName("filters")]
     public StartExecutionRunFilters? Filters { get; set; }
 }

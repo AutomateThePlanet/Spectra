@@ -35,7 +35,7 @@ public sealed class PauseExecutionRunTool : IMcpTool
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<PauseExecutionRunRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<PauseExecutionRunRequest>(parameters, "pause_execution_run");
 
         var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(request?.RunId, _runRepo);
         if (runError is not null)

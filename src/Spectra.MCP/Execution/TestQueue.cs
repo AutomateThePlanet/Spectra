@@ -227,7 +227,14 @@ public sealed class TestQueue
 
         var filtered = entries.AsEnumerable();
 
-        if (filters.Priority.HasValue)
+        // Priority: canonical plural (OR within array, matches find_test_cases)
+        // takes precedence; fall back to the legacy single-value filter.
+        if (filters.Priorities?.Count > 0)
+        {
+            var prioritySet = new HashSet<string>(filters.Priorities, StringComparer.OrdinalIgnoreCase);
+            filtered = filtered.Where(e => prioritySet.Contains(e.Priority));
+        }
+        else if (filters.Priority.HasValue)
         {
             var priorityStr = filters.Priority.Value.ToString().ToLowerInvariant();
             filtered = filtered.Where(e => e.Priority.Equals(priorityStr, StringComparison.OrdinalIgnoreCase));
@@ -235,12 +242,19 @@ public sealed class TestQueue
 
         if (filters.Tags?.Count > 0)
         {
-            // AND logic: test must have ALL specified tags
+            // OR logic (Spec 051): test must have ANY of the specified tags,
+            // matching find_test_cases. (AND-between-fields is preserved.)
             filtered = filtered.Where(e =>
-                filters.Tags.All(tag => e.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase)));
+                e.Tags.Any(tag => filters.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase)));
         }
 
-        if (!string.IsNullOrEmpty(filters.Component))
+        // Component: canonical plural (OR) takes precedence; fall back to legacy single value.
+        if (filters.Components?.Count > 0)
+        {
+            var componentSet = new HashSet<string>(filters.Components, StringComparer.OrdinalIgnoreCase);
+            filtered = filtered.Where(e => e.Component is not null && componentSet.Contains(e.Component));
+        }
+        else if (!string.IsNullOrEmpty(filters.Component))
         {
             filtered = filtered.Where(e =>
                 filters.Component.Equals(e.Component, StringComparison.OrdinalIgnoreCase));

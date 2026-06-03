@@ -43,7 +43,7 @@ public sealed class FindTestCasesTool : IMcpTool
 
     public Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<FindTestCasesRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<FindTestCasesRequest>(parameters, "find_test_cases");
         var maxResults = request?.MaxResults ?? 50;
         if (maxResults < 1)
         {

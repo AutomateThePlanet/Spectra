@@ -94,6 +94,20 @@ The server runs on stdio transport and follows the MCP JSON-RPC 2.0 protocol.
 }
 ```
 
+## Filtering (canonical shape)
+
+`start_execution_run` and `find_test_cases` use the **same** top-level filter shape — learn it once:
+
+```json
+{ "suite": "checkout", "priorities": ["high"], "tags": ["smoke"], "components": ["payments"] }
+```
+
+- `priorities`, `tags`, `components` are **arrays**. Values within one array combine with **OR**; different arrays combine with **AND**.
+- The identical shape works on `find_test_cases` (swap `suite` for `suites: [...]`).
+- There is **no nested `filters` object**. A misplaced field (e.g. top-level singular `priority`, or a `filters: { ... }` wrapper) is rejected with an `INVALID_PARAMS` error that names the offending field and suggests the correct one — it is never silently ignored.
+
+> **Deprecated**: `start_execution_run` still accepts the legacy nested `filters: { priority, tags, component }` object for backward compatibility, but it is deprecated. Use the top-level arrays.
+
 ## Response Format
 
 All tools return responses wrapped in `McpToolResponse<T>`:

@@ -202,6 +202,18 @@ Index the documentation first, then extract criteria. The order matters because 
 
 Re-generate after extracting criteria. Generation auto-loads related criteria as prompt context and writes the linkage into the test case frontmatter.
 
+### Filter ignored / the whole suite ran
+
+If you asked to run only high-priority (or tagged/component) tests but the whole suite started, you were almost certainly sending the filter in the wrong shape. Use the **canonical top-level arrays** — the same shape on both `start_execution_run` and `find_test_cases`:
+
+```json
+{ "suite": "checkout", "priorities": ["high"], "tags": ["smoke"], "components": ["payments"] }
+```
+
+Values within one array are OR'd; different arrays are AND'd. As of Spec 051 a misplaced field (top-level singular `priority`, or a nested `filters: { ... }` wrapper) no longer slips through silently — it returns an `INVALID_PARAMS` error that names the field and suggests the correct one, so the next attempt lands on the right shape. The legacy nested `filters` object is still accepted but deprecated.
+
+> Note: run-mode tag matching is now **OR-within-array** (any listed tag), matching `find_test_cases`. Previously a multi-tag run-filter required *all* tags; if you relied on that AND behavior via the legacy nested shape, split it into separate runs or filter the results.
+
 ---
 
 ## Complete Pipeline — Start to Finish

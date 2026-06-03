@@ -35,7 +35,7 @@ public sealed class ResumeExecutionRunTool : IMcpTool
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<ResumeExecutionRunRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<ResumeExecutionRunRequest>(parameters, "resume_execution_run");
 
         var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(request?.RunId, _runRepo);
         if (runError is not null)

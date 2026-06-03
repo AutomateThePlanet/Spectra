@@ -39,7 +39,7 @@ public sealed class SkipTestCaseTool : IMcpTool
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<SkipTestCaseRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<SkipTestCaseRequest>(parameters, "skip_test_case");
 
         // Resolve test_handle
         var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(null, _runRepo);

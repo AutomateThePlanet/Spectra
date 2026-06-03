@@ -53,7 +53,7 @@ public sealed class FinalizeExecutionRunTool : IMcpTool
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<FinalizeExecutionRunRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<FinalizeExecutionRunRequest>(parameters, "finalize_execution_run");
 
         var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(request?.RunId, _runRepo);
         if (runError is not null)

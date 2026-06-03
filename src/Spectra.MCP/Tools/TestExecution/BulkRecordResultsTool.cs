@@ -56,7 +56,7 @@ public sealed class BulkRecordResultsTool : IMcpTool
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<BulkRecordRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<BulkRecordRequest>(parameters, "bulk_record_results");
         if (request is null || string.IsNullOrEmpty(request.Status))
         {
             return JsonSerializer.Serialize(McpToolResponse<object>.Failure(

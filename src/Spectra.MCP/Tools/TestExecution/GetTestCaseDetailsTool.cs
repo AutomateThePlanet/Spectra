@@ -40,7 +40,7 @@ public sealed class GetTestCaseDetailsTool : IMcpTool
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<GetTestCaseDetailsRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<GetTestCaseDetailsRequest>(parameters, "get_test_case_details");
 
         // Resolve test_handle — for this tool, we need the NEXT test (pending or in-progress),
         // not just in-progress tests, because this tool is what transitions pending → in-progress.

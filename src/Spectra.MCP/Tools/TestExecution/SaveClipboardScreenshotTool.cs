@@ -50,7 +50,7 @@ public sealed class SaveClipboardScreenshotTool : IMcpTool
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<SaveClipboardScreenshotRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<SaveClipboardScreenshotRequest>(parameters, "save_clipboard_screenshot");
 
         // Save clipboard image to a temp file
         var tempPath = Path.Combine(Path.GetTempPath(), $"spectra-clipboard-{Guid.NewGuid():N}.png");
