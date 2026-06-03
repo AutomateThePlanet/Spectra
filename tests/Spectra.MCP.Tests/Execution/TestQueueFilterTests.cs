@@ -67,13 +67,57 @@ public class TestQueueFilterTests
     }
 
     [Fact]
-    public void Build_FilterByMultipleTags_RequiresAllTags()
+    public void Build_FilterByMultipleTags_MatchesAnyTag()
     {
+        // Spec 051: tags are now OR-within-array (matches find_test_cases).
+        // "smoke" OR "auth" → TC-001 (smoke,auth), TC-002 (auth), TC-003 (smoke), TC-005 (smoke).
         var filters = new RunFilters { Tags = ["smoke", "auth"] };
         var queue = TestQueue.Build("run-1", _testEntries, filters);
 
-        Assert.Single(queue.Tests);
-        Assert.Equal("TC-001", queue.Tests[0].TestId);
+        Assert.Equal(4, queue.TotalCount);
+        Assert.Contains(queue.Tests, t => t.TestId == "TC-001");
+        Assert.Contains(queue.Tests, t => t.TestId == "TC-002");
+        Assert.Contains(queue.Tests, t => t.TestId == "TC-003");
+        Assert.Contains(queue.Tests, t => t.TestId == "TC-005");
+        Assert.DoesNotContain(queue.Tests, t => t.TestId == "TC-004");
+    }
+
+    [Fact]
+    public void Build_FilterByPriorities_OrSemantics()
+    {
+        // Spec 051: plural priorities, OR-within-array. high OR low → TC-001, TC-003 (high), TC-004 (low).
+        var filters = new RunFilters { Priorities = ["high", "low"] };
+        var queue = TestQueue.Build("run-1", _testEntries, filters);
+
+        Assert.Equal(3, queue.TotalCount);
+        Assert.Contains(queue.Tests, t => t.TestId == "TC-001");
+        Assert.Contains(queue.Tests, t => t.TestId == "TC-003");
+        Assert.Contains(queue.Tests, t => t.TestId == "TC-004");
+    }
+
+    [Fact]
+    public void Build_FilterByComponents_OrSemantics()
+    {
+        // Spec 051: plural components, OR-within-array. auth OR payment → TC-001, TC-002 (auth), TC-005 (payment).
+        var filters = new RunFilters { Components = ["auth", "payment"] };
+        var queue = TestQueue.Build("run-1", _testEntries, filters);
+
+        Assert.Equal(3, queue.TotalCount);
+        Assert.Contains(queue.Tests, t => t.TestId == "TC-001");
+        Assert.Contains(queue.Tests, t => t.TestId == "TC-002");
+        Assert.Contains(queue.Tests, t => t.TestId == "TC-005");
+    }
+
+    [Fact]
+    public void Build_FilterByPrioritiesUnknownValue_MatchesNothing()
+    {
+        // Spec 051: unknown priority values simply match nothing (no enum-parse throw),
+        // mirroring find_test_cases. "critical" is not a real priority.
+        var filters = new RunFilters { Priorities = ["high", "critical"] };
+        var queue = TestQueue.Build("run-1", _testEntries, filters);
+
+        Assert.Equal(2, queue.TotalCount); // only the 2 high-priority tests
+        Assert.All(queue.Tests, t => Assert.Equal(Priority.High, t.Priority));
     }
 
     [Fact]

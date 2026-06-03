@@ -35,7 +35,7 @@ public sealed class CancelAllActiveRunsTool : IMcpTool
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<CancelAllActiveRunsRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<CancelAllActiveRunsRequest>(parameters, "cancel_all_active_runs");
         var activeRuns = await _runRepo.GetActiveRunsAsync();
 
         if (activeRuns.Count == 0)

@@ -39,7 +39,7 @@ public sealed class AddTestNoteTool : IMcpTool
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<AddTestNoteRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<AddTestNoteRequest>(parameters, "add_test_note");
 
         // Resolve test_handle
         var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(null, _runRepo);

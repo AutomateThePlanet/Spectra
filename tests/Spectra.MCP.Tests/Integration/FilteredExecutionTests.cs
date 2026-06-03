@@ -5,6 +5,7 @@ using Spectra.MCP.Execution;
 using Spectra.MCP.Identity;
 using Spectra.MCP.Infrastructure;
 using Spectra.MCP.Reports;
+using Spectra.MCP.Server;
 using Spectra.MCP.Storage;
 using Spectra.MCP.Tools.RunManagement;
 using Spectra.MCP.Tools.TestExecution;
@@ -183,6 +184,33 @@ public class FilteredExecutionTests : IAsyncDisposable
 
         Assert.Equal(2, finalizeResponse.GetProperty("data").GetProperty("summary").GetProperty("total").GetInt32());
         Assert.Equal(2, finalizeResponse.GetProperty("data").GetProperty("summary").GetProperty("passed").GetInt32());
+    }
+
+    [Fact]
+    public async Task RegressionGuard_PreviousSilentDropFormsNoLongerEnqueueWholeSuite()
+    {
+        // Spec 051: the full suite is 4 tests. Each prior silent-drop form must now
+        // EITHER filter correctly (count < 4) OR raise an actionable error — never
+        // enqueue the unfiltered whole suite.
+        const int fullSuiteSize = 4;
+
+        // Form 1: top-level plural (was silently dropped → whole suite). Now filters.
+        var form1 = JsonDocument.Parse("""{"suite": "checkout", "priorities": ["high"]}""").RootElement;
+        var r1 = await _startTool.ExecuteAsync(form1);
+        var count1 = JsonDocument.Parse(r1).RootElement.GetProperty("data").GetProperty("test_count").GetInt32();
+        Assert.Equal(2, count1);                 // TC-001, TC-003
+        Assert.NotEqual(fullSuiteSize, count1);
+
+        // (reset active run for the next start)
+        await new CancelAllActiveRunsTool(_engine, new RunRepository(_db)).ExecuteAsync(JsonDocument.Parse("{}").RootElement);
+
+        // Form 2: top-level singular 'priority' — now an actionable error, not a whole-suite run.
+        var form2 = JsonDocument.Parse("""{"suite": "checkout", "priority": "high"}""").RootElement;
+        await Assert.ThrowsAsync<McpInvalidParamsException>(() => _startTool.ExecuteAsync(form2));
+
+        // Form 3: plural nested under legacy 'filters' — now an actionable error.
+        var form3 = JsonDocument.Parse("""{"suite": "checkout", "filters": {"priorities": ["high"]}}""").RootElement;
+        await Assert.ThrowsAsync<McpInvalidParamsException>(() => _startTool.ExecuteAsync(form3));
     }
 
     [Fact]

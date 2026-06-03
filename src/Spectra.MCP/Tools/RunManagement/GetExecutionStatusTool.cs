@@ -38,7 +38,7 @@ public sealed class GetExecutionStatusTool : IMcpTool
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<GetExecutionStatusRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<GetExecutionStatusRequest>(parameters, "get_execution_status");
 
         var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(request?.RunId, _runRepo);
         if (runError is not null)

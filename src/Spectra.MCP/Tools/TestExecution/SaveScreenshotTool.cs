@@ -51,7 +51,7 @@ public sealed class SaveScreenshotTool : IMcpTool
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<SaveScreenshotRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<SaveScreenshotRequest>(parameters, "save_screenshot");
 
         // Resolve test_handle — for screenshots, also check the most recently completed test
         // since screenshots are typically attached right after recording a FAILED result

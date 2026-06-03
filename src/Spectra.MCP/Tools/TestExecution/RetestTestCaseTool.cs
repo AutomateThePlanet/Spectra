@@ -37,7 +37,7 @@ public sealed class RetestTestCaseTool : IMcpTool
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<RetestRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<RetestRequest>(parameters, "retest_test_case");
 
         var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(request?.RunId, _runRepo);
         if (runError is not null)

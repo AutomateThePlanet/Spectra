@@ -37,7 +37,7 @@ public sealed class GetRunHistoryTool : IMcpTool
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<GetRunHistoryRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<GetRunHistoryRequest>(parameters, "get_run_history");
 
         // Parse status filter if provided
         RunStatus? statusFilter = null;

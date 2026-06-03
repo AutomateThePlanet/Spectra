@@ -36,7 +36,7 @@ public sealed class CancelExecutionRunTool : IMcpTool
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<CancelExecutionRunRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<CancelExecutionRunRequest>(parameters, "cancel_execution_run");
 
         var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(request?.RunId, _runRepo);
         if (runError is not null)

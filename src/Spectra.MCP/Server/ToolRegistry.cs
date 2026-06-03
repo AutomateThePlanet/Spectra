@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Spectra.Core.Models.Execution;
 
 namespace Spectra.MCP.Server;
 
@@ -52,6 +53,15 @@ public sealed class ToolRegistry
         try
         {
             return await tool.ExecuteAsync(parameters);
+        }
+        catch (McpInvalidParamsException ex)
+        {
+            // Spec 051: an unmapped (misplaced/misspelled) parameter — surface the
+            // actionable message as a structured INVALID_PARAMS tool error rather
+            // than a silent drop or a generic internal error. No run is created.
+            return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
+                "INVALID_PARAMS",
+                ex.Message));
         }
         catch (Exception ex)
         {

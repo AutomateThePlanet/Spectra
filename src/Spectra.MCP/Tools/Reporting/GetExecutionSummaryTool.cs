@@ -35,7 +35,7 @@ public sealed class GetExecutionSummaryTool : IMcpTool
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<GetExecutionSummaryRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<GetExecutionSummaryRequest>(parameters, "get_execution_summary");
 
         var (resolvedRunId, runError) = await ActiveRunResolver.ResolveRunIdAsync(request?.RunId, _runRepo);
         if (runError is not null)

@@ -34,7 +34,7 @@ public sealed class GetTestExecutionHistoryTool : IMcpTool
 
     public async Task<string> ExecuteAsync(JsonElement? parameters)
     {
-        var request = McpProtocol.DeserializeParams<GetTestExecutionHistoryRequest>(parameters);
+        var request = McpProtocol.DeserializeParams<GetTestExecutionHistoryRequest>(parameters, "get_test_execution_history");
 
         var testIds = request?.TestIds;
         var limit = request?.Limit ?? 10;
