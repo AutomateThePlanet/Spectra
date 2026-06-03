@@ -124,7 +124,9 @@ The `spectra-generate` SKILL contains a dedicated section for `--from-descriptio
 
 **Key rule**: if you can read the user's request as a single test case title, the agent routes to `--from-description`. If it's a topic to explore, the agent routes to `--focus`. The agent never asks the user for count or scope to disambiguate — the topic-vs-scenario shape is the only signal.
 
-When `--from-description` runs in a project that has documentation and acceptance criteria, the CLI best-effort loads matching docs (capped at 3 docs × 8000 chars) and matching `.criteria.yaml` entries as formatting context. The resulting test case has populated `source_refs` and `criteria` fields, but `grounding.verdict` stays `manual` — doc context is used for terminology alignment only, never for verification.
+When `--from-description` runs in a project that has documentation and acceptance criteria, the CLI best-effort loads matching docs (capped at 3 docs × 8000 chars) and matching `.criteria.yaml` entries. The matching criteria are injected into the generation prompt as the **mandatory criteria-mapping instruction** — the same "you MUST map each test case to matching acceptance criteria" block the batch flow uses — so the model reliably populates the `criteria` frontmatter field (Spec 050).
+
+The resulting test case has populated `source_refs` and `criteria` fields, but `grounding.verdict` stays `manual` **by design**: from-description runs no independent critic, and populating `criteria` is not verification. Doc context is used for terminology alignment only, never for verification. Consequently a from-description test counts toward **acceptance-criteria coverage** (its `criteria` field is populated) but is excluded from **grounded** statistics (its verdict is `manual`). See [Coverage](coverage.md) for how the two are tallied separately.
 
 ### Non-Interactive Mode
 

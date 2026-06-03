@@ -146,7 +146,8 @@ spectra ai generate --suite {suite} --doc-suite {docSuite} --from-description "{
 **Step 5** — Present the result. From the JSON, show:
 - Test ID and title (from `files_created` or `generation`)
 - Suite it was added to
-- Grounding verdict (will be `manual`)
+- Linked acceptance criteria, if any (from the test's `criteria` field). When the suite has matching criteria, the from-description flow injects them as the mandatory mapping instruction (Spec 050), so the test's `criteria` field is populated and the test counts toward acceptance-criteria coverage.
+- Grounding verdict (will be `manual` — from-description runs no critic, so the test is excluded from grounded statistics even when its `criteria` field is populated; populating criteria is not verification)
 - Any duplicate warnings
 - **Notes (Spec 048)**: if the JSON includes a `notes` array, render each entry verbatim as a short non-blocking note after the result. Notes are informational (e.g. "no acceptance criteria matched suite '{suite}'"); they do not signal failure.
 
