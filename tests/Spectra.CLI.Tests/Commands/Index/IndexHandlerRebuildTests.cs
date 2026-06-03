@@ -14,6 +14,13 @@ namespace Spectra.CLI.Tests.Commands.Index;
 /// recovering any tests that were previously unindexed (e.g., pre-fix
 /// from-description tests) and continuing past malformed files.
 /// </summary>
+/// <remarks>
+/// Spec 052: this class mutates the process-wide current directory, so it MUST
+/// join the "WorkingDirectory" collection that serializes every other CWD-mutating
+/// test. Without it, the class raced other CWD tests and flaked under certain test
+/// schedules (e.g. a filtered <c>Category!=Scale</c> run) while passing in the full run.
+/// </remarks>
+[Collection("WorkingDirectory")]
 public sealed class IndexHandlerRebuildTests : IDisposable
 {
     private readonly string _root;

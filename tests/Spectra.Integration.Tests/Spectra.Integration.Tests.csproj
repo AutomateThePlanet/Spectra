@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="8.0.1" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Spec 052: cross-spec tests exercise the CLI generation/persistence path
+         AND the MCP execution/discovery tools in one flow, so this is the only
+         test project that references both assemblies. -->
+    <ProjectReference Include="..\..\src\Spectra.CLI\Spectra.CLI.csproj" />
+    <ProjectReference Include="..\..\src\Spectra.MCP\Spectra.MCP.csproj" />
+    <ProjectReference Include="..\..\src\Spectra.Core\Spectra.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

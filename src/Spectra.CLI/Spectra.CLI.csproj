@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Spectra.CLI.Tests" />
+    <InternalsVisibleTo Include="Spectra.Integration.Tests" />
   </ItemGroup>
 
   <ItemGroup>

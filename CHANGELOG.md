@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.52.6] - 2026-06-03 — Test reliability & filter binding hardening (047–051)
+
+Consolidated, user-facing summary of the 047–051 reliability block. Spec 052 added
+the cross-spec integration tests, named regression guards, and large-corpus scale
+guard that make these fixes individually recognizable in CI, and audited the docs and
+SKILLs for coherence. No new features and no behavior change shipped in 1.52.6 itself.
+
+### Fixed
+
+- Acceptance-criteria extraction no longer silently skips documents after a parse
+  failure. Inconclusive extractions are retried and never permanently cached. (#047)
+- `docs index` no longer aborts wholesale on large projects after 60s; a 2-minute
+  per-document deadline applies individually, so one slow document can't kill the
+  whole corpus. (#047)
+- From-description tests (`spectra ai generate --from-description`) are now registered
+  in `_index.json` immediately and discoverable by all MCP tools (`find_test_cases`,
+  saved selections, filtered runs) with no manual rebuild. (#049)
+- From-description test generation now populates the `criteria:` field when criteria
+  exist for the suite. (#050)
+- `start_execution_run` with a priority/tag/component filter now actually filters the
+  run instead of silently dropping the filter and enqueueing the whole suite. (#051)
+
+### Added
+
+- Non-blocking warning when `docs index` indexed documents but produced zero
+  acceptance criteria, with the recovery command shown inline (and a `criteria_warning`
+  field in the JSON result). (#048)
+- Non-blocking note in generation results when the target suite has no matching
+  acceptance criteria. (#048)
+- Actionable error messages with field suggestions for misshapen MCP request
+  parameters, replacing silent property drops. (#051)
+- An additive `outcome` field on acceptance-criteria sources (default `extracted`);
+  legacy entries deserialize unchanged. (#048)
+
+### Changed
+
+- `start_execution_run` now accepts the same top-level `priorities`/`tags`/`components`
+  filter shape as `find_test_cases`. The legacy nested `filters: { priority, tags,
+  component }` shape is deprecated but still honored this release. (#051)
+
 ## [1.52.0] - 2026-04-30
 
 ### Added — Spec 040 lifecycle: Test Lifecycle & Process Control

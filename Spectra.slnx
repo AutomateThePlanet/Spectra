@@ -7,6 +7,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Spectra.CLI.Tests/Spectra.CLI.Tests.csproj" />
     <Project Path="tests/Spectra.Core.Tests/Spectra.Core.Tests.csproj" />
+    <Project Path="tests/Spectra.Integration.Tests/Spectra.Integration.Tests.csproj" />
     <Project Path="tests/Spectra.MCP.Tests/Spectra.MCP.Tests.csproj" />
   </Folder>
 </Solution>
