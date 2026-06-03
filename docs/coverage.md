@@ -104,6 +104,15 @@ When a criteria index file exists, SPECTRA cross-references the defined criteria
 
 When no criteria file exists, SPECTRA discovers criteria from test case frontmatter only and reports them as a flat list. `has_criteria_file` is `false`.
 
+### From-description tests and the two coverage axes (Spec 050)
+
+Acceptance-criteria coverage and grounded coverage are tallied independently:
+
+- **Acceptance-criteria coverage** counts a test when its `criteria` frontmatter field is populated.
+- **Grounded coverage** counts a test when its `grounding.verdict` is `grounded` (or `partial`) — i.e. an independent critic verified it.
+
+Tests created with `spectra ai generate --from-description "..."` have their `criteria` field populated (Spec 050 injects the matching criteria as the mandatory mapping instruction), so they **count toward acceptance-criteria coverage**. But from-description runs no critic, so their `grounding.verdict` stays `manual` and they are **excluded from grounded statistics**. This is intended, not an inconsistency: populating `criteria` records what the test claims to cover; it does not assert that an independent critic verified the test against the source documentation. See the [from-description note](skills-integration.md) for the rationale.
+
 ### Criteria File Format
 
 Create `docs/criteria/_criteria_index.yaml` (or use `spectra ai analyze --extract-criteria` to auto-generate):

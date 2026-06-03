@@ -58,21 +58,10 @@ public sealed class UserDescribedGenerator
                 """;
         }
 
-        if (!string.IsNullOrWhiteSpace(criteriaContext))
-        {
-            prompt += $"""
-
-
-                ## Related Acceptance Criteria
-
-                The following acceptance criteria are defined for this area.
-                If the user's test maps to any of these criteria, include the matching
-                criteria IDs in the test's `criteria` frontmatter field.
-
-                {criteriaContext}
-                """;
-        }
-
+        // Criteria are no longer inlined here as a loose section. They are forwarded
+        // to GenerateTestsAsync, which emits the MANDATORY "you MUST map" instruction
+        // (the same block the batch flow uses). The criteriaContext parameter is kept
+        // for signature stability. See spec 050.
         return prompt;
     }
 
@@ -91,9 +80,14 @@ public sealed class UserDescribedGenerator
         CancellationToken ct = default,
         string? documentContext = null,
         string? criteriaContext = null,
-        IReadOnlyList<string>? sourceRefPaths = null)
+        IReadOnlyList<string>? sourceRefPaths = null,
+        Func<SpectraConfig, string, string, Action<string>?, CancellationToken, Task<AgentCreateResult>>? agentFactory = null)
     {
-        var createResult = await AgentFactory.CreateAgentAsync(
+        Func<SpectraConfig, string, string, Action<string>?, CancellationToken, Task<AgentCreateResult>> createAgent =
+            agentFactory ?? ((cfg, basePath, tests, status, token) =>
+                AgentFactory.CreateAgentAsync(cfg, basePath, tests, status, token));
+
+        var createResult = await createAgent(
             config,
             currentDir,
             testsPath,
@@ -110,12 +104,17 @@ public sealed class UserDescribedGenerator
 
         var prompt = BuildPrompt(description, context, suite, existingIds, documentContext, criteriaContext);
 
+        // Spec 050: forward the loaded criteria so the agent emits the MANDATORY
+        // "you MUST map" block. Normalize whitespace-only to null so the "no
+        // criteria" contract holds for every empty representation.
+        var criteria = string.IsNullOrWhiteSpace(criteriaContext) ? null : criteriaContext;
+
         var result = await agent.GenerateTestsAsync(
             prompt,
             [],
             [],
             1,
-            criteriaContext: null,
+            criteriaContext: criteria,
             testimizeData: null,
             ct: ct);
 
