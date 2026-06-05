@@ -386,7 +386,7 @@ public sealed class DocsIndexHandler
     internal static async Task<CriteriaLoopResult> ExtractCriteriaLoopAsync(
         IReadOnlyList<Spectra.Core.Models.DocumentEntry> documents,
         IReadOnlyList<Spectra.Core.Models.Coverage.RequirementDefinition> existing,
-        Func<Spectra.Core.Models.DocumentEntry, CancellationToken, Task<IReadOnlyList<Spectra.Core.Models.Coverage.RequirementDefinition>>> extractPerDoc,
+        Func<Spectra.Core.Models.DocumentEntry, CancellationToken, Task<RequirementsExtractionResult>> extractPerDoc,
         TimeSpan perDocDeadline,
         Action<string>? onSlowDoc,
         Action<string, Exception>? onDocFailure,
@@ -413,7 +413,22 @@ public sealed class DocsIndexHandler
                 }
 
                 var perDoc = await extractTask;
-                aggregated.AddRange(perDoc);
+
+                // Spec 054: the extractor no longer throws on empty/parse failure — it returns a
+                // typed outcome. Aggregate only genuine (cacheable) extractions; a non-cacheable
+                // outcome is an inconclusive document, surfaced via the same failed channel that
+                // a thrown exception used to use.
+                if (perDoc.IsCacheable)
+                {
+                    aggregated.AddRange(perDoc.Requirements);
+                }
+                else
+                {
+                    failed.Add(doc.Path);
+                    onDocFailure?.Invoke(
+                        doc.Path,
+                        new InvalidOperationException($"Extraction inconclusive ({perDoc.Outcome})."));
+                }
             }
             catch (OperationCanceledException)
             {

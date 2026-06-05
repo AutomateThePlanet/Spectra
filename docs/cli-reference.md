@@ -205,6 +205,51 @@ cat ./generated.json | spectra ai ingest-tests reporting
   `.md` files + regenerates `_index.json`).
 - Exit codes: `0` success, `5` content-class failure, `6` schema-invalid.
 
+### `spectra ai compile-extraction-prompt` (Spec 054 — criteria re-homing)
+
+Deterministic, **model-free** compiler for the **acceptance-criteria extraction**
+prompt of a single document — the criteria-extraction analogue of `compile-prompt`.
+Writes the prompt to **stdout**; calls no model and spends no tokens.
+
+```bash
+spectra ai compile-extraction-prompt --doc docs/payment.md --component payment
+```
+
+- **Deterministic**: identical inputs produce byte-identical output.
+- **Refuse-to-emit**: a missing `--doc` (or unreadable content) writes nothing to
+  stdout and reports the missing input (`missing_input` JSON field), exiting **4**.
+- **Empty-source short-circuit**: an empty/whitespace document is a genuine
+  "nothing to extract" (`Extracted, []`) — it emits **no** prompt, performs no
+  model turn, and exits **0**.
+- Writes nothing to disk.
+
+### `spectra ai ingest-criteria` (Spec 054 — fail-loud boundary)
+
+Classifies agent-extracted criteria content and persists it **only** when the
+outcome is a genuine extraction. Content is read from `--from <file>` or stdin.
+The criteria-extraction analogue of `ingest-tests`.
+
+```bash
+spectra ai ingest-criteria --doc docs/payment.md --from ./criteria.json
+cat ./criteria.json | spectra ai ingest-criteria --doc docs/payment.md
+```
+
+- **Fail-loud, zero persistence on failure**: an empty response or unparseable
+  content persists **nothing** and reports the typed `outcome`
+  (`EmptyResponse` / `ParseFailure`). No cache poisoning — the criteria index is
+  left untouched so a later run re-attempts.
+- A genuine `Extracted` result persists via the unchanged `.criteria.yaml` writer
+  + criteria-index upsert (`outcome: extracted`).
+- `--dry-run` classifies and reports without writing.
+- Exit codes: `0` extracted/persisted, `5` `EmptyResponse`, `6` `ParseFailure`.
+
+> **Note (Spec 054):** `spectra docs index` and `spectra ai analyze
+> --extract-criteria` continue to run their extraction in-process today; this
+> spec adds the model-free compile/ingest surface alongside them (matching how
+> Spec 053 shipped the generation surface) and unifies the legacy extractor's
+> failure semantics so a single empty/slow/malformed document is now reported as
+> an inconclusive document rather than throwing and aborting the corpus.
+
 ### `spectra ai generate`
 
 Generate test cases from documentation using systematic ISTQB test design

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Commands.Docs;
 using Spectra.CLI.Commands.Generate;
 using Spectra.Core.Models;
@@ -79,12 +80,13 @@ public sealed class EndToEndScenarios
         var failingDoc = docs[2].Path;
         var firstPassFailed = true;
 
-        Func<DocumentEntry, CancellationToken, Task<IReadOnlyList<RequirementDefinition>>> extract =
+        Func<DocumentEntry, CancellationToken, Task<RequirementsExtractionResult>> extract =
             (doc, ct) =>
             {
                 if (doc.Path == failingDoc && firstPassFailed)
                     throw new InvalidOperationException("transient extraction failure");
-                return Task.FromResult(TestFactory.OneRequirement(doc.Path));
+                return Task.FromResult(new RequirementsExtractionResult(
+                    ExtractionOutcome.Extracted, TestFactory.OneRequirement(doc.Path)));
             };
 
         // First pass: the failing doc is reported as failed (NOT cached/skipped silently).
@@ -161,8 +163,11 @@ public sealed class EndToEndScenarios
     {
         // A realistic corpus where every document extracts to nothing (inconclusive).
         var docs = TestFactory.SyntheticCorpus(8);
-        Func<DocumentEntry, CancellationToken, Task<IReadOnlyList<RequirementDefinition>>> extractNothing =
-            (_, _) => Task.FromResult<IReadOnlyList<RequirementDefinition>>(Array.Empty<RequirementDefinition>());
+        // A genuine empty extraction is (Extracted, []) — cacheable, not a failure (parity with
+        // the criteria path), so the corpus zero-criteria guard fires without marking docs failed.
+        Func<DocumentEntry, CancellationToken, Task<RequirementsExtractionResult>> extractNothing =
+            (_, _) => Task.FromResult(new RequirementsExtractionResult(
+                ExtractionOutcome.Extracted, Array.Empty<RequirementDefinition>()));
 
         var loop = await DocsIndexHandler.ExtractCriteriaLoopAsync(
             docs, existing: [], extractPerDoc: extractNothing,

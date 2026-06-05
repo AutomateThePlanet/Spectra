@@ -20,6 +20,11 @@ public sealed class AiCommand : Command
         // Spec 053: inverted-handoff CLI surface (compile prompt → agent generates → ingest).
         AddCommand(new CompilePromptCommand());
         AddCommand(new IngestTestsCommand());
+
+        // Spec 054: model-free criteria-extraction surface (compile extraction prompt → agent
+        // extracts → ingest criteria).
+        AddCommand(new CompileExtractionPromptCommand());
+        AddCommand(new IngestCriteriaCommand());
     }
 
     /// <summary>
