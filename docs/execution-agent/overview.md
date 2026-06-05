@@ -8,7 +8,7 @@ nav_order: 1
 
 How SPECTRA's MCP-based execution engine enables AI-driven test execution.
 
-Related: [CLI Reference](../cli-reference.md) | [Copilot Spaces](../copilot-spaces-setup.md) | Platform setup: [Copilot Chat](copilot-chat.md) | [Copilot CLI](copilot-cli.md) | [Claude](claude.md) | [Generic MCP](generic-mcp.md)
+Related: [CLI Reference](../cli-reference.md) | Platform setup: [Copilot Chat](copilot-chat.md) | [Copilot CLI](copilot-cli.md) | [Claude](claude.md) | [Generic MCP](generic-mcp.md)
 
 ---
 
@@ -176,11 +176,9 @@ Run complete. 6 passed, 2 failed, 1 skipped, 1 blocked.
 Report saved: .execution/reports/abc123.json
 ```
 
-## Inline Documentation via Copilot Spaces
+## Inline Documentation via Native File Reads
 
-The execution agent supports inline documentation lookup during test execution via [GitHub Copilot Spaces](../copilot-spaces-setup.md). When a tester asks for clarification about a test step or expected behavior, the agent queries the configured Copilot Space to provide concise answers without leaving the execution flow.
-
-Configure in `spectra.config.json` under `execution.copilot_space`. See [Copilot Spaces Setup](../copilot-spaces-setup.md) for details.
+The execution agent answers tester questions about a step or expected result during a run by reading the test case's `source_refs` documentation files directly (with the Read tool) and replying concisely — no external service or configuration is required. The agent stays in the execution flow and never auto-advances or fabricates a verdict; the human verdict pause is always preserved.
 
 ## Storage
 
