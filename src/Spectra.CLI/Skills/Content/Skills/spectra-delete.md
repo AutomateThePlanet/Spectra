@@ -1,9 +1,7 @@
 ---
 name: spectra-delete
 description: Safely delete test cases with automation and dependency checks.
-tools: [{{READONLY_TOOLS}}, runInTerminal]
-model: GPT-4o
-disable-model-invocation: true
+tools: [{{READONLY_TOOLS}}, Bash]
 ---
 
 # SPECTRA Delete SKILL
@@ -12,26 +10,26 @@ You help users delete test cases safely. Always run dry-run first when the user 
 
 ## Delete a single test
 
-**Step 1** — runInTerminal (preview):
+**Step 1** — Run with the Bash tool (preview):
 ```
 spectra delete {test-id} --dry-run --no-interaction --output-format json --verbosity quiet
 ```
 
-**Step 2** — awaitTerminal.
+**Step 2** — Wait for the command to finish.
 
-**Step 3** — readFile `.spectra-result.json`. Show the user:
+**Step 3** — Read `.spectra-result.json`. Show the user:
 - The test title and file path.
 - Any `automated_by` entries (warn: "deleting this strands automation in N files").
 - Any `depends_on` cleanup that will happen.
 
 **Step 4** — Ask the user: "Proceed with deletion? Git is your undo."
 
-**Step 5** (only after explicit "yes") — runInTerminal:
+**Step 5** (only after explicit "yes") — Run with the Bash tool:
 ```
 spectra delete {test-id} --force --no-interaction --output-format json --verbosity quiet
 ```
 
-**Step 6** — awaitTerminal, readFile `.spectra-result.json`, confirm to user.
+**Step 6** — Wait for the command to finish, Read `.spectra-result.json`, confirm to user.
 
 ## Delete multiple tests at once
 
@@ -55,9 +53,9 @@ spectra delete TC-142 TC-150 TC-151 --dry-run --no-interaction --output-format j
 
 If the user says "stop", "cancel", "kill it":
 
-**Step 1** — runInTerminal:
+**Step 1** — Run with the Bash tool:
 ```
 spectra cancel --no-interaction --output-format json --verbosity quiet
 ```
 
-**Step 2** — awaitTerminal, readFile `.spectra-result.json`. Report `target_command` and `shutdown_path`.
+**Step 2** — Wait for the command to finish, Read `.spectra-result.json`. Report `target_command` and `shutdown_path`.

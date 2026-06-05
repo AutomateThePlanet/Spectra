@@ -355,7 +355,7 @@ public class InitCommandTests : IDisposable
         var exitCode = await handler.HandleAsync(force: false);
 
         Assert.Equal(ExitCodes.Success, exitCode);
-        var quickstartPath = Path.Combine(_testDir, ".github", "skills", "spectra-quickstart", "SKILL.md");
+        var quickstartPath = Path.Combine(_testDir, ".claude", "skills", "spectra-quickstart", "SKILL.md");
         Assert.True(File.Exists(quickstartPath), "spectra-quickstart SKILL.md should exist");
         var content = await File.ReadAllTextAsync(quickstartPath);
         Assert.Contains("name: spectra-quickstart", content);
@@ -375,7 +375,7 @@ public class InitCommandTests : IDisposable
         var exitCode = await handler.HandleAsync(force: false, skipSkills: true);
 
         Assert.Equal(ExitCodes.Success, exitCode);
-        var quickstartPath = Path.Combine(_testDir, ".github", "skills", "spectra-quickstart", "SKILL.md");
+        var quickstartPath = Path.Combine(_testDir, ".claude", "skills", "spectra-quickstart", "SKILL.md");
         Assert.False(File.Exists(quickstartPath), "spectra-quickstart SKILL.md should NOT exist when --skip-skills");
     }
 

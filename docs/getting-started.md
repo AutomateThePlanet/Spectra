@@ -61,24 +61,31 @@ my-project/
 ├── test-cases/                                  # Generated test cases go here
 ├── docs/criteria/
 │   └── _criteria_index.yaml                     # Acceptance criteria index
-├── .github/
+├── .claude/
 │   ├── agents/
-│   │   ├── spectra-execution.agent.md           # Test execution agent (MCP)
-│   │   └── spectra-generation.agent.md          # Test generation agent (CLI)
+│   │   └── spectra-critic.agent.md              # Critic subagent (context: fork)
+│   ├── settings.json                            # Tool allowlist (see execution setup)
 │   └── skills/
-│       ├── spectra-generate/SKILL.md            # Generate tests via Copilot Chat
-│       ├── spectra-coverage/SKILL.md            # Check coverage via Copilot Chat
-│       ├── spectra-dashboard/SKILL.md           # Build dashboard via Copilot Chat
-│       ├── spectra-validate/SKILL.md            # Validate tests via Copilot Chat
-│       ├── spectra-list/SKILL.md                # Browse tests via Copilot Chat
-│       ├── spectra-init-profile/SKILL.md        # Configure profile via Copilot Chat
+│       ├── spectra-generate/SKILL.md            # Generate tests via Claude Code
+│       ├── spectra-coverage/SKILL.md            # Check coverage via Claude Code
+│       ├── spectra-dashboard/SKILL.md           # Build dashboard via Claude Code
+│       ├── spectra-validate/SKILL.md            # Validate tests via Claude Code
+│       ├── spectra-list/SKILL.md                # Browse tests via Claude Code
+│       ├── spectra-init-profile/SKILL.md        # Configure profile via Claude Code
 │       ├── spectra-help/SKILL.md                # Help and command reference
 │       ├── spectra-criteria/SKILL.md            # Manage acceptance criteria
-│       └── spectra-docs/SKILL.md                # Index documentation via Copilot Chat
+│       └── spectra-docs/SKILL.md                # Index documentation via Claude Code
+├── .github/
+│   └── agents/
+│       └── spectra-execution.agent.md           # Test execution agent (MCP) — not yet ported to Claude Code
 └── templates/bug-report.md                      # Bug report template
 ```
 
-Use `spectra init --skip-skills` if you don't use GitHub Copilot Chat.
+`spectra init` also writes a `.claude/settings.json` with the tool allowlist Claude Code needs to drive SPECTRA. The allowlist content (including the MCP execution tools) is covered in the execution setup — see [Skills Integration](skills-integration.md) and the execution setup next step.
+
+> The test **execution** agent remains a GitHub Copilot agent under `.github/agents/` for now; its port to Claude Code is scheduled for a later spec.
+
+Use `spectra init --skip-skills` if you don't use Claude Code.
 
 ## Add Your Documentation
 
@@ -210,14 +217,14 @@ Override the default environment variable name in config:
 
 ## First Run
 
-### Option 1: Copilot Chat (recommended)
+### Option 1: Claude Code (recommended)
 
-Open VS Code with Copilot Chat and say:
+Open Claude Code in your project and say:
 - "Generate test cases for the checkout suite"
 - "How's our test case coverage?"
 - "Validate all test cases"
 
-The bundled SKILLs handle CLI invocation automatically. See [Skills Integration](skills-integration.md).
+The bundled `.claude/skills/` SKILLs handle CLI invocation automatically, and the generation SKILL runs the `spectra-critic` subagent before accepting tests. See [Skills Integration](skills-integration.md).
 
 ### Option 2: CLI directly
 

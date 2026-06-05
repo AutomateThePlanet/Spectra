@@ -3,10 +3,10 @@
 Last updated: 2026-04-30 | Version history in `CHANGELOG.md`
 
 ## Tech Stack
-- C# 12, .NET 8+, GitHub Copilot SDK (sole AI runtime), System.CommandLine, Spectre.Console, System.Text.Json
+- C# 12, .NET 8+, Claude Code (AI runtime — authoring orchestration ships as `.claude/skills/` + `.claude/agents/`), System.CommandLine, Spectre.Console, System.Text.Json. The legacy in-process GitHub Copilot SDK path is retained transitionally and retired in the provider-retirement spec.
 - ASP.NET Core (MCP server), Microsoft.Data.Sqlite, SQLite (`.execution/spectra.db`)
 - YamlDotNet (manifest serialization), Microsoft.Extensions.FileSystemGlobbing (exclusion patterns)
-- CsvHelper (CSV import), dual-model verification (Generator + Critic) via Copilot SDK
+- CsvHelper (CSV import), dual-model verification (Generator + Critic) — the critic runs as a `context: fork` subagent (`.claude/agents/spectra-critic`)
 - File-based: test-cases/, docs/, spectra.config.json, _index.json, profiles, .spectra/prompts/
 - **Doc index v2 (Spec 040)**: `docs/_index/_manifest.yaml` + `docs/_index/groups/{suite}.index.md` + `docs/_index/_checksums.json` (manifest always loaded; per-suite files lazy-loaded; checksums never AI-visible)
 - Criteria index: `docs/criteria/_criteria_index.yaml` + per-doc `.criteria.yaml`

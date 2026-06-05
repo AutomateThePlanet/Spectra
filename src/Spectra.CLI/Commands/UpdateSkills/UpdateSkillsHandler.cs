@@ -38,17 +38,18 @@ public sealed class UpdateSkillsHandler
         var unchanged = new List<string>();
         var skipped = new List<string>();
 
-        // Process SKILL files
+        // Spec 056: authoring skills update under .claude/skills/; agents are role-routed
+        // (generation → main-session skill, critic → .claude/agents/, execution → unchanged .github/).
         foreach (var (name, content) in SkillContent.All)
         {
-            var skillPath = Path.Combine(currentDir, ".github", "skills", name, "SKILL.md");
+            var skillPath = SkillInstallLayout.SkillPath(currentDir, name);
             await ProcessFileAsync(skillPath, content, manifest, updated, unchanged, skipped, ct);
         }
 
         // Process agent files
         foreach (var (name, content) in AgentContent.All)
         {
-            var agentPath = Path.Combine(currentDir, ".github", "agents", name);
+            var agentPath = SkillInstallLayout.AgentPath(currentDir, name);
             await ProcessFileAsync(agentPath, content, manifest, updated, unchanged, skipped, ct);
         }
 

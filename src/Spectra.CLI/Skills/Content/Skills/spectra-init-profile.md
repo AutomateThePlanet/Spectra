@@ -2,8 +2,6 @@
 name: spectra-init-profile
 description: Creates or updates the generation profile that controls how AI generates test cases.
 tools: [{{READONLY_TOOLS}}]
-model: GPT-4o
-disable-model-invocation: true
 ---
 
 # SPECTRA Profile
@@ -16,14 +14,14 @@ First ask the user what they want to configure:
 - Domain-specific needs
 - Default priority
 
-**Step 1** — runInTerminal:
+**Step 1** — Run with the Bash tool:
 ```
 spectra init-profile --no-interaction --output-format json --verbosity quiet
 ```
 
-**Step 2** — awaitTerminal
+**Step 2** — Wait for the command to finish.
 
-**Step 3** — readFile `.spectra-result.json`
+**Step 3** — Read `.spectra-result.json`
 Parse the JSON result.
 
 **Your response**:

@@ -2,29 +2,24 @@
 name: spectra-coverage
 description: Analyzes test coverage across documentation, acceptance criteria, and automation.
 tools: [{{READONLY_TOOLS}}]
-model: GPT-4o
-disable-model-invocation: true
 ---
 
 # SPECTRA Coverage
 
-You analyze test coverage by running a CLI command via runInTerminal.
+You analyze test coverage by running a CLI command with the Bash tool.
 
 ## Run coverage analysis
 
-**Step 1** — Open the live progress page:
-```
-show preview .spectra-progress.html?nocache=1
-```
+**Step 1** — Open the live progress page: Open .spectra-progress.html?nocache=1
 
-**Step 2** — runInTerminal:
+**Step 2** — Run with the Bash tool:
 ```
 spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet
 ```
 
-**Step 3** — awaitTerminal. The progress page auto-refreshes — the user can watch live. Between runInTerminal and awaitTerminal, do NOTHING. No readFile, no listDirectory, no checking terminal output, no status messages.
+**Step 3** — Wait for the command to finish. The progress page auto-refreshes — the user can watch live. While it runs, do NOTHING — don't poll the terminal, list directories, or read files; just wait for it to complete.
 
-**Step 4** — readFile `.spectra-result.json`
+**Step 4** — Read `.spectra-result.json`
 
 **Step 5** — Show the three coverage sections from the result:
 - **Documentation coverage**: X% (N/M documents) — list uncovered docs
@@ -39,12 +34,12 @@ If the user asks to improve coverage, suggest generating test cases for uncovere
 
 If the user says "stop", "cancel", "kill it", "stop the analysis", "stop generating":
 
-**Step 1** — runInTerminal:
+**Step 1** — Run with the Bash tool:
 ```
 spectra cancel --no-interaction --output-format json --verbosity quiet
 ```
 
-**Step 2** — awaitTerminal, readFile `.spectra-result.json`.
+**Step 2** — Wait for the command to finish, then Read `.spectra-result.json`.
 
 **Step 3** — Report what happened:
 - `status: completed` with `shutdown_path: cooperative` → "Cancelled at phase {phase}. Tests/files written before stopping are preserved."

@@ -565,18 +565,20 @@ public sealed class InitHandler
         var manifest = new Skills.SkillsManifest();
         var manifestStore = new Skills.SkillsManifestStore(_workingDirectory);
 
-        // Create bundled SKILL files
+        // Spec 056: the authoring set installs as Claude Code skills under .claude/skills/; the
+        // generation agent becomes a main-session skill and the critic a .claude/agents/ subagent.
+        // The execution agent keeps its .github/ install (ported by the next spec).
         foreach (var (name, content) in Skills.SkillContent.All)
         {
-            var skillPath = Path.Combine(_workingDirectory, ".github", "skills", name, "SKILL.md");
+            var skillPath = Skills.SkillInstallLayout.SkillPath(_workingDirectory, name);
             await InstallAgentFileAsync(skillPath, () => content, force, ct);
             manifest.Files[skillPath] = Infrastructure.FileHasher.ComputeHash(content);
         }
 
-        // Create bundled agent files
+        // Create bundled agent files (role-routed by SkillInstallLayout)
         foreach (var (name, content) in Skills.AgentContent.All)
         {
-            var agentPath = Path.Combine(_workingDirectory, ".github", "agents", name);
+            var agentPath = Skills.SkillInstallLayout.AgentPath(_workingDirectory, name);
             await InstallAgentFileAsync(agentPath, () => content, force, ct);
             manifest.Files[agentPath] = Infrastructure.FileHasher.ComputeHash(content);
         }

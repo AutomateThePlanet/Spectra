@@ -2,8 +2,6 @@
 name: spectra-generate
 description: Generates test cases from documentation with AI verification and gap analysis.
 tools: [{{GENERATE_TOOLS}}]
-model: GPT-4o
-disable-model-invocation: true
 ---
 
 # SPECTRA Test Generation
@@ -34,7 +32,7 @@ If the user is asking you to **generate, create, add, write, or build test cases
 
 The ONLY time you skip analysis is when the user describes a single concrete scenario (see "When the user wants to create a specific test case" further down).
 
-**CRITICAL: First open `.spectra-progress.html` in Simple Browser — it auto-refreshes so the user can watch progress live. Then runInTerminal. Between runInTerminal and awaitTerminal, do NOTHING — no readFile, no listDirectory, no checking terminal output, no status messages. The progress page already shows live status. You ONLY read `.spectra-result.json` AFTER awaitTerminal returns.**
+**CRITICAL: First open `.spectra-progress.html?nocache=1` — it auto-refreshes so the user can watch progress live. Then run the command with the Bash tool. While it runs, do NOTHING — don't poll the terminal, list directories, or read files; the progress page already shows live status. You ONLY read `.spectra-result.json` AFTER the command finishes.**
 
 ## CLI flags reference
 
@@ -72,16 +70,16 @@ Before any AI call, Spectra estimates the analyzer prompt size against `ai.analy
 - Otherwise leave `count` blank for now — Step 4 will give you `analysis.recommended` to use in Step 5.
 - NEVER fall back to "5". There is no default.
 
-**Step 1**: show preview .spectra-progress.html?nocache=1
+**Step 1**: Open `.spectra-progress.html?nocache=1` so the user can watch progress live.
 
-**Step 2** — runInTerminal (include `--focus` if user specified any filtering):
+**Step 2** — Run with the Bash tool (include `--focus` if user specified any filtering):
 ```
 spectra ai generate --suite {suite} --doc-suite {docSuite} --analyze-only [--focus "{focus}"] --no-interaction --output-format json
 ```
 
-**Step 3** — awaitTerminal. Do NOTHING else until this completes. Do NOT type anything into the terminal.
+**Step 3** — Wait for the command to finish. Do NOTHING else until it completes.
 
-**Step 4** — readFile `.spectra-result.json` — check `status`:
+**Step 4** — Read `.spectra-result.json` — check `status`:
 - `"failed"` → tell user the `error`.
 - `"analysis_failed"` → DO NOT show a recommendation. The recommended count is a fallback default, NOT a real analysis. Show the `message` field verbatim, and ask the user whether to bump `ai.analysis_timeout_minutes` in `spectra.config.json` and re-run, or proceed with the fallback count anyway. STOP and wait for the user to decide. Do NOT auto-proceed to generation.
 - `"analyzed"` → show this:
@@ -109,18 +107,42 @@ STOP. Wait for user.
 
 ## After user approves:
 
-**Step 5** — runInTerminal (keep the SAME `--focus` from analysis):
+**Step 5** — Run with the Bash tool (keep the SAME `--focus` from analysis). Pass `--skip-critic`: in-session verification is performed by the mandatory `spectra-critic` subagent step below, which is the single critic of record — not the in-process critic.
 ```
-spectra ai generate --suite {suite} --doc-suite {docSuite} --count {count} [--focus "{focus}"] --no-interaction --output-format json
+spectra ai generate --suite {suite} --doc-suite {docSuite} --count {count} [--focus "{focus}"] --skip-critic --no-interaction --output-format json
 ```
 
-**Step 6** — awaitTerminal. Do NOTHING else until this completes. Do NOT type anything into the terminal.
+**Step 6** — Wait for the command to finish. Do NOTHING else until it completes.
 
-**Step 7** — readFile `.spectra-result.json` — check `status`:
+**Step 7** — Read `.spectra-result.json` — check `status`:
 - `"failed"` → tell user the `error`.
-- `"completed"` → "Generated **{generation.tests_written}** test cases." List `files_created`. If tests_written < tests_requested, say "Run again to generate more test cases."
-- If `token_usage` is present, also include a one-line cost/usage summary from `token_usage.total.total_tokens` and `token_usage.cost_display` (e.g. "Token usage: **89K tokens** in {run_summary.duration_seconds}s. Cost: {token_usage.cost_display}"). Do NOT invent numbers if the field is absent.
-- **Notes surfacing (Spec 048)**: if `notes` is present and non-empty, render each entry verbatim as a short note immediately after the results summary. Notes describe situations the user should know about (e.g. no acceptance criteria matched the suite, so generated tests will not contribute to acceptance-criteria coverage) but are NOT failures — `status` will still be `completed`. Do NOT prompt or block on a note.
+- `"completed"` → proceed to the MANDATORY critic verification below, then report. Collect `generation.files_created`.
+- If `token_usage` is present, include a one-line cost/usage summary from `token_usage.total.total_tokens` and `token_usage.cost_display` (e.g. "Token usage: **89K tokens** in {run_summary.duration_seconds}s. Cost: {token_usage.cost_display}"). Do NOT invent numbers if the field is absent.
+- **Notes surfacing (Spec 048)**: if `notes` is present and non-empty, render each entry verbatim as a short note after the results summary. Notes describe situations the user should know about (e.g. no acceptance criteria matched the suite) but are NOT failures — `status` will still be `completed`. Do NOT prompt or block on a note.
+
+## MANDATORY: verify every generated test with the critic subagent
+
+Verification is **mandatory and explicit — never skipped, never auto-invoked**. Generation ran with
+`--skip-critic`, so the `spectra-critic` subagent (a fresh, isolated `context: fork`) is the single
+critic of record. A test is not accepted until its critic step has passed.
+
+For EACH file in `generation.files_created`:
+
+**Step 8** — Invoke the `spectra-critic` subagent with the Task tool, passing only the test file path
+and its source docs (no generator state). It compiles the prompt
+(`spectra ai compile-critic-prompt`), renders a JSON verdict, and ingests it
+(`spectra ai ingest-verdict`). Act on the gate:
+- gate `pass` (verdict `grounded` / `partial`) → keep the test.
+- gate `drop` (verdict `hallucinated`) → remove it: `spectra delete {id} --force --no-interaction --output-format json --verbosity quiet`.
+- ingest exit `5` (empty), exit `6` (missing/unparseable `verdict`/`score` — **damage**), or compile
+  exit `4` (refused) → **fail loud**, NOT a pass. Regenerate that single test addressing the
+  *specific* error and re-verify. This is **bounded by the retry limit** (default 2 attempts) — if it
+  still fails at the limit, STOP and report the failing test and the specific error; never keep an
+  unverified test.
+
+**Step 9** — Report: "Generated **{kept}** verified test cases ({dropped} dropped as hallucinated,
+{failed} unresolved)." List the kept `files_created`. If kept < requested, say "Run again to
+generate more." Never present a test as accepted unless its critic step passed.
 
 ---
 
@@ -128,9 +150,9 @@ spectra ai generate --suite {suite} --doc-suite {docSuite} --count {count} [--fo
 
 Use this flow when the user describes a concrete test scenario — a behavior they want captured as a test case. **Do NOT run analysis. Do NOT ask how many test cases to generate. This always produces exactly 1 test case.**
 
-**Step 1**: show preview .spectra-progress.html?nocache=1
+**Step 1**: Open `.spectra-progress.html?nocache=1` so the user can watch progress live.
 
-**Step 2** — runInTerminal:
+**Step 2** — Run with the Bash tool:
 ```
 spectra ai generate --suite {suite} --doc-suite {docSuite} --from-description "{description}" --context "{context}" --no-interaction --output-format json --verbosity quiet
 ```
@@ -139,9 +161,9 @@ spectra ai generate --suite {suite} --doc-suite {docSuite} --from-description "{
 - `{description}` — the user's test scenario description (verbatim)
 - `{context}` — optional additional context (page, module, flow); omit `--context` if not given
 
-**Step 3** — awaitTerminal. Do NOTHING between runInTerminal and awaitTerminal — no readFile, no listDirectory, no status messages.
+**Step 3** — Wait for the command to finish. While it runs, do NOTHING — don't poll the terminal, list directories, or read files; just wait for it to complete.
 
-**Step 4** — readFile `.spectra-result.json`.
+**Step 4** — Read `.spectra-result.json`.
 
 **Step 5** — Present the result. From the JSON, show:
 - Test ID and title (from `files_created` or `generation`)
@@ -169,12 +191,12 @@ spectra ai generate --suite {suite} --doc-suite {docSuite} --from-description "{
 
 If the user says "stop", "cancel", "kill it", "stop the analysis", "stop generating":
 
-**Step 1** — runInTerminal:
+**Step 1** — Run with the Bash tool:
 ```
 spectra cancel --no-interaction --output-format json --verbosity quiet
 ```
 
-**Step 2** — awaitTerminal, readFile `.spectra-result.json`.
+**Step 2** — Wait for the command to finish, then Read `.spectra-result.json`.
 
 **Step 3** — Report what happened:
 - `status: completed` with `shutdown_path: cooperative` → "Cancelled at phase {phase}. Tests/files written before stopping are preserved."
