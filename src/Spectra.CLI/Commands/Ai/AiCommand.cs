@@ -16,6 +16,10 @@ public sealed class AiCommand : Command
         AddCommand(new GenerateCommand());
         AddCommand(new UpdateCommand());
         AddCommand(new AnalyzeCommand());
+
+        // Spec 053: inverted-handoff CLI surface (compile prompt → agent generates → ingest).
+        AddCommand(new CompilePromptCommand());
+        AddCommand(new IngestTestsCommand());
     }
 
     /// <summary>
