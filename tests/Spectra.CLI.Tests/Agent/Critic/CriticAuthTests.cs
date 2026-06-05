@@ -5,71 +5,33 @@ using Spectra.Core.Models.Config;
 namespace Spectra.CLI.Tests.Agent.Critic;
 
 /// <summary>
-/// Tests for CriticFactory and CriticCreateResult after Copilot SDK consolidation.
-/// Auth is handled by the Copilot SDK at runtime, not at factory level.
+/// Tests for CriticFactory and CriticCreateResult after Spec 058 retired the in-process critic.
+/// <see cref="CriticFactory.TryCreate"/> now always reports the in-process critic unavailable —
+/// verification of record runs as the spectra-critic subagent.
 /// </summary>
 public class CriticAuthTests
 {
     [Fact]
-    public void TryCreate_EnabledConfig_Succeeds_RegardlessOfEnvVars()
+    public void TryCreate_EnabledConfig_ReportsSubagent()
     {
-        // After Copilot SDK consolidation, factory doesn't check API keys.
-        // The Copilot SDK handles authentication at runtime.
-        var config = new CriticConfig
-        {
-            Enabled = true,
-            Provider = "openai"
-        };
-
-        var result = CriticFactory.TryCreate(config);
-
-        Assert.True(result.Success);
-        Assert.NotNull(result.Critic);
-    }
-
-    [Fact]
-    public void TryCreate_DisabledConfig_ReturnsDisabledError()
-    {
-        var config = new CriticConfig
-        {
-            Enabled = false,
-            Provider = "google"
-        };
+        // Spec 058: the in-process critic is retired; the factory never constructs one.
+        var config = new CriticConfig { Enabled = true };
 
         var result = CriticFactory.TryCreate(config);
 
         Assert.False(result.Success);
-        Assert.Contains("disabled", result.ErrorMessage?.ToLowerInvariant() ?? "");
+        Assert.Null(result.Critic);
+        Assert.Equal("subagent", result.ProviderName);
+        Assert.Contains("subagent", result.ErrorMessage ?? "", StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void TryCreate_NullConfig_ReturnsError()
+    public void TryCreate_NullConfig_ReportsSubagent()
     {
         var result = CriticFactory.TryCreate(null);
 
         Assert.False(result.Success);
-        Assert.Equal("none", result.ProviderName);
-    }
-
-    [Theory]
-    [InlineData("github-models")]
-    [InlineData("openai")]
-    [InlineData("anthropic")]
-    [InlineData("azure-openai")]      // Spec 039: now in the canonical set
-    [InlineData("azure-anthropic")]   // Spec 039: now in the canonical set
-    public void TryCreate_WithProvider_ReturnsSuccess(string provider)
-    {
-        var config = new CriticConfig
-        {
-            Enabled = true,
-            Provider = provider
-        };
-
-        var result = CriticFactory.TryCreate(config);
-
-        Assert.True(result.Success);
-        Assert.NotNull(result.Critic);
-        Assert.Equal(provider, result.ProviderName);
+        Assert.Equal("subagent", result.ProviderName);
     }
 
     [Fact]

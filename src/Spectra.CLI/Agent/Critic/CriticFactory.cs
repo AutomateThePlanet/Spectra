@@ -98,69 +98,40 @@ public static class CriticFactory
         new(StringComparer.OrdinalIgnoreCase) { "google" };
 
     /// <summary>
-    /// Tries to create a critic from configuration using the Copilot SDK.
+    /// Spec 058: the in-process critic is retired. Verification of record runs as the
+    /// <c>spectra-critic</c> subagent (Spec 055), and the shipped generation skill always generates
+    /// with <c>--skip-critic</c>. This factory no longer constructs an in-process critic — it always
+    /// reports the in-process critic unavailable so callers proceed without it. (The factory type is
+    /// retained so the dead-but-compiling verification scaffolding in <c>GenerateHandler</c> still
+    /// builds; that scaffolding is removed with the generation inversion in Spec 059.)
     /// </summary>
     public static CriticCreateResult TryCreate(
         CriticConfig? config,
         TokenUsageTracker? tracker = null,
         RunErrorTracker? errorTracker = null)
     {
-        if (config is null || !config.Enabled)
-        {
-            return CriticCreateResult.Failed("none", "Critic not configured or disabled");
-        }
-
-        var (resolved, error) = ResolveProvider(config.Provider);
-        if (resolved is null)
-        {
-            return CriticCreateResult.Failed(config.Provider ?? "", error ?? "Invalid critic provider");
-        }
-
-        // Spec 039: construct CopilotCritic with the resolved (normalized) name.
-        // The original config is preserved so model/api_key_env/base_url still apply.
-        // Spec 043: forward the per-run error tracker so the critic can bump
-        // errors / rate_limits counters from inside its catch blocks.
-        var critic = new CopilotCritic(config, tracker, errorTracker);
-        return CriticCreateResult.Succeeded(critic, resolved);
+        _ = (config, tracker, errorTracker);
+        return CriticCreateResult.Failed(
+            "subagent",
+            "In-process critic retired (Spec 058); verification runs as the spectra-critic subagent.");
     }
 
     /// <summary>
-    /// Tries to create a critic asynchronously with availability check.
+    /// Spec 058: see <see cref="TryCreate"/>. Always reports the in-process critic unavailable.
     /// </summary>
-    public static async Task<CriticCreateResult> TryCreateAsync(
+    public static Task<CriticCreateResult> TryCreateAsync(
         CriticConfig? config,
         CancellationToken ct = default,
         TokenUsageTracker? tracker = null,
         RunErrorTracker? errorTracker = null)
     {
-        if (config is null || !config.Enabled)
-        {
-            return CriticCreateResult.Failed("none", "Critic not configured or disabled");
-        }
-
-        // Spec 039: validate the provider BEFORE the Copilot availability check
-        // so unknown providers fail fast with the actionable error message.
-        var (resolved, error) = ResolveProvider(config.Provider);
-        if (resolved is null)
-        {
-            return CriticCreateResult.Failed(config.Provider ?? "", error ?? "Invalid critic provider");
-        }
-
-        // Check Copilot availability
-        var (available, sdkError) = await CopilotService.CheckAvailabilityAsync(ct);
-        if (!available)
-        {
-            return CriticCreateResult.Failed("copilot-sdk", sdkError ?? "Copilot SDK not available");
-        }
-
-        var critic = new CopilotCritic(config, tracker, errorTracker);
-        return CriticCreateResult.Succeeded(critic, resolved);
+        _ = (config, ct, tracker, errorTracker);
+        return Task.FromResult(TryCreate(config, tracker, errorTracker));
     }
 
     /// <summary>
-    /// Checks if a provider is supported. Returns true for canonical names
-    /// AND legacy aliases (e.g. <c>github</c>). Returns false for
-    /// hard-rejected legacy values (e.g. <c>google</c>) and unknowns.
+    /// Checks if a provider name is in the (legacy) canonical critic set. Retained for the existing
+    /// provider-name tests; no longer gates critic creation (Spec 058).
     /// </summary>
     public static bool IsSupported(string provider)
     {
@@ -170,51 +141,4 @@ public static class CriticFactory
         if (LegacyAliases.ContainsKey(normalized)) return true;
         return SupportedProviders.Contains(normalized);
     }
-
-    /// <summary>
-    /// Spec 039: resolves a user-supplied provider name to the canonical form.
-    /// Returns (resolved, null) on success and (null, errorMessage) on failure.
-    /// Emits a one-line stderr deprecation warning when a legacy alias is used.
-    /// Empty/whitespace input falls back to <see cref="DefaultProvider"/>.
-    /// </summary>
-    internal static (string? resolved, string? error) ResolveProvider(string? raw)
-    {
-        if (string.IsNullOrWhiteSpace(raw))
-        {
-            return (DefaultProvider, null);
-        }
-
-        var normalized = raw.Trim().ToLowerInvariant();
-
-        if (HardErrorProviders.Contains(normalized))
-        {
-            return (null, BuildUnsupportedError(raw));
-        }
-
-        if (LegacyAliases.TryGetValue(normalized, out var canonical))
-        {
-            // Soft alias: warn once and continue.
-            try
-            {
-                Console.Error.WriteLine(
-                    $"⚠ Critic provider '{raw}' is deprecated. Use '{canonical}' instead.");
-            }
-            catch
-            {
-                // Stderr write failure must not block critic creation.
-            }
-            return (canonical, null);
-        }
-
-        if (SupportedProviders.Contains(normalized))
-        {
-            return (normalized, null);
-        }
-
-        return (null, BuildUnsupportedError(raw));
-    }
-
-    private static string BuildUnsupportedError(string raw) =>
-        $"Critic provider '{raw}' is not supported. " +
-        $"Supported providers: {string.Join(", ", SupportedProviders)}.";
 }

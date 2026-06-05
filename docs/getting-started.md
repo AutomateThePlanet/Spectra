@@ -122,14 +122,13 @@ Edit `spectra.config.json` to point to your docs. See [Configuration Reference](
     ],
     "critic": {
       "enabled": true,
-      "provider": "github-models",
-      "model": "gpt-5-mini"
+      "model": "claude-sonnet-4-6"
     }
   }
 }
 ```
 
-> **Spec 041 defaults:** generator `gpt-4.1` + critic `gpt-5-mini` are both 0× multiplier on any paid Copilot plan (Pro, Pro+, Business, Enterprise) and come from different model architectures for independent verification. Running `spectra init -i` offers an **AI Model Preset** menu with alternative pairings (Claude Sonnet 4.5 + GPT-4.1 critic for premium quality, GPT-4.1 + Claude Haiku 4.5 for cross-family verification, or Custom to edit by hand).
+> **Spec 058:** the critic runs as the spectra-critic subagent; `ai.critic.model` (default `claude-sonnet-4-6`) is the only critic selector — the retired `provider`/`api_key_env`/`base_url` keys are ignored. The in-process *generator* still uses `ai.providers`. `spectra init -i` offers an **AI Model Preset** menu for the generator/critic models.
 
 ## Authentication
 

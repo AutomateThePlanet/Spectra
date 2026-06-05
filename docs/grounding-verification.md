@@ -102,8 +102,7 @@ Configure the critic in `spectra.config.json`:
   "ai": {
     "critic": {
       "enabled": true,
-      "provider": "github-models",
-      "model": "gpt-5-mini",
+      "model": "claude-sonnet-4-6",
       "timeout_seconds": 120,
       "max_concurrent": 5
     }
@@ -111,25 +110,16 @@ Configure the critic in `spectra.config.json`:
 }
 ```
 
+> **Spec 058 — the critic is the spectra-critic subagent:** grounding verification runs as the
+> **spectra-critic subagent** (`.claude/agents/spectra-critic`), a Claude Code `context: fork`
+> subagent invoked by the generation skill after generation — not an in-process model call.
+> `ai.critic.model` is the only critic selector. The retired `provider`, `api_key_env`, and
+> `base_url` keys are ignored (`spectra validate` emits a non-blocking notice if they are still
+> present). The generator still runs in-process via `ai.providers`.
+
 > **Spec 043 — parallel verification:** `max_concurrent` (default `1`) controls how many critic verification calls run concurrently. Setting it to `5` typically cuts the critic phase to ~1/5 of sequential time on a large suite without changing any output (results are written in original input order). Clamped to `[1, 20]`. Values >10 emit a rate-limit-risk warning at run start. If you start hitting rate limits, the Run Summary panel surfaces a `Rate limits` count with a hint pointing back at this knob.
 
-> **Spec 055 — single model selector:** `ai.critic.model` is the single source of truth for the critic model. When it is set, that value is used; when it is unset, one same-family default applies (target: Sonnet 4.6) — there is no longer a per-provider default switch. The earlier cross-architecture default (a GPT critic for a Claude generator) is superseded: same-family verification reads as more useful in team testing, and "different families" was a means, not the end. Flipping the critic model is a config change, never a code change — which is what lets a post-migration bake-off compare model choices without touching code.
-
-Supported critic providers (spec 039 — same set as the generator):
-`github-models`, `azure-openai`, `azure-anthropic`, `openai`, `anthropic`.
-
-Default API key environment variables:
-- `github-models`: `GITHUB_TOKEN`
-- `azure-openai`: `AZURE_OPENAI_API_KEY`
-- `azure-anthropic`: `AZURE_ANTHROPIC_API_KEY`
-- `openai`: `OPENAI_API_KEY`
-- `anthropic`: `ANTHROPIC_API_KEY`
-
-> **Legacy values**: `provider: "github"` is accepted as a soft alias for
-> `github-models` (with a one-line deprecation warning on stderr). The legacy
-> value `provider: "google"` is no longer supported — the Copilot SDK runtime
-> cannot route to Google. Update your config to one of the canonical five
-> providers above.
+> **Spec 055 — single model selector:** `ai.critic.model` is the single source of truth for the critic model. When it is set, that value is used; when it is unset, one same-family default applies (target: Sonnet 4.6). Flipping the critic model is a config change, never a code change — which is what lets a post-migration bake-off compare model choices without touching code.
 
 ## Skip Verification
 

@@ -207,11 +207,16 @@ public sealed class ConfigHandler
                 {
                     Console.WriteLine($"    - {provider.Name}: {provider.Model ?? "(default model)"}");
                 }
-                Console.WriteLine($"  Fallback: {config.Ai.FallbackStrategy}");
             }
             else
             {
                 Console.WriteLine("  Providers: (not configured)");
+            }
+            if (config.Ai?.Critic is { Enabled: true } critic)
+            {
+                // Spec 058: the critic runs as the spectra-critic subagent; ai.critic.model is the
+                // only selector (no provider/api_key_env/base_url).
+                Console.WriteLine($"  Critic model: {critic.Model ?? "(same-family default)"}");
             }
 
             Console.WriteLine();

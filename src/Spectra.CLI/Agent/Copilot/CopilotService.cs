@@ -79,26 +79,10 @@ public sealed class CopilotService : IAsyncDisposable
         return await _client.CreateSessionAsync(config, ct);
     }
 
-    /// <summary>
-    /// Creates a new session for verification/critic with a fast model.
-    /// </summary>
-    public async Task<CopilotSession> CreateCriticSessionAsync(
-        CriticConfig? criticConfig,
-        CancellationToken ct = default)
-    {
-        // Map critic config to provider config for reuse
-        var providerConfig = MapCriticToProvider(criticConfig);
-
-        var config = new SessionConfig
-        {
-            Model = GetCriticModel(criticConfig),
-            Provider = ProviderMapping.MapProvider(providerConfig),
-            Streaming = false,
-            OnPermissionRequest = PermissionHandler.ApproveAll
-        };
-
-        return await _client.CreateSessionAsync(config, ct);
-    }
+    // Spec 058: the in-process critic session is retired — verification of record runs as the
+    // spectra-critic subagent (Spec 055). CreateCriticSessionAsync / MapCriticToProvider /
+    // GetCriticModel are removed; the generation session below remains (the in-process generator
+    // is retired with the generation inversion in Spec 059).
 
     /// <summary>
     /// Checks if the Copilot CLI binary is available.
@@ -300,28 +284,6 @@ public sealed class CopilotService : IAsyncDisposable
 
         return null;
     }
-
-    private static SpectraProviderConfig? MapCriticToProvider(CriticConfig? criticConfig)
-    {
-        if (criticConfig is null || !criticConfig.Enabled)
-            return null;
-
-        return new SpectraProviderConfig
-        {
-            Name = criticConfig.Provider ?? "github-models",
-            // Spec 055: single critic-model source of truth (no divergent inline default).
-            Model = Spectra.CLI.Agent.Critic.CriticModelResolver.Resolve(criticConfig),
-            BaseUrl = criticConfig.BaseUrl,
-            ApiKeyEnv = criticConfig.ApiKeyEnv,
-            Enabled = true
-        };
-    }
-
-    // Spec 055 (FR-004/FR-008): delegate to the single CriticModelResolver. ai.critic.model is the
-    // only selector; the default is same-family (§32 direction). The provider→default-model switch
-    // that used to be duplicated here and in CopilotCritic.GetEffectiveModel is gone.
-    private static string GetCriticModel(CriticConfig? criticConfig) =>
-        Spectra.CLI.Agent.Critic.CriticModelResolver.Resolve(criticConfig);
 
     public async ValueTask DisposeAsync()
     {

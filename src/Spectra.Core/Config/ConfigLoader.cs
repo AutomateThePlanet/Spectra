@@ -125,6 +125,58 @@ public sealed class ConfigLoader
     }
 
     /// <summary>
+    /// The deprecated configuration keys retired by Spec 058 (critic-provider retirement). These are
+    /// no longer modeled; a config that still carries them is accepted, but the keys are inert and
+    /// surfaced through a non-blocking notice (never a silent drop). Note: <c>ai.providers</c> is NOT
+    /// listed — it still feeds the in-process generator (its removal is Spec 059).
+    /// </summary>
+    private static readonly (string Dotted, string[] Path)[] DeprecatedKeyPaths =
+    [
+        ("ai.fallback_strategy", ["ai", "fallback_strategy"]),
+        ("ai.critic.provider", ["ai", "critic", "provider"]),
+        ("ai.critic.api_key_env", ["ai", "critic", "api_key_env"]),
+        ("ai.critic.base_url", ["ai", "critic", "base_url"]),
+    ];
+
+    /// <summary>
+    /// Inspects raw config JSON for the deprecated keys retired in Spec 058 and returns the dotted
+    /// names of those present, in declaration order. Pure — does not mutate the file or affect
+    /// validation. Callers surface the result as a non-blocking, key-naming notice (FR-006).
+    /// Malformed JSON yields an empty list (the loader reports the syntax error instead).
+    /// </summary>
+    public static IReadOnlyList<string> DetectDeprecatedKeys(string json)
+    {
+        var present = new List<string>();
+        try
+        {
+            using var doc = JsonDocument.Parse(json, new JsonDocumentOptions
+            {
+                CommentHandling = JsonCommentHandling.Skip,
+                AllowTrailingCommas = true
+            });
+            foreach (var (dotted, path) in DeprecatedKeyPaths)
+            {
+                var node = doc.RootElement;
+                var found = true;
+                foreach (var segment in path)
+                {
+                    if (node.ValueKind != JsonValueKind.Object || !node.TryGetProperty(segment, out node))
+                    {
+                        found = false;
+                        break;
+                    }
+                }
+                if (found) present.Add(dotted);
+            }
+        }
+        catch (JsonException)
+        {
+            // Malformed JSON — Load() reports the syntax error; nothing to detect here.
+        }
+        return present;
+    }
+
+    /// <summary>
     /// Generates a configuration JSON string with custom provider and model.
     /// </summary>
     public static string GenerateConfig(string providerName, string model, string? apiKeyEnv = null, string? baseUrl = null)

@@ -32,7 +32,7 @@ public class InitHandlerModelPresetTests : IDisposable
     }
 
     [Fact]
-    public async Task Default_WritesGpt41AndGpt5Mini()
+    public async Task Default_WritesGpt41Generator_AndSubagentCriticModel()
     {
         var handler = new InitHandler(_logger, _testDir);
         var exitCode = await handler.HandleAsync(force: false);
@@ -45,8 +45,8 @@ public class InitHandlerModelPresetTests : IDisposable
 
         Assert.NotNull(config.Ai.Critic);
         Assert.True(config.Ai.Critic!.Enabled);
-        Assert.Equal("github-models", config.Ai.Critic.Provider);
-        Assert.Equal("gpt-5-mini", config.Ai.Critic.Model);
+        // Spec 058: critic runs as the spectra-critic subagent; the seed sets the same-family default.
+        Assert.Equal("claude-sonnet-4-6", config.Ai.Critic.Model);
     }
 
     [Fact]
@@ -133,12 +133,13 @@ public class InitHandlerModelPresetTests : IDisposable
 
         var configPath = Path.Combine(_testDir, "spectra.config.json");
         var before = await File.ReadAllTextAsync(configPath);
-        Assert.Contains("fallback_strategy", before);
+        // Spec 058: fallback_strategy is retired from the seed; use a still-present generator field
+        // as the "unrelated content preserved" anchor.
+        Assert.Contains("\"name\": \"anthropic\"", before);
 
         await InitHandler.ApplyModelPresetAsync(configPath, ModelPreset.All[1], CancellationToken.None);
 
         var after = await File.ReadAllTextAsync(configPath);
-        Assert.Contains("fallback_strategy", after);
         // Disabled alternate providers (openai / anthropic rows in the template)
         // must still be present.
         Assert.Contains("\"name\": \"openai\"", after);

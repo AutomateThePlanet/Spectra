@@ -14,8 +14,7 @@ public class CriticDisabledTests
     {
         var config = new CriticConfig
         {
-            Enabled = false,
-            Provider = "google"
+            Enabled = false
         };
 
         Assert.False(config.Enabled);
@@ -39,20 +38,6 @@ public class CriticDisabledTests
     }
 
     [Fact]
-    public void CriticConfig_EnabledTrueWithoutProvider_FailsValidation()
-    {
-        var config = new CriticConfig
-        {
-            Enabled = true
-            // No provider specified
-        };
-
-        // When enabled but no provider, it should fail
-        Assert.True(config.Enabled);
-        Assert.Null(config.Provider);
-    }
-
-    [Fact]
     public void AiConfig_NoCriticSection_CriticIsNull()
     {
         var aiConfig = new AiConfig
@@ -71,8 +56,7 @@ public class CriticDisabledTests
             Providers = [new ProviderConfig { Name = "copilot", Model = "gpt-4o" }],
             Critic = new CriticConfig
             {
-                Enabled = false,
-                Provider = "google"
+                Enabled = false
             }
         };
 
@@ -87,7 +71,7 @@ public class CriticDisabledTests
     public void ShouldVerify_ReturnsCorrectResult(bool? enabled, bool expectedShouldVerify)
     {
         CriticConfig? config = enabled.HasValue
-            ? new CriticConfig { Enabled = enabled.Value, Provider = "google" }
+            ? new CriticConfig { Enabled = enabled.Value }
             : null;
 
         var shouldVerify = ShouldVerify(config, skipCritic: false);
@@ -100,8 +84,7 @@ public class CriticDisabledTests
     {
         var config = new CriticConfig
         {
-            Enabled = true,
-            Provider = "google"
+            Enabled = true
         };
 
         var shouldVerify = ShouldVerify(config, skipCritic: true);
@@ -122,8 +105,7 @@ public class CriticDisabledTests
     {
         var config = new CriticConfig
         {
-            Enabled = false,
-            Provider = "google"
+            Enabled = false
         };
 
         var shouldVerify = ShouldVerify(config, skipCritic: true);

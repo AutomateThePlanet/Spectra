@@ -15,6 +15,7 @@ public class CriticConfigLoadingTests
     [Fact]
     public void AiConfig_WithCriticSection_DeserializesCorrectly()
     {
+        // Spec 058: retired keys (provider/api_key_env/base_url) are ignored on read.
         var json = """
             {
               "providers": [
@@ -22,8 +23,7 @@ public class CriticConfigLoadingTests
               ],
               "critic": {
                 "enabled": true,
-                "provider": "google",
-                "model": "gemini-2.0-flash"
+                "model": "claude-sonnet-4-6"
               }
             }
             """;
@@ -33,8 +33,7 @@ public class CriticConfigLoadingTests
         Assert.NotNull(config);
         Assert.NotNull(config.Critic);
         Assert.True(config.Critic.Enabled);
-        Assert.Equal("google", config.Critic.Provider);
-        Assert.Equal("gemini-2.0-flash", config.Critic.Model);
+        Assert.Equal("claude-sonnet-4-6", config.Critic.Model);
     }
 
     [Fact]
@@ -57,13 +56,12 @@ public class CriticConfigLoadingTests
     [Fact]
     public void CriticConfig_WithAllFields_DeserializesCorrectly()
     {
+        // Spec 058: retired provider/api_key_env/base_url keys are ignored; surviving
+        // fields (enabled, model, timeout_seconds) round-trip.
         var json = """
             {
               "enabled": true,
-              "provider": "openai",
-              "model": "gpt-4o-mini",
-              "api_key_env": "MY_OPENAI_KEY",
-              "base_url": "https://custom.openai.com",
+              "model": "claude-sonnet-4-6",
               "timeout_seconds": 60
             }
             """;
@@ -72,10 +70,7 @@ public class CriticConfigLoadingTests
 
         Assert.NotNull(config);
         Assert.True(config.Enabled);
-        Assert.Equal("openai", config.Provider);
-        Assert.Equal("gpt-4o-mini", config.Model);
-        Assert.Equal("MY_OPENAI_KEY", config.ApiKeyEnv);
-        Assert.Equal("https://custom.openai.com", config.BaseUrl);
+        Assert.Equal("claude-sonnet-4-6", config.Model);
         Assert.Equal(60, config.TimeoutSeconds);
     }
 
@@ -84,8 +79,7 @@ public class CriticConfigLoadingTests
     {
         var json = """
             {
-              "enabled": true,
-              "provider": "anthropic"
+              "enabled": true
             }
             """;
 
@@ -93,10 +87,30 @@ public class CriticConfigLoadingTests
 
         Assert.NotNull(config);
         Assert.True(config.Enabled);
-        Assert.Equal("anthropic", config.Provider);
-        Assert.Null(config.Model); // Uses provider default
-        Assert.Null(config.ApiKeyEnv); // Uses provider default
+        Assert.Null(config.Model); // Uses resolver default
         Assert.Equal(120, config.TimeoutSeconds); // v1.43.0: default bumped from 30 to 120
+    }
+
+    [Fact]
+    public void CriticConfig_RetiredKeys_AreIgnored()
+    {
+        // Spec 058: legacy configs carrying provider/api_key_env/base_url still load —
+        // the unknown keys are simply ignored.
+        var json = """
+            {
+              "enabled": true,
+              "provider": "openai",
+              "api_key_env": "MY_OPENAI_KEY",
+              "base_url": "https://custom.openai.com",
+              "model": "claude-sonnet-4-6"
+            }
+            """;
+
+        var config = JsonSerializer.Deserialize<CriticConfig>(json, JsonOptions);
+
+        Assert.NotNull(config);
+        Assert.True(config.Enabled);
+        Assert.Equal("claude-sonnet-4-6", config.Model);
     }
 
     [Fact]
@@ -104,8 +118,7 @@ public class CriticConfigLoadingTests
     {
         var json = """
             {
-              "enabled": false,
-              "provider": "google"
+              "enabled": false
             }
             """;
 
@@ -128,8 +141,7 @@ public class CriticConfigLoadingTests
                 ],
                 "critic": {
                   "enabled": true,
-                  "provider": "github",
-                  "model": "gpt-4o-mini"
+                  "model": "claude-sonnet-4-6"
                 }
               }
             }
@@ -141,81 +153,6 @@ public class CriticConfigLoadingTests
         Assert.NotNull(config.Ai);
         Assert.NotNull(config.Ai.Critic);
         Assert.True(config.Ai.Critic.Enabled);
-        Assert.Equal("github", config.Ai.Critic.Provider);
-    }
-
-    [Theory]
-    [InlineData("google")]
-    [InlineData("openai")]
-    [InlineData("anthropic")]
-    [InlineData("github")]
-    public void CriticConfig_AllProviders_DeserializeCorrectly(string provider)
-    {
-        var json = $$"""
-            {
-              "enabled": true,
-              "provider": "{{provider}}"
-            }
-            """;
-
-        var config = JsonSerializer.Deserialize<CriticConfig>(json, JsonOptions);
-
-        Assert.NotNull(config);
-        Assert.Equal(provider, config.Provider);
-    }
-
-    [Fact]
-    public void CriticConfig_GetEffectiveModel_ReturnsConfiguredModel()
-    {
-        var config = new CriticConfig
-        {
-            Enabled = true,
-            Provider = "google",
-            Model = "gemini-1.5-pro"
-        };
-
-        Assert.Equal("gemini-1.5-pro", config.GetEffectiveModel());
-    }
-
-    [Fact]
-    public void CriticConfig_GetEffectiveModel_ReturnsDefaultWhenNotConfigured()
-    {
-        var config = new CriticConfig
-        {
-            Enabled = true,
-            Provider = "google"
-        };
-
-        Assert.Equal("gemini-2.0-flash", config.GetEffectiveModel());
-    }
-
-    [Theory]
-    [InlineData("google", "GOOGLE_API_KEY")]
-    [InlineData("openai", "OPENAI_API_KEY")]
-    [InlineData("anthropic", "ANTHROPIC_API_KEY")]
-    [InlineData("github", "GITHUB_TOKEN")]
-    public void CriticConfig_GetDefaultApiKeyEnv_ReturnsCorrectEnvVar(string provider, string expectedEnv)
-    {
-        var config = new CriticConfig
-        {
-            Enabled = true,
-            Provider = provider
-        };
-
-        Assert.Equal(expectedEnv, config.GetDefaultApiKeyEnv());
-    }
-
-    [Fact]
-    public void CriticConfig_CustomApiKeyEnv_OverridesDefault()
-    {
-        var config = new CriticConfig
-        {
-            Enabled = true,
-            Provider = "google",
-            ApiKeyEnv = "MY_CUSTOM_KEY"
-        };
-
-        // Custom should be used when specified
-        Assert.Equal("MY_CUSTOM_KEY", config.ApiKeyEnv);
+        Assert.Equal("claude-sonnet-4-6", config.Ai.Critic.Model);
     }
 }

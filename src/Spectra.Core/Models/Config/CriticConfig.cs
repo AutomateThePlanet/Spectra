@@ -15,32 +15,13 @@ public sealed class CriticConfig
     public bool Enabled { get; init; } = false;
 
     /// <summary>
-    /// Provider name. Spec 039: the canonical set is identical to the
-    /// generator provider list — "github-models", "azure-openai",
-    /// "azure-anthropic", "openai", "anthropic". Legacy "github" is still
-    /// recognized as a soft alias for "github-models" (with a deprecation
-    /// warning); legacy "google" is rejected.
-    /// </summary>
-    [JsonPropertyName("provider")]
-    public string? Provider { get; init; }
-
-    /// <summary>
-    /// Model name (e.g., "gemini-2.0-flash", "gpt-4o-mini").
+    /// Critic model selector. Spec 058: this is the single surviving model selector in the whole
+    /// config — the retired <c>provider</c>/<c>api_key_env</c>/<c>base_url</c> keys are gone. When
+    /// unset, <c>CriticModelResolver</c> applies the same-family default. The Claude Code session
+    /// supplies the runtime, so no provider/credential selection lives here.
     /// </summary>
     [JsonPropertyName("model")]
     public string? Model { get; init; }
-
-    /// <summary>
-    /// Environment variable containing the API key.
-    /// </summary>
-    [JsonPropertyName("api_key_env")]
-    public string? ApiKeyEnv { get; init; }
-
-    /// <summary>
-    /// Optional base URL override for the API.
-    /// </summary>
-    [JsonPropertyName("base_url")]
-    public string? BaseUrl { get; init; }
 
     /// <summary>
     /// Timeout for each critic verification call in seconds.
@@ -76,44 +57,10 @@ public sealed class CriticConfig
     }
 
     /// <summary>
-    /// Gets the effective model name for the provider. Spec 041: defaults
-    /// target current GitHub Copilot free / cross-architecture models —
-    /// <c>gpt-5-mini</c> for GPT providers and <c>claude-haiku-4-5</c> for
-    /// Claude providers. Legacy entries kept for read-side safety in case
-    /// any caller bypasses CriticFactory.
+    /// Validates the configuration. Spec 058: the critic no longer has a provider — the Claude Code
+    /// session supplies the runtime and <c>ai.critic.model</c> (optionally) names the model — so an
+    /// enabled critic is always valid. (Retained for callers that previously gated on provider
+    /// presence; it now only fails if a future required field is missing.)
     /// </summary>
-    public string GetEffectiveModel() => Model ?? Provider?.ToLowerInvariant() switch
-    {
-        "github-models" => "gpt-5-mini",
-        "azure-openai" => "gpt-5-mini",
-        "azure-anthropic" => "claude-haiku-4-5",
-        "openai" => "gpt-5-mini",
-        "anthropic" => "claude-haiku-4-5",
-        // Legacy fallthroughs (alias-resolved by CriticFactory before reaching here)
-        "github" => "gpt-5-mini",
-        "google" => "gemini-2.0-flash",
-        _ => "gpt-5-mini"
-    };
-
-    /// <summary>
-    /// Gets the default API key environment variable for the provider.
-    /// </summary>
-    public string GetDefaultApiKeyEnv() => Provider?.ToLowerInvariant() switch
-    {
-        "github-models" => "GITHUB_TOKEN",
-        "azure-openai" => "AZURE_OPENAI_API_KEY",
-        "azure-anthropic" => "AZURE_ANTHROPIC_API_KEY",
-        "openai" => "OPENAI_API_KEY",
-        "anthropic" => "ANTHROPIC_API_KEY",
-        // Legacy fallthroughs
-        "github" => "GITHUB_TOKEN",
-        "google" => "GOOGLE_API_KEY",
-        _ => "GITHUB_TOKEN"
-    };
-
-    /// <summary>
-    /// Validates the configuration.
-    /// </summary>
-    public bool IsValid() =>
-        !Enabled || !string.IsNullOrWhiteSpace(Provider);
+    public bool IsValid() => true;
 }

@@ -10,8 +10,9 @@ public sealed class AiConfig
     [JsonPropertyName("providers")]
     public required IReadOnlyList<ProviderConfig> Providers { get; init; }
 
-    [JsonPropertyName("fallback_strategy")]
-    public string FallbackStrategy { get; init; } = "auto";
+    // Spec 058: `fallback_strategy` retired — there is no programmatic provider fallback. A legacy
+    // config that still carries the key deserializes cleanly (unmapped members are ignored) and is
+    // surfaced through a non-blocking notice.
 
     /// <summary>
     /// Configuration for the grounding verification critic.

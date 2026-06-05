@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — Claude Code migration (v2)
+
+### Changed (Spec 058 — critic-provider retirement + config cleanup)
+
+- The grounding **critic** no longer runs as an in-process model call. Verification of record runs
+  as the `spectra-critic` `context: fork` subagent (Spec 055); the in-process critic
+  (`CopilotCritic`), the `CriticFactory` SDK path, and the `CopilotService` critic session/model
+  helpers were removed.
+- `ai.critic.model` is now the **only** critic selector. The retired keys `ai.fallback_strategy`,
+  `ai.critic.provider`, `ai.critic.api_key_env`, and `ai.critic.base_url` were removed from the
+  config model and the `spectra init` seed. A `spectra.config.json` that still carries them loads
+  unchanged; `spectra validate` surfaces a non-blocking notice naming the retired keys (never a
+  silent drop). The critic default model is `claude-sonnet-4-6`.
+- **Retained (pending Spec 059):** the in-process test **generator**, `ai.providers`, and the GitHub
+  Copilot SDK. Full provider retirement — removing `ai.providers`/the SDK and inverting the
+  generation skill onto the `compile-prompt`/`ingest-tests` seam — is deferred to Spec 059.
+- Surviving config (`analysis.max_prompt_tokens`, `debug.enabled`) and the entire `Spectra.MCP`
+  server are unchanged. Both demo repos were migrated to the cleaned schema.
+
 ## [1.52.6] - 2026-06-03 — Test reliability & filter binding hardening (047–051)
 
 Consolidated, user-facing summary of the 047–051 reliability block. Spec 052 added
