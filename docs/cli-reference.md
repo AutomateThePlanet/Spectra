@@ -164,6 +164,47 @@ Errors with exit code 1 + the available-suites list if `<suite-id>` is unknown.
 
 ## AI Generation Commands
 
+### `spectra ai compile-prompt` (Spec 053 — inverted handoff)
+
+Deterministic, **model-free** prompt compiler. Assembles the grounded generation
+prompt (doc criteria + profile schema) for a suite and writes it to **stdout** —
+it calls no model and spends no tokens.
+
+```bash
+spectra ai compile-prompt reporting --count 5 --focus "export to PDF"
+spectra ai compile-prompt reporting --output-format json   # machine-readable refusal
+```
+
+- **Deterministic**: identical inputs produce byte-identical output.
+- **Refuse-to-emit**: when a required input (criteria context, positive count,
+  user prompt) is missing it writes nothing to stdout and reports the missing
+  input to stderr (and a `missing_input` JSON field), exiting **4**. It never
+  emits a degraded prompt with a missing section.
+- Writes nothing to disk.
+
+Intended to be driven by a generation skill: the skill runs this to get the
+prompt, the interactive agent generates the JSON, then the skill hands the
+result to `ingest-tests`.
+
+### `spectra ai ingest-tests` (Spec 053 — fail-loud boundary)
+
+Validates agent-generated test content and persists it **only when the whole
+batch is valid**. Content is read from `--from <file>` or stdin.
+
+```bash
+spectra ai ingest-tests reporting --from ./generated.json
+cat ./generated.json | spectra ai ingest-tests reporting
+```
+
+- **Fail-loud, zero persistence on failure**: malformed JSON, a truncated array
+  (no salvage), empty content, zero valid tests, or any schema violation persists
+  **nothing** and returns a machine-readable `error_code`
+  (`EMPTY_CONTENT` / `MALFORMED_JSON` / `TRUNCATED` / `NO_TESTS` / `SCHEMA_INVALID`).
+- **Batch-atomic**: one invalid test fails the whole batch.
+- Valid content persists via the unchanged `TestPersistenceService` (writes
+  `.md` files + regenerates `_index.json`).
+- Exit codes: `0` success, `5` content-class failure, `6` schema-invalid.
+
 ### `spectra ai generate`
 
 Generate test cases from documentation using systematic ISTQB test design
