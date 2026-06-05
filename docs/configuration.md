@@ -491,12 +491,9 @@ The default configuration includes a `smoke` selection that matches all high-pri
 
 ## `execution` — Execution Settings
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `copilot_space` | string | — | Copilot Space name for inline documentation lookup during execution |
-| `copilot_space_owner` | string | — | GitHub user or organization that owns the Copilot Space |
+This section currently has no configurable fields. During a run, the execution agent answers tester questions about a test step or expected result by reading that test case's `source_refs` documentation files directly — no configuration is required.
 
-When configured, the execution agent uses the specified Copilot Space to answer tester questions about test steps and expected behavior. See [Copilot Spaces Setup](copilot-spaces-setup.md).
+> The former `copilot_space` / `copilot_space_owner` fields were removed and no longer have any effect. Existing config files that still carry these keys keep working — the keys are simply ignored.
 
 ## `validation` — Test Validation Rules
 

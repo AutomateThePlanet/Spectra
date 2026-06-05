@@ -51,12 +51,23 @@ The SPECTRA Execution Agent can be used with Claude via MCP (Model Context Proto
 
 4. Restart Claude Desktop
 
-## Project Instructions
+## Allow the SPECTRA MCP tools
 
-For optimal results, add the agent prompt to your Claude project:
+So the execution loop's MCP tool calls run without a permission prompt on every call, the `mcp__spectra__*` wildcard must be in `permissions.allow` of `.claude/settings.json`:
 
-1. Copy the content from `.github/agents/spectra-execution.agent.md`
-2. Paste into your Claude project instructions
+```json
+{
+  "permissions": {
+    "allow": ["mcp__spectra__*"]
+  }
+}
+```
+
+`spectra init` writes (or merges) this entry for you. Note this is distinct from a `Bash(spectra-mcp:*)` entry — that allows running the `spectra-mcp` bash command, whereas `mcp__spectra__*` allows the MCP **tool namespace** the execution agent drives.
+
+## Execution Agent Skill
+
+The SPECTRA execution agent installs as a single main-session skill at `.claude/skills/spectra-execution/SKILL.md`. It drives the (unchanged) SPECTRA MCP execution tools to run test cases, presents each result and waits for your plain-text verdict before advancing (never auto-advancing or fabricating a verdict/notes), and answers mid-run questions about a step or expected result by reading the test case's `source_refs` docs directly. `spectra init` installs the skill; no manual copy of project instructions is needed.
 
 ## Invocation
 

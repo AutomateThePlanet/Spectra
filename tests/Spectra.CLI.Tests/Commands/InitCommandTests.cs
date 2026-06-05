@@ -168,13 +168,18 @@ public class InitCommandTests : IDisposable
         // Assert
         Assert.Equal(ExitCodes.Success, exitCode);
 
-        // Verify execution agent file
-        var agentPath = Path.Combine(_testDir, ".github", "agents", "spectra-execution.agent.md");
-        Assert.True(File.Exists(agentPath), "Execution agent file should exist");
+        // Spec 057: the execution agent installs as a single Claude Code skill under .claude/skills/.
+        var agentPath = Path.Combine(_testDir, ".claude", "skills", "spectra-execution", "SKILL.md");
+        Assert.True(File.Exists(agentPath), "Execution skill file should exist under .claude/skills/");
 
         var content = await File.ReadAllTextAsync(agentPath);
         Assert.Contains("spectra-execution", content);
         Assert.Contains("Test Execution Agent", content);
+        // De-Copilot'd: no GPT-4o pin, no Copilot Spaces.
+        Assert.DoesNotContain("GPT-4o", content);
+        Assert.DoesNotContain("copilot_space", content);
+        // And no duplicate .github/ install remains.
+        Assert.False(File.Exists(Path.Combine(_testDir, ".github", "agents", "spectra-execution.agent.md")));
     }
 
     [Fact]
@@ -189,12 +194,14 @@ public class InitCommandTests : IDisposable
         // Assert
         Assert.Equal(ExitCodes.Success, exitCode);
 
-        // Verify execution skill file
-        var skillPath = Path.Combine(_testDir, ".github", "skills", "spectra-execution", "SKILL.md");
-        Assert.True(File.Exists(skillPath), "Execution skill file should exist");
+        // Spec 057: execution agent + skill are consolidated into the one .claude/skills/ file;
+        // the legacy separate .github/skills/spectra-execution/ install is retired.
+        var skillPath = Path.Combine(_testDir, ".claude", "skills", "spectra-execution", "SKILL.md");
+        Assert.True(File.Exists(skillPath), "Execution skill file should exist under .claude/skills/");
 
         var content = await File.ReadAllTextAsync(skillPath);
         Assert.Contains("spectra-execution", content);
+        Assert.False(File.Exists(Path.Combine(_testDir, ".github", "skills", "spectra-execution", "SKILL.md")));
     }
 
     [Fact]
@@ -203,10 +210,10 @@ public class InitCommandTests : IDisposable
         // Arrange
         var handler = new InitHandler(_logger, _testDir);
 
-        // Create existing agent file
-        var agentDir = Path.Combine(_testDir, ".github", "agents");
+        // Create existing execution skill file (Spec 057: .claude/skills/ install target)
+        var agentDir = Path.Combine(_testDir, ".claude", "skills", "spectra-execution");
         Directory.CreateDirectory(agentDir);
-        var agentPath = Path.Combine(agentDir, "spectra-execution.agent.md");
+        var agentPath = Path.Combine(agentDir, "SKILL.md");
         await File.WriteAllTextAsync(agentPath, "# Custom Agent Content");
 
         // Act
@@ -226,10 +233,10 @@ public class InitCommandTests : IDisposable
         // Arrange
         var handler = new InitHandler(_logger, _testDir);
 
-        // Create existing agent file
-        var agentDir = Path.Combine(_testDir, ".github", "agents");
+        // Create existing execution skill file (Spec 057: .claude/skills/ install target)
+        var agentDir = Path.Combine(_testDir, ".claude", "skills", "spectra-execution");
         Directory.CreateDirectory(agentDir);
-        var agentPath = Path.Combine(agentDir, "spectra-execution.agent.md");
+        var agentPath = Path.Combine(agentDir, "SKILL.md");
         await File.WriteAllTextAsync(agentPath, "# Custom Agent Content");
 
         // Act
@@ -255,7 +262,7 @@ public class InitCommandTests : IDisposable
         // Assert
         Assert.Equal(ExitCodes.Success, exitCode);
 
-        var agentPath = Path.Combine(_testDir, ".github", "agents", "spectra-execution.agent.md");
+        var agentPath = Path.Combine(_testDir, ".claude", "skills", "spectra-execution", "SKILL.md");
         var content = await File.ReadAllTextAsync(agentPath);
         Assert.Contains("name: spectra-execution", content);
     }

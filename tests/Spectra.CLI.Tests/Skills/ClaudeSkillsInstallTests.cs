@@ -41,8 +41,8 @@ public sealed class ClaudeSkillsInstallTests : IDisposable
             SkillInstallLayout.AgentPath(_dir, "spectra-generation.agent.md"));
         Assert.Equal(Path.Combine(_dir, ".claude", "agents", "spectra-critic.agent.md"),
             SkillInstallLayout.AgentPath(_dir, "spectra-critic.agent.md"));
-        // Execution agent: unchanged .github/ install.
-        Assert.Equal(Path.Combine(_dir, ".github", "agents", "spectra-execution.agent.md"),
+        // Spec 057: the execution agent is now a main-session skill under .claude/skills/.
+        Assert.Equal(Path.Combine(_dir, ".claude", "skills", "spectra-execution", "SKILL.md"),
             SkillInstallLayout.AgentPath(_dir, "spectra-execution.agent.md"));
     }
 
@@ -74,15 +74,16 @@ public sealed class ClaudeSkillsInstallTests : IDisposable
     }
 
     [Fact]
-    public async Task Install_LeavesExecutionAgent_OnGithub()
+    public async Task Install_PlacesExecutionAgent_UnderClaudeSkills()
     {
         var exit = await new InitHandler(_logger, _dir).HandleAsync(force: false);
         Assert.Equal(ExitCodes.Success, exit);
 
-        // Execution agent is excluded from the port — still installed under .github/agents/.
-        Assert.True(File.Exists(Path.Combine(_dir, ".github", "agents", "spectra-execution.agent.md")));
-        // And it is NOT relocated under .claude/.
-        Assert.False(File.Exists(Path.Combine(_dir, ".claude", "agents", "spectra-execution.agent.md")));
+        // Spec 057: the execution agent is ported to a .claude/skills/ main-session skill...
+        Assert.True(File.Exists(Path.Combine(_dir, ".claude", "skills", "spectra-execution", "SKILL.md")));
+        // ...and the legacy .github/ install (agent + skill) is retired.
+        Assert.False(File.Exists(Path.Combine(_dir, ".github", "agents", "spectra-execution.agent.md")));
+        Assert.False(File.Exists(Path.Combine(_dir, ".github", "skills", "spectra-execution", "SKILL.md")));
     }
 
     [Fact]

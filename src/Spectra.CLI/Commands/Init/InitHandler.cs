@@ -23,8 +23,6 @@ public sealed class InitHandler
 
     private const string ConfigFileName = "spectra.config.json";
     private const string SkillPath = ".github/skills/test-generation/SKILL.md";
-    private const string ExecutionAgentPath = ".github/agents/spectra-execution.agent.md";
-    private const string ExecutionSkillPath = ".github/skills/spectra-execution/SKILL.md";
     private const string VsCodeMcpPath = ".vscode/mcp.json";
     private const string DeployWorkflowPath = ".github/workflows/deploy-dashboard.yml";
     private const string DocsDir = "docs";
@@ -70,11 +68,12 @@ public sealed class InitHandler
                 // Create skill file
                 await CreateSkillFileAsync(ct);
 
-                // Install execution agent files
-                await InstallAgentFilesAsync(force, ct);
-
-                // Create bundled SKILL files
+                // Create bundled SKILL files (incl. the execution skill under .claude/skills/)
                 await CreateBundledSkillFilesAsync(force, ct);
+
+                // Ensure the client-side MCP allowlist (.claude/settings.json) so the execution
+                // loop's mcp__spectra__* tool calls run without per-call permission prompts (Spec 057).
+                await Skills.ClaudeSettingsInstaller.EnsureInstalledAsync(_workingDirectory, ct);
 
                 // Create offline usage guide (USAGE.md)
                 await CreateUsageGuideAsync(force, ct);
@@ -107,8 +106,8 @@ public sealed class InitHandler
             _logger.LogInformation("  - {DocsDir}/", DocsDir);
             _logger.LogInformation("  - {TestsDir}/", TestsDir);
             _logger.LogInformation("  - {SkillPath}", SkillPath);
-            _logger.LogInformation("  - {AgentPath}", ExecutionAgentPath);
-            _logger.LogInformation("  - {SkillPath}", ExecutionSkillPath);
+            _logger.LogInformation("  - .claude/skills/spectra-execution/SKILL.md");
+            _logger.LogInformation("  - .claude/settings.json (mcp__spectra__* allowlist)");
             _logger.LogInformation("  - {WorkflowPath}", DeployWorkflowPath);
             _logger.LogInformation("");
             _logger.LogInformation("  - {TemplatePath}", BugReportTemplatePath);
@@ -884,17 +883,6 @@ public sealed class InitHandler
         var content = GetEmbeddedTemplate("deploy-dashboard.yml");
         await File.WriteAllTextAsync(workflowPath, content, ct);
         _logger.LogDebug("Created deploy workflow: {Path}", workflowPath);
-    }
-
-    private async Task InstallAgentFilesAsync(bool force, CancellationToken ct)
-    {
-        // Install execution agent prompt
-        var agentPath = Path.Combine(_workingDirectory, ExecutionAgentPath);
-        await InstallAgentFileAsync(agentPath, AgentResourceLoader.GetExecutionAgentPrompt, force, ct);
-
-        // Install execution skill
-        var skillPath = Path.Combine(_workingDirectory, ExecutionSkillPath);
-        await InstallAgentFileAsync(skillPath, AgentResourceLoader.GetSkillContent, force, ct);
     }
 
     private async Task InstallAgentFileAsync(string targetPath, Func<string> contentProvider, bool force, CancellationToken ct)
