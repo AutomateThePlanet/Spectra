@@ -17,16 +17,10 @@ public sealed class CriticModelResolverTests
         Assert.Equal("claude-opus-4-8", model);
     }
 
-    [Theory]
-    [InlineData("github-models")]
-    [InlineData("openai")]
-    [InlineData("azure-openai")]
-    [InlineData("anthropic")]
-    [InlineData("azure-anthropic")]
-    [InlineData("azure-deepseek")]
-    public void Resolve_WithNoModel_ReturnsSingleDefault_ForEveryProvider(string provider)
+    [Fact]
+    public void Resolve_WithNoModel_ReturnsSingleDefault()
     {
-        var model = CriticModelResolver.Resolve(new CriticConfig { Enabled = true, Provider = provider });
+        var model = CriticModelResolver.Resolve(new CriticConfig { Enabled = true });
         Assert.Equal(CriticModelResolver.DefaultCriticModel, model);
     }
 

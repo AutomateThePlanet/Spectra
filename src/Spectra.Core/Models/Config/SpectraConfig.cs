@@ -69,8 +69,7 @@ public sealed class SpectraConfig
         Tests = new TestsConfig(),
         Ai = new AiConfig
         {
-            // Spec 041: default to gpt-4.1 generator + gpt-5-mini critic
-            // (both 0× on any paid Copilot plan, cross-architecture critic).
+            // Generator (in-process, pending Spec 059) defaults to gpt-4.1.
             Providers =
             [
                 new ProviderConfig
@@ -81,11 +80,12 @@ public sealed class SpectraConfig
                     Priority = 1
                 }
             ],
+            // Spec 058: critic runs as the spectra-critic subagent; ai.critic.model is the only
+            // selector (no provider/api_key_env/base_url).
             Critic = new CriticConfig
             {
                 Enabled = true,
-                Provider = "github-models",
-                Model = "gpt-5-mini"
+                Model = "claude-sonnet-4-6"
             }
         },
         Selections = new Dictionary<string, SavedSelectionConfig>

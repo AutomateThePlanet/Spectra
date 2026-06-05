@@ -73,18 +73,22 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
         "base_url": null
       }
     ],
-    "fallback_strategy": "auto",
     "critic": {
       "enabled": true,
-      "provider": "github-models",
-      "model": "gpt-5-mini",
-      "api_key_env": null,
-      "base_url": null,
-      "timeout_seconds": 120
+      "model": "claude-sonnet-4-6",
+      "timeout_seconds": 120,
+      "max_concurrent": 1
     }
   }
 }
 ```
+
+> **Spec 058:** the grounding critic runs as the **spectra-critic subagent** (a Claude Code
+> `context: fork` subagent invoked by the generation skill after generation), not an in-process
+> model call. `ai.critic.model` is the only critic selector — the retired `provider`,
+> `api_key_env`, and `base_url` keys are ignored (`spectra validate` emits a non-blocking notice
+> if they are still present). The top-level `ai.fallback_strategy` is also retired (there was no
+> programmatic provider fallback). The generator still uses `ai.providers` (see below).
 
 > **Spec 041 defaults:** `spectra init` writes `gpt-4.1` + `gpt-5-mini` — both 0× multiplier on any paid Copilot plan. `spectra init -i` offers a choice of four presets (GPT-4.1 + GPT-5 mini free, Claude Sonnet 4.5 + GPT-4.1 critic premium, GPT-4.1 + Claude Haiku 4.5 cross-family, or Custom). Existing configs with `gpt-4o` / `gpt-4o-mini` continue to work unchanged.
 
@@ -115,13 +119,11 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 | `openai` | OpenAI API (BYOK) | `OPENAI_API_KEY` |
 | `anthropic` | Anthropic API (BYOK) | `ANTHROPIC_API_KEY` |
 
-All providers are accessed through the GitHub Copilot SDK.
+All providers are accessed through the GitHub Copilot SDK. (Full provider retirement — removing
+`ai.providers` and the SDK — is a future spec; the in-process generator still uses these providers.)
 
-### `ai.fallback_strategy`
-
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `fallback_strategy` | string | `"auto"` | How to handle provider failures. `"auto"` tries the next enabled provider in priority order. When all providers fail, generation exits with an error. |
+> **Spec 058:** the top-level `ai.fallback_strategy` key is retired. There was no programmatic
+> provider fallback, so the setting had no effect; if present it is ignored.
 
 ### `ai.generation_timeout_minutes`, `ai.generation_batch_size`
 
@@ -254,14 +256,15 @@ per-batch timing context.
 
 Grounding verification configuration. See [Grounding Verification](grounding-verification.md).
 
+> **Spec 058:** the critic runs as the spectra-critic subagent; `ai.critic.model` is the only
+> critic selector. The retired `provider`, `api_key_env`, and `base_url` keys are ignored
+> (`spectra validate` emits a non-blocking notice if they are still present).
+
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `enabled` | bool | `false` | Enable dual-model verification |
-| `provider` | string | `github-models` | Critic provider — same set as the generator: `github-models`, `azure-openai`, `azure-anthropic`, `openai`, `anthropic`. The legacy value `github` is still recognized as an alias for `github-models` (deprecation warning). |
-| `model` | string | — | Critic model identifier |
-| `api_key_env` | string | — | Environment variable for critic API key |
-| `base_url` | string | — | Custom API endpoint |
-| `timeout_seconds` | int | `30` | Critic request timeout |
+| `model` | string | `claude-sonnet-4-6` | Critic model identifier (the only critic selector) |
+| `timeout_seconds` | int | `120` | Critic request timeout |
 | `max_concurrent` | int | `1` | **Spec 043:** number of concurrent critic verification calls. `1` (default) preserves the original sequential behavior. Higher values run multiple critic calls in parallel via a `SemaphoreSlim` throttle and dramatically reduce critic phase time on large suites. Clamped to `[1, 20]`. Values >10 emit a rate-limit-risk warning at run start. |
 
 #### Critic concurrency tuning (Spec 043)
@@ -282,7 +285,10 @@ If you start hitting provider rate limits, the Run Summary panel surfaces a
 `Rate limits` count with a hint pointing back at this knob. Drop the value
 and re-run.
 
-#### Example: Azure-only billing (generator + critic on the same account)
+#### Example: generator + critic models
+
+The generator runs in-process via `ai.providers`; the critic runs as the spectra-critic subagent,
+selected solely by `ai.critic.model` (Spec 058 — no critic `provider`/`api_key_env`/`base_url`).
 
 ```json
 {
@@ -292,26 +298,7 @@ and re-run.
     ],
     "critic": {
       "enabled": true,
-      "provider": "azure-openai",
-      "model": "gpt-4o"
-    }
-  }
-}
-```
-
-#### Example: Cross-provider critic for independent verification
-
-```json
-{
-  "ai": {
-    "providers": [
-      { "name": "azure-openai", "model": "gpt-4.1-mini", "enabled": true }
-    ],
-    "critic": {
-      "enabled": true,
-      "provider": "anthropic",
-      "model": "claude-3-5-haiku-latest",
-      "api_key_env": "ANTHROPIC_API_KEY"
+      "model": "claude-sonnet-4-6"
     }
   }
 }

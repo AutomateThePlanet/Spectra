@@ -70,8 +70,8 @@ independent hallucination detection (see [Grounding Verification](grounding-veri
 
 ### Preset 1: Best Quality (Recommended)
 
-Sonnet generator + GPT-4.1 critic. Deep behavior analysis, cross-family
-verification, zero critic cost.
+Sonnet generator + Sonnet critic. Deep behavior analysis, same-family
+verification. The critic runs as the spectra-critic subagent (Spec 058).
 
 ```json
 {
@@ -81,8 +81,7 @@ verification, zero critic cost.
     ],
     "critic": {
       "enabled": true,
-      "provider": "github-models",
-      "model": "gpt-4.1"
+      "model": "claude-sonnet-4-6"
     }
   }
 }
@@ -93,7 +92,7 @@ free. Real-world result: 1,261 tests across 7 suites = 75 PRs total.
 
 ### Preset 2: Zero Cost
 
-GPT-4.1 generator + GPT-5 mini critic. Both unlimited. Good for 80% of use
+GPT-4.1 generator + Sonnet critic subagent. Good for 80% of use
 cases but shallower behavior analysis (~40 behaviors vs ~200 with Sonnet).
 
 ```json
@@ -104,8 +103,7 @@ cases but shallower behavior analysis (~40 behaviors vs ~200 with Sonnet).
     ],
     "critic": {
       "enabled": true,
-      "provider": "github-models",
-      "model": "gpt-5-mini"
+      "model": "claude-sonnet-4-6"
     }
   }
 }
@@ -113,10 +111,10 @@ cases but shallower behavior analysis (~40 behaviors vs ~200 with Sonnet).
 
 Cost: $0 always. Unlimited tests/month.
 
-### Preset 3: Budget Cross-Family
+### Preset 3: Budget Generator
 
-GPT-4.1 generator + Haiku critic. Free generation with cross-family
-verification at 0.33× per critic call.
+GPT-4.1 generator + Sonnet critic subagent. Free generation; the critic runs as
+the spectra-critic subagent (Spec 058).
 
 ```json
 {
@@ -126,8 +124,7 @@ verification at 0.33× per critic call.
     ],
     "critic": {
       "enabled": true,
-      "provider": "github-models",
-      "model": "claude-haiku-4.5"
+      "model": "claude-sonnet-4-6"
     }
   }
 }
@@ -345,15 +342,15 @@ If you're moving from Azure-hosted models to GitHub Models:
     "generation_batch_size": 20,
     "critic": {
       "enabled": true,
-      "provider": "github-models",
-      "model": "gpt-4.1"
+      "model": "claude-sonnet-4-6"
     }
   }
 }
 ```
 
-Key changes: remove `api_key_env` and `base_url` (GitHub Models uses
+Key changes: remove the generator's `api_key_env` and `base_url` (GitHub Models uses
 `gh auth token`), reduce timeouts (faster models), increase batch size
-(no timeout risk), switch critic to a different model family.
+(no timeout risk), set the critic model. Spec 058: the critic runs as the spectra-critic
+subagent; `ai.critic.model` is the only critic selector (no critic `provider`/`api_key_env`/`base_url`).
 
 Authenticate with `gh auth login` and verify with `spectra auth`.

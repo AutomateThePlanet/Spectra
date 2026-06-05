@@ -236,15 +236,18 @@ match, and where acceptance criteria live.
       }
     ],
     "critic": {
-      "provider": "azure-anthropic",
-      "model": "claude-sonnet-4-5"
+      "enabled": true,
+      "model": "claude-sonnet-4-6"
     }
   }
 }
 ```
 
-**Supported providers**: `github-models`, `azure-openai`, `azure-anthropic`,
-`openai`, `anthropic` — all through the GitHub Copilot SDK.
+> Spec 058: the critic runs as the spectra-critic subagent; `ai.critic.model` is the only critic selector. The retired critic `provider`/`api_key_env`/`base_url` keys are ignored.
+
+**Supported generator providers**: `github-models`, `azure-openai`, `azure-anthropic`,
+`openai`, `anthropic` — all through the GitHub Copilot SDK. (These apply to `ai.providers`, the
+in-process generator, not the critic.)
 
 **Tip**: Use a stronger model for the critic than the generator. The critic
 catches hallucinations the generator introduces — a weaker critic defeats

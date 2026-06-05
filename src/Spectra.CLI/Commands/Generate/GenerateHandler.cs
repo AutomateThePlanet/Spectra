@@ -2327,15 +2327,13 @@ public sealed class GenerateHandler
     /// </summary>
     private bool ShouldVerify(CriticConfig? criticConfig)
     {
-        // Skip if --skip-critic flag is set
-        if (_skipCritic)
-            return false;
-
-        // Skip if critic not configured or disabled
-        if (criticConfig is null || !criticConfig.Enabled)
-            return false;
-
-        return true;
+        // Spec 058: the in-process critic is retired — verification of record runs as the
+        // spectra-critic subagent (Spec 055), which the generation skill invokes after generation.
+        // In-process generation therefore never verifies; tests are written unverified and the
+        // subagent is the single critic. (The remaining VerifyTestsAsync scaffolding is dead and is
+        // removed with the generation inversion in Spec 059.)
+        _ = (criticConfig, _skipCritic);
+        return false;
     }
 
     private static readonly Progress.ProgressManager _progressManager =

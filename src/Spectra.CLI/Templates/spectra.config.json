@@ -34,13 +34,11 @@
         "api_key_env": "ANTHROPIC_API_KEY"
       }
     ],
-    "fallback_strategy": "auto",
     "critic": {
       "enabled": true,
-      "provider": "github-models",
-      "model": "gpt-5-mini",
+      "model": "claude-sonnet-4-6",
       "max_concurrent": 1,
-      "_comment_max_concurrent": "Spec 043: number of concurrent critic verification calls. 1 = sequential (default). 5 = ~5x faster on large suites. Max 20. Values >10 risk provider rate limits."
+      "_comment_critic": "Spec 058: the critic runs as the spectra-critic subagent; `model` is the only selector (no provider/api_key_env/base_url). `max_concurrent` (Spec 043): concurrent verification calls, 1 = sequential (default), max 20."
     }
   },
   "generation": {

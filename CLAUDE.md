@@ -3,7 +3,7 @@
 Last updated: 2026-04-30 | Version history in `CHANGELOG.md`
 
 ## Tech Stack
-- C# 12, .NET 8+, Claude Code (AI runtime — authoring orchestration ships as `.claude/skills/` + `.claude/agents/`), System.CommandLine, Spectre.Console, System.Text.Json. The legacy in-process GitHub Copilot SDK path is retained transitionally and retired in the provider-retirement spec.
+- C# 12, .NET 8+, Claude Code (AI runtime — authoring orchestration ships as `.claude/skills/` + `.claude/agents/`), System.CommandLine, Spectre.Console, System.Text.Json. Spec 058 retired the in-process **critic** provider chain (the critic is the `spectra-critic` subagent; `ai.critic.model` is its only selector — no critic provider/api_key_env/base_url). The in-process **generator** + `ai.providers` + the GitHub Copilot SDK are retained transitionally and retired with the generation-skill inversion in Spec 059.
 - ASP.NET Core (MCP server), Microsoft.Data.Sqlite, SQLite (`.execution/spectra.db`)
 - YamlDotNet (manifest serialization), Microsoft.Extensions.FileSystemGlobbing (exclusion patterns)
 - CsvHelper (CSV import), dual-model verification (Generator + Critic) — the critic runs as a `context: fork` subagent (`.claude/agents/spectra-critic`)

@@ -37,6 +37,7 @@ public sealed class ValidateHandler
 
         // Load config if exists
         SpectraConfig? config = null;
+        var configNotes = new List<string>();
         if (File.Exists(configPath))
         {
             try
@@ -46,6 +47,17 @@ public sealed class ValidateHandler
                 {
                     PropertyNameCaseInsensitive = true
                 });
+
+                // Spec 058 (FR-006): names any retired provider-config keys still present so they are
+                // surfaced (non-blocking) rather than silently ignored — never a silent drop.
+                var deprecated = Spectra.Core.Config.ConfigLoader.DetectDeprecatedKeys(configJson);
+                if (deprecated.Count > 0)
+                {
+                    configNotes.Add(
+                        $"spectra.config.json contains retired key(s): {string.Join(", ", deprecated)}. " +
+                        "These are ignored (Spec 058 — the critic runs as the spectra-critic subagent; " +
+                        "ai.critic.model is the only critic selector). Remove them at your convenience.");
+                }
             }
             catch (JsonException ex)
             {
@@ -183,7 +195,8 @@ public sealed class ValidateHandler
             Message = result.IsValid ? "Validation passed." : $"{totalErrors} error(s) found.",
             TotalFiles = testCount,
             Valid = testCount - allErrors.Count,
-            Errors = allErrors
+            Errors = allErrors,
+            Notes = configNotes.Count > 0 ? configNotes : null
         };
         _progressManager.WriteResultOnly(validateResult);
 
@@ -215,6 +228,15 @@ public sealed class ValidateHandler
                     ? warning.FilePath
                     : $"{warning.FilePath} ({warning.TestId})";
                 Console.WriteLine($"  [{warning.Code}] {location}: {warning.Message}");
+            }
+        }
+
+        if (configNotes.Count > 0 && _verbosity >= VerbosityLevel.Minimal)
+        {
+            Console.WriteLine();
+            foreach (var note in configNotes)
+            {
+                Console.WriteLine($"Note: {note}");
             }
         }
 

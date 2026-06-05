@@ -282,12 +282,13 @@ spectra ai ingest-verdict --from ./verdict.json --output-format json
   specific error — **never** a silent `partial`/`0.5` soft pass. Empty input is `EmptyResponse`.
 - Exit codes: `0` verdict classified, `5` `EmptyResponse`, `6` `ParseFailure`, `1` env error.
 
-> **Note (Spec 055):** `spectra ai generate`'s batch verification continues to run the critic
-> in-process today; this spec adds the model-free compile/ingest surface and the `spectra-critic`
-> `context: fork` subagent alongside it (matching how Spec 053/054 shipped their surfaces), makes
-> `ai.critic.model` the single model selector, and changes the critic's damage paths to fail loud
-> (a missing/unparseable verdict is surfaced, not smoothed into a soft pass). Wiring the subagent
-> into generation as a mandatory step is the subsequent spec.
+> **Note (Spec 058):** `spectra ai generate`'s batch verification now runs the critic as the
+> **spectra-critic subagent** — the generation skill invokes the `spectra-critic` `context: fork`
+> subagent after generation, using the compile/ingest surface above. It is no longer an in-process
+> model call. The retired critic `provider`, `api_key_env`, and `base_url` config keys are ignored
+> (`spectra validate` emits a non-blocking notice if present); `ai.critic.model` (default
+> `claude-sonnet-4-6`) is the only critic selector. The `ai.fallback_strategy` key is also retired.
+> The in-process test *generator* still uses `ai.providers` (full provider retirement is a future spec).
 
 ### `spectra ai generate`
 

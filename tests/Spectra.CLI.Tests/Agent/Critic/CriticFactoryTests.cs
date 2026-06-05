@@ -4,8 +4,10 @@ using Spectra.Core.Models.Config;
 namespace Spectra.CLI.Tests.Agent.Critic;
 
 /// <summary>
-/// Tests for CriticFactory after Copilot SDK consolidation.
-/// All providers go through CopilotCritic — no per-provider API key checks at factory level.
+/// Tests for CriticFactory after Spec 058 retired the in-process critic. <see cref="CriticFactory.TryCreate"/>
+/// always reports the in-process critic unavailable (ProviderName "subagent"); the critic of record
+/// runs as the spectra-critic subagent. <see cref="CriticFactory.IsSupported"/> is retained as a
+/// canonical-set check.
 /// </summary>
 public class CriticFactoryTests
 {
@@ -24,75 +26,27 @@ public class CriticFactoryTests
     }
 
     [Fact]
-    public void TryCreate_NullConfig_Fails()
+    public void TryCreate_NullConfig_ReportsSubagent()
     {
         var result = CriticFactory.TryCreate(null);
 
         Assert.False(result.Success);
         Assert.Null(result.Critic);
-        Assert.Equal("none", result.ProviderName);
+        Assert.Equal("subagent", result.ProviderName);
     }
 
     [Fact]
-    public void TryCreate_DisabledConfig_Fails()
+    public void TryCreate_EnabledConfig_ReportsSubagentUnavailable()
     {
-        var config = new CriticConfig { Enabled = false };
-
-        var result = CriticFactory.TryCreate(config);
-
-        Assert.False(result.Success);
-        Assert.Contains("disabled", result.ErrorMessage?.ToLowerInvariant() ?? "");
-    }
-
-    [Fact]
-    public void TryCreate_EnabledWithProvider_Succeeds()
-    {
-        var config = new CriticConfig
-        {
-            Enabled = true,
-            Provider = "github-models"
-        };
-
-        var result = CriticFactory.TryCreate(config);
-
-        Assert.True(result.Success);
-        Assert.NotNull(result.Critic);
-        Assert.Equal("github-models", result.ProviderName);
-    }
-
-    [Fact]
-    public void TryCreate_EnabledWithoutProvider_UsesDefault()
-    {
+        // Spec 058: the in-process critic is retired; the factory never constructs one.
         var config = new CriticConfig { Enabled = true };
 
         var result = CriticFactory.TryCreate(config);
 
-        // After Copilot SDK consolidation, null provider defaults to github-models
-        Assert.True(result.Success);
-        Assert.NotNull(result.Critic);
-        Assert.Equal("github-models", result.ProviderName);
-    }
-
-    [Theory]
-    [InlineData("openai")]
-    [InlineData("anthropic")]
-    [InlineData("azure-openai")]
-    [InlineData("azure-anthropic")]
-    [InlineData("github-models")]
-    public void TryCreate_AnyCanonicalProvider_CreatesCopilotCritic(string provider)
-    {
-        var config = new CriticConfig
-        {
-            Enabled = true,
-            Provider = provider
-        };
-
-        var result = CriticFactory.TryCreate(config);
-
-        // Copilot SDK handles all canonical providers — factory just creates CopilotCritic
-        Assert.True(result.Success);
-        Assert.NotNull(result.Critic);
-        Assert.Equal(provider, result.ProviderName);
+        Assert.False(result.Success);
+        Assert.Null(result.Critic);
+        Assert.Equal("subagent", result.ProviderName);
+        Assert.Contains("subagent", result.ErrorMessage ?? "", StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]

@@ -1061,11 +1061,11 @@ public sealed class InitHandler
                 });
         }
 
-        // Write critic config (overwrites any existing block).
+        // Write critic config (overwrites any existing block). Spec 058: the critic runs as the
+        // spectra-critic subagent; `model` is the only selector (no provider/api_key_env/base_url).
         ai["critic"] = new System.Text.Json.Nodes.JsonObject
         {
             ["enabled"] = true,
-            ["provider"] = preset.CriticProvider,
             ["model"] = preset.CriticModel
         };
 
@@ -1095,87 +1095,23 @@ public sealed class InitHandler
 
         AnsiConsole.WriteLine();
 
-        var providerChoices = new Dictionary<string, (string Provider, string Model, string DefaultKeyEnv)>
+        // Spec 058: the critic runs as the spectra-critic subagent — the only choice is the model
+        // (no provider/api-key/endpoint). `ai.critic.model` is the single selector.
+        var modelChoices = new Dictionary<string, string>
         {
-            ["github-models (GPT-5 mini — fast, included in Copilot plan)"] = ("github-models", "gpt-5-mini", ""),
-            ["anthropic (Claude Haiku 4.5)"] = ("anthropic", "claude-haiku-4-5", "ANTHROPIC_API_KEY"),
-            ["openai (GPT-5 mini)"] = ("openai", "gpt-5-mini", "OPENAI_API_KEY"),
-            ["azure-openai (GPT-4.1)"] = ("azure-openai", "gpt-4.1", "AZURE_OPENAI_API_KEY"),
-            ["azure-anthropic (Claude Haiku 4.5)"] = ("azure-anthropic", "claude-haiku-4-5", "AZURE_ANTHROPIC_API_KEY"),
-            ["Same as primary provider"] = ("same", "", "")
+            ["claude-sonnet-4-6 (same-family default — recommended)"] = "claude-sonnet-4-6",
+            ["claude-haiku-4-5 (faster, lighter)"] = "claude-haiku-4-5",
+            ["gpt-5-mini"] = "gpt-5-mini",
+            ["Use the same-family default"] = "claude-sonnet-4-6"
         };
 
-        var providerChoice = AnsiConsole.Prompt(
+        var modelChoice = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
-                .Title("Select [cyan]critic provider[/]:")
+                .Title("Select [cyan]critic model[/]:")
                 .HighlightStyle(Style.Parse("cyan"))
-                .AddChoices(providerChoices.Keys));
+                .AddChoices(modelChoices.Keys));
 
-        var (provider, model, defaultKeyEnv) = providerChoices[providerChoice];
-
-        string apiKeyEnv;
-
-        if (provider == "same")
-        {
-            // Read primary provider from config
-            var configPath = Path.Combine(_workingDirectory, ConfigFileName);
-            if (File.Exists(configPath))
-            {
-                var json = await File.ReadAllTextAsync(configPath, ct);
-                var config = JsonSerializer.Deserialize<SpectraConfig>(json, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-                var primary = config?.Ai.Providers.FirstOrDefault(p => p.Enabled);
-                if (primary is not null)
-                {
-                    provider = primary.Name;
-                    model = primary.Model ?? "gpt-4.1";
-                    apiKeyEnv = primary.ApiKeyEnv ?? "";
-                }
-                else
-                {
-                    provider = "github-models";
-                    model = "gpt-4.1";
-                    apiKeyEnv = "";
-                }
-            }
-            else
-            {
-                provider = "github-models";
-                model = "gpt-4.1";
-                apiKeyEnv = "";
-            }
-        }
-        else
-        {
-            AnsiConsole.WriteLine();
-            apiKeyEnv = AnsiConsole.Prompt(
-                new TextPrompt<string>($"API key environment variable [grey](default: {defaultKeyEnv})[/]:")
-                    .DefaultValue(defaultKeyEnv)
-                    .PromptStyle("green"));
-        }
-
-        // Azure critic providers need endpoint
-        string? criticBaseUrl = null;
-        if (provider.StartsWith("azure-") && provider != "same")
-        {
-            criticBaseUrl = await PromptForAzureEndpointAsync(provider, ct);
-
-            // For Azure critic, prompt for deployment name override
-            if (criticBaseUrl is not null)
-            {
-                AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine("Enter your [cyan]deployment name[/] for the critic model (or press Enter to use default):");
-                var deploymentName = AnsiConsole.Prompt(
-                    new TextPrompt<string>("Deployment name:")
-                        .PromptStyle("green")
-                        .AllowEmpty());
-
-                if (!string.IsNullOrWhiteSpace(deploymentName))
-                    model = deploymentName;
-            }
-        }
+        var model = modelChoices[modelChoice];
 
         // Write critic config
         var cfgPath = Path.Combine(_workingDirectory, ConfigFileName);
@@ -1186,16 +1122,11 @@ public sealed class InitHandler
             if (root is not null)
             {
                 root["ai"] ??= new System.Text.Json.Nodes.JsonObject();
-                var criticNode = new System.Text.Json.Nodes.JsonObject
+                root["ai"]!["critic"] = new System.Text.Json.Nodes.JsonObject
                 {
                     ["enabled"] = true,
-                    ["provider"] = provider,
-                    ["model"] = model,
-                    ["api_key_env"] = apiKeyEnv
+                    ["model"] = model
                 };
-                if (criticBaseUrl is not null)
-                    criticNode["base_url"] = criticBaseUrl;
-                root["ai"]!["critic"] = criticNode;
 
                 var options = new JsonSerializerOptions { WriteIndented = true };
                 await File.WriteAllTextAsync(cfgPath, root.ToJsonString(options), ct);
@@ -1203,8 +1134,7 @@ public sealed class InitHandler
         }
 
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine($"[green]Critic configured:[/] [cyan]{provider}[/] / [cyan]{model}[/]");
-        AnsiConsole.MarkupLine("[grey]Grounding verification will run after every generation.[/]");
-        AnsiConsole.MarkupLine("[grey]Use --skip-critic to bypass when needed.[/]");
+        AnsiConsole.MarkupLine($"[green]Critic configured:[/] model [cyan]{model}[/]");
+        AnsiConsole.MarkupLine("[grey]Grounding verification runs as the spectra-critic subagent after generation.[/]");
     }
 }
