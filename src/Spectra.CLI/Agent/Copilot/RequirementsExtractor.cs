@@ -1,4 +1,4 @@
-#pragma warning disable CS0618 // Obsolete type usage — legacy extractor kept for backward compat
+#pragma warning disable CS0618 // RequirementDefinition is obsolete project-wide; the docs-index path still produces it pending the full criteria migration. (Throwing legacy semantics removed in Spec 054.)
 using System.Text.Json;
 using GitHub.Copilot.SDK;
 using Spectra.Core.Models.Coverage;
@@ -25,11 +25,9 @@ public sealed class RequirementsExtractor
 
     /// <summary>
     /// Extracts testable requirements from source documents.
-    /// Spec 047: now iterates documents and delegates to the per-document method;
-    /// the caller in <see cref="Commands.Docs.DocsIndexHandler"/> uses the per-doc
-    /// entry point directly so a per-document deadline can be applied.
+    /// Spec 047: iterates documents and delegates to the per-document method.
+    /// Spec 054: aggregates only the genuinely-extracted requirements of each typed result.
     /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown when the AI extraction call fails.</exception>
     public async Task<IReadOnlyList<RequirementDefinition>> ExtractAsync(
         IReadOnlyList<Spectra.Core.Models.DocumentEntry> documents,
         IReadOnlyList<RequirementDefinition> existingRequirements,
@@ -42,18 +40,22 @@ public sealed class RequirementsExtractor
         foreach (var doc in documents)
         {
             var perDoc = await ExtractFromDocumentAsync(doc, existingRequirements, ct);
-            aggregated.AddRange(perDoc);
+            aggregated.AddRange(perDoc.Requirements);
         }
         return aggregated;
     }
 
     /// <summary>
-    /// Spec 047: per-document variant. Sends one prompt containing a single
-    /// document so the caller can apply a per-document deadline instead of a
-    /// corpus-wide one. Behaviour for a single document matches the legacy
-    /// batched path (same prompt template, same internal 2-min SDK guard).
+    /// Spec 047: per-document variant. Sends one prompt containing a single document so the caller
+    /// can apply a per-document deadline.
+    /// Spec 054 (FR-004): returns a typed <see cref="RequirementsExtractionResult"/> sharing the
+    /// <see cref="ExtractionOutcome"/> enum + <c>IsCacheable</c> rule with the criteria path. It no
+    /// longer throws on an empty response or on timeout — an empty response becomes
+    /// <see cref="ExtractionOutcome.EmptyResponse"/>, and the per-document timeout is owned solely
+    /// by the caller's deadline (<c>DocsIndexHandler.ExtractCriteriaLoopAsync</c>), not an internal
+    /// throw.
     /// </summary>
-    public async Task<IReadOnlyList<RequirementDefinition>> ExtractFromDocumentAsync(
+    public async Task<RequirementsExtractionResult> ExtractFromDocumentAsync(
         Spectra.Core.Models.DocumentEntry document,
         IReadOnlyList<RequirementDefinition> existingRequirements,
         CancellationToken ct = default)
@@ -69,37 +71,28 @@ public sealed class RequirementsExtractor
 
         _onStatus?.Invoke($"Extracting acceptance criteria from {document.Path}...");
 
-        var sendTask = session.SendAndWaitAsync(
+        var response = await session.SendAndWaitAsync(
             new MessageOptions { Prompt = prompt },
             timeout: TimeSpan.FromMinutes(2),
             cancellationToken: ct);
-        var delayTask = Task.Delay(TimeSpan.FromMinutes(2), ct);
 
-        var completedTask = await Task.WhenAny(sendTask, delayTask);
-        if (completedTask == delayTask)
-        {
-            throw new TimeoutException(
-                $"AI provider did not respond within 2 minutes for {document.Path}. Check your provider configuration and connectivity.");
-        }
-
-        var response = await sendTask;
         var responseText = response?.Data?.Content ?? "";
+        var result = ClassifyResponse(responseText);
 
-        if (string.IsNullOrWhiteSpace(responseText))
-            throw new InvalidOperationException(
-                $"AI provider returned an empty response for {document.Path}. Check your provider configuration and connectivity.");
-
-        var results = ParseResponse(responseText);
-        if (results.Count == 0)
+        switch (result.Outcome)
         {
-            _onStatus?.Invoke($"Warning: AI response for {document.Path} could not be parsed into acceptance criteria.");
-        }
-        else
-        {
-            _onStatus?.Invoke($"Extracted {results.Count} acceptance criteria from {document.Path}.");
+            case ExtractionOutcome.EmptyResponse:
+                _onStatus?.Invoke($"AI returned an empty response for {document.Path}.");
+                break;
+            case ExtractionOutcome.ParseFailure:
+                _onStatus?.Invoke($"Warning: AI response for {document.Path} could not be parsed into acceptance criteria.");
+                break;
+            default:
+                _onStatus?.Invoke($"Extracted {result.Requirements.Count} acceptance criteria from {document.Path}.");
+                break;
         }
 
-        return results;
+        return result;
     }
 
     private async Task<string> BuildExtractionPromptAsync(
@@ -148,10 +141,18 @@ public sealed class RequirementsExtractor
             """;
     }
 
-    private static IReadOnlyList<RequirementDefinition> ParseResponse(string responseText)
+    /// <summary>
+    /// Spec 054: classify a raw AI response into a typed <see cref="RequirementsExtractionResult"/>,
+    /// paralleling <see cref="CriteriaExtractor.ClassifyResponse"/>. Pure function — exposed
+    /// <c>internal</c> so tests can drive each outcome without an AI provider. A valid JSON array
+    /// (even an empty one) is <see cref="ExtractionOutcome.Extracted"/>; whitespace is
+    /// <see cref="ExtractionOutcome.EmptyResponse"/>; a missing/unparseable array is
+    /// <see cref="ExtractionOutcome.ParseFailure"/>. Never throws.
+    /// </summary>
+    internal static RequirementsExtractionResult ClassifyResponse(string? responseText)
     {
         if (string.IsNullOrWhiteSpace(responseText))
-            return [];
+            return new RequirementsExtractionResult(ExtractionOutcome.EmptyResponse, []);
 
         try
         {
@@ -160,7 +161,7 @@ public sealed class RequirementsExtractor
             var jsonEnd = responseText.LastIndexOf(']');
 
             if (jsonStart < 0)
-                return [];
+                return new RequirementsExtractionResult(ExtractionOutcome.ParseFailure, []);
 
             string jsonText;
             if (jsonEnd < 0 || jsonEnd <= jsonStart)
@@ -169,7 +170,7 @@ public sealed class RequirementsExtractor
                 // Find the last complete JSON object (ends with '}')
                 var lastBrace = responseText.LastIndexOf('}');
                 if (lastBrace <= jsonStart)
-                    return [];
+                    return new RequirementsExtractionResult(ExtractionOutcome.ParseFailure, []);
                 jsonText = responseText[jsonStart..(lastBrace + 1)] + "]";
             }
             else
@@ -183,9 +184,9 @@ public sealed class RequirementsExtractor
             });
 
             if (items is null)
-                return [];
+                return new RequirementsExtractionResult(ExtractionOutcome.ParseFailure, []);
 
-            return items
+            var defs = items
                 .Where(i => !string.IsNullOrWhiteSpace(i.Title))
                 .Select(i => new RequirementDefinition
                 {
@@ -194,10 +195,12 @@ public sealed class RequirementsExtractor
                     Priority = NormalizePriority(i.Priority)
                 })
                 .ToList();
+
+            return new RequirementsExtractionResult(ExtractionOutcome.Extracted, defs);
         }
         catch
         {
-            return [];
+            return new RequirementsExtractionResult(ExtractionOutcome.ParseFailure, []);
         }
     }
 

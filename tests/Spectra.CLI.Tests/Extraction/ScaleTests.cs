@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Commands.Docs;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Coverage;
@@ -103,7 +104,8 @@ public sealed class ScaleTests
             .ToList();
 
 #pragma warning disable CS0618
-    private static IReadOnlyList<RequirementDefinition> OneRequirement(string docPath) =>
-        [new RequirementDefinition { Id = "REQ-" + Math.Abs(docPath.GetHashCode()).ToString("X"), Title = docPath }];
+    private static RequirementsExtractionResult OneRequirement(string docPath) =>
+        new(ExtractionOutcome.Extracted,
+            [new RequirementDefinition { Id = "REQ-" + Math.Abs(docPath.GetHashCode()).ToString("X"), Title = docPath }]);
 #pragma warning restore CS0618
 }

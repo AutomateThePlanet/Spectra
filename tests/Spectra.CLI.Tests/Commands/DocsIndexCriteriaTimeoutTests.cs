@@ -1,4 +1,5 @@
-#pragma warning disable CS0618 // RequirementDefinition is obsolete — Spec 047 keeps the legacy extractor.
+#pragma warning disable CS0618 // RequirementDefinition is obsolete — the docs-index path still produces it.
+using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Commands.Docs;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Coverage;
@@ -46,8 +47,8 @@ public class DocsIndexCriteriaTimeoutTests
             extractPerDoc: (doc, _) =>
             {
                 perDocCalls.Add(doc.Path);
-                return Task.FromResult<IReadOnlyList<RequirementDefinition>>(
-                    new[] { Req($"Requirement from {doc.Path}") });
+                return Task.FromResult(new RequirementsExtractionResult(
+                    ExtractionOutcome.Extracted, new[] { Req($"Requirement from {doc.Path}") }));
             },
             perDocDeadline: TimeSpan.FromSeconds(5),
             onSlowDoc: _ => Assert.Fail("No doc should time out in this test."),
@@ -84,9 +85,11 @@ public class DocsIndexCriteriaTimeoutTests
                     // Hang past the 200ms deadline; respect cancellation if observed.
                     try { await Task.Delay(TimeSpan.FromSeconds(5), token); }
                     catch (OperationCanceledException) { }
-                    return new[] { Req("should not be observed") };
+                    return new RequirementsExtractionResult(
+                        ExtractionOutcome.Extracted, new[] { Req("should not be observed") });
                 }
-                return new[] { Req($"Requirement from {doc.Path}") };
+                return new RequirementsExtractionResult(
+                    ExtractionOutcome.Extracted, new[] { Req($"Requirement from {doc.Path}") });
             },
             perDocDeadline: TimeSpan.FromMilliseconds(200),
             onSlowDoc: path => timedOutPaths.Add(path),
@@ -119,8 +122,8 @@ public class DocsIndexCriteriaTimeoutTests
             {
                 if (doc.Path == "docs/throws.md")
                     throw new InvalidOperationException("simulated provider error");
-                return Task.FromResult<IReadOnlyList<RequirementDefinition>>(
-                    new[] { Req($"R from {doc.Path}") });
+                return Task.FromResult(new RequirementsExtractionResult(
+                    ExtractionOutcome.Extracted, new[] { Req($"R from {doc.Path}") }));
             },
             perDocDeadline: TimeSpan.FromSeconds(5),
             onSlowDoc: _ => Assert.Fail("No doc should time out in this test."),

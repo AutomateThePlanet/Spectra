@@ -150,50 +150,15 @@ public sealed class CriteriaExtractor
         return result.Criteria;
     }
 
+    /// <summary>
+    /// Spec 054: thin delegate to the relocated, model-free
+    /// <see cref="Spectra.CLI.Extraction.ExtractionPromptCompiler.Assemble"/> so the in-process
+    /// extraction path and the <c>compile-extraction-prompt</c> CLI surface share a single source
+    /// of extraction-prompt truth.
+    /// </summary>
     internal static string BuildExtractionPrompt(string docPath, string content, string? component,
         PromptTemplateLoader? templateLoader = null)
-    {
-        if (templateLoader is not null)
-        {
-            var template = templateLoader.LoadTemplate("criteria-extraction");
-            var values = new Dictionary<string, string>
-            {
-                ["document_text"] = content,
-                ["document_title"] = docPath,
-                ["existing_criteria"] = "",
-                ["component"] = component ?? ""
-            };
-            return PromptTemplateLoader.Resolve(template, values);
-        }
-
-        var componentHint = component is not null
-            ? $"\nThe document belongs to the \"{component}\" component."
-            : "";
-
-        return $$"""
-            You are a requirements analyst. Extract all testable acceptance criteria from this single document.
-
-            For each criterion:
-            - text: Rewrite using RFC 2119 language (MUST, SHOULD, MAY). Preserve original meaning.
-            - rfc2119: The primary RFC 2119 keyword used (MUST, MUST NOT, SHALL, SHALL NOT, SHOULD, SHOULD NOT, MAY, REQUIRED, RECOMMENDED, OPTIONAL)
-            - source_section: The heading/section where this criterion was found
-            - priority: "high" for MUST/SHALL/REQUIRED, "medium" for SHOULD/RECOMMENDED, "low" for MAY/OPTIONAL
-            - tags: 1-3 relevant categorization tags
-            - technique_hint (optional): "BVA" if the criterion mentions a numeric range, "DT" if multiple conditions with outcomes, "ST" if a workflow/state change, "EP" if valid/invalid input categories. Omit if no technique clearly applies.
-            {{componentHint}}
-
-            Respond ONLY with a JSON array. No markdown, no explanation, no code fences. Example:
-            [
-              {"text": "System MUST validate IBAN format before payment", "rfc2119": "MUST", "source_section": "Payment Validation", "priority": "high", "tags": ["payment", "validation"], "technique_hint": "EP"},
-              {"text": "System SHOULD display inline error within 500ms", "rfc2119": "SHOULD", "source_section": "UX Requirements", "priority": "medium", "tags": ["ux", "performance"]}
-            ]
-
-            Document path: {{docPath}}
-
-            Document content:
-            {{content}}
-            """;
-    }
+        => Spectra.CLI.Extraction.ExtractionPromptCompiler.Assemble(docPath, content, component, templateLoader);
 
     private static string BuildSplitPrompt(string rawText, string? sourceKey, string? component)
     {
