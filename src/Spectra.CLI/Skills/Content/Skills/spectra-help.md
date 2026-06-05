@@ -2,8 +2,6 @@
 name: spectra-help
 description: Shows all available SPECTRA commands and prompts you can use in Copilot Chat.
 tools: []
-model: GPT-4o
-disable-model-invocation: true
 ---
 
 # SPECTRA Help
@@ -125,16 +123,16 @@ spectra ai update --suite notification --diff
 
 If duplicate test IDs are reported, or you suspect ID drift:
 
-**Step 1** — runInTerminal:
+**Step 1** — Run with the Bash tool:
 ```
 spectra doctor ids --no-interaction --output-format json --verbosity quiet
 ```
 
-**Step 2** — awaitTerminal, readFile `.spectra-result.json`.
+**Step 2** — Wait for the command to finish, then Read `.spectra-result.json`.
 
 **Step 3** — If `duplicates` is non-empty, show the duplicate groups (id, file paths, mtimes). Ask the user to confirm before fixing.
 
-**Step 4** (only after confirmation) — runInTerminal:
+**Step 4** (only after confirmation) — Run with the Bash tool:
 ```
 spectra doctor ids --fix --no-interaction --output-format json --verbosity quiet
 ```

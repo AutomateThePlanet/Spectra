@@ -91,9 +91,9 @@ public class GenerateSkillContentTests
     public void GenerationAgent_RoutingForbidsCountQuestions()
     {
         var content = AgentContentText;
-        Assert.Contains("Do NOT ask", content);
-        // Either "count" or "scope" should appear in the forbidden-questions context
-        Assert.True(content.Contains("count", StringComparison.OrdinalIgnoreCase)
-                 || content.Contains("scope", StringComparison.OrdinalIgnoreCase));
+        // Spec 056: the Copilot "Do NOT ask clarifying questions" line is translated to Claude
+        // Code's confirmation model — the intent (don't stop to confirm count/scope) is preserved.
+        Assert.Contains("count or scope", content);
+        Assert.Contains("without a needless confirmation", content);
     }
 }

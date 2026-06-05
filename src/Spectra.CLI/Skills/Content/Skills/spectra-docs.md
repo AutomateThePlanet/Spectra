@@ -2,8 +2,6 @@
 name: spectra-docs
 description: Index documentation, manage the v2 docs/_index/ manifest layout, and discover doc-suite IDs for analyzer filtering.
 tools: [{{READONLY_TOOLS}}]
-model: GPT-4o
-disable-model-invocation: true
 ---
 
 # SPECTRA Docs Index SKILL
@@ -16,12 +14,9 @@ token counts, content hashes) for efficient test generation and coverage analysi
 
 ## Index / reindex documentation
 
-**Step 1** — Show the live progress page:
-```
-show preview .spectra-progress.html?nocache=1
-```
+**Step 1** — Show the live progress page: Open .spectra-progress.html?nocache=1
 
-**Step 2** — runInTerminal:
+**Step 2** — Run with the Bash tool:
 ```
 spectra docs index --no-interaction --output-format json --verbosity quiet
 ```
@@ -38,9 +33,9 @@ To skip acceptance criteria extraction (index only):
 spectra docs index --skip-criteria --no-interaction --output-format json --verbosity quiet
 ```
 
-**Step 3** — awaitTerminal. The progress page auto-refreshes — the user can watch live. Between runInTerminal and awaitTerminal, do NOTHING. No readFile, no listDirectory, no checking terminal output, no status messages.
+**Step 3** — Wait for the command to finish. The progress page auto-refreshes — the user can watch live. While it runs, do NOTHING — don't poll the terminal, list directories, or read files; just wait for it to complete.
 
-**Step 4** — readFile `.spectra-result.json`. **Never re-run the command** — if result shows status "completed", present the results and stop.
+**Step 4** — Read `.spectra-result.json`. **Never re-run the command** — if result shows status "completed", present the results and stop.
 
 From the JSON result, show:
 - Documents indexed vs skipped vs total
@@ -75,12 +70,12 @@ Do NOT re-run `docs index` automatically and do NOT prompt the user before conti
 
 When the user asks "what suites are available?" or "list doc suites", or you need to resolve a `--doc-suite` argument before running `spectra ai generate`:
 
-**Step 1** — runInTerminal:
+**Step 1** — Run with the Bash tool:
 ```
 spectra docs list-suites --output-format json --no-interaction --verbosity quiet
 ```
 
-**Step 2** — awaitTerminal, then read the JSON output:
+**Step 2** — Wait for the command to finish, then read the JSON output:
 
 ```json
 {
@@ -138,12 +133,12 @@ After indexing:
 
 If the user says "stop", "cancel", "kill it", "stop the analysis", "stop generating":
 
-**Step 1** — runInTerminal:
+**Step 1** — Run with the Bash tool:
 ```
 spectra cancel --no-interaction --output-format json --verbosity quiet
 ```
 
-**Step 2** — awaitTerminal, readFile `.spectra-result.json`.
+**Step 2** — Wait for the command to finish, then Read `.spectra-result.json`.
 
 **Step 3** — Report what happened:
 - `status: completed` with `shutdown_path: cooperative` → "Cancelled at phase {phase}. Tests/files written before stopping are preserved."

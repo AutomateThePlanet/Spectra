@@ -282,10 +282,13 @@ public class SkillsManifestTests : IDisposable
     }
 
     [Fact]
-    public void UpdateSkill_ToolsListContainsBrowserOpenBrowserPage()
+    public void UpdateSkill_ToolsList_IsClaudeCodeModel_NotCopilot()
     {
+        // Spec 056: ported skills resolve {{…TOOLS}} to Claude Code tools — the Copilot
+        // browser/openBrowserPage tool name is gone; the progress-page affordance survives.
         var content = SkillContent.Update;
-        Assert.Contains("browser/openBrowserPage", content);
+        Assert.DoesNotContain("browser/openBrowserPage", content);
+        Assert.Contains(".spectra-progress.html", content);
     }
 
     [Fact]

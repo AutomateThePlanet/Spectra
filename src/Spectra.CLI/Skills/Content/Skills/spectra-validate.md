@@ -2,22 +2,20 @@
 name: spectra-validate
 description: Validates all test case files for correct format, unique IDs, and required fields.
 tools: [{{READONLY_TOOLS}}]
-model: GPT-4o
-disable-model-invocation: true
 ---
 
 # SPECTRA Validate
 
 You validate test cases by running a CLI command. Follow these steps:
 
-**Step 1** — runInTerminal:
+**Step 1** — Run with the Bash tool:
 ```
 spectra validate --no-interaction --output-format json --verbosity quiet
 ```
 
-**Step 2** — awaitTerminal
+**Step 2** — Wait for the command to finish
 
-**Step 3** — readFile `.spectra-result.json`
+**Step 3** — Read `.spectra-result.json`
 Parse the JSON result.
 
 **Your response**:

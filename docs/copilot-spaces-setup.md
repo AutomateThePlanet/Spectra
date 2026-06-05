@@ -6,6 +6,14 @@ nav_order: 3
 
 # Copilot Spaces Integration
 
+> **Deprecated — superseded by the Claude Code workflow.** SPECTRA's authoring
+> orchestration now installs as Claude Code skills under `.claude/skills/<name>/SKILL.md`,
+> with the critic running as a `.claude/agents/spectra-critic.agent.md` subagent.
+> See [Skills Integration](skills-integration.md) and [Getting Started](getting-started.md)
+> for the current setup. This page describes the execution-side GitHub Copilot Spaces
+> flow, which is being migrated to Claude Code in a later spec. It is retained for
+> reference until that migration lands.
+
 How to use GitHub Copilot Spaces for inline documentation lookup during test execution.
 
 Related: [Execution Agent](execution-agent/overview.md) | [Configuration](configuration.md)

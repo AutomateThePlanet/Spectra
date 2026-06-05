@@ -13,7 +13,7 @@ Prompt templates are markdown files in `.spectra/prompts/` with `{{placeholders}
 ## When the user asks to LIST prompt templates
 
 **Step 1**: List all templates with status
-Tool: runInTerminal
+Tool: Run with the Bash tool
 Command: `spectra prompts list --output-format json --no-interaction`
 
 Parse the JSON to show template IDs, status (customized/default/missing), and descriptions.
@@ -21,7 +21,7 @@ Parse the JSON to show template IDs, status (customized/default/missing), and de
 ## When the user asks to SHOW a template
 
 **Step 1**: Show the template content
-Tool: runInTerminal
+Tool: Run with the Bash tool
 Command: `spectra prompts show {template-id} --no-interaction`
 
 Available template IDs: `behavior-analysis`, `test-generation`, `criteria-extraction`, `critic-verification`, `test-update`
@@ -29,7 +29,7 @@ Available template IDs: `behavior-analysis`, `test-generation`, `criteria-extrac
 ## When the user asks to VALIDATE a template
 
 **Step 1**: Validate the template
-Tool: runInTerminal
+Tool: Run with the Bash tool
 Command: `spectra prompts validate {template-id} --output-format json --no-interaction`
 
 Parse the JSON to report validity, placeholder count, warnings, and errors.
@@ -37,7 +37,7 @@ Parse the JSON to report validity, placeholder count, warnings, and errors.
 ## When the user asks to RESET a template
 
 **Step 1**: Reset to built-in default
-Tool: runInTerminal
+Tool: Run with the Bash tool
 Command: `spectra prompts reset {template-id} --no-interaction`
 
 Use `--all` flag to reset all templates: `spectra prompts reset --all --no-interaction`

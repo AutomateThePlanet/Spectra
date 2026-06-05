@@ -6,7 +6,7 @@ nav_order: 8
 
 # Skills Integration
 
-How SPECTRA integrates with GitHub Copilot Chat through SKILL files.
+How SPECTRA integrates with Claude Code through `.claude/skills/<name>/SKILL.md` files.
 
 Related: [CLI Reference](cli-reference.md) | [Getting Started](getting-started.md)
 
@@ -14,46 +14,53 @@ Related: [CLI Reference](cli-reference.md) | [Getting Started](getting-started.m
 
 ## Overview
 
-SPECTRA ships 12 SKILL files and 2 agent prompts that enable Copilot Chat to invoke CLI commands through natural language. SKILLs translate what users say in chat into CLI commands with `--output-format json --verbosity quiet`, parse the JSON output, and present results conversationally. The bundled SKILLs are auto-discovered from embedded resources and refreshed by `spectra update-skills`.
+SPECTRA ships its authoring orchestration — the generation agent plus 13 authoring SKILLs — as Claude Code skills under `.claude/skills/<name>/SKILL.md`. These SKILLs let Claude Code invoke CLI commands through natural language: they translate what users say into CLI commands with `--output-format json --verbosity quiet`, parse the JSON output, and present results conversationally. The bundled SKILLs are auto-discovered from embedded resources and installed/refreshed by `spectra init` and `spectra update-skills` through the same install pipeline.
+
+The critic runs as a Claude Code subagent defined at `.claude/agents/spectra-critic.agent.md` (a `context: fork` subagent). The generation SKILL invokes `spectra-critic` as a **mandatory, explicit step** before a generated test is accepted.
+
+> **Not yet ported (later spec):** the test **execution** agent is still a GitHub Copilot agent at `.github/agents/spectra-execution.agent.md`. Its port to Claude Code is scheduled for a later spec. The in-process GitHub Copilot SDK generation path is also retained transitionally and will be retired in a later provider-retirement spec.
 
 ## Architecture
 
 ```
-User (Copilot Chat) → SKILL file → CLI command → JSON output → Chat response
+User (Claude Code) → SKILL file → CLI command → JSON output → response
 ```
 
 1. User asks: "Generate test cases for the checkout suite"
-2. SKILL matches the request and builds: `spectra ai generate --suite checkout --output-format json --verbosity quiet`
-3. CLI executes and outputs structured JSON
-4. SKILL parses JSON and presents: "Generated 10 test cases (8 grounded, 1 partial, 1 rejected)"
+2. The SKILL matches the request and builds: `spectra ai generate --suite checkout --output-format json --verbosity quiet`
+3. The CLI executes and outputs structured JSON
+4. The SKILL parses JSON, runs the mandatory `spectra-critic` subagent step, and presents: "Generated 10 test cases (8 grounded, 1 partial, 1 rejected)"
 
 ## Bundled SKILLs
 
-Created by `spectra init` in `.github/skills/`:
+Created by `spectra init` in `.claude/skills/` (one `SKILL.md` per skill directory):
 
 | SKILL | Path | Wraps |
 |-------|------|-------|
-| SPECTRA Generate | `spectra-generate/SKILL.md` | `spectra ai generate` with all session flags |
-| SPECTRA Update | `spectra-update/SKILL.md` | `spectra ai update` with classification reporting |
-| SPECTRA Coverage | `spectra-coverage/SKILL.md` | `spectra ai analyze --coverage --auto-link` |
-| SPECTRA Dashboard | `spectra-dashboard/SKILL.md` | `spectra dashboard --output ./site` |
-| SPECTRA Validate | `spectra-validate/SKILL.md` | `spectra validate` |
-| SPECTRA List | `spectra-list/SKILL.md` | `spectra list` and `spectra show` |
-| SPECTRA Profile | `spectra-init-profile/SKILL.md` | `spectra init-profile` |
-| SPECTRA Help | `spectra-help/SKILL.md` | Help and command reference (terse, flag-oriented) |
-| SPECTRA Criteria | `spectra-criteria/SKILL.md` | `spectra ai analyze --extract-criteria` and import |
-| SPECTRA Docs | `spectra-docs/SKILL.md` | `spectra docs index` with progress page |
-| SPECTRA Prompts | `spectra-prompts/SKILL.md` | `spectra prompts list/show/reset/validate` for prompt template customization |
-| SPECTRA Quickstart | `spectra-quickstart/SKILL.md` | Workflow-oriented onboarding & walkthroughs (12 workflows) |
+| SPECTRA Generate | `.claude/skills/spectra-generate/SKILL.md` | `spectra ai generate` with all session flags |
+| SPECTRA Update | `.claude/skills/spectra-update/SKILL.md` | `spectra ai update` with classification reporting |
+| SPECTRA Coverage | `.claude/skills/spectra-coverage/SKILL.md` | `spectra ai analyze --coverage --auto-link` |
+| SPECTRA Dashboard | `.claude/skills/spectra-dashboard/SKILL.md` | `spectra dashboard --output ./site` |
+| SPECTRA Validate | `.claude/skills/spectra-validate/SKILL.md` | `spectra validate` |
+| SPECTRA List | `.claude/skills/spectra-list/SKILL.md` | `spectra list` and `spectra show` |
+| SPECTRA Profile | `.claude/skills/spectra-init-profile/SKILL.md` | `spectra init-profile` |
+| SPECTRA Help | `.claude/skills/spectra-help/SKILL.md` | Help and command reference (terse, flag-oriented) |
+| SPECTRA Criteria | `.claude/skills/spectra-criteria/SKILL.md` | `spectra ai analyze --extract-criteria` and import |
+| SPECTRA Docs | `.claude/skills/spectra-docs/SKILL.md` | `spectra docs index` with progress page |
+| SPECTRA Prompts | `.claude/skills/spectra-prompts/SKILL.md` | `spectra prompts list/show/reset/validate` for prompt template customization |
+| SPECTRA Quickstart | `.claude/skills/spectra-quickstart/SKILL.md` | Workflow-oriented onboarding & walkthroughs (12 workflows) |
 
-## Agent Prompts
+## Critic Subagent
 
-Created by `spectra init` in `.github/agents/`:
+Created by `spectra init` in `.claude/agents/`:
 
 | Agent | Path | Purpose |
 |-------|------|---------|
-| SPECTRA Execution | `spectra-execution.agent.md` | Test execution via MCP tools |
-| SPECTRA Generation | `spectra-generation.agent.md` | Test generation via terminal + CLI |
+| SPECTRA Critic | `spectra-critic.agent.md` | Independent verification of generated tests, run as a `context: fork` subagent |
+
+The generation SKILL invokes `spectra-critic` as a mandatory explicit step before a test is accepted.
+
+> The test **execution** agent (`.github/agents/spectra-execution.agent.md`) is **not yet ported** to Claude Code — it remains a GitHub Copilot agent until a later spec.
 
 ## Key Patterns
 
@@ -114,7 +121,7 @@ spectra ai generate --suite {suite} --auto-complete --output-format json --verbo
 
 ### Intent Routing in Chat (spec 033)
 
-The `spectra-generate` SKILL contains a dedicated section for `--from-description` and an intent-routing table that the `spectra-generation` agent uses to choose between flows:
+The `spectra-generate` SKILL contains a dedicated section for `--from-description` and an intent-routing table the generation flow uses to choose between flows:
 
 | User intent | Signal | Flow |
 |-------------|--------|------|
@@ -122,7 +129,7 @@ The `spectra-generate` SKILL contains a dedicated section for `--from-descriptio
 | Create a specific test | "Add a test for...", "I need a test that verifies..." | `--from-description` (1 test, no analysis, no count question) |
 | Generate from suggestions | "Use the previous suggestions" | `--from-suggestions` |
 
-**Key rule**: if you can read the user's request as a single test case title, the agent routes to `--from-description`. If it's a topic to explore, the agent routes to `--focus`. The agent never asks the user for count or scope to disambiguate — the topic-vs-scenario shape is the only signal.
+**Key rule**: if you can read the user's request as a single test case title, the flow routes to `--from-description`. If it's a topic to explore, it routes to `--focus`. The flow never asks the user for count or scope to disambiguate — the topic-vs-scenario shape is the only signal.
 
 When `--from-description` runs in a project that has documentation and acceptance criteria, the CLI best-effort loads matching docs (capped at 3 docs × 8000 chars) and matching `.criteria.yaml` entries. The matching criteria are injected into the generation prompt as the **mandatory criteria-mapping instruction** — the same "you MUST map each test case to matching acceptance criteria" block the batch flow uses — so the model reliably populates the `criteria` frontmatter field (Spec 050).
 
@@ -139,12 +146,12 @@ Exit code 3 is returned if required arguments are missing when `--no-interaction
 
 ## Customizing SKILLs
 
-SKILL files are plain Markdown — edit them freely to:
+`SKILL.md` files are plain Markdown — edit them freely to:
 - Add project-specific instructions
 - Change default flags
 - Add custom examples for your domain
 
-**Important**: If you modify a SKILL file, `spectra update-skills` will skip it (preserving your changes).
+**Important**: If you modify a `SKILL.md` file, `spectra update-skills` will skip it (preserving your changes).
 
 ## Updating SKILLs
 
@@ -159,9 +166,9 @@ spectra update-skills
 
 ## Skipping SKILLs
 
-For projects that don't use Copilot Chat:
+For projects that don't use Claude Code:
 ```bash
 spectra init --skip-skills
 ```
 
-This creates only core files (config, directories, templates) without `.github/skills/` or `.github/agents/`.
+This creates only core files (config, directories, templates) without the `.claude/skills/` SKILLs or the `.claude/agents/` critic subagent.

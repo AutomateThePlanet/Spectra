@@ -2,8 +2,6 @@
 name: spectra-quickstart
 description: Guided onboarding and workflow walkthroughs for SPECTRA via Copilot Chat. Use this when the user asks for help getting started, a tutorial, or wants to see what SPECTRA can do.
 tools: []
-model: GPT-4o
-disable-model-invocation: true
 ---
 
 # SPECTRA Quickstart Guide
@@ -435,12 +433,12 @@ Re-run coverage analysis (Workflow 4) followed by dashboard generation (Workflow
 
 **What happens:** Cooperative cancellation triggers within ~5 seconds. Tests and files written so far are kept on disk. The progress page transitions to a terminal "Cancelled" phase.
 
-**Step 1** — runInTerminal:
+**Step 1** — Run with the Bash tool:
 ```
 spectra cancel --no-interaction --output-format json --verbosity quiet
 ```
 
-**Step 2** — awaitTerminal, readFile `.spectra-result.json`.
+**Step 2** — Wait for the command to finish, then Read `.spectra-result.json`.
 
 **Step 3** — Report:
 - `target_command` — what was running

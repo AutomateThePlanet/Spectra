@@ -9,7 +9,7 @@ nav_order: 10
 This guide covers every way you can customize SPECTRA's behavior, from test case
 output format to AI reasoning strategy.
 
-> **Looking for workflow how-tos instead of customization?** See [`USAGE.md`](USAGE.md) — the workflow guide for using SPECTRA from VS Code Copilot Chat.
+> **Looking for workflow how-tos instead of customization?** See [`USAGE.md`](USAGE.md) — the workflow guide for using SPECTRA from Claude Code.
 
 ---
 
@@ -24,7 +24,7 @@ output format to AI reasoning strategy.
 | AI provider & model | `spectra.config.json` → `ai.providers` | Change provider/model |
 | Critic strictness | `spectra.config.json` → `ai.critic` | Change critic model, or skip with `--skip-critic` |
 | Dashboard branding | `spectra.config.json` → `dashboard.branding` | Logo, colors, company name, theme |
-| VS Code integration | `.github/skills/*.md`, `.github/agents/*.md` | Edit SKILL/agent prompts |
+| Claude Code integration | `.claude/skills/<name>/SKILL.md`, `.claude/agents/spectra-critic.agent.md` | Edit authoring SKILL files / critic subagent |
 
 ---
 
@@ -283,22 +283,24 @@ data and your branding applied, without needing real test data.
 
 ---
 
-## 7. VS Code Copilot Chat Integration
+## 7. Claude Code Integration
 
-**What it controls**: How Copilot Chat interacts with SPECTRA CLI.
+**What it controls**: How Claude Code interacts with SPECTRA CLI.
 
 **Files**:
-- `.github/skills/*.md` — SKILL files (one per command group)
-- `.github/agents/*.md` — Agent prompts (generation + execution)
-- `.vscode/mcp.json` — MCP server connection for execution agent
+- `.claude/skills/<name>/SKILL.md` — authoring SKILL files (one per command group)
+- `.claude/agents/spectra-critic.agent.md` — critic subagent (`context: fork`), run as a mandatory step by the generation SKILL
+- `.vscode/mcp.json` — MCP server connection for the execution agent
 
-**SKILLs** (bundled): `spectra-generate`, `spectra-update`, `spectra-coverage`,
+**SKILLs** (bundled, authoring set): `spectra-generate`, `spectra-update`, `spectra-coverage`,
 `spectra-dashboard`, `spectra-validate`, `spectra-list`, `spectra-init-profile`,
-`spectra-help`, `spectra-criteria`, `spectra-docs`, `spectra-prompts`.
+`spectra-help`, `spectra-criteria`, `spectra-docs`, `spectra-prompts`, `spectra-quickstart`.
 
-**Agents** (bundled): `spectra-generation` (primary), `spectra-execution` (MCP).
+**Critic subagent** (bundled): `spectra-critic` — independent verification of generated tests.
 
-**How to customize**: Edit any SKILL or agent file to change how Copilot Chat
+> The test **execution** agent (`.github/agents/spectra-execution.agent.md`) is **not yet ported** to Claude Code — it remains a GitHub Copilot agent until a later spec.
+
+**How to customize**: Edit any `SKILL.md` or the critic subagent file to change how Claude Code
 invokes CLI commands, presents results, or handles multi-step workflows.
 
 **Safe updates**: Same hash-tracking as prompt templates. `spectra update-skills`
