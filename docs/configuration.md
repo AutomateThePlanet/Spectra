@@ -86,7 +86,13 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 }
 ```
 
-> **Spec 041 defaults:** `spectra init` writes `gpt-4.1` + `gpt-5-mini` — both 0× multiplier on any paid Copilot plan and from different model architectures for independent critic verification. `spectra init -i` offers a choice of four presets (GPT-4.1 + GPT-5 mini free, Claude Sonnet 4.5 + GPT-4.1 critic premium, GPT-4.1 + Claude Haiku 4.5 cross-family, or Custom). Existing configs with `gpt-4o` / `gpt-4o-mini` continue to work unchanged.
+> **Spec 041 defaults:** `spectra init` writes `gpt-4.1` + `gpt-5-mini` — both 0× multiplier on any paid Copilot plan. `spectra init -i` offers a choice of four presets (GPT-4.1 + GPT-5 mini free, Claude Sonnet 4.5 + GPT-4.1 critic premium, GPT-4.1 + Claude Haiku 4.5 cross-family, or Custom). Existing configs with `gpt-4o` / `gpt-4o-mini` continue to work unchanged.
+
+> **Spec 055 — `ai.critic.model` is the single selector:** the critic model comes solely from
+> `ai.critic.model`. When you leave it unset, a single same-family default applies (target: Sonnet
+> 4.6) — there is no longer a per-provider default switch, and the earlier cross-architecture
+> default is superseded by a same-family direction. The `spectra init` presets above still write
+> whatever explicit models you pick; only the *unset* fallback changed.
 
 ### `ai.providers[]`
 

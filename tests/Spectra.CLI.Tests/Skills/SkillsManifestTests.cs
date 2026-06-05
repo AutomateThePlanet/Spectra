@@ -79,9 +79,11 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void AgentContent_HasAllAgents()
     {
-        Assert.Equal(2, AgentContent.All.Count);
+        // Spec 055 adds the context:fork critic subagent.
+        Assert.Equal(3, AgentContent.All.Count);
         Assert.True(AgentContent.All.ContainsKey("spectra-execution.agent.md"));
         Assert.True(AgentContent.All.ContainsKey("spectra-generation.agent.md"));
+        Assert.True(AgentContent.All.ContainsKey("spectra-critic.agent.md"));
     }
 
     [Fact]

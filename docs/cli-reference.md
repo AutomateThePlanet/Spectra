@@ -250,6 +250,45 @@ cat ./criteria.json | spectra ai ingest-criteria --doc docs/payment.md
 > failure semantics so a single empty/slow/malformed document is now reported as
 > an inconclusive document rather than throwing and aborting the corpus.
 
+### `spectra ai compile-critic-prompt` (Spec 055 — critic subagent)
+
+Deterministic, model-free compilation of the **critic verification prompt** for one generated
+test — the verification analogue of `compile-prompt`. Writes nothing; calls no model. The
+`spectra-critic` `context: fork` subagent runs the emitted prompt in a fresh, isolated context
+(test artifact + selected source docs only) and hands its verdict to `ingest-verdict`.
+
+```bash
+spectra ai compile-critic-prompt --test ./tc-900.json --docs ./docs/checkout
+```
+
+- **Deterministic**: identical `(test, docs)` → byte-identical prompt (no timestamps/GUIDs).
+- **Refuse-to-emit**: a missing test artifact (no id/title) exits `4`; an empty `--docs` set is
+  allowed (the prompt notes "no documentation provided"), not a refusal.
+- Exit codes: `0` compiled/emitted, `4` refused, `1` environment error.
+
+### `spectra ai ingest-verdict` (Spec 055 — fail-loud boundary)
+
+Classifies an agent-produced critic JSON into a typed outcome and reports the verdict + gate
+decision. Content is read from `--from <file>` or stdin. The verification analogue of
+`ingest-tests`; it persists nothing (the grounding write-back stays in generation).
+
+```bash
+echo '{"verdict":"hallucinated","score":0.1,"findings":[]}' | spectra ai ingest-verdict
+spectra ai ingest-verdict --from ./verdict.json --output-format json
+```
+
+- **Advisory gate**: only `hallucinated` reports `drop`; `grounded`/`partial` report `pass`.
+- **Fail loud on damage**: a missing/unparseable `verdict` or `score` is a `ParseFailure` with a
+  specific error — **never** a silent `partial`/`0.5` soft pass. Empty input is `EmptyResponse`.
+- Exit codes: `0` verdict classified, `5` `EmptyResponse`, `6` `ParseFailure`, `1` env error.
+
+> **Note (Spec 055):** `spectra ai generate`'s batch verification continues to run the critic
+> in-process today; this spec adds the model-free compile/ingest surface and the `spectra-critic`
+> `context: fork` subagent alongside it (matching how Spec 053/054 shipped their surfaces), makes
+> `ai.critic.model` the single model selector, and changes the critic's damage paths to fail loud
+> (a missing/unparseable verdict is surfaced, not smoothed into a soft pass). Wiring the subagent
+> into generation as a mandatory step is the subsequent spec.
+
 ### `spectra ai generate`
 
 Generate test cases from documentation using systematic ISTQB test design
