@@ -25,6 +25,11 @@ public sealed class AiCommand : Command
         // extracts → ingest criteria).
         AddCommand(new CompileExtractionPromptCommand());
         AddCommand(new IngestCriteriaCommand());
+
+        // Spec 055: model-free critic surface (compile critic prompt → context:fork subagent
+        // verifies → ingest verdict, fail-loud on damage).
+        AddCommand(new CompileCriticPromptCommand());
+        AddCommand(new IngestVerdictCommand());
     }
 
     /// <summary>

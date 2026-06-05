@@ -189,22 +189,11 @@ public sealed class CopilotCritic : ICriticRuntime
         }
     }
 
-    private static string GetEffectiveModel(CriticConfig config)
-    {
-        if (!string.IsNullOrEmpty(config.Model))
-            return config.Model;
-
-        // Spec 041: default critic models. Cross-architecture when possible
-        // so the critic catches hallucinations the generator can't see.
-        var provider = config.Provider?.ToLowerInvariant() ?? "github-models";
-        return provider switch
-        {
-            "anthropic" or "azure-anthropic" => "claude-haiku-4-5",
-            "azure-deepseek" => "DeepSeek-V3-0324",
-            "openai" or "azure-openai" => "gpt-5-mini",
-            _ => "gpt-5-mini"
-        };
-    }
+    // Spec 055 (FR-004/FR-008): the provider→default-model switch is gone. ai.critic.model is the
+    // single selector; the default is same-family (§32 direction), resolved in one place by
+    // CriticModelResolver — no longer duplicated here and in CopilotService.GetCriticModel.
+    private static string GetEffectiveModel(CriticConfig config) =>
+        Spectra.CLI.Agent.Critic.CriticModelResolver.Resolve(config);
 
     private VerificationResult CreateErrorResult(string error, TimeSpan duration)
     {
@@ -220,54 +209,6 @@ public sealed class CopilotCritic : ICriticRuntime
     }
 }
 
-/// <summary>
-/// Factory for creating Copilot SDK-based critics.
-/// </summary>
-public static class CopilotCriticFactory
-{
-    /// <summary>
-    /// Result of creating a critic.
-    /// </summary>
-    public sealed record CreateResult(
-        bool Success,
-        ICriticRuntime? Critic,
-        string? ErrorMessage);
-
-    /// <summary>
-    /// Tries to create a Copilot SDK critic from configuration.
-    /// </summary>
-    public static async Task<CreateResult> TryCreateAsync(
-        CriticConfig? config,
-        CancellationToken ct = default)
-    {
-        if (config is null || !config.Enabled)
-        {
-            return new CreateResult(false, null, "Critic not configured or disabled");
-        }
-
-        // Check Copilot availability
-        var (available, error) = await CopilotService.CheckAvailabilityAsync(ct);
-        if (!available)
-        {
-            return new CreateResult(false, null, error ?? "Copilot SDK not available");
-        }
-
-        var critic = new CopilotCritic(config);
-        return new CreateResult(true, critic, null);
-    }
-
-    /// <summary>
-    /// Creates a critic synchronously (validation only, no async check).
-    /// </summary>
-    public static CreateResult TryCreate(CriticConfig? config)
-    {
-        if (config is null || !config.Enabled)
-        {
-            return new CreateResult(false, null, "Critic not configured or disabled");
-        }
-
-        // Create without async validation - will fail on first use if unavailable
-        var critic = new CopilotCritic(config);
-        return new CreateResult(true, critic, null);
-    }
-}
+// Spec 055 (FR-008): the dead second factory `CopilotCriticFactory` was removed here — it was
+// unreferenced outside its own file (investigation 02 F-1). The live factory is
+// Spectra.CLI.Agent.Critic.CriticFactory.

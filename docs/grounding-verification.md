@@ -19,9 +19,23 @@ When AI generates test cases, it can hallucinate — invent steps, expected resu
 ## How It Works
 
 1. **Generator** creates draft test cases from your documentation
-2. **Critic** (different model) verifies each test case against the same docs
+2. **Critic** verifies each test case against the same docs. The critic runs in a fresh, isolated
+   (`context: fork`) context — it sees only the test artifact and its selected source documents,
+   never the generator's prompt, reasoning, tool calls, or token usage.
 3. Test cases receive a verdict: `grounded`, `partial`, or `hallucinated`
 4. Only grounded and partial test cases are written to disk
+
+### Advisory verdict, fail-loud damage
+
+The verdict is **advisory-gating**: a clear `hallucinated` verdict drops the test; `grounded`,
+`partial`, and manually-marked tests pass through. But the critic's *damage* paths fail loud rather
+than silently passing:
+
+- A critic response missing its `verdict` or `score`, or otherwise unparseable, is surfaced as a
+  specific error — it is **not** smoothed into a soft `partial` / `0.5` pass.
+- A critic *call* that fails or times out is non-blocking (the test is marked unverified and
+  generation continues) but is recorded **distinctly** from a malformed response, so a failed
+  critic and a bad critic response are never conflated.
 
 ## Verdicts
 
@@ -99,7 +113,7 @@ Configure the critic in `spectra.config.json`:
 
 > **Spec 043 — parallel verification:** `max_concurrent` (default `1`) controls how many critic verification calls run concurrently. Setting it to `5` typically cuts the critic phase to ~1/5 of sequential time on a large suite without changing any output (results are written in original input order). Clamped to `[1, 20]`. Values >10 emit a rate-limit-risk warning at run start. If you start hitting rate limits, the Run Summary panel surfaces a `Rate limits` count with a hint pointing back at this knob.
 
-> **Spec 041:** `gpt-5-mini` is the new default critic model (was `gpt-4o-mini`). It's included free on any paid Copilot plan and, when paired with a `gpt-4.1` generator, provides cross-architecture verification without burning premium requests. For Claude generators, the default critic rotates to `claude-haiku-4-5`. Per-provider defaults resolved by `CriticConfig.GetEffectiveModel()`: `github-models` / `openai` / `azure-openai` → `gpt-5-mini`; `anthropic` / `azure-anthropic` → `claude-haiku-4-5`.
+> **Spec 055 — single model selector:** `ai.critic.model` is the single source of truth for the critic model. When it is set, that value is used; when it is unset, one same-family default applies (target: Sonnet 4.6) — there is no longer a per-provider default switch. The earlier cross-architecture default (a GPT critic for a Claude generator) is superseded: same-family verification reads as more useful in team testing, and "different families" was a means, not the end. Flipping the critic model is a config change, never a code change — which is what lets a post-migration bake-off compare model choices without touching code.
 
 Supported critic providers (spec 039 — same set as the generator):
 `github-models`, `azure-openai`, `azure-anthropic`, `openai`, `anthropic`.

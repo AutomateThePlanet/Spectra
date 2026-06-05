@@ -309,31 +309,19 @@ public sealed class CopilotService : IAsyncDisposable
         return new SpectraProviderConfig
         {
             Name = criticConfig.Provider ?? "github-models",
-            Model = criticConfig.Model ?? "gpt-5-mini",
+            // Spec 055: single critic-model source of truth (no divergent inline default).
+            Model = Spectra.CLI.Agent.Critic.CriticModelResolver.Resolve(criticConfig),
             BaseUrl = criticConfig.BaseUrl,
             ApiKeyEnv = criticConfig.ApiKeyEnv,
             Enabled = true
         };
     }
 
-    private static string GetCriticModel(CriticConfig? criticConfig)
-    {
-        if (!string.IsNullOrEmpty(criticConfig?.Model))
-            return criticConfig.Model;
-
-        // Spec 041: Default to fast/cheap models for verification. Defaults
-        // target the current GitHub Copilot free models where possible and
-        // favor cross-architecture verification (GPT critic for a Claude
-        // generator and vice versa).
-        var provider = criticConfig?.Provider?.ToLowerInvariant() ?? "github-models";
-        return provider switch
-        {
-            "anthropic" or "azure-anthropic" => "claude-haiku-4-5",
-            "azure-deepseek" => "DeepSeek-V3-0324",
-            "openai" or "azure-openai" => "gpt-5-mini",
-            _ => "gpt-5-mini"
-        };
-    }
+    // Spec 055 (FR-004/FR-008): delegate to the single CriticModelResolver. ai.critic.model is the
+    // only selector; the default is same-family (§32 direction). The provider→default-model switch
+    // that used to be duplicated here and in CopilotCritic.GetEffectiveModel is gone.
+    private static string GetCriticModel(CriticConfig? criticConfig) =>
+        Spectra.CLI.Agent.Critic.CriticModelResolver.Resolve(criticConfig);
 
     public async ValueTask DisposeAsync()
     {
