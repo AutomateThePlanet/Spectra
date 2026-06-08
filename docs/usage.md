@@ -146,6 +146,27 @@ The MCP server must be running. Check `.vscode/mcp.json` for the connection conf
 
 ---
 
+## Driving a Run from the Web Console
+
+> "Open the execution console"
+
+For hands-on manual runs, `spectra run console` serves a **local** web page (in Spectra's report
+styling) where you drive the run from the browser — click PASS / FAIL / BLOCKED, add a comment, drop or
+paste a screenshot, and the page advances. SQLite is the source of truth, so a refresh loses nothing.
+
+```bash
+spectra run start checkout          # start (or use an active run)
+spectra run console                 # prints a http://127.0.0.1:<port>/ URL — open it
+# … record verdicts in the browser; click Finalize when done …
+spectra run console --stop          # stop the detached server
+```
+
+No MCP server, no tokens, no network beyond localhost. The console runs detached (survives closing the
+launching terminal) and the page is ephemeral/gitignored. See `cli-reference.md` for the full command and
+`deployment.md` for how it differs from the static dashboard.
+
+---
+
 ## Creating a Custom Profile
 
 > "Create a test generation profile for our API team"

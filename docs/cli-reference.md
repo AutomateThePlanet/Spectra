@@ -505,7 +505,24 @@ spectra run screenshot-clipboard [<handle>]     # local CLI is the host
 spectra run pause|resume|cancel [<run-id>] | spectra run cancel-all
 spectra run finalize [<run-id>] [--force]       # generates JSON/MD/HTML reports under .execution/reports/
 spectra run history [--suite X] | spectra run summary [<run-id>] | spectra run selections
+spectra run console [--port N]                  # serve a local web console for the active run
+spectra run console --stop                       # stop the running console
 ```
+
+#### `spectra run console` — local web console (Spec 066)
+
+A local, human-driven **execution console**: a small detached HTTP server on `127.0.0.1` serving an
+ephemeral, gitignored page (in Spectra's report styling) where a QA engineer drives a run from the
+browser — sees the current test, clicks **PASS / FAIL / BLOCKED**, adds a comment, drops/pastes a
+screenshot. It is a *third transport over the same engine* (sibling of `spectra run …` and the MCP
+tools): **SQLite is the single source of truth; the browser is a view + write-back caller, never a
+store**, so a refresh or reopen loses nothing. Verdict guardrails are enforced server-side (a comment is
+required for FAIL/BLOCKED/SKIP; a verdict is never inferred), identical to `spectra run advance`.
+
+The server starts **detached** — it survives the launching terminal/agent session ending and stops only
+on `spectra run console --stop` (a `.execution/console.json` marker records its pid/port/url). `--port`
+is optional (a free port is auto-selected). This is a different deployment model from the dashboard — see
+`deployment.md`.
 
 Every subcommand honors the global `--output-format json|human` and `--verbosity`. Exit code is `0` on
 success and non-zero on error; a reconstruction failure surfaces as a distinct `RECONSTRUCTION_FAILED`

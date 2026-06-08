@@ -1,4 +1,5 @@
-# Execution state (local, transient)
+# Execution state (local, transient) — includes the ephemeral console marker
+# (.execution/console.json) and the local-only run console page (Spec 066). Never committed.
 .execution/
 
 # Reports (local execution reports, not source code)
