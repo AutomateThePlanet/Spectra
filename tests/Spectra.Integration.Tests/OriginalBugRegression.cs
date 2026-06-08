@@ -2,6 +2,7 @@ using System.Text.Json;
 using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Commands.Analyze;
 using Spectra.CLI.Commands.Docs;
+using Spectra.CLI.Generation;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Coverage;
 using Spectra.Integration.Tests.Support;
@@ -71,13 +72,13 @@ public sealed class OriginalBugRegression
         var (context, matched) = await ws.LoadCriteriaAsync("checkout");
         Assert.True(matched > 0, "criteria should match the suite by component");
 
-        var produced = TestFactory.Make("TC-900", "Checkout totals", Priority.High,
-            component: "checkout", criteria: ["AC-001"], filePath: "checkout/TC-900.md");
-        var (test, agent) = await ws.GenerateFromDescriptionAsync("checkout", produced, context);
-
-        Assert.NotNull(test);
-        Assert.True(agent.ReceivedCriteria, "loaded criteria must be forwarded to the agent (050)");
-        Assert.NotEmpty(test!.Criteria);
+        // Spec 059: the loaded criteria MUST flow into the compiled generation prompt (the
+        // mandatory-mapping block) so the in-session agent maps them — the 050 guarantee, now on
+        // the seam rather than the deleted in-process agent.
+        var userPrompt = DescriptionPromptBuilder.Build("Checkout totals", null, "checkout", []);
+        var prompt = PromptCompiler.Assemble(userPrompt, requestedCount: 1, criteriaContext: context);
+        Assert.Contains("ACCEPTANCE CRITERIA — MANDATORY", prompt);
+        Assert.Contains("AC-001", prompt);
     }
 
     // ── 049: from-description test missing from index / different shape ────────
@@ -91,10 +92,9 @@ public sealed class OriginalBugRegression
 
         var produced = TestFactory.Make("TC-900", "From description", Priority.High,
             tags: ["smoke"], component: "checkout", filePath: "checkout/TC-900.md");
-        var (test, _) = await ws.GenerateFromDescriptionAsync("checkout", produced, criteriaContext: null);
-        Assert.NotNull(test);
 
-        await ws.PersistAsync("checkout", new[] { test! }, new[] { peer, test! });
+        // Spec 059: persist the produced test as the seam's ingest-tests does, then assert index parity.
+        await ws.PersistAsync("checkout", new[] { produced }, new[] { peer, produced });
 
         var index = ws.ReadIndex("checkout");
         var entry = Assert.Single(index.Tests, e => e.Id == "TC-900");

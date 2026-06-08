@@ -26,10 +26,11 @@ public sealed class GenerationSkillContractTests
     public void GenerationSkill_CriticStep_IsNotSkippable()
     {
         var skill = Generate();
-        // The mandated flow states verification is never skipped, and generation is run with
-        // --skip-critic specifically because the subagent is the critic of record.
+        // Spec 059: generation runs through the model-free compile/ingest seam — there is no
+        // in-process critic and therefore no `--skip-critic` flag. The `spectra-critic` subagent
+        // is unconditional and is the single critic of record.
         Assert.Contains("never skipped", skill);
-        Assert.Contains("--skip-critic", skill);
+        Assert.DoesNotContain("--skip-critic", skill);
         Assert.Contains("critic of record", skill);
     }
 

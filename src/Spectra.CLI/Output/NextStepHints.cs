@@ -75,7 +75,7 @@ public static class NextStepHints
 
     private static List<string> GetInitHints() =>
     [
-        "spectra ai generate           # Generate your first test suite",
+        "Ask Claude Code to generate tests      # runs the spectra-generate skill",
         "spectra init-profile           # Configure generation preferences",
         "spectra ai analyze --extract-criteria  # Extract acceptance criteria from docs",
         "",
@@ -95,7 +95,7 @@ public static class NextStepHints
 
         if (context.SuiteName is not null)
         {
-            hints.Add("spectra ai generate            # Interactive mode (pick another suite)");
+            hints.Add("Ask Claude Code to generate another suite  # spectra-generate skill");
         }
 
         return hints;
@@ -116,7 +116,7 @@ public static class NextStepHints
 
         if (context.HasGaps)
         {
-            hints.Add("spectra ai generate                        # Fill coverage gaps");
+            hints.Add("Ask Claude Code to generate tests          # spectra-generate skill (fills gaps)");
         }
 
         hints.Add("spectra ai analyze --extract-criteria       # Extract acceptance criteria from docs");
@@ -149,19 +149,19 @@ public static class NextStepHints
 
         return
         [
-            "spectra ai generate            # Generate more tests",
+            "Ask Claude Code to generate more tests  # spectra-generate skill",
             "spectra index                  # Rebuild indexes if needed"
         ];
     }
 
     private static List<string> GetDocsIndexHints() =>
     [
-        "spectra ai generate            # Generate tests from indexed docs"
+        "Ask Claude Code to generate tests from indexed docs  # spectra-generate skill"
     ];
 
     private static List<string> GetIndexHints() =>
     [
         "spectra validate               # Validate test files",
-        "spectra ai generate            # Generate more tests"
+        "Ask Claude Code to generate more tests  # spectra-generate skill"
     ];
 }

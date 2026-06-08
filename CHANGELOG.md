@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — Claude Code migration (v2)
 
+### Changed (Spec 059 — generation-skill inversion + completion)
+
+- **Generation now runs in the interactive session, not in-process.** The `spectra-generate` skill
+  (and `spectra-generation` agent) were rewritten so all three flows — bulk, from-description, and
+  behavior analysis — run through the deterministic compile→generate-in-session→ingest seam with the
+  mandatory `spectra-critic` step and the fail-loud bounded retry. The skill no longer invokes any
+  `spectra ai generate` command.
+- **New model-free CLI seam commands:** `spectra ai compile-prompt --from-description` (single-test
+  mode), `spectra ai compile-analysis-prompt`, and `spectra ai ingest-analysis` (deterministic
+  behavior-analysis accounting). The from-description and analyze flows now route through the same
+  seam as bulk generation (Spec 053).
+- **Removed the in-process generation path:** `CopilotGenerationAgent`, `BehaviorAnalyzer`,
+  `UserDescribedGenerator`, `ProviderChain`, `AgentFactory.CreateAgentAsync` (+ its hardcoded
+  fallback), and the `spectra ai generate` command. Their deterministic logic (criteria loading,
+  prompt shaping, analysis accounting) was relocated to `CriteriaContextLoader`,
+  `DescriptionPromptBuilder`, `AnalysisPromptCompiler`, and `AnalysisRecommendationBuilder`.
+- **Retained (out of scope — narrow-complete):** `CopilotService`, `ProviderMapping`, `ai.providers`,
+  and the GitHub Copilot SDK remain because the still-in-process **criteria-extraction** path
+  (`CriteriaExtractor`/`RequirementsExtractor`, driven by `ai analyze --extract-criteria` / `docs
+  index`) and **Copilot auth** (`AuthHandler`/`InitHandler`) still use them. Full SDK + `ai.providers`
+  retirement awaits a spec that also inverts those paths.
+- `Spectra.Core` (542) and `Spectra.MCP` (368) test corpora unchanged and green.
+
 ### Changed (Spec 058 — critic-provider retirement + config cleanup)
 
 - The grounding **critic** no longer runs as an in-process model call. Verification of record runs

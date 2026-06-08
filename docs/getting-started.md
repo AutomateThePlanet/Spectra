@@ -227,15 +227,16 @@ The bundled `.claude/skills/` SKILLs handle CLI invocation automatically, and th
 
 ### Option 2: CLI directly
 
+Generation itself is **skill-driven** (it runs in your interactive Claude Code session, not as a
+standalone CLI command). The CLI handles the deterministic surrounding steps:
+
 ```bash
 # Build the documentation index
 spectra docs index
 
-# Interactive generation session (analyze → generate → suggest → loop)
-spectra ai generate
-
-# Or direct mode with specific suite
-spectra ai generate checkout --count 10
+# Ask Claude Code: "generate test cases for the checkout suite"
+# → the spectra-generate skill drives: compile-analysis-prompt → (you generate in-session)
+#   → ingest-analysis → compile-prompt → ingest-tests → spectra-critic verification
 
 # Validate
 spectra validate
@@ -244,9 +245,6 @@ spectra validate
 ### Option 3: CI/SKILL automation
 
 ```bash
-# Full automated generation with JSON output
-spectra ai generate checkout --auto-complete --output-format json
-
 # Coverage check
 spectra ai analyze --coverage --output-format json
 

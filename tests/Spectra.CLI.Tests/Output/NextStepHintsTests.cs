@@ -10,7 +10,7 @@ public class NextStepHintsTests
     {
         var hints = NextStepHints.GetHints("init", true, new HintContext());
 
-        Assert.Contains(hints, h => h.Contains("spectra ai generate"));
+        Assert.Contains(hints, h => h.Contains("spectra-generate skill"));
         Assert.Contains(hints, h => h.Contains("spectra init-profile"));
         Assert.Contains(hints, h => h.Contains("Copilot Space"));
     }
@@ -21,7 +21,7 @@ public class NextStepHintsTests
         var hints = NextStepHints.GetHints("generate", true, new HintContext { SuiteName = "checkout" });
 
         Assert.Contains(hints, h => h.Contains("spectra ai analyze --coverage"));
-        Assert.Contains(hints, h => h.Contains("Interactive mode"));
+        Assert.Contains(hints, h => h.Contains("generate another suite"));
     }
 
     [Fact]
@@ -53,7 +53,7 @@ public class NextStepHintsTests
     {
         var hints = NextStepHints.GetHints("analyze", true, new HintContext { HasGaps = true });
 
-        Assert.Contains(hints, h => h.Contains("spectra ai generate"));
+        Assert.Contains(hints, h => h.Contains("spectra-generate skill"));
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public class NextStepHintsTests
     {
         var hints = NextStepHints.GetHints("validate", true, new HintContext { ErrorCount = 0 });
 
-        Assert.Contains(hints, h => h.Contains("spectra ai generate"));
+        Assert.Contains(hints, h => h.Contains("spectra-generate skill"));
         Assert.Contains(hints, h => h.Contains("spectra index"));
     }
 
@@ -88,7 +88,7 @@ public class NextStepHintsTests
     {
         var hints = NextStepHints.GetHints("docs-index", true, new HintContext());
 
-        Assert.Contains(hints, h => h.Contains("spectra ai generate"));
+        Assert.Contains(hints, h => h.Contains("spectra-generate skill"));
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public class NextStepHintsTests
         var hints = NextStepHints.GetHints("index", true, new HintContext());
 
         Assert.Contains(hints, h => h.Contains("spectra validate"));
-        Assert.Contains(hints, h => h.Contains("spectra ai generate"));
+        Assert.Contains(hints, h => h.Contains("spectra-generate skill"));
     }
 
     [Fact]

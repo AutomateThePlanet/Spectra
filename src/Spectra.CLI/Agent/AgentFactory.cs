@@ -51,95 +51,13 @@ public sealed record AgentCreateResult
 }
 
 /// <summary>
-/// Factory for creating AI agent instances using the Copilot SDK.
+/// Copilot-SDK auth / provider helpers retained after Spec 059. The in-process generation agent
+/// factory (<c>CreateAgentAsync</c>) was removed with the generation inversion — generation now
+/// runs on the compile/ingest seam. The auth-status and provider-listing helpers below remain in
+/// use by the auth and init commands and by the still-in-process criteria-extraction path.
 /// </summary>
 public static class AgentFactory
 {
-    /// <summary>
-    /// Creates an agent using the Copilot SDK.
-    /// This is the primary method for creating agents.
-    /// </summary>
-    public static async Task<AgentCreateResult> CreateAgentAsync(
-        SpectraConfig config,
-        string basePath,
-        string testsPath,
-        Action<string>? onStatus = null,
-        CancellationToken ct = default,
-        TokenUsageTracker? tracker = null,
-        RunErrorTracker? errorTracker = null)
-    {
-        // Get provider config (or use default)
-        var providerConfig = config.Ai?.Providers?.FirstOrDefault(p => p.Enabled)
-            ?? new ProviderConfig { Name = "github-models", Model = "gpt-4o", Enabled = true };
-
-        var isByok = IsByokProvider(providerConfig);
-
-        if (isByok)
-        {
-            // BYOK providers only need the CLI binary present — no Copilot auth required.
-            // Per SDK docs: BYOK "bypasses GitHub Copilot authentication."
-            var (cliAvailable, cliError) = CopilotService.CheckCliAvailable();
-            if (!cliAvailable)
-            {
-                return AgentCreateResult.Failed(providerConfig.Name ?? "copilot-sdk",
-                    AuthResult.Failure(
-                        cliError ?? "Copilot CLI not available",
-                        "Ensure the 'copilot' CLI is installed and in PATH",
-                        "Run: npm install -g @github/copilot"));
-            }
-        }
-        else
-        {
-            // GitHub Models / Copilot requires full auth check (ping)
-            var (available, error) = await CopilotService.CheckAvailabilityAsync(ct);
-            if (!available)
-            {
-                return AgentCreateResult.Failed(providerConfig.Name ?? "copilot-sdk",
-                    AuthResult.Failure(
-                        error ?? "Copilot SDK not available",
-                        "Ensure the 'copilot' CLI is installed and in PATH",
-                        "Run: copilot --version"));
-            }
-        }
-
-        // Validate provider (API key, base_url for Azure, etc.)
-        var (valid, validationError) = CopilotService.ValidateProvider(providerConfig);
-        if (!valid)
-        {
-            return AgentCreateResult.Failed(providerConfig.Name ?? "copilot-sdk",
-                AuthResult.Failure(validationError ?? "Provider validation failed"));
-        }
-
-        try
-        {
-            var agent = new CopilotGenerationAgent(
-                providerConfig,
-                config,
-                basePath,
-                testsPath,
-                onStatus,
-                tracker,
-                errorTracker);
-
-            return AgentCreateResult.Succeeded(agent);
-        }
-        catch (Exception ex)
-        {
-            return AgentCreateResult.Failed(providerConfig.Name ?? "copilot-sdk",
-                AuthResult.Failure($"Failed to create Copilot agent: {ex.Message}"));
-        }
-    }
-
-    /// <summary>
-    /// Determines if a provider is BYOK (Bring Your Own Key) — i.e. not GitHub Models/Copilot.
-    /// BYOK providers bypass GitHub Copilot authentication.
-    /// </summary>
-    private static bool IsByokProvider(ProviderConfig? config)
-    {
-        var name = config?.Name?.ToLowerInvariant() ?? "";
-        return name is not ("github-models" or "github-copilot" or "copilot" or "");
-    }
-
     /// <summary>
     /// Gets all available provider names supported by the Copilot SDK.
     /// </summary>

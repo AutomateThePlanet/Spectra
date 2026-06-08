@@ -105,8 +105,8 @@ includes a `technique_breakdown` map alongside the category breakdown.
 ## CLI Commands (Terminal)
 
 ```bash
-spectra ai generate --suite payments --count 20
-spectra ai generate --suite payments --analyze-only
+spectra ai compile-analysis-prompt --suite payments   # analyze: emits the behavior-analysis prompt
+spectra ai compile-prompt --suite payments --count 20  # generate: emits the generation prompt
 spectra ai analyze --coverage --auto-link
 spectra ai analyze --extract-criteria --output-format json
 spectra dashboard --output ./site

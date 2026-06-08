@@ -1,4 +1,4 @@
-using Spectra.CLI.Agent.Copilot;
+using Spectra.CLI.Generation;
 using Spectra.Core.Models;
 
 namespace Spectra.CLI.Tests.Agent;
@@ -16,7 +16,7 @@ public class BehaviorAnalyzerLegacyFallbackTests
         {
             new() { Path = "docs/sample.md", Title = "Sample", Content = "Sample doc content.", Sections = [] }
         };
-        return BehaviorAnalyzer.BuildAnalysisPrompt(docs, focusArea: null, config: null, templateLoader: null);
+        return AnalysisPromptCompiler.BuildAnalysisPrompt(docs, focusArea: null, config: null, templateLoader: null);
     }
 
     [Fact]

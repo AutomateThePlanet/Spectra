@@ -1,5 +1,5 @@
 using Spectra.CLI.Agent.Analysis;
-using Spectra.CLI.Agent.Copilot;
+using Spectra.CLI.Generation;
 
 namespace Spectra.CLI.Tests.Agent;
 
@@ -21,7 +21,7 @@ public class BehaviorAnalyzerTechniqueTests
             }
             """;
 
-        var result = BehaviorAnalyzer.ParseAnalysisResponse(json);
+        var result = AnalysisRecommendationBuilder.ParseAnalysisResponse(json);
 
         Assert.NotNull(result);
         Assert.Equal(2, result.Count);
@@ -41,7 +41,7 @@ public class BehaviorAnalyzerTechniqueTests
             }
             """;
 
-        var result = BehaviorAnalyzer.ParseAnalysisResponse(json);
+        var result = AnalysisRecommendationBuilder.ParseAnalysisResponse(json);
 
         Assert.NotNull(result);
         Assert.Single(result);

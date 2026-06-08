@@ -1,6 +1,6 @@
 using System.Text;
 using System.Text.Json;
-using Spectra.CLI.Commands.Generate;
+using Spectra.CLI.Generation;
 using Spectra.CLI.IO;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
@@ -15,12 +15,13 @@ using Spectra.MCP.Tools.RunManagement;
 namespace Spectra.Integration.Tests.Support;
 
 /// <summary>
-/// Spec 052: a temporary project directory wired like a real Spectra workspace
-/// (config + test-cases/ + docs/criteria/ + .spectra/). Composes the same
-/// production services <c>GenerateHandler.ExecuteFromDescriptionAsync</c> composes —
-/// <see cref="UserDescribedGenerator"/> → <see cref="TestPersistenceService"/> →
-/// real <see cref="StartExecutionRunTool"/>/<see cref="FindTestCasesTool"/> reading
-/// the on-disk index — so a single test can cross the CLI↔MCP seam offline.
+/// Spec 052/059: a temporary project directory wired like a real Spectra workspace
+/// (config + test-cases/ + docs/criteria/ + .spectra/). Composes the same production
+/// persistence the seam's <c>ingest-tests</c> uses — <see cref="TestPersistenceService"/> →
+/// real <see cref="StartExecutionRunTool"/>/<see cref="FindTestCasesTool"/> reading the on-disk
+/// index — so a single test can cross the CLI↔MCP seam offline. (Spec 059 removed the in-process
+/// generator; generation now runs in-session, so these tests persist the produced test directly
+/// rather than driving a hermetic in-process agent.)
 /// </summary>
 public sealed class IntegrationWorkspace : IAsyncDisposable
 {
@@ -56,35 +57,11 @@ public sealed class IntegrationWorkspace : IAsyncDisposable
         await File.WriteAllTextAsync(Path.Combine(CriteriaDir, $"{suite}.criteria.yaml"), sb.ToString());
     }
 
-    /// <summary>Loads suite-relevant criteria context exactly as the generate flow does (047/048).</summary>
+    /// <summary>Loads suite-relevant criteria context via the relocated loader the seam uses (Spec 059).</summary>
     public async Task<(string? Context, int SuiteMatchedCount)> LoadCriteriaAsync(string suite)
     {
-        var result = await GenerateHandler.LoadCriteriaContextAsync(Root, suite, Config, CancellationToken.None);
+        var result = await CriteriaContextLoader.LoadCriteriaContextAsync(Root, suite, Config, CancellationToken.None);
         return (result.Context, result.SuiteMatchedCount);
-    }
-
-    /// <summary>
-    /// Drives the real <see cref="UserDescribedGenerator"/> with a hermetic agent and the
-    /// supplied criteria context (050). Returns both the generated test and the fake so the
-    /// test can assert the criteria were forwarded.
-    /// </summary>
-    public async Task<(TestCase? Test, FakeAgentRuntime Agent)> GenerateFromDescriptionAsync(
-        string suite, TestCase produced, string? criteriaContext)
-    {
-        var fake = new FakeAgentRuntime(() => produced);
-        var test = await new UserDescribedGenerator().GenerateAsync(
-            description: produced.Title,
-            context: null,
-            suite: suite,
-            existingIds: Array.Empty<string>(),
-            config: Config,
-            currentDir: Root,
-            testsPath: TestsPath,
-            onStatus: null,
-            ct: CancellationToken.None,
-            criteriaContext: criteriaContext,
-            agentFactory: fake.CreateAsync);
-        return (test, fake);
     }
 
     /// <summary>Persists tests + regenerates the suite index via the production service (049).</summary>

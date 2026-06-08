@@ -68,7 +68,7 @@ Do NOT re-run `docs index` automatically and do NOT prompt the user before conti
 
 ## List doc-suites (Spec 040 / 1.51.0+)
 
-When the user asks "what suites are available?" or "list doc suites", or you need to resolve a `--doc-suite` argument before running `spectra ai generate`:
+When the user asks "what suites are available?" or "list doc suites", or you need to resolve a `--doc-suite` argument before running `spectra ai compile-analysis-prompt`:
 
 **Step 1** — Run with the Bash tool:
 ```
