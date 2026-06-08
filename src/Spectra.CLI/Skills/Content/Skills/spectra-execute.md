@@ -1,21 +1,28 @@
 ---
 name: spectra-execute
-description: Run manual test cases interactively from the CLI via `spectra run` — present a test, wait for the human's verdict, then advance. No MCP server required.
+description: Orchestrate a manual test run from the CLI — select tests, start the run, launch the local web console, and stay on-call. The tester records verdicts in the browser console; you never drive a per-test loop in chat. No MCP server required.
 tools: [{{READONLY_TOOLS}}, Bash]
 ---
 
 # SPECTRA Execute SKILL
 
-You drive manual test execution through the `spectra run` CLI (one tool, no MCP server, no MCP
-config). Run commands with the Bash tool. The engine is the authoritative state machine — you only
-present tests and record the human's explicit verdict.
+You **orchestrate** manual test execution through the `spectra run` CLI (one tool, no MCP server, no MCP
+config). Run commands with the Bash tool. You do **not** present tests one-by-one or collect verdicts in
+chat — the **execution console** (a local web page) presents each test and records the human's verdict
+via PASS / FAIL / BLOCKED buttons. Your job is: select → start → launch the console → hand over the URL →
+be on-call.
 
-## Iron rules (human-in-the-loop)
+## Verdict discipline is a console guarantee
 
-- **Present ONE test at a time. WAIT for the human's verdict before advancing.**
-- **NEVER auto-advance.** Never call `spectra run advance` until the human has given a result.
-- **NEVER fabricate a result or a failure note.** For fail/blocked/skip, ask the human and use their exact words.
-- **NEVER use dialog/popup tools.** Plain text only, so the user can paste screenshots.
+The console is the **only** verdict channel, and it enforces the discipline mechanically: it requires an
+explicit verdict, requires a comment for FAIL/BLOCKED/SKIP, never auto-advances, and never infers a
+verdict. So you do **not** carry these rules as a chat loop:
+
+- **NEVER record a verdict in chat.** You never call an advance/record command on the user's behalf — the
+  human clicks it in the console.
+- **NEVER fabricate a result or a failure note.** If asked to "just mark them all passed," decline and
+  point to the console.
+- **NEVER use dialog/popup tools.** Plain text only.
 
 ## Workflow
 
@@ -28,48 +35,44 @@ spectra run list-suites --output-format json
 ```
 spectra run start {suite} --output-format json
 ```
-The result has `run_id` and the first test's `next_test.test_handle`.
+The result has `run_id` and the first test's `next_test`.
 
-**Step 3** — Show the current test's full details, then present it to the user:
+**Step 3** — Launch the local console and hand the tester the URL:
 ```
-spectra run show --output-format json
+spectra run console
 ```
-Present numbered steps, preconditions, and the expected result. End with: `Result? (pass/fail/blocked/skip)`.
+It prints `Console running at http://127.0.0.1:{port}/`. Reply with that URL and tell the tester to drive
+the run there — click PASS / FAIL / BLOCKED, add a comment, drop or paste a screenshot. The page advances
+itself; state lives in SQLite, so a refresh loses nothing. (If a console is already running, the command
+prints its existing URL — hand that over instead of launching a second one.)
 
-**Step 4** — WAIT for the human's verdict. Then record it:
-- pass → `spectra run advance --status pass --output-format json`
-- fail → ask "What went wrong?", wait, then `spectra run advance --status fail --notes "{their words}" --output-format json`
-- blocked → ask "What's blocking?", wait, then `spectra run advance --status blocked --notes "{their words}" --output-format json`
-- skip → ask "Why skip?", wait, then `spectra run skip --reason "{their words}" --output-format json`
+**Step 4** — Be on-call. When the tester switches to chat mid-run, read current state from the database
+(never from the console page):
+```
+spectra run status --output-format json
+```
+Use `spectra run show --output-format json` for the full current test. Answer step/expected-result
+questions from the test's source documentation — read the `source_refs` files with the Read tool (Grep/Glob
+to locate them). Keep answers brief; the tester is mid-run.
 
-The result's `next_test` is the next test. Loop back to Step 3 until `next_test` is null.
-
-**Step 5** — Finalize and show the report:
+**Step 5** — Finalize on request and show the report:
 ```
 spectra run finalize --output-format json
 ```
 Open the HTML report named in `reports.html` (under `.execution/reports/`). Offer to log bugs for failures.
 
-## Result mapping
-
-| User says | Command |
-|-----------|---------|
-| "passed", "yes", "p" | `spectra run advance --status pass` |
-| "failed", "bug", "f" | ask why → `spectra run advance --status fail --notes "..."` |
-| "blocked", "b" | ask what's blocking → `spectra run advance --status blocked --notes "..."` |
-| "skip", "N/A", "s" | ask why → `spectra run skip --reason "..."` |
-
 ## Screenshots (failure evidence)
 
-When the user pastes an image, attach it to the current test:
+Screenshots are attached in the **console** — the tester drops or pastes an image on the page and it is
+saved to the current test. Fallback only if the tester pastes into chat instead:
 ```
 spectra run screenshot-clipboard --output-format json
 ```
-Fallback if clipboard capture fails: `spectra run screenshot --file {path} --output-format json`.
 
 ## Other commands
 
-- Status / where am I: `spectra run status --output-format json`
+- Status / where am I (reads SQLite, session-free): `spectra run status --output-format json`
+- Stop the console: `spectra run console --stop`
 - Re-run a flaky test: `spectra run retest --test-id {id} --output-format json`
 - Pause / resume: `spectra run pause` / `spectra run resume`
 - Cancel: `spectra run cancel`
@@ -81,6 +84,6 @@ Fallback if clipboard capture fails: `spectra run screenshot --file {path} --out
 
 ## Refuse to do
 
-- Record a verdict the user did not give.
-- Advance past a test the user has not judged.
-- Invent failure/blocking/skip notes.
+- Record or advance a verdict in chat — the console is the verdict channel.
+- Invent a failure/blocking/skip note.
+- Read run state from the console page or URL instead of `spectra run status`.

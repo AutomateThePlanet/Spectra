@@ -3,13 +3,18 @@ using Spectra.CLI.Skills;
 namespace Spectra.CLI.Tests.Skills;
 
 /// <summary>
-/// Spec 057 — the single canonical execution agent is de-Copilot'd (no GPT-4o pin, no Copilot Spaces),
-/// resolves doc-lookup via native file reads, and preserves the human-verdict pause. Static contract
-/// checks on the bundled agent content (the basis for SC-002/SC-003/SC-006).
+/// Spec 067 — the execution agent is rewritten from loop-driver to **orchestrator + on-call**: it
+/// selects tests, starts the run, launches <c>spectra run console</c>, hands over the URL, and answers
+/// on-call questions by reading <c>spectra run status</c> (SQLite) + source docs. It no longer presents
+/// tests or collects verdicts in chat. Spec 057's de-Copilot'd doc-lookup contract is preserved; the
+/// verdict discipline is restated as a console guarantee (FR-002/FR-003/FR-004/FR-006). Static contract
+/// checks on the bundled agent content.
 /// </summary>
 public sealed class ExecutionAgentPortTests
 {
     private static string Agent() => AgentContent.ExecutionAgent;
+
+    // ---------- preserved from spec 057 (no Copilot-isms, native doc lookup) ----------
 
     [Theory]
     [InlineData("model: GPT-4o")]
@@ -30,53 +35,85 @@ public sealed class ExecutionAgentPortTests
     public void ExecutionAgent_DocLookup_IsNativeFileRead()
     {
         var agent = Agent();
-        // The Copilot Spaces section is replaced by a read-the-source-docs section.
         Assert.Contains("source_refs", agent);
         Assert.Contains("Read", agent);
         Assert.Contains("Documentation lookup", agent);
         Assert.DoesNotContain("Copilot Spaces", agent);
     }
 
+    // ---------- orchestrate-not-drive (FR-002 / FR-003 / SC-001) ----------
+
     [Fact]
-    public void ExecutionAgent_DrivesSpectraRunCli()
+    public void ExecutionAgent_Orchestrates_StartLaunchConsole()
     {
-        // Spec 065: the agent's default loop drives the `spectra run` CLI (one tool, no MCP config),
-        // not raw MCP tool calls. MCP remains an optional networked path mentioned in prose.
         var agent = Agent();
         Assert.Contains("spectra run start", agent);
-        Assert.Contains("spectra run show", agent);
-        Assert.Contains("spectra run advance", agent);
+        Assert.Contains("spectra run console", agent);
         Assert.Contains("spectra run finalize", agent);
-        // Screenshot capture via the CLI (local host).
-        Assert.Contains("spectra run screenshot-clipboard", agent);
-        Assert.Contains("spectra run screenshot", agent);
     }
 
-    // ---------- verdict-pause guardrails (FR-004 / SC-006) ----------
+    [Fact]
+    public void ExecutionAgent_LaunchesConsole_HandsOverUrl()
+    {
+        // FR-003: after start, launch the console and hand the tester the local URL.
+        var agent = Agent();
+        Assert.Contains("spectra run console", agent);
+        Assert.Contains("http://127.0.0.1", agent);
+    }
+
+    [Fact]
+    public void ExecutionAgent_DoesNotDriveChatLoop()
+    {
+        // FR-001/FR-002: the per-test presentation + result-collection loop is gone (console owns it).
+        var agent = Agent();
+        Assert.DoesNotContain("Result Collection", agent);
+        Assert.DoesNotContain("ask BEFORE running the command", agent);
+        Assert.DoesNotContain("Result? (pass/fail/blocked/skip)", agent);
+    }
+
+    // ---------- on-call state from the database (FR-006 / SC-004) ----------
+
+    [Fact]
+    public void ExecutionAgent_OnCall_ReadsStatusFromDb()
+    {
+        var agent = Agent();
+        Assert.Contains("spectra run status", agent);
+        Assert.Contains("never from the console page", agent);
+    }
+
+    // ---------- guardrail discipline as a console guarantee (FR-004 / SC-003) ----------
+
+    [Fact]
+    public void ExecutionAgent_StatesConsoleGuarantee()
+    {
+        var agent = Agent();
+        Assert.Contains("console", agent, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("verdict", agent, StringComparison.OrdinalIgnoreCase);
+        // The agent's only residual verdict rule: never record one in chat.
+        Assert.Contains("never record a verdict in chat", agent, StringComparison.OrdinalIgnoreCase);
+    }
 
     [Fact]
     public void ExecutionAgent_NeverFabricatesNotes()
     {
-        var agent = Agent();
-        Assert.Contains("NEVER fabricate", agent);
-        Assert.Contains("Never invent notes", agent);
-    }
-
-    [Fact]
-    public void ExecutionAgent_AsksBeforeRecording_NonPassOutcomes()
-    {
-        var agent = Agent();
-        // Spec 065: FAIL/BLOCKED/SKIP ask first and wait; BLOCKED uses `advance --status blocked`, not skip.
-        Assert.Contains("ask BEFORE running the command", agent);
-        Assert.Contains("BLOCKED uses `advance --status blocked`", agent);
+        Assert.Contains("NEVER fabricate", Agent());
     }
 
     [Fact]
     public void ExecutionAgent_UsesPlainText_NotDialogTools()
     {
-        // Spec 065: the dialog/popup ban is stated as plain-text-only.
         var agent = Agent();
-        Assert.Contains("plain text", agent);
+        Assert.Contains("plain text", agent, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("dialog/popup", agent);
+    }
+
+    // ---------- lifecycle retained (FR-002 / US4) ----------
+
+    [Fact]
+    public void ExecutionAgent_RetainsLifecycleControls()
+    {
+        var agent = Agent();
+        Assert.Contains("spectra run finalize", agent);
+        Assert.Contains("resume", agent, StringComparison.OrdinalIgnoreCase);
     }
 }

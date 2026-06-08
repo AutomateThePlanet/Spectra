@@ -83,6 +83,11 @@ my-project/
 
 `spectra init` also writes a `.claude/settings.json` with the tool allowlist Claude Code needs to drive SPECTRA. The allowlist content (including the MCP execution tools) is covered in the execution setup — see [Skills Integration](skills-integration.md) and the execution setup next step.
 
+> **Manual test runs:** ask the agent to run a suite and it starts the run, launches the local web
+> console (`spectra run console`), and hands you a `http://127.0.0.1:<port>/` URL. You record verdicts —
+> PASS / FAIL / BLOCKED, comment, screenshot — in the browser; the agent stays on-call. See
+> [CLI Reference](cli-reference.md) (`spectra run console`).
+
 > The test **execution** agent remains a GitHub Copilot agent under `.github/agents/` for now; its port to Claude Code is scheduled for a later spec.
 
 Use `spectra init --skip-skills` if you don't use Claude Code.
