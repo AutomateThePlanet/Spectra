@@ -527,7 +527,11 @@ is optional (a free port is auto-selected). This is a different deployment model
 Every subcommand honors the global `--output-format json|human` and `--verbosity`. Exit code is `0` on
 success and non-zero on error; a reconstruction failure surfaces as a distinct `RECONSTRUCTION_FAILED`
 outcome (never conflated with a benign "run not found"). The `spectra-execute` SKILL and the execution
-agent drive this loop with human-in-the-loop guardrails (present → wait for verdict → advance).
+agent **orchestrate** this run — select tests → `spectra run start` → launch `spectra run console` →
+hand over the local URL → stay on-call — rather than driving a per-test loop in chat. The tester records
+each verdict in the browser console, whose write-back endpoint enforces the human-in-the-loop guardrails
+(explicit verdict; comment required for fail/blocked/skip; no auto-advance; no inferred verdict). The
+agent reads current state on-call from `spectra run status` (SQLite), never from the console page.
 
 Handle resolution: when `<handle>`/`<run-id>` is omitted, the active run for the current user and its
 in-progress (or next-pending) test are auto-resolved — so the agent rarely needs to pass them explicitly.
