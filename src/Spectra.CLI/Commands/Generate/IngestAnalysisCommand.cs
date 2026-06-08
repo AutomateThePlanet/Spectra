@@ -129,7 +129,14 @@ public sealed class IngestAnalysisCommand : Command
                     recommended = result.RecommendedCount,
                     breakdown = result.Breakdown,
                     technique_breakdown = result.TechniqueBreakdown,
-                    documents_analyzed = result.DocumentsAnalyzed
+                    documents_analyzed = result.DocumentsAnalyzed,
+                    boundary_gaps = result.BoundaryGaps.Select(g => new
+                    {
+                        field = g.Field,
+                        kind = g.Kind,
+                        description = g.Description,
+                        source = g.Source
+                    })
                 }));
             }
             else
@@ -149,6 +156,16 @@ public sealed class IngestAnalysisCommand : Command
                     Console.Out.WriteLine("Techniques:");
                     foreach (var kvp in result.TechniqueBreakdown)
                         Console.Out.WriteLine($"  {kvp.Key}: {kvp.Value}");
+                }
+                // Spec 062: advisory boundary-coverage gaps — printed only when present (no noise).
+                if (result.BoundaryGaps.Count > 0)
+                {
+                    Console.Out.WriteLine("Boundary gaps:");
+                    foreach (var g in result.BoundaryGaps)
+                    {
+                        var src = string.IsNullOrWhiteSpace(g.Source) ? "" : $"  [{g.Source}]";
+                        Console.Out.WriteLine($"  {g.Kind} · {g.Field} — {g.Description}{src}");
+                    }
                 }
             }
             return ExitSuccess;

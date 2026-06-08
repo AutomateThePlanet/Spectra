@@ -91,6 +91,27 @@ Return ONLY a JSON object in this exact format (no other text):
 
 {"behaviors": [{"category": "boundary", "title": "Input field rejects 21 chars (max is 20)", "source": "docs/form.md", "technique": "BVA"}]}
 
+## BOUNDARY-COVERAGE GAPS
+
+Extending the Boundary Value Analysis above, also report **boundary-coverage gaps**: boundary/edge
+conditions the documentation or acceptance criteria *imply should be tested* — min/max, off-by-one,
+empty/null, overflow, timeout — that are **NOT** covered by the existing tests (see coverage context
+below, if present) and are **NOT** already addressed by a behavior you listed above.
+
+Emit them in a top-level `boundary_gaps` array, a sibling of `behaviors`. For each gap provide:
+- `field`: the field/parameter or behavior the boundary concerns (e.g. "username", "order total")
+- `kind`: the boundary kind — one of `min-max`, `off-by-one`, `empty-null`, `overflow`, `timeout`, `max-length`
+- `description`: the specific missing edge (e.g. "21-char input (max 20) is untested")
+- `source`: the document/criterion that implies the boundary (may be "" if inferred from combined context)
+
+Be CONSERVATIVE: report a gap ONLY where the source actually implies a boundary condition. If the
+documentation implies no boundary, or every implied boundary is already covered, return
+`"boundary_gaps": []`. Do NOT emit speculative "you might want to test X" suggestions.
+
+Full output shape with both arrays:
+
+{"behaviors": [{"category": "boundary", "title": "Input field rejects 21 chars (max is 20)", "source": "docs/form.md", "technique": "BVA"}], "boundary_gaps": [{"field": "username", "kind": "max-length", "description": "max length boundary (20) has no test", "source": "docs/form.md"}]}
+
 ## DISTRIBUTION GUIDELINES
 
 - Do NOT generate more than 40% of behaviors in any single category — push toward boundary, negative, and edge cases

@@ -1,3 +1,5 @@
+using Spectra.CLI.Agent.Analysis;
+
 namespace Spectra.CLI.Generation;
 
 /// <summary>
@@ -54,6 +56,14 @@ public sealed record AnalysisRecommendation
     /// <summary>Number of source documents the agent analyzed.</summary>
     public int DocumentsAnalyzed { get; private init; }
 
+    /// <summary>
+    /// Spec 062: boundary-coverage gaps surfaced by the analysis — edges the source implies should
+    /// be tested but that the planned/existing tests don't cover. Advisory and additive: it does
+    /// NOT affect <see cref="RecommendedCount"/> or any breakdown. Empty unless a well-formed
+    /// <c>boundary_gaps</c> array was present on a <see cref="AnalysisIngestOutcome.Recommendation"/>.
+    /// </summary>
+    public IReadOnlyList<BoundaryGap> BoundaryGaps { get; private init; } = [];
+
     /// <summary>Specific error(s) on a damage outcome; empty on success.</summary>
     public IReadOnlyList<string> Errors { get; private init; } = [];
 
@@ -65,14 +75,16 @@ public sealed record AnalysisRecommendation
         int alreadyCovered,
         IReadOnlyDictionary<string, int> breakdown,
         IReadOnlyDictionary<string, int> techniqueBreakdown,
-        int documentsAnalyzed) => new()
+        int documentsAnalyzed,
+        IReadOnlyList<BoundaryGap>? boundaryGaps = null) => new()
         {
             Outcome = AnalysisIngestOutcome.Recommendation,
             TotalBehaviors = totalBehaviors,
             AlreadyCovered = alreadyCovered,
             Breakdown = breakdown ?? new Dictionary<string, int>(),
             TechniqueBreakdown = techniqueBreakdown ?? new Dictionary<string, int>(),
-            DocumentsAnalyzed = documentsAnalyzed
+            DocumentsAnalyzed = documentsAnalyzed,
+            BoundaryGaps = boundaryGaps ?? []
         };
 
     /// <summary>Creates a fail-loud empty-response result with specific error(s).</summary>

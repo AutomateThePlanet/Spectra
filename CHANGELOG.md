@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — Claude Code migration (v2)
 
+### Added (Spec 062 — boundary-coverage gap detection)
+
+- **The analysis phase now surfaces boundary-coverage gaps.** Extending the existing ISTQB Boundary
+  Value Analysis reasoning, the `behavior-analysis` prompt instructs the in-session model to emit a
+  top-level `boundary_gaps` array — boundary/edge conditions the docs/criteria imply (min/max,
+  off-by-one, empty/null, overflow, timeout) that aren't covered by existing or planned tests. The
+  array rides alongside `behaviors` (mirroring `field_specs`).
+- **Carried in the typed result, validated fail-loud.** `AnalysisRecommendation` gains an additive
+  `BoundaryGaps` field; `ingest-analysis` emits it (JSON `boundary_gaps` + a human `Boundary gaps:`
+  section) alongside `technique_breakdown`. A malformed payload (not an array, or an element missing
+  `field`/`kind`/`description`) fails loud via the existing `ParseFailure` outcome → exit 6 with a
+  specific, index-attributed error — never silently dropped. A missing/empty section ingests cleanly
+  as no gaps (backward-compatible). Boundary gaps are **advisory**: they never change `recommended`,
+  the breakdowns, or generation's blocking behavior.
+- **Grounding/completeness split, deliberately.** Detection lives on the analysis seam (seam b), not
+  the grounding critic (seam a). The critic (`spectra-critic.agent.md`, `CriticPromptBuilder`,
+  `VerdictIngestor`) and all of `Spectra.Core` are **untouched** — a guard test asserts the verdict
+  vocabulary stays grounding-only (`grounded`/`partial`/`hallucinated`/`manual`). `grounding-verification`
+  docs updated to clarify the split.
+- `Spectra.Core` (558) and `Spectra.MCP` (381) test corpora unchanged and green; CLI corpus gains new
+  boundary-gap, ingest-command, and critic-unchanged guard tests.
+
 ### Changed (Spec 059 — generation-skill inversion + completion)
 
 - **Generation now runs in the interactive session, not in-process.** The `spectra-generate` skill

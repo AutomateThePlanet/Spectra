@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://spectra.dev/schemas/062/boundary-gaps.schema.json",
+  "title": "Boundary-coverage gaps (analysis phase)",
+  "description": "Top-level boundary_gaps array emitted by the in-session analysis alongside behaviors. Each element is an uncovered boundary condition implied by the source. Strict: a present-but-malformed payload fails ingest (exit 6); an absent key is treated as no gaps.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["field", "kind", "description"],
+    "additionalProperties": false,
+    "properties": {
+      "field": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The parameter/field or behavior the boundary concerns (e.g. 'username', 'order total')."
+      },
+      "kind": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Boundary kind. Expected vocabulary (not enforced as an enum): min-max, off-by-one, empty-null, overflow, timeout, max-length.",
+        "examples": ["min-max", "off-by-one", "empty-null", "overflow", "timeout", "max-length"]
+      },
+      "description": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Short description of the missing edge (e.g. '21-char input (max 20) is untested')."
+      },
+      "source": {
+        "type": "string",
+        "description": "Document/criterion that implies the boundary. Optional; empty string is valid (model may infer from combined context)."
+      }
+    }
+  }
+}
