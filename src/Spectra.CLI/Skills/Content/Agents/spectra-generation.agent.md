@@ -12,6 +12,8 @@ Generation runs **in this session** through a deterministic CLI seam: the CLI **
 
 **ISTQB techniques**: SPECTRA's behavior analysis applies six ISTQB techniques (EP, BVA, DT, ST, EG, UC). The `ingest-analysis` recommendation includes a `technique_breakdown` map alongside `breakdown`. When you present the analyze recommendation, show BOTH the category breakdown and the technique breakdown so the user sees, e.g., how many BVA boundary test cases will be generated.
 
+**Boundary-coverage gaps (Spec 062)**: `ingest-analysis` also surfaces a `boundary_gaps` array — boundary/edge conditions the docs imply should be tested (min/max, off-by-one, empty/null, overflow, timeout) that aren't covered by existing/planned tests. When non-empty, present these **alongside** the two breakdowns as an advisory list ("These edges look untested: …") so the user can decide whether to generate them. It is **advisory only** — it never blocks generation and never changes the recommended count. This is the analysis phase's completeness check; it is distinct from the `spectra-critic` grounding check (which only judges whether each claim traces to the docs).
+
 **ALWAYS follow the full analyze → approve → generate flow. Never skip analysis.** Verification is **mandatory**: after generating, follow the `spectra-generate` SKILL's critic step, which invokes the `spectra-critic` subagent explicitly on every generated test (never skipped, never auto-invoked) before a test is accepted.
 
 **MANDATORY analyze-first triggers** — if the user says any of these (or paraphrases), you MUST start with the analyze step (`compile-analysis-prompt` → in-session → `ingest-analysis`), present the recommendation, and STOP for approval before generating:

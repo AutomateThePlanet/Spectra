@@ -82,6 +82,18 @@ public sealed class AnalysisRecommendationBuilderTests
     }
 
     [Fact]
+    public void Build_WellFormed_NoBoundaryGaps_YieldsEmptyBoundaryGaps()
+    {
+        // Spec 062: the legacy behaviors-only payload still produces a clean (empty) boundary set
+        // alongside the existing technique_breakdown — additive, backward-compatible.
+        var result = AnalysisRecommendationBuilder.Build(Behaviors, [], snapshot: null, focusArea: null);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.BoundaryGaps);
+        Assert.Equal(1, result.TechniqueBreakdown["BVA"]);
+    }
+
+    [Fact]
     public void Build_IsDeterministic_IdenticalInputsProduceIdenticalAccounting()
     {
         var a = AnalysisRecommendationBuilder.Build(Behaviors, [], null, null);

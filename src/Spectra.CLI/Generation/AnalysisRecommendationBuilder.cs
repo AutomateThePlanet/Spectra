@@ -68,13 +68,104 @@ public static class AnalysisRecommendationBuilder
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Count();
 
+        // Spec 062: parse the optional top-level boundary_gaps array. Absent → empty (legacy-safe);
+        // present-but-malformed → fail loud with a specific, index-attributed error (never silently
+        // dropped). Boundary gaps are advisory: they do NOT influence any count above.
+        var (boundaryGaps, boundaryError) = ParseBoundaryGaps(agentContent);
+        if (boundaryError is not null)
+            return AnalysisRecommendation.ParseFail(boundaryError);
+
         return AnalysisRecommendation.Recommendation(
             totalBehaviors: behaviors.Count,
             alreadyCovered: coveredCount,
             breakdown: breakdown,
             techniqueBreakdown: techniqueBreakdown,
-            documentsAnalyzed: documentsAnalyzed);
+            documentsAnalyzed: documentsAnalyzed,
+            boundaryGaps: boundaryGaps);
     }
+
+    // ---- Boundary-gap parsing (Spec 062) — strict, fail-loud (contrast with the tolerant behaviors parse) ----
+
+    /// <summary>
+    /// Reads the optional top-level <c>boundary_gaps</c> array. Returns the parsed gaps and a null
+    /// error on success (absent key → empty list). Returns a non-null, specific error when the key
+    /// is present but malformed — not a JSON array, an element that isn't an object, or an element
+    /// missing a required field (<c>field</c>/<c>kind</c>/<c>description</c>). Unlike the behaviors
+    /// parse, this is deliberately strict: a dropped gap is an invisible false-negative, exactly the
+    /// failure this feature exists to prevent (FR-003).
+    /// </summary>
+    internal static (IReadOnlyList<BoundaryGap> Gaps, string? Error) ParseBoundaryGaps(string agentContent)
+    {
+        var empty = (IReadOnlyList<BoundaryGap>)[];
+        if (string.IsNullOrWhiteSpace(agentContent))
+            return (empty, null);
+
+        var json = ExtractJson(agentContent);
+        if (json is null)
+            return (empty, null);
+
+        JsonDocument doc;
+        try
+        {
+            doc = JsonDocument.Parse(json);
+        }
+        catch
+        {
+            // JSON not cleanly parseable at the top level (e.g. truncated response the behaviors
+            // tolerant-parser recovered). We can't reliably locate boundary_gaps — treat as absent
+            // rather than fabricate a malformed error.
+            return (empty, null);
+        }
+
+        using (doc)
+        {
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object ||
+                !root.TryGetProperty("boundary_gaps", out var gapsElement))
+            {
+                return (empty, null); // bare behaviors array or no key → no gaps.
+            }
+
+            if (gapsElement.ValueKind != JsonValueKind.Array)
+                return (empty, "boundary_gaps must be a JSON array.");
+
+            var gaps = new List<BoundaryGap>();
+            var index = 0;
+            foreach (var element in gapsElement.EnumerateArray())
+            {
+                if (element.ValueKind != JsonValueKind.Object)
+                    return (empty, $"boundary_gaps[{index}] must be an object.");
+
+                var field = ReadString(element, "field");
+                var kind = ReadString(element, "kind");
+                var description = ReadString(element, "description");
+                var source = ReadString(element, "source");
+
+                if (string.IsNullOrWhiteSpace(field))
+                    return (empty, $"boundary_gaps[{index}] is missing required field 'field'.");
+                if (string.IsNullOrWhiteSpace(kind))
+                    return (empty, $"boundary_gaps[{index}] is missing required field 'kind'.");
+                if (string.IsNullOrWhiteSpace(description))
+                    return (empty, $"boundary_gaps[{index}] is missing required field 'description'.");
+
+                gaps.Add(new BoundaryGap
+                {
+                    Field = field.Trim(),
+                    Kind = kind.Trim(),
+                    Description = description.Trim(),
+                    Source = source?.Trim() ?? ""
+                });
+                index++;
+            }
+
+            return (gaps, null);
+        }
+    }
+
+    private static string? ReadString(JsonElement obj, string name)
+        => obj.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String
+            ? v.GetString()
+            : null;
 
     // ---- Parse helpers (copied verbatim from BehaviorAnalyzer; self-contained, model-free) ----
 

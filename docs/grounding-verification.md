@@ -37,6 +37,30 @@ than silently passing:
   generation continues) but is recorded **distinctly** from a malformed response, so a failed
   critic and a bad critic response are never conflated.
 
+### Grounding vs. boundary/edge completeness — two distinct checks
+
+Grounding answers **"does each claim in a generated test trace back to the docs?"** It is a
+*retrospective, per-artifact* check, and it is **deliberately scoped to grounding only**: the critic
+judges what is in front of it and treats anything it wasn't given as `unverified`, never as a missing
+test. It does **not** ask whether the edges that *should* be tested are covered.
+
+That second question — **"are the boundary/edge conditions the docs imply actually covered?"** — is
+**completeness**, and it lives in the **analysis phase**, not the critic (Spec 062). When you run the
+analyze step, `ingest-analysis` reports **boundary-coverage gaps** (min/max, off-by-one, empty/null,
+overflow, timeout) implied by the docs/criteria but not covered by existing or planned tests, in a
+`boundary_gaps` array alongside the `technique_breakdown`. It is *proactive* (surface the gap so the
+edge case gets generated) and **advisory** — it never blocks generation and never changes the critic's
+verdict.
+
+Keeping these separate is intentional: folding completeness into the critic would erode its clean
+grounding-only contract. See the [generation/analysis flow](user-guide.md) for where boundary gaps
+surface in the analyze recommendation.
+
+| Concern | Where | Question | Timing |
+|---------|-------|----------|--------|
+| **Grounding** | `spectra-critic` subagent | Does each claim trace to the docs? | Retrospective (after generation) |
+| **Boundary/edge completeness** | Analysis phase (`ingest-analysis`) | Are the implied edges covered? | Proactive (before generation) |
+
 ## Verdicts
 
 | Verdict | Meaning | Action |
