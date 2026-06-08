@@ -70,7 +70,8 @@ public sealed class CoverageReportWriter
         var doc = report.DocumentationCoverage;
         sb.AppendLine("## Documentation Coverage");
         sb.AppendLine();
-        sb.AppendLine($"**{doc.Percentage:F1}%** — {doc.CoveredDocs} of {doc.TotalDocs} documents covered");
+        var excludedSuffix = doc.ExcludedDocs > 0 ? $" ({doc.ExcludedDocs} excluded)" : "";
+        sb.AppendLine($"**{doc.Percentage:F1}%** — {doc.CoveredDocs} of {doc.TotalDocs} documents covered{excludedSuffix}");
         sb.AppendLine();
 
         if (doc.UndocumentedTestCount > 0)
@@ -91,7 +92,7 @@ public sealed class CoverageReportWriter
             sb.AppendLine("|----------|-------|---------|");
             foreach (var detail in doc.Details)
             {
-                var status = detail.Covered ? "Yes" : "No";
+                var status = detail.Excluded ? "Excluded" : detail.Covered ? "Yes" : "No";
                 sb.AppendLine($"| {detail.Doc} | {detail.TestCount} | {status} |");
             }
             sb.AppendLine();
@@ -206,10 +207,11 @@ public sealed class CoverageReportWriter
         var doc = report.DocumentationCoverage;
         sb.AppendLine("DOCUMENTATION COVERAGE");
         sb.AppendLine(new string('-', 30));
-        sb.AppendLine($"  {doc.Percentage:F1}% — {doc.CoveredDocs}/{doc.TotalDocs} documents covered");
+        var excludedNote = doc.ExcludedDocs > 0 ? $" ({doc.ExcludedDocs} excluded)" : "";
+        sb.AppendLine($"  {doc.Percentage:F1}% — {doc.CoveredDocs}/{doc.TotalDocs} documents covered{excludedNote}");
         foreach (var detail in doc.Details)
         {
-            var mark = detail.Covered ? "+" : "-";
+            var mark = detail.Excluded ? "~" : detail.Covered ? "+" : "-";
             sb.AppendLine($"  [{mark}] {detail.Doc} ({detail.TestCount} tests)");
         }
         sb.AppendLine();

@@ -12,6 +12,7 @@ using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Coverage;
 using Spectra.Core.Parsing;
+using Spectra.Core.Source;
 using Spectre.Console;
 using LegacyModels = Spectra.Core.Models;
 
@@ -196,7 +197,8 @@ public sealed class AnalyzeHandler
             {
                 // Legacy doc-only coverage mode
                 return await RunLegacyCoverageAsync(
-                    documentMap, allTests, outputPath, format, ct);
+                    documentMap, allTests, config.Coverage.CoverageExcludePatterns,
+                    outputPath, format, ct);
             }
 
             // === Unified three-section coverage analysis ===
@@ -205,7 +207,8 @@ public sealed class AnalyzeHandler
 
             // 1. Documentation coverage
             var docAnalyzer = new DocumentationCoverageAnalyzer();
-            var docCoverage = docAnalyzer.Analyze(documentMap, allTests);
+            var docCoverage = docAnalyzer.Analyze(
+                documentMap, allTests, config.Coverage.CoverageExcludePatterns);
 
             progress.Update("analyzing-criteria", "Matching tests to acceptance criteria...");
 
@@ -1499,6 +1502,7 @@ public sealed class AnalyzeHandler
     private async Task<int> RunLegacyCoverageAsync(
         DocumentMap documentMap,
         List<TestCase> allTests,
+        IReadOnlyList<string> coverageExcludePatterns,
         string? outputPath,
         ReportFormat format,
         CancellationToken ct)
@@ -1506,6 +1510,11 @@ public sealed class AnalyzeHandler
         var suiteCoverages = new List<LegacyModels.SuiteCoverage>();
         var documentCoverages = new List<LegacyModels.DocumentCoverage>();
         var gaps = new List<LegacyModels.CoverageGap>();
+
+        // Spec 060: coverage-scoped exclusions drop docs from the denominator only.
+        var excludeMatcher = coverageExcludePatterns is { Count: > 0 }
+            ? new ExclusionPatternMatcher(coverageExcludePatterns)
+            : null;
 
         // Build suite coverages from allTests
         var bySuite = allTests.GroupBy(t =>
@@ -1536,17 +1545,25 @@ public sealed class AnalyzeHandler
                 .Where(t => t.SourceRefs.Contains(doc.Path))
                 .ToList();
 
-            var isCovered = testsForDoc.Count > 0;
+            // Spec 060: exclusion takes precedence over covered/uncovered.
+            string? excludedByPattern = null;
+            var isExcluded = excludeMatcher is not null
+                             && excludeMatcher.IsExcluded(doc.Path, out excludedByPattern);
+
+            var isCovered = !isExcluded && testsForDoc.Count > 0;
 
             documentCoverages.Add(new LegacyModels.DocumentCoverage
             {
                 Path = doc.Path,
                 IsCovered = isCovered,
                 TestCount = testsForDoc.Count,
-                TestIds = testsForDoc.Select(t => t.Id).ToList()
+                TestIds = testsForDoc.Select(t => t.Id).ToList(),
+                IsExcluded = isExcluded,
+                ExcludedByPattern = excludedByPattern
             });
 
-            if (!isCovered)
+            // Excluded docs are intentionally out of scope — no gap is generated.
+            if (!isCovered && !isExcluded)
             {
                 gaps.Add(new LegacyModels.CoverageGap
                 {
@@ -1558,13 +1575,16 @@ public sealed class AnalyzeHandler
             }
         }
 
+        var excludedCount = documentCoverages.Count(d => d.IsExcluded);
         var report = new LegacyModels.CoverageReport
         {
             GeneratedAt = DateTime.UtcNow,
-            TotalDocuments = documentMap.Documents.Count,
+            // Denominator excludes coverage-scoped exclusions (Spec 060).
+            TotalDocuments = documentMap.Documents.Count - excludedCount,
             TotalTests = allTests.Count,
             CoveredDocuments = documentCoverages.Count(d => d.IsCovered),
-            UncoveredDocuments = documentCoverages.Count(d => !d.IsCovered),
+            UncoveredDocuments = documentCoverages.Count(d => !d.IsCovered && !d.IsExcluded),
+            ExcludedDocuments = excludedCount,
             Suites = suiteCoverages,
             Documents = documentCoverages,
             Gaps = gaps.OrderByDescending(g => g.Severity).ToList()

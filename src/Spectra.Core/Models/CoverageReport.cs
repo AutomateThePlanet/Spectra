@@ -31,7 +31,16 @@ public sealed record CoverageReport
     public required int UncoveredDocuments { get; init; }
 
     /// <summary>
-    /// Overall coverage percentage (0-100).
+    /// Number of documents dropped from the coverage denominator by
+    /// <c>coverage.coverage_exclude_patterns</c> (Spec 060). Zero when no
+    /// coverage-scoped exclusions are configured. <see cref="TotalDocuments"/>
+    /// already excludes these.
+    /// </summary>
+    public int ExcludedDocuments { get; init; }
+
+    /// <summary>
+    /// Overall coverage percentage (0-100). Denominator is
+    /// <see cref="TotalDocuments"/>, which excludes coverage-scoped exclusions.
     /// </summary>
     public double CoveragePercentage =>
         TotalDocuments > 0 ? (double)CoveredDocuments / TotalDocuments * 100 : 0;
@@ -73,6 +82,16 @@ public sealed record DocumentCoverage
     public int TestCount { get; init; }
     public IReadOnlyList<string> TestIds { get; init; } = [];
     public IReadOnlyList<string> UncoveredSections { get; init; } = [];
+
+    /// <summary>
+    /// True when this document matched a <c>coverage.coverage_exclude_patterns</c>
+    /// glob (Spec 060). Excluded docs are out of the coverage denominator and do
+    /// not produce a <see cref="CoverageGap"/>.
+    /// </summary>
+    public bool IsExcluded { get; init; }
+
+    /// <summary>The first coverage-exclude glob that matched, or null.</summary>
+    public string? ExcludedByPattern { get; init; }
 }
 
 /// <summary>

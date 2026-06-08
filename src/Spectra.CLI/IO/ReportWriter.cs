@@ -72,6 +72,10 @@ public sealed class ReportWriter
         sb.AppendLine($"| Total Documents | {report.TotalDocuments} |");
         sb.AppendLine($"| Covered Documents | {report.CoveredDocuments} |");
         sb.AppendLine($"| Uncovered Documents | {report.UncoveredDocuments} |");
+        if (report.ExcludedDocuments > 0)
+        {
+            sb.AppendLine($"| Excluded Documents | {report.ExcludedDocuments} |");
+        }
         sb.AppendLine($"| Coverage | {report.CoveragePercentage:F1}% |");
         sb.AppendLine($"| Total Tests | {report.TotalTests} |");
         sb.AppendLine();
@@ -130,8 +134,8 @@ public sealed class ReportWriter
             }
         }
 
-        // Uncovered Documents
-        var uncovered = report.Documents.Where(d => !d.IsCovered).ToList();
+        // Uncovered Documents (excluded docs are intentionally out of scope, not "uncovered")
+        var uncovered = report.Documents.Where(d => !d.IsCovered && !d.IsExcluded).ToList();
         if (uncovered.Count > 0)
         {
             sb.AppendLine("## Uncovered Documents");
@@ -162,6 +166,10 @@ public sealed class ReportWriter
         sb.AppendLine($"  Total Documents:     {report.TotalDocuments}");
         sb.AppendLine($"  Covered Documents:   {report.CoveredDocuments}");
         sb.AppendLine($"  Uncovered Documents: {report.UncoveredDocuments}");
+        if (report.ExcludedDocuments > 0)
+        {
+            sb.AppendLine($"  Excluded Documents:  {report.ExcludedDocuments}");
+        }
         sb.AppendLine($"  Coverage:            {report.CoveragePercentage:F1}%");
         sb.AppendLine($"  Total Tests:         {report.TotalTests}");
         sb.AppendLine();

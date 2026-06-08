@@ -416,6 +416,7 @@ See [Coverage](coverage.md) for how these settings are used.
 | `criteria_import.normalize_rfc2119` | bool | `true` | Normalize RFC 2119 keywords (MUST, SHALL, SHOULD) in imported criteria |
 | `criteria_import.id_prefix` | string | `"AC"` | Prefix for auto-generated acceptance criteria IDs |
 | `analysis_exclude_patterns` | string[] | see below | **Spec 040** Glob patterns whose matched documents are still indexed and counted in coverage but whose suites are flagged `skip_analysis: true` and excluded from AI analyzer prompts by default. Pass `--include-archived` on `spectra ai generate` / `spectra ai analyze` / `spectra docs index` to override. The list **replaces** rather than merges with defaults — set to `[]` to disable all default exclusions. |
+| `coverage_exclude_patterns` | string[] | `[]` (empty) | **Spec 060** Glob patterns whose matched documents are dropped from the **documentation-coverage denominator only**. Excluded docs remain fully present in the document map for generation, analysis, and indexing, and are reported with a distinct `excluded` status. Defaults to empty (no implicit patterns) — unconfigured workspaces see unchanged coverage output. See [the three exclusion mechanisms](#the-three-exclusion-mechanisms) below. |
 | `max_suite_tokens` | int | `80000` | **Spec 040** Spillover threshold. When a single suite's `tokens_estimated` exceeds this, the indexer additionally writes per-doc files at `docs/_index/docs/{sanitized}.index.md` so finer-grained loading is possible (Spec 041 prep). |
 
 ### Default `analysis_exclude_patterns`
@@ -437,6 +438,33 @@ See [Coverage](coverage.md) for how these settings are used.
 ```
 
 Documents matching these patterns are still counted in coverage reports — the exclusion only removes them from analyzer-facing prompts. To opt a single document back in despite a pattern match, add `analyze: true` to its frontmatter (planned for a future release; see Spec 040 §3.6).
+
+### Example: `coverage_exclude_patterns`
+
+```json
+{
+  "coverage": {
+    "coverage_exclude_patterns": [
+      "docs/release-notes/**",
+      "**/SUMMARY.md"
+    ]
+  }
+}
+```
+
+Documents matching these patterns are dropped from the documentation-coverage **denominator** and reported with a distinct `excluded` status. They remain in the document map for generation, analysis, and indexing — only the coverage percentage ignores them. The default is empty (`[]`): with no patterns configured, coverage output is identical to before Spec 060.
+
+### The three exclusion mechanisms
+
+Spectra has **three** independent document-exclusion mechanisms. They are evaluated separately — matching a document under one has no effect on the others. Choose by the scope you want to affect:
+
+| Config key | Scope of effect | What it does | Default |
+|------------|-----------------|--------------|---------|
+| `source.exclude_patterns` | **Everything** | Total removal at discovery — the document never enters the document map. Invisible to generation, analysis, indexing, **and** coverage. | `["**/CHANGELOG.md"]` |
+| `coverage.analysis_exclude_patterns` | **Index / AI analysis** | The document is still indexed and **still counts in coverage**, but its suite is flagged `skip_analysis: true` and it is dropped from AI analyzer prompts. | `["**/Old/**", "**/old/**", "**/legacy/**", "**/archive/**", "**/release-notes/**", "**/CHANGELOG*", "**/SUMMARY.md"]` |
+| `coverage.coverage_exclude_patterns` | **Coverage % only** | The document is dropped from the documentation-coverage denominator and reported `excluded`. It remains in the map for generation, analysis, and indexing. | `[]` (empty) |
+
+> A document matched by `analysis_exclude_patterns` but **not** by `coverage_exclude_patterns` **still counts** against the coverage percentage. To stop a release-notes folder from dragging the coverage number down without removing it from generation/analysis, use `coverage_exclude_patterns`.
 
 ## `selections` — Saved Test Selections
 

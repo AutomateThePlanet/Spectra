@@ -1,14 +1,17 @@
 using Microsoft.Extensions.FileSystemGlobbing;
 
-namespace Spectra.CLI.Source;
+namespace Spectra.Core.Source;
 
 /// <summary>
-/// Matches repo-relative document paths against the configured
-/// <c>coverage.analysis_exclude_patterns</c> globs (Spec 040 §3.6).
-/// Wraps <see cref="Microsoft.Extensions.FileSystemGlobbing.Matcher"/> for full
-/// glob semantics (<c>**</c>, <c>*</c>, brace expansion). Phase 5 replacement
-/// for the naive segment-matcher used in Phases 3–4.
+/// Matches repo-relative document paths against a configured set of exclusion
+/// globs. Wraps <see cref="Microsoft.Extensions.FileSystemGlobbing.Matcher"/> for
+/// full glob semantics (<c>**</c>, <c>*</c>, brace expansion).
 /// </summary>
+/// <remarks>
+/// Relocated from <c>Spectra.CLI.Source</c> to <c>Spectra.Core.Source</c> (Spec 060)
+/// so the Core-resident coverage analyzer can reuse it without a CLI→Core inversion.
+/// Behavior is unchanged from the original CLI implementation.
+/// </remarks>
 public sealed class ExclusionPatternMatcher
 {
     private readonly List<(string Pattern, Matcher Matcher)> _matchers;

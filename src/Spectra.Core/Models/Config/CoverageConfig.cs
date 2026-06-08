@@ -140,6 +140,31 @@ public sealed class CoverageConfig
     ];
 
     /// <summary>
+    /// Glob patterns whose matched documents are dropped from the
+    /// documentation-coverage <b>denominator only</b> (Spec 060). Excluded
+    /// documents remain fully present in the document map for generation,
+    /// analysis, and indexing — only the coverage percentage ignores them, and
+    /// they are reported with a distinct "excluded" status.
+    /// </summary>
+    /// <remarks>
+    /// This is the THIRD, coverage-scoped exclusion mechanism and is distinct
+    /// from the other two:
+    /// <list type="bullet">
+    ///   <item><c>source.exclude_patterns</c> — total removal at discovery (the
+    ///   doc vanishes from the map for everything).</item>
+    ///   <item><c>coverage.analysis_exclude_patterns</c> (above) — the doc is
+    ///   still indexed but its suite is flagged <c>skip_analysis: true</c>;
+    ///   never affects the coverage percentage.</item>
+    ///   <item><c>coverage.coverage_exclude_patterns</c> (this) — drops the doc
+    ///   from the coverage denominator only.</item>
+    /// </list>
+    /// Defaults to EMPTY: no implicit patterns, so unconfigured workspaces see
+    /// identical coverage output to before this feature.
+    /// </remarks>
+    [JsonPropertyName("coverage_exclude_patterns")]
+    public IReadOnlyList<string> CoverageExcludePatterns { get; init; } = [];
+
+    /// <summary>
     /// Spillover threshold for per-doc index files (Spec 040 §3.7 Phase 5).
     /// When a single suite's <c>tokens_estimated</c> exceeds this value, the
     /// indexer additionally writes per-doc files under
