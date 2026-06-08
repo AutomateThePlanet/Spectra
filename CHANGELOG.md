@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — Claude Code migration (v2)
 
+### Fixed (execution identity stability)
+
+- **`UserIdentityResolver` now resolves a single, process-stable identity.** It previously shelled out
+  to `git config user.name` on every call with a per-instance cache, falling back to
+  `Environment.UserName` when that subprocess was slow, blocked, or failed to spawn. Because each
+  `spectra run` handler call builds a fresh `RunServices` (and a fresh resolver), and runs are
+  stored/looked-up by identity (`RunRepository.GetActiveRunByUserAsync`), a slow `git` spawn under load
+  could make `start` resolve the git name and a later `advance` fall back to the OS name — two
+  identities in one session — so the loop saw **"no active run."** The cache is now process-wide
+  (resolve once, reuse everywhere), the git timeout is handled without throwing, and a kill-on-timeout
+  guard was added. This also collapses thousands of redundant `git` spawns (which antivirus may
+  intercept) to one. Net effect: deterministic active-run resolution, and the run-loop/parity tests are
+  no longer flaky under parallel load. New `UserIdentityStabilityTests`.
+
 ### Added (Spec 063 — targeted test updates / inverted update seam)
 
 - **Doc-aware targeted update now exists.** Previously `spectra ai update` only *classified* tests
