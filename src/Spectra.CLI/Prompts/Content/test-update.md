@@ -1,76 +1,66 @@
 ---
 spectra_version: "1.0"
 template_id: test-update
-description: "How SPECTRA classifies and proposes updates for tests when documentation changes"
+description: "How SPECTRA edits an OUTDATED test in place when its source documentation or acceptance criteria changed (inverted update seam)"
 placeholders:
   - name: test_case
-    description: "Existing test case content"
-  - name: original_source
-    description: "Original source documentation at generation time"
+    description: "The existing OUTDATED test, serialized as a JSON object (the artifact to edit)"
   - name: current_source
-    description: "Current source documentation (may have changed)"
-  - name: criteria_changes
-    description: "Changed/new/removed acceptance criteria since last generation"
+    description: "Current source documentation the edit must reconcile the test against (may be empty)"
+  - name: acceptance_criteria
+    description: "Changed/current acceptance criteria the edited test should map to (may be empty)"
+  - name: profile_format
+    description: "JSON schema example for the output format"
 ---
 
-<!-- Pattern: Persona + Boundaries + Chain-of-thought -->
-<!-- Customize the classification thresholds and update strategy -->
+<!-- Pattern: Persona + Boundaries + Targeted edit + Structured output -->
+<!-- This template drives an EDIT, not a regeneration. The classifier already decided this test is OUTDATED. -->
 
-You are a test maintenance engineer. Determine if this test case is still
-valid after documentation and criteria changes. Propose minimal updates —
-do NOT rewrite from scratch. Do NOT change test IDs.
+You are a test maintenance engineer. You are given ONE existing test case that has
+been classified as OUTDATED because its source documentation or acceptance criteria
+changed. Your job is to **edit the affected parts of this test in place** so it
+matches the current documentation.
 
-### TEST CASE
+## EDIT — DO NOT REGENERATE
+
+1. **Edit, don't rewrite.** Change ONLY the parts of the test implicated by the
+   documentation/criteria change. Leave everything else exactly as it is.
+2. **Keep the id.** Return the SAME `id` as the existing test. Never invent a new id.
+3. **Preserve structure and manual content.** Do not restructure the test, retag it,
+   change its priority or component, or alter manual notes. Touch only the behavior,
+   steps, expected result, test data, scenario reference, and criteria links that the
+   change requires.
+4. If the change added a numeric boundary, a new equivalence class, or a new rule,
+   update the relevant steps/expected results to use the exact documented values.
+
+### EXISTING TEST (edit this)
+```json
 {{test_case}}
+```
 
-### ORIGINAL SOURCE (at generation time)
-{{original_source}}
-
-### CURRENT SOURCE (latest)
+{{#if current_source}}
+### CURRENT SOURCE (reconcile the test against this)
 {{current_source}}
-
-{{#if criteria_changes}}
-### CRITERIA CHANGES
-{{criteria_changes}}
 {{/if}}
 
-## Technique Completeness Check
+{{#if acceptance_criteria}}
+### ACCEPTANCE CRITERIA (map the edited test to these)
+{{acceptance_criteria}}
+{{/if}}
 
-Before classifying, assess whether the test applies appropriate ISTQB test
-design techniques to the current documentation:
+## OUTPUT FORMAT
 
-- If documentation added a NEW numeric range → flag OUTDATED if no BVA tests exist for that range
-- If documentation added NEW business rules with conditions → flag OUTDATED if no Decision Table coverage
-- If documentation added NEW workflow states → flag OUTDATED if no State Transition tests
-- If documentation changed boundary values (e.g., max changed from 100 to 200) → flag OUTDATED with specific boundary update needed
-- If the test uses generic values where boundaries are documented → propose update to use exact boundary values
+Your FINAL message must contain ONLY a JSON array with the SINGLE edited test case —
+no explanatory text before or after. The edited test MUST keep the original `id`.
 
-When proposing updates for OUTDATED tests:
-- Replace generic test values with boundary values from the current documentation
-- Add new steps for newly documented equivalence classes
-- Update expected results to match changed boundary conditions
+The JSON array must follow this exact schema:
 
-## Process
+```json
+{{profile_format}}
+```
 
-1. Compare original vs current source — what changed?
-2. Filter to changes that affect THIS test's behavior, preconditions, or assertions
-3. Classify:
-   - **UP_TO_DATE** — still valid, no changes needed
-   - **OUTDATED** — behavior changed, specify what needs updating
-   - **ORPHANED** — tested behavior no longer exists in docs
-   - **REDUNDANT** — another test covers this more completely
-4. For OUTDATED: propose specific, minimal changes (which steps, which assertions)
-
-## Output
-
-Return ONLY a JSON object:
-{
-  "classification": "UP_TO_DATE" | "OUTDATED" | "ORPHANED" | "REDUNDANT",
-  "reason": "Brief explanation",
-  "changes_detected": [
-    {"section": "Section Name", "type": "modified|added|removed", "impact": "Description"}
-  ],
-  "proposed_updates": [
-    {"target": "step 3", "current": "Current text", "proposed": "Updated text"}
-  ]
-}
+IMPORTANT:
+1. Return exactly ONE test object in the array — the edited version of the test above.
+2. Keep the original `id`. Keep `priority`, `component`, and `tags` unchanged.
+3. Edit only what the documentation/criteria change requires; leave untouched fields as-is.
+4. Your FINAL response must be ONLY the JSON array — no other text.

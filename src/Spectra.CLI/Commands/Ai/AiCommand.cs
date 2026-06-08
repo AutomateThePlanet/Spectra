@@ -35,6 +35,11 @@ public sealed class AiCommand : Command
         // behaviors in-session → ingest analysis recommendation, fail-loud on damage).
         AddCommand(new CompileAnalysisPromptCommand());
         AddCommand(new IngestAnalysisCommand());
+
+        // Spec 063: inverted update surface (compile update prompt → agent edits the OUTDATED test
+        // in-session → ingest update, fail-loud, preserving id and manual fields, drift-guarded).
+        AddCommand(new CompileUpdatePromptCommand());
+        AddCommand(new IngestUpdateCommand());
     }
 
     /// <summary>
