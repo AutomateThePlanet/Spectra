@@ -74,10 +74,8 @@ my-project/
 │       ├── spectra-init-profile/SKILL.md        # Configure profile via Claude Code
 │       ├── spectra-help/SKILL.md                # Help and command reference
 │       ├── spectra-criteria/SKILL.md            # Manage acceptance criteria
-│       └── spectra-docs/SKILL.md                # Index documentation via Claude Code
-├── .github/
-│   └── agents/
-│       └── spectra-execution.agent.md           # Test execution agent (MCP) — not yet ported to Claude Code
+│       ├── spectra-docs/SKILL.md                # Index documentation via Claude Code
+│       └── spectra-execution/SKILL.md           # Drive test execution via Claude Code (launches the run console)
 └── templates/bug-report.md                      # Bug report template
 ```
 
@@ -88,7 +86,8 @@ my-project/
 > PASS / FAIL / BLOCKED, comment, screenshot — in the browser; the agent stays on-call. See
 > [CLI Reference](cli-reference.md) (`spectra run console`).
 
-> The test **execution** agent remains a GitHub Copilot agent under `.github/agents/` for now; its port to Claude Code is scheduled for a later spec.
+> The test **execution** agent is a native Claude Code skill (`.claude/skills/spectra-execution/`); it
+> orchestrates the run and launches the web console rather than driving a per-test loop in chat.
 
 Use `spectra init --skip-skills` if you don't use Claude Code.
 

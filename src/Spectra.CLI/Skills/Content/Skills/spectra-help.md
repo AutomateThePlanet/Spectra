@@ -24,11 +24,16 @@ When the user asks for help, what they can do, or what commands are available, r
 
 ## Test Execution (SPECTRA Execution agent)
 
+The agent starts the run and launches a **local web console** (`spectra run console`) where you record
+each verdict in the browser — PASS / FAIL / BLOCKED, comment, screenshot. The agent stays on-call; it
+doesn't collect verdicts in chat.
+
 | What you want | What to type |
 |--------------|-------------|
 | Run a test suite | "run test cases for notification" |
 | Run high priority test cases | "run high priority test cases" |
 | Run smoke test cases | "run the smoke test cases" |
+| Open the run console | "open the execution console" |
 | Resume a paused run | "resume the last run" |
 | Check active runs | "what runs are active?" |
 | Cancel all runs | "cancel all runs" |

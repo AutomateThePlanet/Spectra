@@ -138,7 +138,11 @@ Classifies every test case in the suite as **UP_TO_DATE**, **OUTDATED**, **ORPHA
 > "Run the smoke test selection"
 > "Execute the checkout suite"
 
-Switch to the **SPECTRA Execution** agent for this workflow. The agent presents each test, you provide PASS/FAIL/SKIP/BLOCKED results, and an HTML report is generated at the end. Saved selections (like `smoke`) live in `spectra.config.json` and let you run a curated subset without naming individual test IDs.
+Switch to the **SPECTRA Execution** agent for this workflow. The agent orchestrates: it starts the run,
+launches the local web console, and hands you the URL — you record each PASS/FAIL/SKIP/BLOCKED verdict in
+the browser console (see [Driving a Run from the Web Console](#driving-a-run-from-the-web-console) below),
+and finalize generates an HTML report. Saved selections (like `smoke`) live in `spectra.config.json` and
+let you run a curated subset without naming individual test IDs.
 
 ### Prerequisite
 

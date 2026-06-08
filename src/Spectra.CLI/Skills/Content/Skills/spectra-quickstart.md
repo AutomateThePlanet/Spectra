@@ -297,33 +297,30 @@ Or:
 
 **What happens:**
 
-This uses the MCP execution server (a different agent — the SPECTRA Execution agent — handles it). The agent presents each test case to the user, the user marks it PASSED/FAILED/BLOCKED/SKIPPED, and a report is generated at the end.
+The SPECTRA Execution agent **orchestrates** the run: it selects the tests, starts the run, launches a
+local web console, and hands the user a `http://127.0.0.1:<port>/` URL. The user drives the run in the
+**browser console** — clicking PASS / FAIL / BLOCKED, adding a comment, dropping a screenshot — and the
+page advances itself. The agent does not present tests or collect verdicts in chat; it stays on-call to
+answer questions (reading current state from `spectra run status`) and finalizes on request. No MCP
+server is required.
 
 **Example conversation:**
 
 ```
 User: Run the checkout suite
-Bot:  Starting execution run for checkout (25 test cases).
-
-      Test 1/25: TC-201 — Verify valid credit card accepted
-      Priority: high | Component: checkout | Est: 5min
-
-      Steps:
-      1. Navigate to checkout page
-      2. Enter valid Visa card 4111-1111-1111-1111
-      3. Click Submit Payment
-
-      Expected: Payment processed, confirmation shown
-
-      Result? (pass/fail/skip/blocked)
-User: pass
-Bot:  OK TC-201 PASSED
-
-      Test 2/25: TC-202 — Verify expired card rejected
-      ...
+Bot:  Started run for checkout (25 test cases). Open the console to drive it:
+        http://127.0.0.1:7878/
+      Click PASS / FAIL / BLOCKED, add a comment, drop a screenshot. I'm on call if you
+      need a step explained — just ask here. Say "finalize" when you're done.
+User: (records verdicts in the browser; later, in chat) what does step 3 of the current test mean?
+Bot:  (reads `spectra run status`, then the test's source docs) Step 3 verifies that…
+User: finalize
+Bot:  Run finalized — report at .execution/reports/checkout-….html
 ```
 
-After completion the agent presents a report and opens the HTML report in a browser tab.
+The browser is a view + write-back caller; SQLite is the source of truth, so a refresh loses nothing. The
+verdict discipline (explicit verdict; comment required for FAIL/BLOCKED/SKIP; no auto-advance) is enforced
+by the console, not by the agent.
 
 ---
 
