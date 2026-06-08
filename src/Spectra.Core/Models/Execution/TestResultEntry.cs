@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Spectra.Core.Models;
 
 namespace Spectra.Core.Models.Execution;
 
@@ -63,4 +64,30 @@ public sealed record TestResultEntry
     [JsonPropertyName("screenshot_paths")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<string>? ScreenshotPaths { get; init; }
+
+    /// <summary>Test priority (sourced from the test case).</summary>
+    [JsonPropertyName("priority")]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Priority? Priority { get; init; }
+
+    /// <summary>Tags for categorization (sourced from the test case).</summary>
+    [JsonPropertyName("tags")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? Tags { get; init; }
+
+    /// <summary>Component under test (sourced from the test case).</summary>
+    [JsonPropertyName("component")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Component { get; init; }
+
+    /// <summary>Linked acceptance-criteria IDs (sourced from the test case).</summary>
+    [JsonPropertyName("criteria")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? Criteria { get; init; }
+
+    /// <summary>Source documentation references (sourced from the test case).</summary>
+    [JsonPropertyName("source_refs")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? SourceRefs { get; init; }
 }

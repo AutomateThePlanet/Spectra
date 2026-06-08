@@ -122,6 +122,11 @@ public sealed class ReportWriter
         sb.AppendLine($"**Started**: {report.StartedAt:yyyy-MM-dd HH:mm:ss} UTC");
         sb.AppendLine($"**Completed**: {report.CompletedAt:yyyy-MM-dd HH:mm:ss} UTC");
         sb.AppendLine($"**Duration**: {FormatRunDuration(report)}");
+        if (report.Timing is not null)
+        {
+            sb.AppendLine($"**Total Test Time**: {FormatDuration(report.Timing.TotalTestDurationMs)}");
+            sb.AppendLine($"**Avg per Test**: {FormatDuration(report.Timing.AverageTestDurationMs)}");
+        }
         sb.AppendLine();
 
         // Summary
@@ -164,6 +169,22 @@ public sealed class ReportWriter
                 sb.AppendLine($"### {test.TestId}: {test.Title}");
                 sb.AppendLine();
                 sb.AppendLine($"- **Duration**: {FormatDuration(test.DurationMs)}");
+                if (!string.IsNullOrEmpty(test.Component))
+                {
+                    sb.AppendLine($"- **Component**: {test.Component}");
+                }
+                if (test.Tags is { Count: > 0 })
+                {
+                    sb.AppendLine($"- **Tags**: {string.Join(", ", test.Tags)}");
+                }
+                if (test.Criteria is { Count: > 0 })
+                {
+                    sb.AppendLine($"- **Criteria**: {string.Join(", ", test.Criteria)}");
+                }
+                if (test.SourceRefs is { Count: > 0 })
+                {
+                    sb.AppendLine($"- **Source Docs**: {string.Join(", ", test.SourceRefs)}");
+                }
                 if (!string.IsNullOrEmpty(test.Notes))
                 {
                     sb.AppendLine($"- **Reason**: {test.Notes}");
@@ -225,13 +246,13 @@ public sealed class ReportWriter
         // All results table
         sb.AppendLine("## All Results");
         sb.AppendLine();
-        sb.AppendLine("| Test ID | Title | Status | Attempt | Duration |");
-        sb.AppendLine("|---------|-------|--------|---------|----------|");
+        sb.AppendLine("| Test ID | Title | Status | Priority | Attempt | Duration |");
+        sb.AppendLine("|---------|-------|--------|----------|---------|----------|");
         foreach (var test in report.Results)
         {
             var duration = FormatDuration(test.DurationMs);
             var status = GetStatusText(test.Status);
-            sb.AppendLine($"| {test.TestId} | {test.Title} | {status} | {test.Attempt} | {duration} |");
+            sb.AppendLine($"| {test.TestId} | {test.Title} | {status} | {PriorityText(test.Priority)} | {test.Attempt} | {duration} |");
         }
         sb.AppendLine();
 
@@ -255,6 +276,12 @@ public sealed class ReportWriter
             _ => status.ToString()
         };
     }
+
+    /// <summary>
+    /// Renders a test priority as text, or "-" when absent.
+    /// </summary>
+    private static string PriorityText(Core.Models.Priority? priority)
+        => priority?.ToString() ?? "-";
 
     /// <summary>
     /// Writes the HTML report with a light, professional design.
@@ -333,6 +360,7 @@ public sealed class ReportWriter
                     <td class=""test-id"">{Escape(t.TestId)}</td>
                     <td>{Escape(t.Title)}</td>
                     <td><span class=""status-badge {statusClass}"">{t.Status}</span></td>
+                    <td>{Escape(PriorityText(t.Priority))}</td>
                     <td>{FormatDuration(t.DurationMs)}</td>
                 </tr>";
             }
@@ -356,12 +384,13 @@ public sealed class ReportWriter
 
                 return $@"
                 <tr class=""{statusClass} expandable-row"">
-                    <td colspan=""4"">
+                    <td colspan=""5"">
                         <details class=""table-details"">
                             <summary>
                                 <span class=""test-id"">{Escape(t.TestId)}</span>
                                 <span class=""test-title-cell"">{Escape(t.Title)}</span>
                                 <span class=""status-badge {statusClass}"">{t.Status}</span>
+                                <span class=""priority-cell"">{Escape(PriorityText(t.Priority))}</span>
                                 <span class=""duration-cell"">{FormatDuration(t.DurationMs)}</span>
                             </summary>
                             {detailsContent}
@@ -607,7 +636,8 @@ public sealed class ReportWriter
         th {{ color: var(--color-text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; background: var(--color-bg); }}
         th:nth-child(1), td:nth-child(1) {{ width: 100px; }}
         th:nth-child(3), td:nth-child(3) {{ width: 100px; text-align: center; }}
-        th:nth-child(4), td:nth-child(4) {{ width: 80px; text-align: right; }}
+        th:nth-child(4), td:nth-child(4) {{ width: 90px; text-align: center; }}
+        th:nth-child(5), td:nth-child(5) {{ width: 80px; text-align: right; }}
         tr:hover {{ background: var(--color-primary-light); }}
         tr.failed {{ background: rgba(254, 226, 226, 0.3); }}
         tr.blocked {{ background: rgba(254, 243, 199, 0.3); }}
@@ -619,7 +649,7 @@ public sealed class ReportWriter
         .table-details summary {{
             padding: 0.875rem 1rem;
             display: grid;
-            grid-template-columns: 100px 1fr 100px 80px;
+            grid-template-columns: 100px 1fr 100px 90px 80px;
             gap: 1rem;
             align-items: center;
             cursor: pointer;
@@ -637,6 +667,7 @@ public sealed class ReportWriter
         .table-details[open] summary::before {{ transform: rotate(90deg); }}
         .table-details summary {{ position: relative; padding-left: 1.5rem; }}
         .test-title-cell {{ flex: 1; }}
+        .priority-cell {{ text-align: center; color: var(--color-text-muted); }}
         .duration-cell {{ text-align: right; color: var(--color-text-muted); }}
         .expanded-details {{
             padding: 1rem 1.5rem;
@@ -704,6 +735,8 @@ public sealed class ReportWriter
                 <div class=""meta-item""><strong>Run ID:</strong> {Escape(report.RunId.Length > 8 ? report.RunId[..8] + "..." : report.RunId)}</div>
                 <div class=""meta-item""><strong>Executed By:</strong> {Escape(report.ExecutedBy)}</div>
                 <div class=""meta-item""><strong>Duration:</strong> {FormatRunDuration(report)}</div>
+                {(report.Timing is null ? "" : $@"<div class=""meta-item""><strong>Total Test Time:</strong> {FormatDuration(report.Timing.TotalTestDurationMs)}</div>
+                <div class=""meta-item""><strong>Avg per Test:</strong> {FormatDuration(report.Timing.AverageTestDurationMs)}</div>")}
                 <div class=""meta-item""><strong>Completed:</strong> {report.CompletedAt:MMM dd, yyyy HH:mm}</div>
             </div>
         </header>
@@ -767,6 +800,7 @@ public sealed class ReportWriter
                             <th>Test ID</th>
                             <th>Title</th>
                             <th>Status</th>
+                            <th>Priority</th>
                             <th>Duration</th>
                         </tr>
                     </thead>
@@ -792,7 +826,12 @@ public sealed class ReportWriter
     /// </summary>
     private string RenderTestContent(TestResultEntry t, string reportsPath)
     {
-        var hasContent = !string.IsNullOrEmpty(t.Preconditions)
+        var hasContent = t.Priority.HasValue
+            || !string.IsNullOrEmpty(t.Component)
+            || t.Tags is { Count: > 0 }
+            || t.Criteria is { Count: > 0 }
+            || t.SourceRefs is { Count: > 0 }
+            || !string.IsNullOrEmpty(t.Preconditions)
             || t.Steps is { Count: > 0 }
             || !string.IsNullOrEmpty(t.ExpectedResult)
             || !string.IsNullOrEmpty(t.TestData)
@@ -802,6 +841,31 @@ public sealed class ReportWriter
 
         var sb = new StringBuilder();
         sb.Append("<div class=\"test-content\">");
+
+        if (t.Priority.HasValue)
+        {
+            sb.Append($"<div class=\"detail-row\"><strong>Priority:</strong> {Escape(t.Priority.Value.ToString())}</div>");
+        }
+
+        if (!string.IsNullOrEmpty(t.Component))
+        {
+            sb.Append($"<div class=\"detail-row\"><strong>Component:</strong> {Escape(t.Component)}</div>");
+        }
+
+        if (t.Tags is { Count: > 0 })
+        {
+            sb.Append($"<div class=\"detail-row\"><strong>Tags:</strong> {Escape(string.Join(", ", t.Tags))}</div>");
+        }
+
+        if (t.Criteria is { Count: > 0 })
+        {
+            sb.Append($"<div class=\"detail-row\"><strong>Criteria:</strong> {Escape(string.Join(", ", t.Criteria))}</div>");
+        }
+
+        if (t.SourceRefs is { Count: > 0 })
+        {
+            sb.Append($"<div class=\"detail-row\"><strong>Source Docs:</strong> {Escape(string.Join(", ", t.SourceRefs))}</div>");
+        }
 
         if (!string.IsNullOrEmpty(t.Preconditions))
         {

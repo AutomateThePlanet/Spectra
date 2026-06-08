@@ -49,7 +49,12 @@ public sealed class ReportGenerator
                     Steps = tc?.Steps is { Count: > 0 } ? tc.Steps : null,
                     ExpectedResult = tc?.ExpectedResult,
                     TestData = tc?.TestData,
-                    ScreenshotPaths = r.ScreenshotPaths
+                    ScreenshotPaths = r.ScreenshotPaths,
+                    Priority = tc?.Priority,
+                    Tags = tc?.Tags is { Count: > 0 } ? tc.Tags : null,
+                    Component = tc?.Component,
+                    Criteria = tc?.Criteria is { Count: > 0 } ? tc.Criteria : null,
+                    SourceRefs = tc?.SourceRefs is { Count: > 0 } ? tc.SourceRefs : null
                 };
             }).ToList();
 
@@ -64,7 +69,30 @@ public sealed class ReportGenerator
             Status = run.Status,
             Summary = summary,
             Results = entries,
-            Filters = run.Filters
+            Filters = run.Filters,
+            Timing = ComputeTiming(entries)
+        };
+    }
+
+    /// <summary>
+    /// Computes a run-level timing breakdown from the entries that recorded a duration.
+    /// Returns null when no entry has a duration.
+    /// </summary>
+    private static ReportTiming? ComputeTiming(IReadOnlyList<TestResultEntry> entries)
+    {
+        var durations = entries
+            .Where(e => e.DurationMs.HasValue)
+            .Select(e => e.DurationMs!.Value)
+            .ToList();
+
+        if (durations.Count == 0)
+            return null;
+
+        var total = durations.Sum();
+        return new ReportTiming
+        {
+            TotalTestDurationMs = total,
+            AverageTestDurationMs = (long)Math.Round((double)total / durations.Count)
         };
     }
 
