@@ -141,6 +141,15 @@ Report features:
 - Human-readable durations ("1h 23m 45s")
 - UTC-normalized timestamps
 - Expandable non-passing test cases with failure reasons
+- Per-test enrichment sourced from the test case: `priority`, `tags`, `component`, linked
+  acceptance-criteria IDs (`criteria`), and source-doc references (`source_refs`)
+- A run-level `timing` breakdown (`total_test_duration_ms`, `average_test_duration_ms`)
+
+All enrichment fields are **optional** — they appear in JSON for every test that has the data and are
+omitted entirely when absent. In Markdown/HTML, `priority` shows as a column in the "All Results"
+table for every test, while the list-valued fields render in each non-passing test's detail block
+(consistent with how steps/preconditions are shown). The additions are backward-compatible: older
+reports and JSON consumers (e.g. the dashboard) are unaffected.
 
 ## Example Execution Flow
 

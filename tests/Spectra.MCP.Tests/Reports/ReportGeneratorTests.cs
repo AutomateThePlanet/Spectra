@@ -215,6 +215,139 @@ public class ReportGeneratorTests
         Assert.Equal(0, report.Summary.Total);
     }
 
+    [Fact]
+    public void Generate_PopulatesPriorityTagsComponent_FromTestCases()
+    {
+        var run = CreateTestRun();
+        var results = new[] { CreateResult("TC-001", TestStatus.Passed) };
+        var testCases = new Dictionary<string, TestCase>
+        {
+            ["TC-001"] = CreateTestCase("TC-001", priority: Priority.High,
+                tags: ["smoke", "auth"], component: "Authentication")
+        };
+
+        var report = _generator.Generate(run, results, testTitles: null, testCases);
+
+        var entry = report.Results[0];
+        Assert.Equal(Priority.High, entry.Priority);
+        Assert.Equal(["smoke", "auth"], entry.Tags!);
+        Assert.Equal("Authentication", entry.Component);
+    }
+
+    [Fact]
+    public void Generate_PopulatesCriteriaAndSourceRefs_FromTestCases()
+    {
+        var run = CreateTestRun();
+        var results = new[] { CreateResult("TC-001", TestStatus.Failed) };
+        var testCases = new Dictionary<string, TestCase>
+        {
+            ["TC-001"] = CreateTestCase("TC-001",
+                criteria: ["AC-12", "AC-13"], sourceRefs: ["docs/auth/login.md"])
+        };
+
+        var report = _generator.Generate(run, results, testTitles: null, testCases);
+
+        var entry = report.Results[0];
+        Assert.Equal(["AC-12", "AC-13"], entry.Criteria!);
+        Assert.Equal(["docs/auth/login.md"], entry.SourceRefs!);
+    }
+
+    [Fact]
+    public void Generate_LeavesEnrichmentNull_WhenTestCaseAbsent()
+    {
+        var run = CreateTestRun();
+        var results = new[] { CreateResult("TC-001", TestStatus.Passed) };
+
+        // No testCases dictionary supplied.
+        var report = _generator.Generate(run, results);
+
+        var entry = report.Results[0];
+        Assert.Null(entry.Priority);
+        Assert.Null(entry.Tags);
+        Assert.Null(entry.Component);
+        Assert.Null(entry.Criteria);
+        Assert.Null(entry.SourceRefs);
+    }
+
+    [Fact]
+    public void Generate_NormalizesEmptyCollectionsToNull()
+    {
+        var run = CreateTestRun();
+        var results = new[] { CreateResult("TC-001", TestStatus.Passed) };
+        var testCases = new Dictionary<string, TestCase>
+        {
+            // Empty tags/criteria/sourceRefs (the CreateTestCase defaults).
+            ["TC-001"] = CreateTestCase("TC-001", priority: Priority.Low)
+        };
+
+        var report = _generator.Generate(run, results, testTitles: null, testCases);
+
+        var entry = report.Results[0];
+        Assert.Equal(Priority.Low, entry.Priority);
+        Assert.Null(entry.Tags);
+        Assert.Null(entry.Criteria);
+        Assert.Null(entry.SourceRefs);
+    }
+
+    [Fact]
+    public void Generate_ComputesTiming_FromDurations()
+    {
+        var run = CreateTestRun();
+        var now = DateTime.UtcNow;
+        var results = new[]
+        {
+            new TestResult
+            {
+                RunId = run.RunId, TestId = "TC-001", TestHandle = "h1",
+                Status = TestStatus.Passed, Attempt = 1,
+                StartedAt = now.AddSeconds(-4), CompletedAt = now
+            },
+            new TestResult
+            {
+                RunId = run.RunId, TestId = "TC-002", TestHandle = "h2",
+                Status = TestStatus.Passed, Attempt = 1,
+                StartedAt = now.AddSeconds(-6), CompletedAt = now
+            }
+        };
+
+        var report = _generator.Generate(run, results);
+
+        Assert.NotNull(report.Timing);
+        // ~4000ms + ~6000ms = ~10000ms total; ~5000ms average.
+        Assert.True(report.Timing!.TotalTestDurationMs >= 10000);
+        Assert.True(report.Timing.AverageTestDurationMs >= 5000);
+    }
+
+    [Fact]
+    public void Generate_TimingNull_WhenNoDurations()
+    {
+        var run = CreateTestRun();
+        var results = new[] { CreateResult("TC-001", TestStatus.Skipped) };
+
+        var report = _generator.Generate(run, results);
+
+        Assert.Null(report.Timing);
+    }
+
+    private static TestCase CreateTestCase(
+        string id,
+        Priority priority = Priority.Medium,
+        IReadOnlyList<string>? tags = null,
+        string? component = null,
+        IReadOnlyList<string>? criteria = null,
+        IReadOnlyList<string>? sourceRefs = null) => new()
+    {
+        Id = id,
+        FilePath = $"{id}.md",
+        Title = $"Title {id}",
+        ExpectedResult = "Expected",
+        Priority = priority,
+        Tags = tags ?? [],
+        Component = component,
+        Criteria = criteria ?? [],
+        SourceRefs = sourceRefs ?? []
+    };
+
     private static Run CreateTestRun() => new()
     {
         RunId = Guid.NewGuid().ToString(),

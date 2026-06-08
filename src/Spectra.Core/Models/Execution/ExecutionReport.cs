@@ -65,4 +65,9 @@ public sealed record ExecutionReport
     [JsonPropertyName("filters")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RunFilters? Filters { get; init; }
+
+    /// <summary>Run-level timing breakdown (omitted when no test recorded a duration).</summary>
+    [JsonPropertyName("timing")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ReportTiming? Timing { get; init; }
 }
