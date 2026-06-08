@@ -188,10 +188,11 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void AllSkills_WithCommands_IncludeNoInteractionFlag()
     {
-        // Spec 059: spectra-generate now drives the deterministic compile/ingest seam, whose
-        // commands are inherently non-interactive (stdin/args → stdout) and do not take
-        // --no-interaction. It is excluded from this legacy-convention check.
-        var skillsWithCommands = new[] { "spectra-update", "spectra-coverage", "spectra-dashboard",
+        // Spec 059/063: spectra-generate and spectra-update now drive the deterministic
+        // compile/ingest seam, whose commands are inherently non-interactive (stdin/args →
+        // stdout) and do not take --no-interaction. They are excluded from this legacy-convention
+        // check (their per-line flag conformance is not meaningful for seam commands).
+        var skillsWithCommands = new[] { "spectra-coverage", "spectra-dashboard",
             "spectra-validate", "spectra-criteria", "spectra-docs", "spectra-list", "spectra-init-profile" };
 
         foreach (var skillName in skillsWithCommands)
@@ -210,7 +211,9 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void AllSkills_WithCommands_IncludeOutputFormatJson()
     {
-        var skillsWithCommands = new[] { "spectra-generate", "spectra-update", "spectra-coverage", "spectra-dashboard",
+        // Spec 063: spectra-update excluded — its seam commands (compile-update-prompt /
+        // ingest-update) emit to stdout and do not all take --output-format (mirrors spectra-generate).
+        var skillsWithCommands = new[] { "spectra-coverage", "spectra-dashboard",
             "spectra-validate", "spectra-criteria", "spectra-docs", "spectra-list", "spectra-init-profile" };
 
         foreach (var skillName in skillsWithCommands)
@@ -228,7 +231,9 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void AllSkills_WithCommands_IncludeVerbosityQuiet()
     {
-        var skillsWithCommands = new[] { "spectra-update", "spectra-coverage", "spectra-dashboard",
+        // Spec 063: spectra-update excluded — its seam commands do not all take --verbosity
+        // (mirrors spectra-generate).
+        var skillsWithCommands = new[] { "spectra-coverage", "spectra-dashboard",
             "spectra-validate", "spectra-criteria", "spectra-docs", "spectra-list", "spectra-init-profile" };
 
         foreach (var skillName in skillsWithCommands)

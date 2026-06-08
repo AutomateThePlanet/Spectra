@@ -347,6 +347,39 @@ spectra ai update checkout --no-interaction   # CI mode
 | `--no-review` | | Skip interactive review |
 | `--dry-run` | | Preview without applying changes |
 
+`spectra ai update` is the **selector**: it classifies tests but does not rewrite them. The doc-aware targeted edit of an OUTDATED test runs in the interactive session via the `spectra-update` skill, over the deterministic update seam below.
+
+### `spectra ai compile-update-prompt`
+
+Compile a deterministic, model-free **edit** prompt for one OUTDATED test (the existing test + the changed source/criteria + "edit, don't regenerate; preserve id/structure/manual fields"). Emits to stdout; writes nothing.
+
+```bash
+spectra ai compile-update-prompt --suite checkout --test-id TC-104
+```
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--suite` | `-s` | Suite containing the test to update (required) |
+| `--test-id` | | Id of the OUTDATED test to compile an edit prompt for (required) |
+
+Exit codes: `0` prompt emitted · `4` refused (missing suite/test-id, test not found, or no changed source/criteria) · `1` config/I/O error.
+
+### `spectra ai ingest-update`
+
+Validate the edited test and persist it through the single write+index path — **without allocating a new id**. Deterministically protects invariants: id from the original, pre-existing `Manual` verdict/notes re-asserted, and a drift guard that fails loud on out-of-scope field changes.
+
+```bash
+spectra ai ingest-update checkout --test-id TC-104 --from .spectra/updated.json
+```
+
+| Option | Description |
+|--------|-------------|
+| `suite` (positional) | Suite the edited test belongs to (required) |
+| `--test-id` | Id of the original test being edited (required) |
+| `--from` | File with the edited-test JSON (omit to read stdin) |
+
+Exit codes: `0` persisted (id unchanged) · `5` content invalid or `DRIFT_DETECTED` · `6` schema invalid · `1` config/I/O error or original not found. On any non-zero exit nothing is persisted.
+
 ### `spectra ai analyze --coverage`
 
 Run unified coverage analysis across three dimensions.

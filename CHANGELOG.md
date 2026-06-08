@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — Claude Code migration (v2)
 
+### Added (Spec 063 — targeted test updates / inverted update seam)
+
+- **Doc-aware targeted update now exists.** Previously `spectra ai update` only *classified* tests
+  (UP_TO_DATE / OUTDATED / ORPHANED / REDUNDANT) and never rewrote OUTDATED ones against changed
+  docs; the skill's "rewrites affected test cases" claim was false. This spec adds the missing
+  update counterpart of the inverted compile→in-session→ingest seam.
+- **Two new CLI commands.** `spectra ai compile-update-prompt --suite <s> --test-id <id>` emits a
+  deterministic, model-free **edit** prompt (existing test + changed source/criteria + "edit, don't
+  regenerate; preserve id/structure/manual fields"); `spectra ai ingest-update <suite> --test-id
+  <id> [--from <file>]` is the fail-loud boundary that validates the edit and persists it through
+  the single `TestPersistenceService` write+index path.
+- **Invariants protected deterministically at ingest, never trusted to the model.** `ingest-update`
+  takes the **id from the original** (no new id allocated — an edit, not a create), re-asserts a
+  pre-existing **`Manual` verdict / grounding** (and all non-round-tripped fields) from the original,
+  and runs a **drift guard** that fails loud (`DRIFT_DETECTED`, exit 5) when the edit changes a
+  protected field not implicated by the doc change (priority, component, tags). New
+  `UpdatePromptCompiler`, `UpdatedTestIngestor` (+ `DriftReport`/`DriftEntry`); the generation
+  parse/validate pipeline is reused verbatim.
+- **`spectra-update` skill rewritten** to drive compile → in-session edit → ingest with bounded
+  fail-loud retry, replacing the false "the command rewrites for you" framing. `TestClassifier`
+  (selector) and `TestPersistenceService` (persist) reused unchanged. `usage.md` / `cli-reference.md`
+  corrected.
+
 ### Added (Spec 062 — boundary-coverage gap detection)
 
 - **The analysis phase now surfaces boundary-coverage gaps.** Extending the existing ISTQB Boundary

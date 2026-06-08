@@ -22,10 +22,12 @@ public class PromptTemplateMigrationTests
         Assert.NotNull(tg);
         Assert.Contains("TEST DESIGN TECHNIQUE RULES", tg);
 
-        // test-update: technique completeness check
+        // test-update (Spec 063): the template now drives an EDIT of an already-OUTDATED test —
+        // classification moved to the deterministic TestClassifier, so the old "Technique
+        // Completeness Check" classify section was replaced by edit-not-regenerate guidance.
         var tu = BuiltInTemplates.GetRawContent("test-update");
         Assert.NotNull(tu);
-        Assert.Contains("Technique Completeness Check", tu);
+        Assert.Contains("DO NOT REGENERATE", tu);
 
         // critic-verification: technique verification
         var cv = BuiltInTemplates.GetRawContent("critic-verification");
