@@ -12,8 +12,8 @@ public sealed class AiCommand : Command
 {
     public AiCommand() : base("ai", "AI-powered test generation and analysis commands")
     {
-        // Add subcommands
-        AddCommand(new GenerateCommand());
+        // Add subcommands. Spec 059 retired the in-process `ai generate` command — generation
+        // now runs entirely on the compile/ingest seam below, driven by the spectra-generate skill.
         AddCommand(new UpdateCommand());
         AddCommand(new AnalyzeCommand());
 
@@ -30,6 +30,11 @@ public sealed class AiCommand : Command
         // verifies → ingest verdict, fail-loud on damage).
         AddCommand(new CompileCriticPromptCommand());
         AddCommand(new IngestVerdictCommand());
+
+        // Spec 059: model-free analyze-first surface (compile analysis prompt → agent identifies
+        // behaviors in-session → ingest analysis recommendation, fail-loud on damage).
+        AddCommand(new CompileAnalysisPromptCommand());
+        AddCommand(new IngestAnalysisCommand());
     }
 
     /// <summary>

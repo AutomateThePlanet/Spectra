@@ -6,17 +6,24 @@ tools: [{{GENERATE_TOOLS}}]
 
 # SPECTRA Test Generation
 
-You generate test cases by running CLI commands. Follow the EXACT tool sequence below — no extra tool calls.
+You generate test cases **in this session** through a deterministic CLI seam. The CLI never calls a model — it **compiles a grounded prompt**, *you* perform the generative turn in your own context (reading the docs with your file tools), and the CLI **ingests** and validates what you produced. Every test is then verified by the mandatory `spectra-critic` subagent before it counts as accepted.
+
+The seam, for every flow:
+
+```
+compile (CLI, deterministic)  →  you generate in-session  →  ingest (CLI, fail-loud)  →  critic subagent (mandatory)
+```
+
+There is **no** `spectra ai generate` command anymore. Do not look for one. The commands you use are `spectra ai compile-prompt`, `compile-analysis-prompt`, `ingest-tests`, `ingest-analysis`, plus the critic's `compile-critic-prompt` / `ingest-verdict`.
 
 **ALWAYS follow the full analyze → approve → generate flow. Never skip the analysis step.**
 
 ## MANDATORY: Analyze first, every time
 
-If the user is asking you to **generate, create, add, write, or build test cases for an area, feature, module, suite, page, or topic** — you **MUST** start with the analysis step (`--analyze-only`), present the recommendation, and **STOP and wait for the user to approve** before generating anything.
+If the user is asking you to **generate, create, add, write, or build test cases for an area, feature, module, suite, page, or topic** — you **MUST** start with the analysis step, present the recommendation, and **STOP and wait for the user to approve** before generating anything.
 
 **These trigger phrases ALL require the analyze-first flow:**
 - "create test cases for {X}"
-- "generate test cases for {X}"
 - "generate test cases for {X}"
 - "add test cases to {X}"
 - "test the {X} module"
@@ -25,73 +32,81 @@ If the user is asking you to **generate, create, add, write, or build test cases
 - "write test cases for {X}"
 
 **Forbidden behaviors when the user names an area:**
-- Do NOT call `spectra ai generate` without `--analyze-only` on the first call.
-- Do NOT invent a `--count` value. There is no default — if the user didn't say a number, you DO NOT pass `--count` at all on the analyze call.
-- Do NOT skip Steps 1–4 below.
+- Do NOT generate tests before running the analysis step and getting approval.
+- Do NOT invent a `--count` value. There is no default — the analysis step recommends a number.
 - Do NOT ask the user how many test cases they want — the analyze step will recommend a number.
 
-The ONLY time you skip analysis is when the user describes a single concrete scenario (see "When the user wants to create a specific test case" further down).
-
-**CRITICAL: First open `.spectra-progress.html?nocache=1` — it auto-refreshes so the user can watch progress live. Then run the command with the Bash tool. While it runs, do NOTHING — don't poll the terminal, list directories, or read files; the progress page already shows live status. You ONLY read `.spectra-result.json` AFTER the command finishes.**
+The ONLY time you skip analysis is when the user describes a single concrete scenario (see "When the user wants to create a specific test case").
 
 ## CLI flags reference
 
-| Flag | Type | Description |
-|------|------|-------------|
-| `--suite {name}` | string | Target test suite (REQUIRED) — directory under `test-cases/` where new tests will land. |
-| `--doc-suite {id}` | string | **Spec 040 (1.51.2+)** Doc-suite ID from the manifest (`spectra docs list-suites`). Filters which documentation feeds the analyzer. **Required when `--suite` does not match a doc-suite ID** — otherwise the pre-flight budget check (default 96K tokens) will reject the run. |
-| `--count {n}` | int | Number of test cases to generate. NEVER invent a value — use ONLY a number the user explicitly stated, or the `recommended` field returned by the analyze step. |
-| `--focus {text}` | string | Focus area: "negative", "edge cases", "high priority security", etc. |
-| `--skip-critic` | bool | Skip grounding verification |
-| `--analyze-only` | bool | Only analyze, don't generate |
-| `--include-archived` | bool | **Spec 040** Include suites flagged `skip_analysis: true` (Old/, legacy/, archive/, release-notes/) in analyzer input |
-| `--dry-run` | bool | Preview without writing |
+| Command / flag | Description |
+|------|-------------|
+| `compile-analysis-prompt --suite {name}` | Emits the behavior-analysis prompt (deterministic). REQUIRED suite — directory under `test-cases/`. |
+| `compile-analysis-prompt --doc-suite {id}` | **Spec 040** Doc-suite ID from the manifest (`spectra docs list-suites`). Filters which documentation feeds the analyzer. **Required when `--suite` does not match a doc-suite ID** — otherwise the pre-flight budget check (default 96K tokens) refuses the run (exit 4). |
+| `compile-prompt --suite {name} --count {n}` | Emits the generation prompt for `{n}` tests (deterministic). NEVER invent `{n}` — use a number the user stated, or the `recommended` field from the analyze step. |
+| `compile-prompt --from-description "{text}"` | Single-test mode: emits a one-test prompt from a plain-language description. |
+| `--focus {text}` | Focus area: "negative", "edge cases", "high priority security", etc. Pass the SAME focus to analyze and generate. |
+| `--context {text}` | Extra context for `--from-description` (page, module, flow). |
+| `--include-archived` | **Spec 040** Include suites flagged `skip_analysis: true` in analyzer input. |
+| `ingest-tests {suite} --from {file}` | Validates and persists the tests you generated (fail-loud). Omit `--from` to read stdin. |
+| `ingest-analysis --suite {name} --from {file}` | Turns your behavior JSON into a recommendation (deterministic accounting). |
+
+**There is NO `--priority`, `--type`, or `--category` flag.** Use `--focus` for ALL filtering by type, priority, or category. Capture the user's FULL intent in `--focus`:
+- "generate 15 negative test cases" → `--focus "negative tests"` (count 15)
+- "generate high priority edge cases" → `--focus "high priority edge cases"`
+- "cover its acceptance criteria" → `--focus "acceptance criteria"`
 
 ### Pre-flight token-budget check (Spec 040, exit code 4)
 
-Before any AI call, Spectra estimates the analyzer prompt size against `ai.analysis.max_prompt_tokens` (default 96K). If the estimate exceeds the budget, the command exits with code 4 and an actionable message naming every candidate doc-suite + token cost. Two recovery paths:
+`compile-analysis-prompt` inlines documentation, so before emitting it estimates the prompt size against `ai.analysis.max_prompt_tokens` (default 96K). If the estimate exceeds the budget it exits with code 4 and an actionable message naming every candidate doc-suite + token cost. Two recovery paths:
 
-1. **Narrow with `--doc-suite {id}`** — re-run targeting one doc-suite that fits the budget. Run `spectra docs list-suites` to discover IDs.
-2. **Raise the budget** — bump `ai.analysis.max_prompt_tokens` in `spectra.config.json` (within the model's context-window capacity).
+1. **Narrow with `--doc-suite {id}`** — re-run targeting one doc-suite that fits. Run `spectra docs list-suites` to discover IDs.
+2. **Raise the budget** — bump `ai.analysis.max_prompt_tokens` in `spectra.config.json`.
 
-**There is NO `--priority`, `--type`, or `--category` flag.** Use `--focus` for ALL filtering by type, priority, or category. Capture the user's FULL intent in `--focus` — don't split or drop parts. Examples:
-- "generate 15 negative test cases" → `--focus "negative tests"` `--count 15`
-- "generate high priority edge cases" → `--focus "high priority edge cases"`
-- "generate security test cases only" → `--focus "security tests"`
-- "cover its acceptance criteria" → `--focus "acceptance criteria"`
-- "happy path tests covering acceptance criteria" → `--focus "happy path acceptance criteria"`
+---
 
-## When user asks to generate test cases:
+## Main generation flow (user names an area)
 
-**Determine focus**: Extract the user's full intent into a `--focus` value. Include ALL qualifiers (type + topic). If no focus, omit `--focus`.
+**Determine focus**: Extract the user's full intent into a `--focus` value (type + topic). If no focus, omit `--focus`.
 
 **Determine count for the LATER generate step**:
-- If the user said an explicit number ("generate 10 test cases", "give me 3"), use that.
-- Otherwise leave `count` blank for now — Step 4 will give you `analysis.recommended` to use in Step 5.
+- If the user said an explicit number, use that.
+- Otherwise leave count blank — the analyze step gives you `recommended` to use.
 - NEVER fall back to "5". There is no default.
 
-**Step 1**: Open `.spectra-progress.html?nocache=1` so the user can watch progress live.
+### Step 1 — Compile the analysis prompt
 
-**Step 2** — Run with the Bash tool (include `--focus` if user specified any filtering):
+Run with the Bash tool and capture stdout:
 ```
-spectra ai generate --suite {suite} --doc-suite {docSuite} --analyze-only [--focus "{focus}"] --no-interaction --output-format json
+spectra ai compile-analysis-prompt --suite {suite} --doc-suite {docSuite} [--focus "{focus}"] --output-format json
 ```
+- Exit 4 → the budget was exceeded (or no suite given). Show the message verbatim and follow a recovery path above. Do NOT proceed.
+- Exit 1 → tell the user the error.
+- Exit 0 → stdout is the compiled analysis prompt. Proceed.
 
-**Step 3** — Wait for the command to finish. Do NOTHING else until it completes.
+### Step 2 — Identify behaviors IN-SESSION
 
-**Step 4** — Read `.spectra-result.json` — check `status`:
-- `"failed"` → tell user the `error`.
-- `"analysis_failed"` → DO NOT show a recommendation. The recommended count is a fallback default, NOT a real analysis. Show the `message` field verbatim, and ask the user whether to bump `ai.analysis_timeout_minutes` in `spectra.config.json` and re-run, or proceed with the fallback count anyway. STOP and wait for the user to decide. Do NOT auto-proceed to generation.
-- `"analyzed"` → show this:
+Read the compiled prompt. It instructs you to identify the distinct testable behaviors in the named documentation, each tagged with a category and an ISTQB technique. Do that now, in this turn, using your file tools to read the referenced docs as needed. Produce a JSON array (or `{"behaviors":[…]}`) exactly as the prompt specifies. **Write that JSON to `.spectra/analysis.json`** with the Write tool.
 
-**{analysis.already_covered}** test cases already exist. I recommend generating **{analysis.recommended}** new test cases:
+### Step 3 — Ingest the analysis
 
-Category breakdown (read keys directly from `analysis.breakdown`, e.g. `happy_path`, `boundary`, `negative`, `edge_case`, `security`, `error_handling`, plus any custom categories):
+```
+spectra ai ingest-analysis --suite {suite} --from .spectra/analysis.json --output-format json
+```
+- Exit 5 (empty) or 6 (unparseable) → your behavior JSON was rejected. Re-read the compiled prompt, regenerate stricter JSON, and re-ingest. **Bounded: at most 2 attempts**, then STOP and report.
+- Exit 0 → the JSON holds the recommendation.
 
-- {category}: {count} (one bullet per non-zero entry in `analysis.breakdown`)
+### Step 4 — Present the recommendation and STOP
 
-ISTQB technique breakdown (read from `analysis.technique_breakdown` — keys are `BVA`, `EP`, `DT`, `ST`, `EG`, `UC`; show only non-zero entries; the section may be empty for legacy responses):
+From the `ingest-analysis` JSON show:
 
+**{already_covered}** test cases already exist. I recommend generating **{recommended}** new test cases:
+
+Category breakdown (one bullet per non-zero entry in `breakdown`, e.g. `happy_path`, `boundary`, `negative`, `edge_case`, `security`, `error_handling`):
+- {category}: {count}
+
+ISTQB technique breakdown (non-zero entries from `technique_breakdown` — keys `BVA`, `EP`, `DT`, `ST`, `EG`, `UC`):
 - BVA (Boundary Value Analysis): {count}
 - EP (Equivalence Partitioning): {count}
 - DT (Decision Table): {count}
@@ -101,48 +116,51 @@ ISTQB technique breakdown (read from `analysis.technique_breakdown` — keys are
 
 Shall I proceed?
 
-STOP. Wait for user.
+**STOP. Wait for user approval.** If `recommended` is 0, tell the user every identified behavior is already covered and do not generate.
 
 ---
 
-## After user approves:
+## After user approves
 
-**Step 5** — Run with the Bash tool (keep the SAME `--focus` from analysis). Pass `--skip-critic`: in-session verification is performed by the mandatory `spectra-critic` subagent step below, which is the single critic of record — not the in-process critic.
+### Step 5 — Compile the generation prompt
+
+Keep the SAME `--focus` from analysis. Use `{count}` = the user's explicit number or `recommended`.
 ```
-spectra ai generate --suite {suite} --doc-suite {docSuite} --count {count} [--focus "{focus}"] --skip-critic --no-interaction --output-format json
+spectra ai compile-prompt --suite {suite} --count {count} [--focus "{focus}"] --output-format json
 ```
+- Exit 4 → refuse-to-emit; the `missing_input`/`message` names what's missing (e.g. no acceptance criteria resolved). Show it and follow the guidance.
+- Exit 0 → stdout is the compiled generation prompt.
 
-**Step 6** — Wait for the command to finish. Do NOTHING else until it completes.
+### Step 6 — Generate the tests IN-SESSION
 
-**Step 7** — Read `.spectra-result.json` — check `status`:
-- `"failed"` → tell user the `error`.
-- `"completed"` → proceed to the MANDATORY critic verification below, then report. Collect `generation.files_created`.
-- If `token_usage` is present, include a one-line cost/usage summary from `token_usage.total.total_tokens` and `token_usage.cost_display` (e.g. "Token usage: **89K tokens** in {run_summary.duration_seconds}s. Cost: {token_usage.cost_display}"). Do NOT invent numbers if the field is absent.
-- **Notes surfacing (Spec 048)**: if `notes` is present and non-empty, render each entry verbatim as a short note after the results summary. Notes describe situations the user should know about (e.g. no acceptance criteria matched the suite) but are NOT failures — `status` will still be `completed`. Do NOT prompt or block on a note.
+Read the compiled prompt and generate the requested test cases now, in this turn. **You have file access — read the relevant documents under `docs/` so every test is grounded in real product behavior**; never invent generic patterns. When acceptance criteria appear in the prompt under "ACCEPTANCE CRITERIA — MANDATORY", every test MUST map at least one criterion ID in its `criteria` array. Your output must be ONLY the JSON array of test cases the prompt's schema describes. **Write that JSON array to `.spectra/generated.json`** with the Write tool.
+
+### Step 7 — Ingest (fail-loud)
+
+```
+spectra ai ingest-tests {suite} --from .spectra/generated.json --output-format json
+```
+- Exit 0 → `{ persisted, ids }`. The tests are written and the index updated. Proceed to the MANDATORY critic step.
+- Exit 5 (`EMPTY_CONTENT`/`MALFORMED_JSON`/`TRUNCATED`/`NO_TESTS`) or exit 6 (`SCHEMA_INVALID`) → **fail loud, nothing was persisted.** Read the `error_code` + `errors`, regenerate addressing that *specific* error, rewrite `.spectra/generated.json`, and re-ingest. **Bounded: at most 2 attempts.** If it still fails, STOP and report the error; never present unverified tests as done.
+
+---
 
 ## MANDATORY: verify every generated test with the critic subagent
 
-Verification is **mandatory and explicit — never skipped, never auto-invoked**. Generation ran with
-`--skip-critic`, so the `spectra-critic` subagent (a fresh, isolated `context: fork`) is the single
-critic of record. A test is not accepted until its critic step has passed.
+Verification is **mandatory and explicit — never skipped, never auto-invoked**. The `ingest-tests` boundary only validates schema; the `spectra-critic` subagent (a fresh, isolated `context: fork`) is the single critic of record for grounding. A test is not accepted until its critic step has passed.
 
-For EACH file in `generation.files_created`:
+For EACH id in the `ingest-tests` `ids` list:
 
-**Step 8** — Invoke the `spectra-critic` subagent with the Task tool, passing only the test file path
-and its source docs (no generator state). It compiles the prompt
-(`spectra ai compile-critic-prompt`), renders a JSON verdict, and ingests it
-(`spectra ai ingest-verdict`). Act on the gate:
+### Step 8 — Invoke the `spectra-critic` subagent
+
+Invoke it with the Task tool, passing only the test file path and its source docs (no generator state). It compiles the prompt (`spectra ai compile-critic-prompt`), renders a JSON verdict in-session, and ingests it (`spectra ai ingest-verdict`). Act on the gate:
 - gate `pass` (verdict `grounded` / `partial`) → keep the test.
 - gate `drop` (verdict `hallucinated`) → remove it: `spectra delete {id} --force --no-interaction --output-format json --verbosity quiet`.
-- ingest exit `5` (empty), exit `6` (missing/unparseable `verdict`/`score` — **damage**), or compile
-  exit `4` (refused) → **fail loud**, NOT a pass. Regenerate that single test addressing the
-  *specific* error and re-verify. This is **bounded by the retry limit** (default 2 attempts) — if it
-  still fails at the limit, STOP and report the failing test and the specific error; never keep an
-  unverified test.
+- ingest exit `5` (empty), exit `6` (missing/unparseable `verdict`/`score` — **damage**), or compile exit `4` (refused) → **fail loud**, NOT a pass. Regenerate that single test addressing the *specific* error and re-verify. **Bounded by the retry limit (2 attempts).** If it still fails at the limit, STOP and report the failing test and the specific error; never keep an unverified test.
 
-**Step 9** — Report: "Generated **{kept}** verified test cases ({dropped} dropped as hallucinated,
-{failed} unresolved)." List the kept `files_created`. If kept < requested, say "Run again to
-generate more." Never present a test as accepted unless its critic step passed.
+### Step 9 — Report
+
+"Generated **{kept}** verified test cases ({dropped} dropped as hallucinated, {failed} unresolved)." List the kept ids. If kept < requested, say "Run again to generate more." Never present a test as accepted unless its critic step passed.
 
 ---
 
@@ -150,28 +168,34 @@ generate more." Never present a test as accepted unless its critic step passed.
 
 Use this flow when the user describes a concrete test scenario — a behavior they want captured as a test case. **Do NOT run analysis. Do NOT ask how many test cases to generate. This always produces exactly 1 test case.**
 
-**Step 1**: Open `.spectra-progress.html?nocache=1` so the user can watch progress live.
+### Step 1 — Compile the from-description prompt
 
-**Step 2** — Run with the Bash tool:
 ```
-spectra ai generate --suite {suite} --doc-suite {docSuite} --from-description "{description}" --context "{context}" --no-interaction --output-format json --verbosity quiet
+spectra ai compile-prompt --suite {suite} --from-description "{description}" [--context "{context}"] --output-format json
 ```
+- `{suite}` — target suite (ask only if not obvious from context).
+- `{description}` — the user's scenario, verbatim.
+- `{context}` — optional (page, module, flow); omit `--context` if not given.
+- Exit 0 → stdout is the single-test prompt (criteria are injected when the suite has matching ones — Spec 050).
 
-- `{suite}` — target suite name (ask the user only if not obvious from context)
-- `{description}` — the user's test scenario description (verbatim)
-- `{context}` — optional additional context (page, module, flow); omit `--context` if not given
+### Step 2 — Generate the one test IN-SESSION
 
-**Step 3** — Wait for the command to finish. While it runs, do NOTHING — don't poll the terminal, list directories, or read files; just wait for it to complete.
+Generate exactly one test case from the compiled prompt, reading any referenced docs with your file tools. Write the one-element JSON array to `.spectra/generated.json`.
 
-**Step 4** — Read `.spectra-result.json`.
+### Step 3 — Ingest (fail-loud)
 
-**Step 5** — Present the result. From the JSON, show:
-- Test ID and title (from `files_created` or `generation`)
-- Suite it was added to
-- Linked acceptance criteria, if any (from the test's `criteria` field). When the suite has matching criteria, the from-description flow injects them as the mandatory mapping instruction (Spec 050), so the test's `criteria` field is populated and the test counts toward acceptance-criteria coverage.
-- Grounding verdict (will be `manual` — from-description runs no critic, so the test is excluded from grounded statistics even when its `criteria` field is populated; populating criteria is not verification)
-- Any duplicate warnings
-- **Notes (Spec 048)**: if the JSON includes a `notes` array, render each entry verbatim as a short non-blocking note after the result. Notes are informational (e.g. "no acceptance criteria matched suite '{suite}'"); they do not signal failure.
+```
+spectra ai ingest-tests {suite} --from .spectra/generated.json --output-format json
+```
+Handle exit 5/6 with the same bounded regenerate-and-retry as the main flow.
+
+### Step 4 — Critic (mandatory)
+
+Run the **Step 8** critic flow above on the persisted test. From-description tests now get a real grounding verdict like every other flow (not `manual`).
+
+### Step 5 — Present the result
+
+From the ingest + critic output, show: test id and title; the suite; linked acceptance criteria (the test's `criteria` field — populated when the suite had matching criteria); the grounding verdict; any duplicate warnings; and any non-blocking notes.
 
 ---
 
@@ -179,28 +203,15 @@ spectra ai generate --suite {suite} --doc-suite {docSuite} --from-description "{
 
 | User intent | Signal | Flow |
 |-------------|--------|------|
-| Explore a feature area | "Generate test cases for...", "Test the... module", "Cover... error handling" | Main generation flow (with `--focus`) |
-| Create a specific test case | "Add a test case for...", "Create a test case where...", "I need a test case that verifies..." | From-description flow |
-| Generate from previous suggestions | "Generate from suggestions", "Use the previous suggestions" | `--from-suggestions` flow |
+| Explore a feature area | "Generate test cases for...", "Test the... module", "Cover... error handling" | Main generation flow (analyze → approve → generate, with `--focus`) |
+| Create a specific test case | "Add a test case for...", "Create a test case where...", "I need a test case that verifies..." | From-description flow (`compile-prompt --from-description`) |
 
-**Key rule**: If you can read the user's request as a single test case title, it's `--from-description`. If it's a topic to explore, it's `--focus`. Do NOT ask the user about count or scope to disambiguate — the topic-vs-scenario shape is the only signal you need.
+**Key rule**: If you can read the user's request as a single test case title, it's `--from-description`. If it's a topic to explore, it's the main flow. Do NOT ask the user about count or scope to disambiguate — the topic-vs-scenario shape is the only signal you need.
 
 ---
 
-## Cancel the current run
+## Notes
 
-If the user says "stop", "cancel", "kill it", "stop the analysis", "stop generating":
-
-**Step 1** — Run with the Bash tool:
-```
-spectra cancel --no-interaction --output-format json --verbosity quiet
-```
-
-**Step 2** — Wait for the command to finish, then Read `.spectra-result.json`.
-
-**Step 3** — Report what happened:
-- `status: completed` with `shutdown_path: cooperative` → "Cancelled at phase {phase}. Tests/files written before stopping are preserved."
-- `status: completed` with `shutdown_path: forced` → "Force-killed after grace window."
-- `status: no_active_run` → "Nothing was running."
-
-If the original command's progress page is still open, point the user at it — it now shows the "Cancelled" terminal phase.
+- The compile/ingest commands are fast and deterministic — the thinking time is *your* in-session generation, not a CLI model call. There is no long-running background command to watch.
+- Always write your generated JSON to a file under `.spectra/` and pass it with `--from`; this keeps large payloads off the shell.
+- Surface any non-blocking `notes` from ingest/critic output verbatim after the results summary (Spec 048). Notes are informational (e.g. "no acceptance criteria matched suite '{suite}'") — they do not signal failure.

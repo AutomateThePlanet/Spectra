@@ -1,5 +1,5 @@
 using Spectra.CLI.Agent.Analysis;
-using Spectra.CLI.Agent.Copilot;
+using Spectra.CLI.Generation;
 using Spectra.CLI.Prompts;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
@@ -21,7 +21,7 @@ public class BehaviorAnalyzerTests
             }
             """;
 
-        var result = BehaviorAnalyzer.ParseAnalysisResponse(json);
+        var result = AnalysisRecommendationBuilder.ParseAnalysisResponse(json);
 
         Assert.NotNull(result);
         Assert.Equal(3, result.Count);
@@ -42,7 +42,7 @@ public class BehaviorAnalyzerTests
             ```
             """;
 
-        var result = BehaviorAnalyzer.ParseAnalysisResponse(json);
+        var result = AnalysisRecommendationBuilder.ParseAnalysisResponse(json);
 
         Assert.NotNull(result);
         Assert.Single(result);
@@ -55,7 +55,7 @@ public class BehaviorAnalyzerTests
         // Use a clean JSON string without leading/trailing whitespace issues
         var json = "[{\"category\": \"security\", \"title\": \"Auth check\", \"source\": \"docs/sec.md\"}]";
 
-        var result = BehaviorAnalyzer.ParseAnalysisResponse(json);
+        var result = AnalysisRecommendationBuilder.ParseAnalysisResponse(json);
 
         Assert.NotNull(result);
         Assert.Single(result);
@@ -65,14 +65,14 @@ public class BehaviorAnalyzerTests
     [Fact]
     public void ParseAnalysisResponse_MalformedJson_ReturnsNull()
     {
-        var result = BehaviorAnalyzer.ParseAnalysisResponse("this is not json at all");
+        var result = AnalysisRecommendationBuilder.ParseAnalysisResponse("this is not json at all");
         Assert.Null(result);
     }
 
     [Fact]
     public void ParseAnalysisResponse_EmptyString_ReturnsNull()
     {
-        var result = BehaviorAnalyzer.ParseAnalysisResponse("");
+        var result = AnalysisRecommendationBuilder.ParseAnalysisResponse("");
         Assert.Null(result);
     }
 
@@ -80,7 +80,7 @@ public class BehaviorAnalyzerTests
     public void ParseAnalysisResponse_EmptyBehaviors_ReturnsEmptyList()
     {
         var json = """{"behaviors": []}""";
-        var result = BehaviorAnalyzer.ParseAnalysisResponse(json);
+        var result = AnalysisRecommendationBuilder.ParseAnalysisResponse(json);
         Assert.NotNull(result);
         Assert.Empty(result);
     }
@@ -95,7 +95,7 @@ public class BehaviorAnalyzerTests
             new() { Category = "edge_case", Title = "Edge case", Source = "a.md" }
         };
 
-        var result = BehaviorAnalyzer.FilterByFocus(behaviors, "negative scenarios");
+        var result = AnalysisRecommendationBuilder.FilterByFocus(behaviors, "negative scenarios");
 
         Assert.Single(result);
         Assert.Equal("negative", result[0].Category);
@@ -110,7 +110,7 @@ public class BehaviorAnalyzerTests
             new() { Category = "edge_case", Title = "Boundary", Source = "a.md" }
         };
 
-        var result = BehaviorAnalyzer.FilterByFocus(behaviors, "edge cases");
+        var result = AnalysisRecommendationBuilder.FilterByFocus(behaviors, "edge cases");
 
         Assert.Single(result);
         Assert.Equal("edge_case", result[0].Category);
@@ -125,7 +125,7 @@ public class BehaviorAnalyzerTests
             new() { Category = "security", Title = "Auth check", Source = "a.md" }
         };
 
-        var result = BehaviorAnalyzer.FilterByFocus(behaviors, "sec");
+        var result = AnalysisRecommendationBuilder.FilterByFocus(behaviors, "sec");
 
         Assert.Single(result);
         Assert.Equal("security", result[0].Category);
@@ -140,7 +140,7 @@ public class BehaviorAnalyzerTests
             new() { Category = "negative", Title = "Fails", Source = "a.md" }
         };
 
-        var result = BehaviorAnalyzer.FilterByFocus(behaviors, "NEGATIVE");
+        var result = AnalysisRecommendationBuilder.FilterByFocus(behaviors, "NEGATIVE");
 
         Assert.Single(result);
     }
@@ -154,7 +154,7 @@ public class BehaviorAnalyzerTests
             new() { Category = "negative", Title = "Fails", Source = "a.md" }
         };
 
-        var result = BehaviorAnalyzer.FilterByFocus(behaviors, "something unrelated");
+        var result = AnalysisRecommendationBuilder.FilterByFocus(behaviors, "something unrelated");
 
         Assert.Equal(2, result.Count);
     }
@@ -167,7 +167,7 @@ public class BehaviorAnalyzerTests
             new() { Category = "happy_path", Title = "Successful checkout", Source = "a.md" }
         };
 
-        var result = BehaviorAnalyzer.CountCoveredBehaviors(behaviors, []);
+        var result = AnalysisRecommendationBuilder.CountCoveredBehaviors(behaviors, []);
 
         Assert.Equal(0, result);
     }
@@ -194,7 +194,7 @@ public class BehaviorAnalyzerTests
             }
         };
 
-        var result = BehaviorAnalyzer.CountCoveredBehaviors(behaviors, existingTests);
+        var result = AnalysisRecommendationBuilder.CountCoveredBehaviors(behaviors, existingTests);
 
         // First behavior matches (similar title), second does not
         Assert.Equal(1, result);
@@ -214,7 +214,7 @@ public class BehaviorAnalyzerTests
             }
         };
 
-        var prompt = BehaviorAnalyzer.BuildAnalysisPrompt(docs, null);
+        var prompt = AnalysisPromptCompiler.BuildAnalysisPrompt(docs, null);
 
         Assert.Contains("Checkout Flow", prompt);
         Assert.Contains("checkout.md", prompt);
@@ -236,7 +236,7 @@ public class BehaviorAnalyzerTests
             }
         };
 
-        var prompt = BehaviorAnalyzer.BuildAnalysisPrompt(docs, "negative scenarios");
+        var prompt = AnalysisPromptCompiler.BuildAnalysisPrompt(docs, "negative scenarios");
 
         Assert.Contains("Focus area: negative scenarios", prompt);
     }
@@ -288,7 +288,7 @@ public class BehaviorAnalyzerTests
                 new() { Path = "docs/x.md", Title = "X", Content = "content", Sections = [] }
             };
 
-            var prompt = BehaviorAnalyzer.BuildAnalysisPrompt(docs, null, config: null, templateLoader: loader);
+            var prompt = AnalysisPromptCompiler.BuildAnalysisPrompt(docs, null, config: null, templateLoader: loader);
 
             Assert.Contains(sentinel, prompt);
         }
@@ -329,7 +329,7 @@ public class BehaviorAnalyzerTests
                 new() { Path = "docs/a11y.md", Title = "A11y", Content = "content", Sections = [] }
             };
 
-            var prompt = BehaviorAnalyzer.BuildAnalysisPrompt(docs, null, config, loader);
+            var prompt = AnalysisPromptCompiler.BuildAnalysisPrompt(docs, null, config, loader);
 
             Assert.Contains("keyboard_interaction", prompt);
             Assert.Contains("screen_reader_support", prompt);
@@ -350,7 +350,7 @@ public class BehaviorAnalyzerTests
             new() { Path = "docs/x.md", Title = "X", Content = "content", Sections = [] }
         };
 
-        var prompt = BehaviorAnalyzer.BuildAnalysisPrompt(docs, null, config: null, templateLoader: null);
+        var prompt = AnalysisPromptCompiler.BuildAnalysisPrompt(docs, null, config: null, templateLoader: null);
 
         // Spec 037: legacy fallback now contains the ISTQB-enhanced category set
         // (performance was dropped in favour of boundary + error_handling).
@@ -387,7 +387,7 @@ public class BehaviorAnalyzerTests
                 new() { Path = "docs/x.md", Title = "X", Content = "content", Sections = [] }
             };
 
-            var prompt = BehaviorAnalyzer.BuildAnalysisPrompt(docs, null, config, loader);
+            var prompt = AnalysisPromptCompiler.BuildAnalysisPrompt(docs, null, config, loader);
 
             // 6 Spec 030 defaults
             Assert.Contains("happy_path", prompt);
@@ -414,17 +414,17 @@ public class BehaviorAnalyzerTests
         };
 
         // Custom category: "keyboard" → matches "keyboard_interaction"
-        var result = BehaviorAnalyzer.FilterByFocus(behaviors, "keyboard");
+        var result = AnalysisRecommendationBuilder.FilterByFocus(behaviors, "keyboard");
         Assert.Single(result);
         Assert.Equal("keyboard_interaction", result[0].Category);
 
         // Legacy regression: "happy path" still matches happy_path
-        var result2 = BehaviorAnalyzer.FilterByFocus(behaviors, "happy path");
+        var result2 = AnalysisRecommendationBuilder.FilterByFocus(behaviors, "happy path");
         Assert.Single(result2);
         Assert.Equal("happy_path", result2[0].Category);
 
         // No-match fallback: returns all 3
-        var result3 = BehaviorAnalyzer.FilterByFocus(behaviors, "asdfqwerty");
+        var result3 = AnalysisRecommendationBuilder.FilterByFocus(behaviors, "asdfqwerty");
         Assert.Equal(3, result3.Count);
     }
 
@@ -433,7 +433,7 @@ public class BehaviorAnalyzerTests
     {
         var json = """{"behaviors":[{"category":"keyboard_interaction","title":"Tab navigation works","source":"docs/a11y.md"}]}""";
 
-        var result = BehaviorAnalyzer.ParseAnalysisResponse(json);
+        var result = AnalysisRecommendationBuilder.ParseAnalysisResponse(json);
 
         Assert.NotNull(result);
         Assert.Single(result);

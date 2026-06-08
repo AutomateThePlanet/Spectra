@@ -145,7 +145,7 @@ spectra docs list-suites
 spectra docs list-suites --output-format json
 ```
 
-Useful when the pre-flight token-budget check on `spectra ai generate` fails — the error message tells you to narrow with `--suite <id>`, and `list-suites` shows the available IDs and their token costs.
+Useful when the pre-flight token-budget check on `spectra ai compile-analysis-prompt` fails — the error message tells you to narrow with `--doc-suite <id>`, and `list-suites` shows the available IDs and their token costs.
 
 ---
 
@@ -282,106 +282,50 @@ spectra ai ingest-verdict --from ./verdict.json --output-format json
   specific error — **never** a silent `partial`/`0.5` soft pass. Empty input is `EmptyResponse`.
 - Exit codes: `0` verdict classified, `5` `EmptyResponse`, `6` `ParseFailure`, `1` env error.
 
-> **Note (Spec 058):** `spectra ai generate`'s batch verification now runs the critic as the
-> **spectra-critic subagent** — the generation skill invokes the `spectra-critic` `context: fork`
-> subagent after generation, using the compile/ingest surface above. It is no longer an in-process
-> model call. The retired critic `provider`, `api_key_env`, and `base_url` config keys are ignored
-> (`spectra validate` emits a non-blocking notice if present); `ai.critic.model` (default
-> `claude-sonnet-4-6`) is the only critic selector. The `ai.fallback_strategy` key is also retired.
-> The in-process test *generator* still uses `ai.providers` (full provider retirement is a future spec).
+> **Note (Spec 059):** there is no longer a `spectra ai generate` command. Generation runs **in your
+> interactive Claude Code session** via the `spectra-generate` skill, which drives the deterministic
+> model-free seam below: the CLI compiles a grounded prompt, Claude generates in-session, and the CLI
+> ingests/validates the result, with the `spectra-critic` subagent verifying every test. The retired
+> critic keys (`ai.critic.provider`/`api_key_env`/`base_url`, `ai.fallback_strategy`) are ignored with
+> a non-blocking `spectra validate` notice; `ai.critic.model` (default `claude-sonnet-4-6`) is the only
+> critic selector. `ai.providers` and the GitHub Copilot SDK are still used by the in-process
+> criteria-extraction path and Copilot auth (their retirement is a future spec).
 
-### `spectra ai generate`
+### Generation (in-session via the `spectra-generate` skill)
 
-Generate test cases from documentation using systematic ISTQB test design
-techniques (Equivalence Partitioning, Boundary Value Analysis, Decision
-Table, State Transition, Error Guessing, Use Case). The analysis output
-includes both a category breakdown (`happy_path`, `boundary`, `negative`, …)
-and a technique breakdown (`BVA`, `EP`, `DT`, `ST`, `EG`, `UC`) — see spec
-037. The analysis step is **coverage-aware** (spec 044): for existing suites,
-it considers test coverage from `_index.json`, acceptance criteria, and
-doc sections to recommend only gap tests. Supports multiple modes.
+Test generation is **skill-driven**, not a direct CLI command — ask Claude Code (e.g. *"generate test
+cases for the checkout suite"*) and the `spectra-generate` skill orchestrates the seam. The underlying
+model-free CLI commands (each deterministic, emitting a prompt to stdout or ingesting agent output, all
+supporting `--output-format json`) are:
 
-**Interactive Session** — four-phase guided session:
+| Command | Role |
+|---------|------|
+| `spectra ai compile-analysis-prompt --suite <s> [--doc-suite <id>] [--focus <text>]` | Emit the behavior-analysis prompt (analyze-first step). |
+| `spectra ai ingest-analysis --suite <s> [--from <file>]` | Turn the agent's behavior JSON into a recommendation (already-covered, recommended count, category + ISTQB technique breakdowns). |
+| `spectra ai compile-prompt --suite <s> --count <n> [--focus <text>]` | Emit the bulk generation prompt for `<n>` tests. |
+| `spectra ai compile-prompt --suite <s> --from-description "<text>" [--context <text>]` | Emit a single-test prompt from a plain-language description (count forced to 1; Spec 050 criteria injected). |
+| `spectra ai ingest-tests <suite> [--from <file>]` | Validate + persist the agent-generated tests (fail-loud: exit 5 content-invalid, 6 schema-invalid). |
+| `spectra ai compile-critic-prompt` / `spectra ai ingest-verdict` | The mandatory `spectra-critic` verification step (Spec 055). |
 
-```bash
-spectra ai generate
-```
+ISTQB techniques (EP, BVA, DT, ST, EG, UC) and coverage-aware analysis (Spec 044 — existing
+`_index.json` / criteria / doc sections inform the recommended gap count) are applied inside the
+analysis prompt. `--include-archived` includes `skip_analysis` suites in the analyzer input.
 
-Launches a generation session that flows through:
-1. **Phase 1 — Analysis**: Counts testable behaviors in documentation, shows breakdown by category
-2. **Phase 2 — Generation**: Creates test cases with AI verification (grounded/partial/hallucinated)
-3. **Phase 3 — Suggestions**: Proposes additional test cases for uncovered areas
-4. **Phase 4 — User-Described**: Create test cases from your own descriptions (skips critic, marked `verdict: manual`)
-5. Phases 3-4 loop until you choose "Done", then displays session summary
+**Doc-suite filtering & pre-flight budget check (Spec 040)** — `compile-analysis-prompt` inlines
+documentation, so pass `--doc-suite <id>` when the test-suite name doesn't match a doc-suite ID;
+otherwise it loads the full corpus and may exit `4` (estimated prompt exceeds
+`ai.analysis.max_prompt_tokens`, default 96,000) with an actionable message naming candidate suites +
+token costs. `spectra docs list-suites` shows available IDs and their token estimates. `compile-prompt`
+(generation) is criteria-grounded and not subject to the inlined-doc budget.
 
-**Direct Mode** — specify suite and options upfront:
+**Exit codes** — compile commands: `0` emitted, `4` refused (missing input or budget exceeded), `1`
+config/IO error. Ingest commands: `0` persisted/classified, `5` empty content, `6` schema/parse damage,
+`1` config/IO error. The skill drives a bounded regenerate-and-retry on `5`/`6`.
 
-```bash
-spectra ai generate checkout --count 10
-spectra ai generate checkout --focus "error handling"
-spectra ai generate checkout --skip-critic
-spectra ai generate checkout --count 5 --dry-run
-```
-
-**Session Commands** — work with previous session state:
-
-```bash
-spectra ai generate checkout --from-suggestions                     # Generate from last session's suggestions
-spectra ai generate checkout --from-suggestions 1,3                 # Generate specific suggestions by index
-spectra ai generate checkout --from-description "IBAN validation"   # Create test case from description
-spectra ai generate checkout --from-description "IBAN validation" --context "checkout page"
-spectra ai generate checkout --auto-complete --output-format json   # CI: all phases, no prompts
-```
-
-**SKILL/CI Mode** — structured JSON output:
-
-```bash
-spectra ai generate checkout --output-format json --verbosity quiet   # JSON for Copilot SKILL parsing
-spectra ai generate checkout --no-interaction --output-format json    # CI pipeline with exit codes
-```
-
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--count` | `-n` | Number of test cases to generate (default: AI-recommended count) |
-| `--focus` | `-f` | Focus area description for targeted generation |
-| `--skip-critic` | | Skip grounding verification (faster) |
-| `--from-suggestions` | | Generate from previous session's suggestions (optionally pass indices like `1,3`) |
-| `--from-description` | | Create a test case from a plain-language behavior description |
-| `--context` | | Additional context for `--from-description` |
-| `--auto-complete` | | Run all phases without prompts (analyze → generate → suggestions → finalize) |
-| `--dry-run` | | Preview without writing files |
-| `--include-archived` | | **Spec 040** Include suites flagged `skip_analysis: true` (Old/, legacy/, archive/, release-notes/) in analyzer input |
-
-**Spec 040: doc-suite filtering and pre-flight budget check.** When `--suite <id>` is passed, the analyzer loads ONLY the matching doc-suite's documents into its prompt (instead of the full corpus). On large projects this is the difference between a 200K-token overflow and a comfortable ~10K-token analysis call. If `<id>` doesn't match any doc-suite in the manifest, the command warns and falls back to no-filter behavior — still subject to the pre-flight budget check.
-
-**Pre-flight budget violation** — exit code `4`. When the estimated analyzer prompt exceeds `ai.analysis.max_prompt_tokens` (default 96,000), the command exits cleanly with this code and an actionable message naming every candidate suite + token cost + suggested narrowing flags. Replaces the raw `400 prompt token count exceeds the limit of 128000` from the model. To diagnose: `spectra docs list-suites` shows available doc-suites and their token estimates.
-
-**No-match note (Spec 048)**: when a generation run (batch or from-description) finds no acceptance criteria matching the target suite by component, source-doc, or file-name, the result's `notes` array carries a non-blocking note explaining that generated tests will not contribute to acceptance-criteria coverage. The note is present in the JSON regardless of console verbosity; only the human-facing console echo is suppressed under `--verbosity quiet`. The run still exits success.
-
-Session state is stored in `.spectra/session.json` and expires after 1 hour.
-
-**Live progress bars** (spec 041) — at default verbosity, long runs render two
-sequential Spectre.Console progress bars in the terminal: a `Generating test cases`
-bar that advances per batch, then a `Verifying test cases` bar that advances per
-critic call (showing the most recent test ID and verdict). The same data is
-mirrored to `.spectra-progress.html` via an in-flight `progress` object inside
-`.spectra-result.json`. Progress bars are automatically suppressed under
-`--output-format json`, `--verbosity quiet`, or non-interactive stdout (piped
-or redirected) so SKILL/CI output remains clean.
-
-User-described test cases are marked with `grounding.verdict: manual` and `source: user-described`.
-
-When a project has documentation in `docs/` and acceptance criteria in `docs/criteria/`, `--from-description` runs in **doc-aware mode**: it best-effort loads matching docs (capped at 3 docs × 8000 chars) and matching `.criteria.yaml` entries as formatting context, then populates the new test case's `source_refs` (with the doc paths used) and `criteria` fields (with any IDs the AI matches to your description). The grounding verdict stays `manual` — doc context is used for terminology and navigation alignment only, never for verification. If no docs or criteria exist, the flow is identical to the no-context behavior.
-
-Duplicate detection warns when a new test case has >80% title similarity to an existing test case.
-
-**Exit codes:** `0` = success, `1` = error, `3` = missing required args with `--no-interaction`, `4` = pre-flight token-budget exceeded (Spec 040 — narrow with `--suite` or raise `ai.analysis.max_prompt_tokens`).
-
-**Speeding up the critic phase** (Spec 043, v1.48.0+): on a large generate run, the critic verifies test cases one at a time and is typically the dominant cost (~6s/call × N tests). Set `ai.critic.max_concurrent: 5` (or higher, max 20) in `spectra.config.json` to run multiple critic calls in parallel — this typically cuts critic phase time to ~1/N of sequential without changing any output. The Run Summary panel shows the active `Critic concurrency` along with `Errors` and `Rate limits` counts. If you see `Rate limits > 0`, drop `max_concurrent` and re-run.
-
-**Troubleshooting failed runs** (Spec 043, v1.48.0+): when `debug.enabled: true`, every failed AI call (timeout, HTTP 429, parse error, MCP failure, generic exception) writes a full entry to `.spectra-errors.log` — exception type, message, response body (truncated to 500 chars), `Retry-After` header, and stack trace. The file is created lazily on first error and never touched on healthy runs, so a single `cat .spectra-errors.log` answers "did anything go wrong?". Each error gets a `see=.spectra-errors.log` cross-reference in `.spectra-debug.log` so you can jump from the timeline to the full context.
-
-**Tuning for slow models** (v1.41.0+): generation runs in batches of `ai.generation_batch_size` test cases (default 30), each subject to `ai.generation_timeout_minutes` (default 5). Slower / reasoning-class models (DeepSeek-V3, large Azure deployments, GPT-4 Turbo with long contexts) typically need `generation_timeout_minutes: 15–20` and `generation_batch_size: 6–10`. When `ai.debug_log_enabled` is true (the default), each batch writes a timestamped `BATCH START` / `BATCH OK` / `BATCH TIMEOUT` line to `.spectra-debug.log` in the project root with the model, provider, requested count, and elapsed seconds — inspect this file to dial the knobs precisely. See [Configuration → ai.generation_timeout_minutes](configuration.md) for the full reference, example configs, and the timeout error message format.
+**Troubleshooting** — when `debug.enabled: true`, failures during the still-in-process criteria
+extraction (`ai analyze --extract-criteria` / `docs index`) write full entries to `.spectra-errors.log`.
+Duplicate detection (>80% title similarity) and the `ai.critic.max_concurrent` critic-throughput lever
+continue to apply to the verification path.
 
 ### `spectra ai update`
 

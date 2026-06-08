@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Commands.Docs;
-using Spectra.CLI.Commands.Generate;
+using Spectra.CLI.Generation;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Coverage;
 using Spectra.Integration.Tests.Support;
@@ -29,18 +29,17 @@ public sealed class EndToEndScenarios
         await using var ws = new IntegrationWorkspace();
         await ws.SeedCriteriaAsync("checkout", ("AC-001", "Totals update on quantity change"));
 
-        // 050: criteria loaded and forwarded; resulting test carries them.
-        var (context, matched) = await ws.LoadCriteriaAsync("checkout");
+        // 050: criteria loaded for the suite (forwarding into the prompt is unit-tested on the seam).
+        var (_, matched) = await ws.LoadCriteriaAsync("checkout");
         Assert.True(matched > 0);
+        // Spec 059: generation runs in-session; the integration boundary persists the produced test
+        // exactly as `ingest-tests` does, then asserts the cross-seam (index → MCP filter).
         var produced = TestFactory.Make("TC-900", "Checkout high via description", Priority.High,
             component: "checkout", criteria: ["AC-001"], filePath: "checkout/TC-900.md");
-        var (test, agent) = await ws.GenerateFromDescriptionAsync("checkout", produced, context);
-        Assert.NotNull(test);
-        Assert.True(agent.ReceivedCriteria);
-        Assert.NotEmpty(test!.Criteria);
+        Assert.NotEmpty(produced.Criteria);
 
         // 049: registered in the index.
-        await ws.PersistAsync("checkout", new[] { test! });
+        await ws.PersistAsync("checkout", new[] { produced });
         Assert.Contains(ws.ReadIndex("checkout").Tests, e => e.Id == "TC-900");
 
         // 051: a high-priority filtered run enqueues exactly the new test.
@@ -53,9 +52,9 @@ public sealed class EndToEndScenarios
         Assert.Equal("TC-900", data.GetProperty("first_test").GetProperty("test_id").GetString());
     }
 
-    // 047 + 050 (batch path criteria contract)
+    // 047 + 050 (criteria flow into the generation prompt — now a seam concern)
     [Fact]
-    public async Task BatchGeneration_FromExtractedCriteria_PopulatesCriteriaField()
+    public async Task BatchGeneration_FromExtractedCriteria_ForwardsCriteriaIntoPrompt()
     {
         await using var ws = new IntegrationWorkspace();
         await ws.SeedCriteriaAsync("payments", ("AC-010", "Card declined shows message"), ("AC-011", "Refund within 30 days"));
@@ -63,13 +62,13 @@ public sealed class EndToEndScenarios
         var (context, matched) = await ws.LoadCriteriaAsync("payments");
         Assert.True(matched >= 2);
 
-        var produced = TestFactory.Make("TC-500", "Pay with card", Priority.High,
-            component: "payments", criteria: ["AC-010", "AC-011"], filePath: "payments/TC-500.md");
-        var (test, agent) = await ws.GenerateFromDescriptionAsync("payments", produced, context);
-
-        Assert.NotNull(test);
-        Assert.True(agent.ReceivedCriteria);
-        Assert.Equal(new[] { "AC-010", "AC-011" }, test!.Criteria.ToArray());
+        // Spec 059: the loaded criteria are forwarded into the compiled generation prompt (the
+        // mandatory-mapping block) — the in-session agent then maps them. Assert on the seam output.
+        var userPrompt = DescriptionPromptBuilder.Build("Pay with card", null, "payments", []);
+        var prompt = PromptCompiler.Assemble(userPrompt, requestedCount: 1, criteriaContext: context);
+        Assert.Contains("ACCEPTANCE CRITERIA — MANDATORY", prompt);
+        Assert.Contains("AC-010", prompt);
+        Assert.Contains("AC-011", prompt);
     }
 
     // 047
@@ -114,8 +113,7 @@ public sealed class EndToEndScenarios
         await using var ws = new IntegrationWorkspace();
         var produced = TestFactory.Make("TC-777", "Search returns results", Priority.Medium,
             tags: ["search"], component: "search", filePath: "search/TC-777.md");
-        var (test, _) = await ws.GenerateFromDescriptionAsync("search", produced, criteriaContext: null);
-        await ws.PersistAsync("search", new[] { test! });
+        await ws.PersistAsync("search", new[] { produced });
 
         var find = ws.BuildFindTool();
         var data = JsonDocument.Parse(await find.ExecuteAsync(
@@ -182,25 +180,20 @@ public sealed class EndToEndScenarios
         Assert.Contains("extract-criteria", warning);
     }
 
-    // 048
+    // 048 (criteria suite-match accounting — the basis for the no-criteria note)
     [Fact]
-    public async Task GenerationNote_AppearsWhenNoCriteriaMatch()
+    public async Task CriteriaMatch_CountsZero_WhenNoCriteriaMatchSuite()
     {
         await using var ws = new IntegrationWorkspace();
         // Criteria exist for a DIFFERENT suite, so the target suite has no match.
         await ws.SeedCriteriaAsync("auth", ("AC-001", "Login requires password"));
 
+        // Spec 059: the suite-match count drives the upstream "no criteria matched" signal.
         var (_, matched) = await ws.LoadCriteriaAsync("checkout");
         Assert.Equal(0, matched);
 
-        // The note is a result-level value (not gated on verbosity); it is present regardless.
-        var note = GenerateHandler.BuildNoCriteriaNote(matched, "checkout");
-        Assert.NotNull(note);
-        Assert.Contains("checkout", note);
-
-        // When criteria DO match, no note.
+        // When criteria DO match, the count is positive.
         var (_, matchedAuth) = await ws.LoadCriteriaAsync("auth");
         Assert.True(matchedAuth > 0);
-        Assert.Null(GenerateHandler.BuildNoCriteriaNote(matchedAuth, "auth"));
     }
 }

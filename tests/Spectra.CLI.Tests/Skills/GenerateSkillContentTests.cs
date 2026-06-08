@@ -22,21 +22,25 @@ public class GenerateSkillContentTests
     [Fact]
     public void GenerateSkill_HasIntentRoutingTable()
     {
+        // Spec 059: the seam supports two flows (main/focus and from-description); the
+        // in-process --from-suggestions sub-mode was retired with the in-process generator.
         Assert.Contains("How to choose between generation flows", SkillContentText);
         Assert.Contains("--from-description", SkillContentText);
         Assert.Contains("--focus", SkillContentText);
-        Assert.Contains("--from-suggestions", SkillContentText);
     }
 
     [Fact]
-    public void GenerateSkill_FromDescriptionUsesCorrectFlags()
+    public void GenerateSkill_FromDescriptionUsesSeamCommand()
     {
-        // The documented from-description command must include all SKILL-standard flags.
+        // Spec 059: from-description routes through the compile-prompt seam, not the
+        // retired in-process `spectra ai generate --from-description`.
         var content = SkillContentText;
+        Assert.Contains("compile-prompt --suite", content);
         Assert.Contains("--from-description", content);
-        Assert.Contains("--no-interaction", content);
         Assert.Contains("--output-format json", content);
-        Assert.Contains("--verbosity quiet", content);
+        // No in-process generation invocations remain (the seam replaced them).
+        Assert.DoesNotContain("ai generate --from-description", content);
+        Assert.DoesNotContain("ai generate --count", content);
     }
 
     [Fact]
@@ -79,12 +83,15 @@ public class GenerateSkillContentTests
     }
 
     [Fact]
-    public void GenerationAgent_DocumentsAllThreeIntents()
+    public void GenerationAgent_DocumentsExploreAndFromDescriptionIntents()
     {
+        // Spec 059: two routed intents survive on the seam — explore-area (--focus) and
+        // create-specific (--from-description). The --from-suggestions intent was retired
+        // with the in-process generator.
         var content = AgentContentText;
         Assert.Contains("Intent 1", content);
         Assert.Contains("Intent 2", content);
-        Assert.Contains("Intent 3", content);
+        Assert.DoesNotContain("--from-suggestions", content);
     }
 
     [Fact]

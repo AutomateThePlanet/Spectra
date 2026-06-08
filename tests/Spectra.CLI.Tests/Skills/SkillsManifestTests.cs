@@ -188,7 +188,10 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void AllSkills_WithCommands_IncludeNoInteractionFlag()
     {
-        var skillsWithCommands = new[] { "spectra-generate", "spectra-update", "spectra-coverage", "spectra-dashboard",
+        // Spec 059: spectra-generate now drives the deterministic compile/ingest seam, whose
+        // commands are inherently non-interactive (stdin/args → stdout) and do not take
+        // --no-interaction. It is excluded from this legacy-convention check.
+        var skillsWithCommands = new[] { "spectra-update", "spectra-coverage", "spectra-dashboard",
             "spectra-validate", "spectra-criteria", "spectra-docs", "spectra-list", "spectra-init-profile" };
 
         foreach (var skillName in skillsWithCommands)
@@ -255,7 +258,9 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void AllSkills_WithCommands_IncludeResultFileRead()
     {
-        var skillsWithResultFile = new[] { "spectra-generate", "spectra-update", "spectra-coverage", "spectra-dashboard",
+        // Spec 059: spectra-generate reads command stdout from the compile/ingest seam rather
+        // than the legacy `.spectra-result.json` sink, so it is excluded here.
+        var skillsWithResultFile = new[] { "spectra-update", "spectra-coverage", "spectra-dashboard",
             "spectra-validate", "spectra-criteria", "spectra-docs" };
 
         foreach (var skillName in skillsWithResultFile)
