@@ -91,6 +91,21 @@ public sealed class ExecutionDb : IAsyncDisposable
             CREATE INDEX IF NOT EXISTS idx_results_run ON test_results(run_id);
             CREATE INDEX IF NOT EXISTS idx_results_handle ON test_results(test_handle);
             CREATE INDEX IF NOT EXISTS idx_results_status ON test_results(run_id, status);
+
+            -- Queue snapshot table (spec 064): write-once-at-run-build capture of each test's
+            -- orchestration data, so the execution queue is reconstructable from the DB alone.
+            CREATE TABLE IF NOT EXISTS queue_snapshot (
+                run_id      TEXT NOT NULL,
+                test_id     TEXT NOT NULL,
+                title       TEXT NOT NULL,
+                priority    TEXT NOT NULL,
+                depends_on  TEXT,
+                order_index INTEGER NOT NULL,
+                PRIMARY KEY (run_id, test_id),
+                FOREIGN KEY (run_id) REFERENCES runs(run_id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_queue_snapshot_run ON queue_snapshot(run_id);
             """;
 
         await using var command = connection.CreateCommand();

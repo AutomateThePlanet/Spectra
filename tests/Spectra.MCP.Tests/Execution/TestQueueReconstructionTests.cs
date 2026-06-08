@@ -4,38 +4,58 @@ using Spectra.MCP.Execution;
 
 namespace Spectra.MCP.Tests.Execution;
 
+/// <summary>
+/// Exercises the lossless reconstruction primitive <see cref="TestQueue.AddReconstructed"/>
+/// (spec 064). Migrated from the former lossy <c>AddFromResult</c> path: the same queue-mechanics
+/// assertions are preserved, and orchestration fields (title/priority/depends_on) are now asserted
+/// to be restored rather than silently defaulted.
+/// </summary>
 public class TestQueueReconstructionTests
 {
+    private static QueueSnapshotEntry Snapshot(
+        string testId,
+        int orderIndex,
+        string title = "Title",
+        string priority = "medium",
+        string? dependsOn = null) => new()
+    {
+        RunId = "run-1",
+        TestId = testId,
+        Title = title,
+        Priority = priority,
+        DependsOn = dependsOn,
+        OrderIndex = orderIndex
+    };
+
     [Fact]
-    public void AddFromResult_AddsTestToQueue()
+    public void AddReconstructed_AddsTestToQueue_WithRestoredOrchestration()
     {
         var queue = new TestQueue("run-1");
-        var result = new TestResult
-        {
-            RunId = "run-1",
-            TestId = "TC-001",
-            TestHandle = "run-1-TC-001-abc",
-            Status = TestStatus.Pending,
-            Attempt = 1
-        };
 
-        queue.AddFromResult(result);
+        queue.AddReconstructed(
+            Snapshot("TC-001", 0, title: "Login works", priority: "high", dependsOn: "TC-000"),
+            TestStatus.Pending,
+            "run-1-TC-001-abc");
 
         Assert.Single(queue.Tests);
         Assert.Equal("TC-001", queue.Tests[0].TestId);
         Assert.Equal("run-1-TC-001-abc", queue.Tests[0].TestHandle);
         Assert.Equal(TestStatus.Pending, queue.Tests[0].Status);
+        // Orchestration is restored from the snapshot (no longer defaulted).
+        Assert.Equal("Login works", queue.Tests[0].Title);
+        Assert.Equal(Priority.High, queue.Tests[0].Priority);
+        Assert.Equal("TC-000", queue.Tests[0].DependsOn);
     }
 
     [Fact]
-    public void AddFromResult_InProgressTest_SetsCurrentIndex()
+    public void AddReconstructed_InProgressTest_SetsCurrentIndex()
     {
         var queue = new TestQueue("run-1");
 
         // Add 3 tests, second one is in progress
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-001", TestHandle = "h1", Status = TestStatus.Passed, Attempt = 1 });
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-002", TestHandle = "h2", Status = TestStatus.InProgress, Attempt = 1 });
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-003", TestHandle = "h3", Status = TestStatus.Pending, Attempt = 1 });
+        queue.AddReconstructed(Snapshot("TC-001", 0), TestStatus.Passed, "h1");
+        queue.AddReconstructed(Snapshot("TC-002", 1), TestStatus.InProgress, "h2");
+        queue.AddReconstructed(Snapshot("TC-003", 2), TestStatus.Pending, "h3");
 
         Assert.Equal(3, queue.TotalCount);
         Assert.Equal(1, queue.CurrentIndex); // Should point to TC-002 (in progress)
@@ -45,9 +65,9 @@ public class TestQueueReconstructionTests
     public void GetNext_ReturnsInProgressTestFirst()
     {
         var queue = new TestQueue("run-1");
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-001", TestHandle = "h1", Status = TestStatus.Passed, Attempt = 1 });
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-002", TestHandle = "h2", Status = TestStatus.InProgress, Attempt = 1 });
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-003", TestHandle = "h3", Status = TestStatus.Pending, Attempt = 1 });
+        queue.AddReconstructed(Snapshot("TC-001", 0), TestStatus.Passed, "h1");
+        queue.AddReconstructed(Snapshot("TC-002", 1), TestStatus.InProgress, "h2");
+        queue.AddReconstructed(Snapshot("TC-003", 2), TestStatus.Pending, "h3");
 
         var next = queue.GetNext();
 
@@ -60,9 +80,9 @@ public class TestQueueReconstructionTests
     public void GetNext_NoInProgress_ReturnsPendingTest()
     {
         var queue = new TestQueue("run-1");
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-001", TestHandle = "h1", Status = TestStatus.Passed, Attempt = 1 });
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-002", TestHandle = "h2", Status = TestStatus.Failed, Attempt = 1 });
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-003", TestHandle = "h3", Status = TestStatus.Pending, Attempt = 1 });
+        queue.AddReconstructed(Snapshot("TC-001", 0), TestStatus.Passed, "h1");
+        queue.AddReconstructed(Snapshot("TC-002", 1), TestStatus.Failed, "h2");
+        queue.AddReconstructed(Snapshot("TC-003", 2), TestStatus.Pending, "h3");
 
         var next = queue.GetNext();
 
@@ -75,9 +95,9 @@ public class TestQueueReconstructionTests
     public void GetNext_AllCompleted_ReturnsNull()
     {
         var queue = new TestQueue("run-1");
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-001", TestHandle = "h1", Status = TestStatus.Passed, Attempt = 1 });
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-002", TestHandle = "h2", Status = TestStatus.Failed, Attempt = 1 });
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-003", TestHandle = "h3", Status = TestStatus.Skipped, Attempt = 1 });
+        queue.AddReconstructed(Snapshot("TC-001", 0), TestStatus.Passed, "h1");
+        queue.AddReconstructed(Snapshot("TC-002", 1), TestStatus.Failed, "h2");
+        queue.AddReconstructed(Snapshot("TC-003", 2), TestStatus.Skipped, "h3");
 
         var next = queue.GetNext();
 
@@ -90,9 +110,9 @@ public class TestQueueReconstructionTests
         // Scenario: Test was started, client crashed, reconnected
         // InProgress test should be returned first even if there are earlier pending tests
         var queue = new TestQueue("run-1");
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-001", TestHandle = "h1", Status = TestStatus.Pending, Attempt = 1 });
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-002", TestHandle = "h2", Status = TestStatus.InProgress, Attempt = 1 });
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-003", TestHandle = "h3", Status = TestStatus.Pending, Attempt = 1 });
+        queue.AddReconstructed(Snapshot("TC-001", 0), TestStatus.Pending, "h1");
+        queue.AddReconstructed(Snapshot("TC-002", 1), TestStatus.InProgress, "h2");
+        queue.AddReconstructed(Snapshot("TC-003", 2), TestStatus.Pending, "h3");
 
         var next = queue.GetNext();
 
@@ -105,8 +125,8 @@ public class TestQueueReconstructionTests
     public void ReconstructedQueue_CanMarkCompleted()
     {
         var queue = new TestQueue("run-1");
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-001", TestHandle = "h1", Status = TestStatus.InProgress, Attempt = 1 });
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-002", TestHandle = "h2", Status = TestStatus.Pending, Attempt = 1 });
+        queue.AddReconstructed(Snapshot("TC-001", 0), TestStatus.InProgress, "h1");
+        queue.AddReconstructed(Snapshot("TC-002", 1), TestStatus.Pending, "h2");
 
         // Complete the in-progress test
         queue.MarkCompleted("h1", TestStatus.Passed);
@@ -121,9 +141,9 @@ public class TestQueueReconstructionTests
     public void ReconstructedQueue_PreservesCompletedCount()
     {
         var queue = new TestQueue("run-1");
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-001", TestHandle = "h1", Status = TestStatus.Passed, Attempt = 1 });
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-002", TestHandle = "h2", Status = TestStatus.Failed, Attempt = 1 });
-        queue.AddFromResult(new TestResult { RunId = "run-1", TestId = "TC-003", TestHandle = "h3", Status = TestStatus.Pending, Attempt = 1 });
+        queue.AddReconstructed(Snapshot("TC-001", 0), TestStatus.Passed, "h1");
+        queue.AddReconstructed(Snapshot("TC-002", 1), TestStatus.Failed, "h2");
+        queue.AddReconstructed(Snapshot("TC-003", 2), TestStatus.Pending, "h3");
 
         Assert.Equal(2, queue.CompletedCount);
         Assert.Equal(1, queue.PendingCount);

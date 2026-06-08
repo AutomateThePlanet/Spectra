@@ -14,6 +14,7 @@ public sealed class ExecutionEngine
 {
     private readonly RunRepository _runRepo;
     private readonly ResultRepository _resultRepo;
+    private readonly QueueSnapshotRepository _snapshotRepo;
     private readonly IUserIdentityResolver _identity;
     private readonly McpConfig _config;
     private readonly DependencyResolver _dependencyResolver;
@@ -24,11 +25,13 @@ public sealed class ExecutionEngine
     public ExecutionEngine(
         RunRepository runRepo,
         ResultRepository resultRepo,
+        QueueSnapshotRepository snapshotRepo,
         IUserIdentityResolver identity,
         McpConfig config)
     {
         _runRepo = runRepo;
         _resultRepo = resultRepo;
+        _snapshotRepo = snapshotRepo;
         _identity = identity;
         _config = config;
         _dependencyResolver = new DependencyResolver();
@@ -77,6 +80,21 @@ public sealed class ExecutionEngine
 
         await _runRepo.CreateAsync(run);
 
+        // Persist the orchestration snapshot (spec 064) so the queue is reconstructable from the
+        // DB alone, independent of the mutable on-disk index. If this fails, the exception
+        // propagates and run creation fails — never leave an unreconstructable run (FR-007).
+        var snapshot = queue.Tests.Select((t, index) => new QueueSnapshotEntry
+        {
+            RunId = runId,
+            TestId = t.TestId,
+            Title = t.Title,
+            Priority = t.Priority.ToString().ToLowerInvariant(),
+            DependsOn = t.DependsOn,
+            OrderIndex = index
+        });
+
+        await _snapshotRepo.CreateManyAsync(snapshot);
+
         // Create test result records
         var results = queue.Tests.Select(t => new TestResult
         {
@@ -111,10 +129,11 @@ public sealed class ExecutionEngine
         var run = await _runRepo.GetByIdAsync(runId);
         if (run is null) return null;
 
-        if (!_queues.TryGetValue(runId, out var queue))
-        {
-            return null;
-        }
+        // Reconstruct the queue from the DB when not held in memory, so status (and callers like
+        // retest) behave identically in a short-lived process (FR-004). Fails loud on a corrupt
+        // snapshot; returns null only when the run genuinely has nothing recorded.
+        var queue = await GetQueueAsync(runId);
+        if (queue is null) return null;
 
         return (run, queue);
     }
@@ -124,41 +143,91 @@ public sealed class ExecutionEngine
     /// </summary>
     public async Task<TestQueue?> GetQueueAsync(string runId)
     {
+        // Warm path: the original in-memory queue is authoritative when present (FR-005).
         if (_queues.TryGetValue(runId, out var queue))
         {
             return queue;
         }
 
-        // Reconstruct from database
+        // Cold path: reconstruct losslessly from the durable orchestration snapshot + results.
         var results = await _resultRepo.GetByRunIdAsync(runId);
-        if (results.Count == 0)
+        var snapshot = await _snapshotRepo.GetByRunIdAsync(runId);
+
+        // Benign absence — the run genuinely has nothing recorded (run not found). Not an error.
+        if (results.Count == 0 && snapshot.Count == 0)
         {
             return null;
         }
 
-        // Rebuild queue from persisted results
-        queue = ReconstructQueue(runId, results);
+        // Faithful rebuild or fail loud (FR-001/FR-003).
+        queue = ReconstructQueue(runId, results, snapshot);
         _queues[runId] = queue;
         return queue;
     }
 
     /// <summary>
-    /// Reconstructs a TestQueue from persisted test results.
+    /// Reconstructs a TestQueue losslessly from the durable orchestration snapshot (spec 064),
+    /// using the latest-attempt result per test for current status and handle. Fails loud rather
+    /// than silently producing a degraded queue when the snapshot cannot faithfully rebuild it.
     /// </summary>
-    private static TestQueue ReconstructQueue(string runId, IReadOnlyList<TestResult> results)
+    private static TestQueue ReconstructQueue(
+        string runId,
+        IReadOnlyList<TestResult> results,
+        IReadOnlyList<QueueSnapshotEntry> snapshot)
     {
-        var queue = new TestQueue(runId);
+        // Latest attempt per test_id (handles retest — newest handle/status wins).
+        var latestByTestId = results
+            .GroupBy(r => r.TestId, StringComparer.Ordinal)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(r => r.Attempt).First(),
+                StringComparer.Ordinal);
 
-        // Group by TestId and take the latest attempt for each
-        var latestResults = results
-            .GroupBy(r => r.TestId)
-            .Select(g => g.OrderByDescending(r => r.Attempt).First())
-            .OrderBy(r => r.TestId)
-            .ToList();
-
-        foreach (var result in latestResults)
+        // Fail-loud: results exist but no orchestration snapshot to rebuild from.
+        if (snapshot.Count == 0)
         {
-            queue.AddFromResult(result);
+            throw new QueueReconstructionException(runId,
+                $"Run '{runId}' has recorded results but no orchestration snapshot; the execution queue cannot be faithfully reconstructed.");
+        }
+
+        var snapshotIds = new HashSet<string>(snapshot.Select(s => s.TestId), StringComparer.Ordinal);
+
+        // Fail-loud: a recorded result has no snapshot row (orchestration data missing).
+        foreach (var testId in latestByTestId.Keys)
+        {
+            if (!snapshotIds.Contains(testId))
+            {
+                throw new QueueReconstructionException(runId,
+                    $"Run '{runId}' has a recorded result for test '{testId}' with no orchestration snapshot row.");
+            }
+        }
+
+        // Fail-loud: a snapshot row has no recorded result (incomplete capture).
+        foreach (var entry in snapshot)
+        {
+            if (!latestByTestId.ContainsKey(entry.TestId))
+            {
+                throw new QueueReconstructionException(runId,
+                    $"Run '{runId}' orchestration snapshot references test '{entry.TestId}' with no recorded result.");
+            }
+        }
+
+        // Fail-loud: a dependency edge points at a test absent from the snapshot.
+        foreach (var entry in snapshot)
+        {
+            if (!string.IsNullOrEmpty(entry.DependsOn) && !snapshotIds.Contains(entry.DependsOn))
+            {
+                throw new QueueReconstructionException(runId,
+                    $"Run '{runId}' snapshot test '{entry.TestId}' depends on '{entry.DependsOn}', which is absent from the snapshot.");
+            }
+        }
+
+        // Build the queue in the original order (snapshot already ordered by order_index).
+        var queue = new TestQueue(runId);
+        foreach (var entry in snapshot)
+        {
+            var latest = latestByTestId[entry.TestId];
+            queue.AddReconstructed(entry, latest.Status, latest.TestHandle);
         }
 
         return queue;
@@ -188,10 +257,8 @@ public sealed class ExecutionEngine
             TestStatus.InProgress,
             startedAt: DateTime.UtcNow);
 
-        if (_queues.TryGetValue(runId, out var queue))
-        {
-            queue.MarkInProgress(testHandle);
-        }
+        var queue = await GetQueueAsync(runId);
+        queue?.MarkInProgress(testHandle);
 
         return transition.Value;
     }
@@ -226,7 +293,10 @@ public sealed class ExecutionEngine
         var blocked = new List<string>();
         QueuedTest? next = null;
 
-        if (_queues.TryGetValue(runId, out var queue))
+        // Reconstruct from the DB when not held in memory so block-propagation and next-test
+        // selection are identical across process boundaries (FR-004).
+        var queue = await GetQueueAsync(runId);
+        if (queue is not null)
         {
             queue.MarkCompleted(testHandle, status);
 
@@ -335,9 +405,15 @@ public sealed class ExecutionEngine
         var run = await _runRepo.GetByIdAsync(runId);
         if (run is null) return null;
 
-        if (!force && _queues.TryGetValue(runId, out var queue) && queue.PendingCount > 0)
+        if (!force)
         {
-            throw new InvalidOperationException($"{queue.PendingCount} tests are still pending. Use force=true to finalize anyway.");
+            // Reconstruct from the DB when not held in memory so the pending guard is honoured
+            // regardless of process lifetime (FR-004).
+            var queue = await GetQueueAsync(runId);
+            if (queue is not null && queue.PendingCount > 0)
+            {
+                throw new InvalidOperationException($"{queue.PendingCount} tests are still pending. Use force=true to finalize anyway.");
+            }
         }
 
         var transition = StateMachine.Transition(run, RunStatus.Completed);
@@ -374,7 +450,10 @@ public sealed class ExecutionEngine
 
         var newAttempt = latestAttempt + 1;
 
-        if (!_queues.TryGetValue(runId, out var queue))
+        // Reconstruct from the DB when not held in memory — fixes the cross-process RUN_NOT_FOUND
+        // bug where retest hard-failed after a restart (FR-004).
+        var queue = await GetQueueAsync(runId);
+        if (queue is null)
         {
             return null;
         }
@@ -429,6 +508,10 @@ public sealed class ExecutionEngine
         var allBlocked = new List<string>();
         var now = DateTime.UtcNow;
 
+        // Reconstruct from the DB when not held in memory so block-propagation is identical across
+        // process boundaries (FR-004). Fetched once for the whole batch.
+        var queue = await GetQueueAsync(runId);
+
         foreach (var testHandle in testHandles)
         {
             var result = await _resultRepo.GetByHandleAsync(testHandle);
@@ -454,7 +537,7 @@ public sealed class ExecutionEngine
                 notes: notes);
 
             // Update queue state
-            if (_queues.TryGetValue(runId, out var queue))
+            if (queue is not null)
             {
                 queue.MarkCompleted(testHandle, status);
 

@@ -28,7 +28,7 @@ public class SkipTestCaseTests : IAsyncDisposable
         var identity = new UserIdentityResolver();
         var config = new McpConfig { BasePath = _testDir };
 
-        _engine = new ExecutionEngine(runRepo, resultRepo, identity, config);
+        _engine = new ExecutionEngine(runRepo, resultRepo, new QueueSnapshotRepository(_db), identity, config);
         _tool = new SkipTestCaseTool(_engine, runRepo, resultRepo);
 
         _testEntries =

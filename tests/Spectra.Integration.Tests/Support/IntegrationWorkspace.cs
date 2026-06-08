@@ -89,7 +89,7 @@ public sealed class IntegrationWorkspace : IAsyncDisposable
         var resultRepo = new ResultRepository(_db);
         var identity = new UserIdentityResolver();
         var config = new McpConfig { BasePath = Root, ReportsPath = Path.Combine(Root, "reports") };
-        return new ExecutionEngine(runRepo, resultRepo, identity, config);
+        return new ExecutionEngine(runRepo, resultRepo, new QueueSnapshotRepository(_db), identity, config);
     }
 
     public async ValueTask DisposeAsync()
