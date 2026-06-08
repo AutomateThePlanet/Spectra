@@ -59,9 +59,12 @@ spectra ai analyze --coverage --verbosity detailed
     "total_docs": 4,
     "covered_docs": 3,
     "percentage": 75.00,
+    "excluded_docs": 1,
     "details": [
       { "doc": "docs/auth.md", "test_count": 28, "covered": true, "test_ids": ["TC-001", "..."] },
-      { "doc": "docs/admin.md", "test_count": 0, "covered": false, "test_ids": [] }
+      { "doc": "docs/admin.md", "test_count": 0, "covered": false, "test_ids": [] },
+      { "doc": "docs/release-notes/v1.md", "test_count": 0, "covered": false, "test_ids": [],
+        "excluded": true, "excluded_by_pattern": "docs/release-notes/**" }
     ]
   },
   "acceptance_criteria_coverage": {
@@ -91,6 +94,28 @@ spectra ai analyze --coverage --verbosity detailed
 Measures which documentation files have at least one test case referencing them via `source_refs`.
 
 For each doc in `docs/`, SPECTRA checks if any test case file has it in its `source_refs` frontmatter field.
+
+### Excluding docs from the coverage percentage (Spec 060)
+
+Some documents — release notes, changelogs, summaries, archived material — should stay indexed and available to generation and analysis but should **not** drag down the documentation-coverage number, because nobody writes test cases against them. Configure `coverage.coverage_exclude_patterns` to drop matched docs from the coverage **denominator only**:
+
+```json
+{
+  "coverage": {
+    "coverage_exclude_patterns": ["docs/release-notes/**", "**/SUMMARY.md"]
+  }
+}
+```
+
+With this configured, a matched doc:
+
+- is **removed from the coverage denominator** (`total_docs` counts only in-scope docs, and `percentage` is computed over them);
+- is **counted in `excluded_docs`** and reported in `details` with `"excluded": true` and the matching `"excluded_by_pattern"` — it is **never silently dropped**;
+- **remains fully present** in the document map for generation, analysis, and indexing.
+
+The `excluded_docs`, `excluded`, and `excluded_by_pattern` fields appear only when at least one doc is excluded; with the default (empty) configuration, coverage output is identical to before Spec 060. In the markdown report the excluded docs show an `Excluded` status (distinct from `Yes`/`No`); in the compact/terminal report they show a `~` mark (distinct from covered `+` and uncovered `-`).
+
+> This is one of **three independent exclusion mechanisms**. It is distinct from `source.exclude_patterns` (which removes a doc from *everything*) and `coverage.analysis_exclude_patterns` (which only skips AI analysis and **still counts** the doc in coverage). See [the three exclusion mechanisms](configuration.md#the-three-exclusion-mechanisms) in the configuration reference for the full comparison.
 
 ## Acceptance Criteria Coverage
 

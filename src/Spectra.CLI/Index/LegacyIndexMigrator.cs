@@ -4,6 +4,7 @@ using Spectra.Core.Index;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Index;
+using Spectra.Core.Source;
 
 namespace Spectra.CLI.Index;
 

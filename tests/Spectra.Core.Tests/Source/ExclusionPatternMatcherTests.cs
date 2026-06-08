@@ -1,7 +1,9 @@
-using Spectra.CLI.Source;
+using Spectra.Core.Source;
 
-namespace Spectra.CLI.Tests.Source;
+namespace Spectra.Core.Tests.Source;
 
+// Relocated from Spectra.CLI.Tests (Spec 060) alongside the matcher's move to
+// Spectra.Core. Behavior is unchanged — this is the unmodified regression net.
 public class ExclusionPatternMatcherTests
 {
     [Fact]
