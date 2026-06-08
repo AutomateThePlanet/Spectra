@@ -32,6 +32,7 @@ public sealed class RunCommand : Command
         AddCommand(BuildSelections());
         AddCommand(BuildScreenshot());
         AddCommand(BuildScreenshotClipboard());
+        AddCommand(BuildConsole());
     }
 
     private static RunHandler Handler(System.CommandLine.Invocation.InvocationContext ctx) => new(
@@ -254,6 +255,22 @@ public sealed class RunCommand : Command
             ctx.ParseResult.GetValueForArgument(handle),
             ctx.ParseResult.GetValueForOption(file),
             ctx.ParseResult.GetValueForOption(caption),
+            ctx.GetCancellationToken()));
+        return cmd;
+    }
+
+    private static Command BuildConsole()
+    {
+        // Spec 066: a local, detached web console for driving a run in the browser.
+        var cmd = new Command("console", "Serve a local web console for driving a run in the browser (PASS/FAIL/BLOCKED, comment, screenshot)");
+        var port = new Option<int>("--port", () => 0, "Port to bind (0 = auto-select a free port)");
+        var stop = new Option<bool>("--stop", "Stop the running console");
+        var serve = new Option<bool>("--serve", "Internal: run the HTTP server in the foreground (used by the detached launcher)") { IsHidden = true };
+        cmd.AddOption(port); cmd.AddOption(stop); cmd.AddOption(serve);
+        cmd.SetHandler(async ctx => ctx.ExitCode = await new WebConsole.ConsoleCommand().RunAsync(
+            ctx.ParseResult.GetValueForOption(port),
+            ctx.ParseResult.GetValueForOption(stop),
+            ctx.ParseResult.GetValueForOption(serve),
             ctx.GetCancellationToken()));
         return cmd;
     }
