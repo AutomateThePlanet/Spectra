@@ -86,22 +86,25 @@ public sealed class TestQueue
     }
 
     /// <summary>
-    /// Adds a test from a persisted result (for queue reconstruction).
+    /// Adds a test during lossless queue reconstruction (spec 064). Orchestration data
+    /// (title, priority, dependency edge, order) comes from the durable run-build snapshot;
+    /// the current status and handle (latest attempt) come from the persisted result. This
+    /// restores the fields the old result-only path silently dropped.
     /// </summary>
-    public void AddFromResult(TestResult result)
+    public void AddReconstructed(QueueSnapshotEntry snapshot, TestStatus status, string testHandle)
     {
         _tests.Add(new QueuedTest
         {
-            TestId = result.TestId,
-            TestHandle = result.TestHandle,
-            Title = result.TestId, // Title not available from result, use ID
-            Priority = Priority.Medium, // Not stored in result
-            DependsOn = null, // Not stored in result
-            Status = result.Status
+            TestId = snapshot.TestId,
+            TestHandle = testHandle,
+            Title = snapshot.Title,
+            Priority = ParsePriority(snapshot.Priority),
+            DependsOn = snapshot.DependsOn,
+            Status = status
         });
 
-        // If this test is in progress, set it as current
-        if (result.Status == TestStatus.InProgress)
+        // If this test is in progress, set it as current (resume after restart).
+        if (status == TestStatus.InProgress)
         {
             _currentIndex = _tests.Count - 1;
         }

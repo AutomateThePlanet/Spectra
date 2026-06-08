@@ -63,6 +63,14 @@ public sealed class ToolRegistry
                 "INVALID_PARAMS",
                 ex.Message));
         }
+        catch (Spectra.MCP.Execution.QueueReconstructionException ex)
+        {
+            // Spec 064: the run's orchestration snapshot cannot faithfully rebuild the queue.
+            // Surface a distinct, loud error — NEVER conflated with RUN_NOT_FOUND.
+            return JsonSerializer.Serialize(McpToolResponse<object>.Failure(
+                "RECONSTRUCTION_FAILED",
+                ex.Message));
+        }
         catch (Exception ex)
         {
             return McpProtocol.CreateErrorResponse(

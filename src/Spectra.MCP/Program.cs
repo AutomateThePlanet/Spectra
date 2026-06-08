@@ -38,11 +38,12 @@ public static class Program
         var db = new ExecutionDb(Path.Combine(basePath, ".execution"));
         var runRepo = new RunRepository(db);
         var resultRepo = new ResultRepository(db);
+        var snapshotRepo = new QueueSnapshotRepository(db);
         var identity = new UserIdentityResolver();
         var logger = new McpLogging(config.LogLevel);
 
         // Initialize engine and services
-        var engine = new ExecutionEngine(runRepo, resultRepo, identity, config);
+        var engine = new ExecutionEngine(runRepo, resultRepo, snapshotRepo, identity, config);
         var reportGenerator = new ReportGenerator();
         var reportWriter = new ReportWriter(config.ReportsPath);
 

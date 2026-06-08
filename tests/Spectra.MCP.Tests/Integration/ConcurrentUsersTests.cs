@@ -47,8 +47,8 @@ public class ConcurrentUsersTests : IAsyncDisposable
         var identityA = new MockUserIdentityResolver("user-a");
         var identityB = new MockUserIdentityResolver("user-b");
 
-        var engineA = new ExecutionEngine(_runRepo, _resultRepo, identityA, _config);
-        var engineB = new ExecutionEngine(_runRepo, _resultRepo, identityB, _config);
+        var engineA = new ExecutionEngine(_runRepo, _resultRepo, new QueueSnapshotRepository(_db), identityA, _config);
+        var engineB = new ExecutionEngine(_runRepo, _resultRepo, new QueueSnapshotRepository(_db), identityB, _config);
 
         var startToolA = new StartExecutionRunTool(engineA, _ => _testEntries);
         var startToolB = new StartExecutionRunTool(engineB, _ => _testEntries);
@@ -67,7 +67,7 @@ public class ConcurrentUsersTests : IAsyncDisposable
     public async Task SameUser_SameSuite_SecondStartFails()
     {
         var identity = new MockUserIdentityResolver("user-a");
-        var engine = new ExecutionEngine(_runRepo, _resultRepo, identity, _config);
+        var engine = new ExecutionEngine(_runRepo, _resultRepo, new QueueSnapshotRepository(_db), identity, _config);
         var startTool = new StartExecutionRunTool(engine, _ => _testEntries);
 
         var result1 = await startTool.ExecuteAsync(JsonDocument.Parse("""{"suite": "checkout"}""").RootElement);
@@ -84,7 +84,7 @@ public class ConcurrentUsersTests : IAsyncDisposable
     public async Task SameUser_DifferentSuites_BothCanStart()
     {
         var identity = new MockUserIdentityResolver("user-a");
-        var engine = new ExecutionEngine(_runRepo, _resultRepo, identity, _config);
+        var engine = new ExecutionEngine(_runRepo, _resultRepo, new QueueSnapshotRepository(_db), identity, _config);
         var startTool = new StartExecutionRunTool(engine, _ => _testEntries);
 
         var result1 = await startTool.ExecuteAsync(JsonDocument.Parse("""{"suite": "checkout"}""").RootElement);
@@ -101,7 +101,7 @@ public class ConcurrentUsersTests : IAsyncDisposable
     public async Task SameUser_AfterCancel_CanStartNew()
     {
         var identity = new MockUserIdentityResolver("user-a");
-        var engine = new ExecutionEngine(_runRepo, _resultRepo, identity, _config);
+        var engine = new ExecutionEngine(_runRepo, _resultRepo, new QueueSnapshotRepository(_db), identity, _config);
         var startTool = new StartExecutionRunTool(engine, _ => _testEntries);
         var cancelTool = new CancelExecutionRunTool(engine, _runRepo);
 
@@ -123,7 +123,7 @@ public class ConcurrentUsersTests : IAsyncDisposable
     public async Task SameUser_AfterComplete_CanStartNew()
     {
         var identity = new MockUserIdentityResolver("user-a");
-        var engine = new ExecutionEngine(_runRepo, _resultRepo, identity, _config);
+        var engine = new ExecutionEngine(_runRepo, _resultRepo, new QueueSnapshotRepository(_db), identity, _config);
         var startTool = new StartExecutionRunTool(engine, _ => _testEntries);
 
         // Start first run

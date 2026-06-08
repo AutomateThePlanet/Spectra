@@ -26,7 +26,7 @@ public class CancelAllActiveRunsToolTests : IAsyncDisposable
         _resultRepo = new ResultRepository(_db);
         var identity = new UserIdentityResolver();
         var config = new McpConfig { BasePath = _testDir, ReportsPath = Path.Combine(_testDir, "reports") };
-        var engine = new ExecutionEngine(_runRepo, _resultRepo, identity, config);
+        var engine = new ExecutionEngine(_runRepo, _resultRepo, new QueueSnapshotRepository(_db), identity, config);
 
         _tool = new CancelAllActiveRunsTool(engine, _runRepo);
     }

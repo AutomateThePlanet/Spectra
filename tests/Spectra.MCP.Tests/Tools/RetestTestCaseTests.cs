@@ -32,7 +32,7 @@ public class RetestTestCaseTests : IAsyncDisposable
         var identity = new UserIdentityResolver();
         var config = new McpConfig { BasePath = _testDir, ReportsPath = Path.Combine(_testDir, "reports") };
 
-        _engine = new ExecutionEngine(runRepo, resultRepo, identity, config);
+        _engine = new ExecutionEngine(runRepo, resultRepo, new QueueSnapshotRepository(_db), identity, config);
 
         var testEntries = new List<TestIndexEntry>
         {
