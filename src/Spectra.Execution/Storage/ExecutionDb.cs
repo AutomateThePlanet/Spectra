@@ -42,6 +42,16 @@ public sealed class ExecutionDb : IAsyncDisposable
         _connection = new SqliteConnection(_connectionString);
         await _connection.OpenAsync();
 
+        // Spec 065: per-process SQLite safety. CLI invocations are short-lived processes (each opens
+        // its own connection) rather than one long-lived server, so without these a second concurrent
+        // writer hits SQLITE_BUSY immediately. WAL (persisted on the file) lets readers and a writer
+        // coexist; busy_timeout makes a contending writer wait and retry instead of failing.
+        await using (var pragma = _connection.CreateCommand())
+        {
+            pragma.CommandText = "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;";
+            await pragma.ExecuteNonQueryAsync();
+        }
+
         if (!_initialized)
         {
             await InitializeSchemaAsync(_connection);

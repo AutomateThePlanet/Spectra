@@ -4,22 +4,18 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <OutputType>Exe</OutputType>
+  </PropertyGroup>
 
-    <!-- NuGet Tool Configuration -->
-    <PackAsTool>true</PackAsTool>
-    <ToolCommandName>spectra-mcp</ToolCommandName>
-    <PackageId>Spectra.MCP</PackageId>
+  <PropertyGroup>
+    <PackageId>Spectra.Execution</PackageId>
     <Authors>Anton Angelov</Authors>
     <Company>Automate The Planet</Company>
-    <Description>MCP execution server for SPECTRA. Deterministic AI-orchestrated test execution with state machine, pause/resume, and multi-format reports.</Description>
+    <Description>Transport-neutral execution engine for SPECTRA — deterministic SQLite-backed test-execution state machine shared by the Spectra CLI and the MCP server.</Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/AutomateThePlanet/Spectra</PackageProjectUrl>
     <RepositoryUrl>https://github.com/AutomateThePlanet/Spectra</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>testing;mcp;test-execution;ai;qa;spectra;dotnet-tool</PackageTags>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageOutputPath>./nupkg</PackageOutputPath>
+    <PackageTags>testing;test-execution;mcp;qa;spectra</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
@@ -29,11 +25,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Spectra.Core\Spectra.Core.csproj" />
-    <ProjectReference Include="..\Spectra.Execution\Spectra.Execution.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <InternalsVisibleTo Include="Spectra.Execution.Tests" />
+    <InternalsVisibleTo Include="Spectra.MCP.Tests" />
+    <InternalsVisibleTo Include="Spectra.CLI.Tests" />
+    <InternalsVisibleTo Include="Spectra.Integration.Tests" />
   </ItemGroup>
 
 </Project>
