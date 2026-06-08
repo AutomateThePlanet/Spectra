@@ -38,16 +38,18 @@ public sealed class ExecutionAgentPortTests
     }
 
     [Fact]
-    public void ExecutionAgent_StillReferencesMcpTools_Unchanged()
+    public void ExecutionAgent_DrivesSpectraRunCli()
     {
+        // Spec 065: the agent's default loop drives the `spectra run` CLI (one tool, no MCP config),
+        // not raw MCP tool calls. MCP remains an optional networked path mentioned in prose.
         var agent = Agent();
-        Assert.Contains("start_execution_run", agent);
-        Assert.Contains("get_test_case_details", agent);
-        Assert.Contains("advance_test_case", agent);
-        Assert.Contains("finalize_execution_run", agent);
-        // Screenshot capture stays on the existing path-based tools (FR-006).
-        Assert.Contains("save_clipboard_screenshot", agent);
-        Assert.Contains("save_screenshot", agent);
+        Assert.Contains("spectra run start", agent);
+        Assert.Contains("spectra run show", agent);
+        Assert.Contains("spectra run advance", agent);
+        Assert.Contains("spectra run finalize", agent);
+        // Screenshot capture via the CLI (local host).
+        Assert.Contains("spectra run screenshot-clipboard", agent);
+        Assert.Contains("spectra run screenshot", agent);
     }
 
     // ---------- verdict-pause guardrails (FR-004 / SC-006) ----------
@@ -64,17 +66,17 @@ public sealed class ExecutionAgentPortTests
     public void ExecutionAgent_AsksBeforeRecording_NonPassOutcomes()
     {
         var agent = Agent();
-        // FAIL/BLOCKED/SKIP ask first and wait; BLOCKED uses advance_test_case, not skip.
-        Assert.Contains("ask BEFORE calling the tool", agent);
-        Assert.Contains("BLOCKED uses `advance_test_case`", agent);
+        // Spec 065: FAIL/BLOCKED/SKIP ask first and wait; BLOCKED uses `advance --status blocked`, not skip.
+        Assert.Contains("ask BEFORE running the command", agent);
+        Assert.Contains("BLOCKED uses `advance --status blocked`", agent);
     }
 
     [Fact]
     public void ExecutionAgent_UsesPlainText_NotDialogTools()
     {
-        // The askQuestion/askForConfirmation ban becomes "use plain text".
+        // Spec 065: the dialog/popup ban is stated as plain-text-only.
         var agent = Agent();
         Assert.Contains("plain text", agent);
-        Assert.Contains("askQuestion", agent); // named in the ban line
+        Assert.Contains("dialog/popup", agent);
     }
 }

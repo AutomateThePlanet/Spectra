@@ -59,7 +59,9 @@ public class SkillsManifestTests : IDisposable
     {
         // Spec 040 lifecycle (v1.52.0) added spectra-delete and spectra-suite
         // → bundled SKILL count went from 12 to 14.
-        Assert.Equal(14, SkillContent.All.Count);
+        // Spec 065 added spectra-execute (CLI execution-loop SKILL) → 15.
+        Assert.Equal(15, SkillContent.All.Count);
+        Assert.True(SkillContent.All.ContainsKey("spectra-execute"));
         Assert.True(SkillContent.All.ContainsKey("spectra-generate"));
         Assert.True(SkillContent.All.ContainsKey("spectra-update"));
         Assert.True(SkillContent.All.ContainsKey("spectra-coverage"));

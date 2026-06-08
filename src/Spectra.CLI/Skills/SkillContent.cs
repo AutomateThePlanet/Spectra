@@ -23,4 +23,7 @@ public static class SkillContent
     // Spec 040 lifecycle (v1.52.0)
     public static string Delete => All["spectra-delete"];
     public static string Suite => All["spectra-suite"];
+
+    // Spec 065: CLI execution-loop SKILL (spectra run …).
+    public static string Execute => All["spectra-execute"];
 }

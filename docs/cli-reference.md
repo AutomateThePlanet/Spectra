@@ -478,16 +478,55 @@ See [Testimize Integration](testimize-integration.md) for the full guide.
 
 ## Execution Commands
 
-### `spectra-mcp` (separate tool)
+Execution has two interchangeable surfaces over the **same** deterministic engine and the same
+`.execution/spectra.db`: the **`spectra run` CLI** (default — no extra install, no MCP config) and the
+optional **`spectra-mcp` server** (for networked/remote MCP clients). They are behaviorally identical;
+a short-lived `spectra run` process reconstructs run state losslessly from the database.
 
-The MCP execution server is a separate global tool packaged as `Spectra.MCP`. Install it once and let your MCP client launch it via stdio:
+### `spectra run …` (CLI — no MCP server required)
+
+Since Spec 065, the single `dotnet tool install -g Spectra` provides execution as well as generation.
+Drive a full manual loop from the shell:
+
+```bash
+spectra run list-suites                         # what's runnable
+spectra run start <suite> [--priorities high] [--tags …] [--components …]
+spectra run start --test-ids TC-1 TC-2 --output-format json
+spectra run start --selection smoke
+spectra run status [<run-id>]                   # counts + next actionable test (active run if omitted)
+spectra run show [<run-id>] [--test-id ID | --handle H]   # full steps/expected for the current test
+spectra run advance [<handle>] --status pass|fail|blocked|skip [--notes "…"]
+spectra run skip [<handle>] --reason "…" [--blocked]
+spectra run note [<handle>] --note "…"
+spectra run bulk-record [<run-id>] --status pass --remaining   # or --test-ids TC-1 TC-2
+spectra run retest [<run-id>] --test-id TC-201
+spectra run screenshot [<handle>] --file ./bug.png
+spectra run screenshot-clipboard [<handle>]     # local CLI is the host
+spectra run pause|resume|cancel [<run-id>] | spectra run cancel-all
+spectra run finalize [<run-id>] [--force]       # generates JSON/MD/HTML reports under .execution/reports/
+spectra run history [--suite X] | spectra run summary [<run-id>] | spectra run selections
+```
+
+Every subcommand honors the global `--output-format json|human` and `--verbosity`. Exit code is `0` on
+success and non-zero on error; a reconstruction failure surfaces as a distinct `RECONSTRUCTION_FAILED`
+outcome (never conflated with a benign "run not found"). The `spectra-execute` SKILL and the execution
+agent drive this loop with human-in-the-loop guardrails (present → wait for verdict → advance).
+
+Handle resolution: when `<handle>`/`<run-id>` is omitted, the active run for the current user and its
+in-progress (or next-pending) test are auto-resolved — so the agent rarely needs to pass them explicitly.
+
+### `spectra-mcp` (optional separate tool — networked/remote clients)
+
+The MCP execution server is a separate global tool packaged as `Spectra.MCP`, retained as a thin adapter
+over the same engine. It is **only** needed for clients that drive execution over MCP; the `spectra run`
+CLI path above requires neither it nor any `.vscode/mcp.json` / `.mcp.json` config.
 
 ```bash
 dotnet tool install -g Spectra.MCP
 spectra-mcp                # Started by your MCP client over stdio (JSON-RPC 2.0)
 ```
 
-For VS Code Copilot Chat, `spectra init` writes a working `.vscode/mcp.json` that points at `spectra-mcp`. The MCP tools available are grouped below.
+For VS Code Copilot Chat, `spectra init` writes a working `.vscode/mcp.json` that points at `spectra-mcp`. The MCP tools available are grouped below (each maps one-to-one to a `spectra run` subcommand).
 
 #### Run Management Tools
 
