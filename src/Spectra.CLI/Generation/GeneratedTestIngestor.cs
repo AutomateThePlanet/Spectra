@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Spectra.CLI.IO;
@@ -161,7 +162,7 @@ public sealed class GeneratedTestIngestor
         return "";
     }
 
-    private static bool TryParseArray(string json, out JsonElement? array)
+    private static bool TryParseArray(string json, [NotNullWhen(true)] out JsonElement? array)
     {
         array = null;
         try

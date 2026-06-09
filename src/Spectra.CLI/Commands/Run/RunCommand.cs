@@ -35,7 +35,7 @@ public sealed class RunCommand : Command
         AddCommand(BuildConsole());
     }
 
-    private static RunHandler Handler(System.CommandLine.Invocation.InvocationContext ctx) => new(
+    private static RunHandler CreateHandler(System.CommandLine.Invocation.InvocationContext ctx) => new(
         ctx.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption),
         ctx.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption));
 
@@ -54,7 +54,7 @@ public sealed class RunCommand : Command
         cmd.AddOption(testIds); cmd.AddOption(selection); cmd.AddOption(environment);
         cmd.SetHandler(async ctx =>
         {
-            ctx.ExitCode = await Handler(ctx).StartAsync(
+            ctx.ExitCode = await CreateHandler(ctx).StartAsync(
                 ctx.ParseResult.GetValueForArgument(suite),
                 ctx.ParseResult.GetValueForOption(priorities),
                 ctx.ParseResult.GetValueForOption(tags),
@@ -72,7 +72,7 @@ public sealed class RunCommand : Command
         var cmd = new Command("status", "Show run status and the next actionable test");
         var runId = new Argument<string?>("run-id", () => null, "Run id (defaults to the active run)");
         cmd.AddArgument(runId);
-        cmd.SetHandler(async ctx => ctx.ExitCode = await Handler(ctx).StatusAsync(ctx.ParseResult.GetValueForArgument(runId), ctx.GetCancellationToken()));
+        cmd.SetHandler(async ctx => ctx.ExitCode = await CreateHandler(ctx).StatusAsync(ctx.ParseResult.GetValueForArgument(runId), ctx.GetCancellationToken()));
         return cmd;
     }
 
@@ -83,7 +83,7 @@ public sealed class RunCommand : Command
         var testId = new Option<string?>("--test-id", "Show a specific test by id");
         var handle = new Option<string?>("--handle", "Show a specific test by handle");
         cmd.AddArgument(runId); cmd.AddOption(testId); cmd.AddOption(handle);
-        cmd.SetHandler(async ctx => ctx.ExitCode = await Handler(ctx).ShowAsync(
+        cmd.SetHandler(async ctx => ctx.ExitCode = await CreateHandler(ctx).ShowAsync(
             ctx.ParseResult.GetValueForArgument(runId),
             ctx.ParseResult.GetValueForOption(testId),
             ctx.ParseResult.GetValueForOption(handle),
@@ -98,7 +98,7 @@ public sealed class RunCommand : Command
         var status = new Option<string?>("--status", "Verdict: pass | fail | blocked | skip") { IsRequired = false };
         var notes = new Option<string?>("--notes", "Observations (required for fail/blocked/skip)");
         cmd.AddArgument(handle); cmd.AddOption(status); cmd.AddOption(notes);
-        cmd.SetHandler(async ctx => ctx.ExitCode = await Handler(ctx).AdvanceAsync(
+        cmd.SetHandler(async ctx => ctx.ExitCode = await CreateHandler(ctx).AdvanceAsync(
             ctx.ParseResult.GetValueForArgument(handle),
             ctx.ParseResult.GetValueForOption(status),
             ctx.ParseResult.GetValueForOption(notes),
@@ -113,7 +113,7 @@ public sealed class RunCommand : Command
         var reason = new Option<string?>("--reason", "Reason for skipping (required)");
         var blocked = new Option<bool>("--blocked", "Mark as BLOCKED instead of SKIPPED");
         cmd.AddArgument(handle); cmd.AddOption(reason); cmd.AddOption(blocked);
-        cmd.SetHandler(async ctx => ctx.ExitCode = await Handler(ctx).SkipAsync(
+        cmd.SetHandler(async ctx => ctx.ExitCode = await CreateHandler(ctx).SkipAsync(
             ctx.ParseResult.GetValueForArgument(handle),
             ctx.ParseResult.GetValueForOption(reason),
             ctx.ParseResult.GetValueForOption(blocked),
@@ -127,7 +127,7 @@ public sealed class RunCommand : Command
         var handle = new Argument<string?>("handle", () => null, "Test handle (defaults to the in-progress test)");
         var note = new Option<string?>("--note", "Note text (required)");
         cmd.AddArgument(handle); cmd.AddOption(note);
-        cmd.SetHandler(async ctx => ctx.ExitCode = await Handler(ctx).NoteAsync(
+        cmd.SetHandler(async ctx => ctx.ExitCode = await CreateHandler(ctx).NoteAsync(
             ctx.ParseResult.GetValueForArgument(handle),
             ctx.ParseResult.GetValueForOption(note),
             ctx.GetCancellationToken()));
@@ -140,7 +140,7 @@ public sealed class RunCommand : Command
         var runId = new Argument<string?>("run-id", () => null, "Run id (defaults to the active run)");
         var testId = new Option<string?>("--test-id", "Test id to requeue (required)");
         cmd.AddArgument(runId); cmd.AddOption(testId);
-        cmd.SetHandler(async ctx => ctx.ExitCode = await Handler(ctx).RetestAsync(
+        cmd.SetHandler(async ctx => ctx.ExitCode = await CreateHandler(ctx).RetestAsync(
             ctx.ParseResult.GetValueForArgument(runId),
             ctx.ParseResult.GetValueForOption(testId),
             ctx.GetCancellationToken()));
@@ -156,7 +156,7 @@ public sealed class RunCommand : Command
         var testIds = new Option<string[]>("--test-ids", "Apply to specific test IDs") { AllowMultipleArgumentsPerToken = true };
         var reason = new Option<string?>("--reason", "Reason/notes");
         cmd.AddArgument(runId); cmd.AddOption(status); cmd.AddOption(remaining); cmd.AddOption(testIds); cmd.AddOption(reason);
-        cmd.SetHandler(async ctx => ctx.ExitCode = await Handler(ctx).BulkRecordAsync(
+        cmd.SetHandler(async ctx => ctx.ExitCode = await CreateHandler(ctx).BulkRecordAsync(
             ctx.ParseResult.GetValueForOption(status),
             ctx.ParseResult.GetValueForOption(remaining),
             ctx.ParseResult.GetValueForOption(testIds),
@@ -172,7 +172,7 @@ public sealed class RunCommand : Command
         var runId = new Argument<string?>("run-id", () => null, "Run id (defaults to the active run)");
         var force = new Option<bool>("--force", "Finalize even if tests are still pending");
         cmd.AddArgument(runId); cmd.AddOption(force);
-        cmd.SetHandler(async ctx => ctx.ExitCode = await Handler(ctx).FinalizeAsync(
+        cmd.SetHandler(async ctx => ctx.ExitCode = await CreateHandler(ctx).FinalizeAsync(
             ctx.ParseResult.GetValueForArgument(runId),
             ctx.ParseResult.GetValueForOption(force),
             ctx.GetCancellationToken()));
@@ -186,7 +186,7 @@ public sealed class RunCommand : Command
         cmd.AddArgument(runId);
         cmd.SetHandler(async ctx =>
         {
-            var h = Handler(ctx);
+            var h = CreateHandler(ctx);
             var id = ctx.ParseResult.GetValueForArgument(runId);
             ctx.ExitCode = name switch
             {
@@ -201,21 +201,21 @@ public sealed class RunCommand : Command
     private static Command BuildCancelAll()
     {
         var cmd = new Command("cancel-all", "Cancel every active run");
-        cmd.SetHandler(async ctx => ctx.ExitCode = await Handler(ctx).CancelAllAsync(ctx.GetCancellationToken()));
+        cmd.SetHandler(async ctx => ctx.ExitCode = await CreateHandler(ctx).CancelAllAsync(ctx.GetCancellationToken()));
         return cmd;
     }
 
     private static Command BuildListSuites()
     {
         var cmd = new Command("list-suites", "List runnable suites");
-        cmd.SetHandler(async ctx => ctx.ExitCode = await Handler(ctx).ListSuitesAsync(ctx.GetCancellationToken()));
+        cmd.SetHandler(async ctx => ctx.ExitCode = await CreateHandler(ctx).ListSuitesAsync(ctx.GetCancellationToken()));
         return cmd;
     }
 
     private static Command BuildListActive()
     {
         var cmd = new Command("list-active", "List active runs");
-        cmd.SetHandler(async ctx => ctx.ExitCode = await Handler(ctx).ListActiveAsync(ctx.GetCancellationToken()));
+        cmd.SetHandler(async ctx => ctx.ExitCode = await CreateHandler(ctx).ListActiveAsync(ctx.GetCancellationToken()));
         return cmd;
     }
 
@@ -224,7 +224,7 @@ public sealed class RunCommand : Command
         var cmd = new Command("history", "Show recent run history");
         var suite = new Option<string?>("--suite", "Filter by suite");
         cmd.AddOption(suite);
-        cmd.SetHandler(async ctx => ctx.ExitCode = await Handler(ctx).HistoryAsync(ctx.ParseResult.GetValueForOption(suite), ctx.GetCancellationToken()));
+        cmd.SetHandler(async ctx => ctx.ExitCode = await CreateHandler(ctx).HistoryAsync(ctx.ParseResult.GetValueForOption(suite), ctx.GetCancellationToken()));
         return cmd;
     }
 
@@ -233,14 +233,14 @@ public sealed class RunCommand : Command
         var cmd = new Command("summary", "Show a status-count summary for a run");
         var runId = new Argument<string?>("run-id", () => null, "Run id (defaults to the active run)");
         cmd.AddArgument(runId);
-        cmd.SetHandler(async ctx => ctx.ExitCode = await Handler(ctx).SummaryAsync(ctx.ParseResult.GetValueForArgument(runId), ctx.GetCancellationToken()));
+        cmd.SetHandler(async ctx => ctx.ExitCode = await CreateHandler(ctx).SummaryAsync(ctx.ParseResult.GetValueForArgument(runId), ctx.GetCancellationToken()));
         return cmd;
     }
 
     private static Command BuildSelections()
     {
         var cmd = new Command("selections", "List saved selections");
-        cmd.SetHandler(async ctx => ctx.ExitCode = await Handler(ctx).SelectionsAsync(ctx.GetCancellationToken()));
+        cmd.SetHandler(async ctx => ctx.ExitCode = await CreateHandler(ctx).SelectionsAsync(ctx.GetCancellationToken()));
         return cmd;
     }
 
@@ -251,7 +251,7 @@ public sealed class RunCommand : Command
         var file = new Option<string?>("--file", "Path to the image file (required)");
         var caption = new Option<string?>("--caption", "Optional caption");
         cmd.AddArgument(handle); cmd.AddOption(file); cmd.AddOption(caption);
-        cmd.SetHandler(async ctx => ctx.ExitCode = await Handler(ctx).ScreenshotAsync(
+        cmd.SetHandler(async ctx => ctx.ExitCode = await CreateHandler(ctx).ScreenshotAsync(
             ctx.ParseResult.GetValueForArgument(handle),
             ctx.ParseResult.GetValueForOption(file),
             ctx.ParseResult.GetValueForOption(caption),
@@ -281,7 +281,7 @@ public sealed class RunCommand : Command
         var handle = new Argument<string?>("handle", () => null, "Test handle (defaults to the in-progress/last test)");
         var caption = new Option<string?>("--caption", "Optional caption");
         cmd.AddArgument(handle); cmd.AddOption(caption);
-        cmd.SetHandler(async ctx => ctx.ExitCode = await Handler(ctx).ScreenshotClipboardAsync(
+        cmd.SetHandler(async ctx => ctx.ExitCode = await CreateHandler(ctx).ScreenshotClipboardAsync(
             ctx.ParseResult.GetValueForArgument(handle),
             ctx.ParseResult.GetValueForOption(caption),
             ctx.GetCancellationToken()));
