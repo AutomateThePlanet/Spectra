@@ -1,4 +1,5 @@
 #pragma warning disable CS0618 // RequirementDefinition is obsolete project-wide; the docs-index path still produces it pending the full criteria migration (Spec 047 kept the two payload types separate).
+using Spectra.CLI.Extraction;
 using Spectra.Core.Models.Coverage;
 
 namespace Spectra.CLI.Agent.Copilot;

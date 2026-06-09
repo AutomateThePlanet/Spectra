@@ -1,6 +1,6 @@
 using System.Diagnostics;
-using System.Text.Json;
 using GitHub.Copilot.SDK;
+using Spectra.CLI.Extraction;
 using Spectra.CLI.Prompts;
 using Spectra.CLI.Services;
 using Spectra.Core.Models.Coverage;
@@ -181,95 +181,15 @@ public sealed class CriteriaExtractor
     }
 
     /// <summary>
-    /// Spec 047: classify a raw AI response into one of three outcomes.
-    /// Pure function — exposed as <c>internal</c> so tests can drive each
-    /// branch of the 7-row mapping table without an AI provider.
-    /// The <paramref name="onException"/> callback fires for parse-time
-    /// exceptions and lets the caller log via <c>ErrorLogger</c>.
+    /// Spec 069: thin delegate to the rescued, model-free
+    /// <see cref="Spectra.CLI.Extraction.CriteriaResponseClassifier.Classify"/>. Retained as
+    /// <c>internal</c> so the pre-069 <c>CriteriaExtractor</c> tests drive the classifier through the
+    /// same entry point until this class is deleted (Spec 069 Phase E).
     /// </summary>
     internal static CriteriaExtractionResult ClassifyResponse(
         string? responseText,
         string? source,
         string? component,
         Action<Exception>? onException = null)
-    {
-        if (string.IsNullOrWhiteSpace(responseText))
-            return new CriteriaExtractionResult(ExtractionOutcome.EmptyResponse, []);
-
-        try
-        {
-            var jsonStart = responseText.IndexOf('[');
-            var jsonEnd = responseText.LastIndexOf(']');
-            if (jsonStart < 0 || jsonEnd <= jsonStart)
-                return new CriteriaExtractionResult(ExtractionOutcome.ParseFailure, []);
-
-            var jsonText = responseText[jsonStart..(jsonEnd + 1)];
-
-            var items = JsonSerializer.Deserialize<List<ExtractedCriterion>>(jsonText, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
-
-            if (items is null)
-                return new CriteriaExtractionResult(ExtractionOutcome.ParseFailure, []);
-
-            var criteria = items
-                .Where(i => !string.IsNullOrWhiteSpace(i!.Text))
-                .Select(i => new AcceptanceCriterion
-                {
-                    Text = i!.Text!.Trim(),
-                    Rfc2119 = i.Rfc2119?.Trim().ToUpperInvariant(),
-                    SourceDoc = source,
-                    SourceSection = i.SourceSection?.Trim(),
-                    Component = component,
-                    Priority = NormalizePriority(i.Priority),
-                    Tags = i.Tags?.Where(t => !string.IsNullOrWhiteSpace(t)).ToList() ?? [],
-                    TechniqueHint = NormalizeTechniqueHint(i.TechniqueHint)
-                })
-                .ToList();
-
-            return new CriteriaExtractionResult(ExtractionOutcome.Extracted, criteria);
-        }
-        catch (Exception ex)
-        {
-            onException?.Invoke(ex);
-            return new CriteriaExtractionResult(ExtractionOutcome.ParseFailure, []);
-        }
-    }
-
-    private static string NormalizePriority(string? priority) =>
-        priority?.Trim().ToLowerInvariant() switch
-        {
-            "high" => "high",
-            "low" => "low",
-            _ => "medium"
-        };
-
-    /// <summary>
-    /// Normalizes ISTQB technique hint codes to canonical uppercase form.
-    /// Returns null for empty/whitespace input or unrecognized values so the
-    /// YAML serializer omits the field rather than writing junk.
-    /// </summary>
-    private static string? NormalizeTechniqueHint(string? hint)
-    {
-        if (string.IsNullOrWhiteSpace(hint)) return null;
-        var upper = hint.Trim().ToUpperInvariant();
-        return upper switch
-        {
-            "BVA" or "EP" or "DT" or "ST" or "EG" or "UC" => upper,
-            _ => null
-        };
-    }
-
-    private sealed class ExtractedCriterion
-    {
-        public string? Text { get; set; }
-        public string? Rfc2119 { get; set; }
-        public string? SourceSection { get; set; }
-        public string? Priority { get; set; }
-        public List<string>? Tags { get; set; }
-
-        [System.Text.Json.Serialization.JsonPropertyName("technique_hint")]
-        public string? TechniqueHint { get; set; }
-    }
+        => CriteriaResponseClassifier.Classify(responseText, source, component, onException);
 }

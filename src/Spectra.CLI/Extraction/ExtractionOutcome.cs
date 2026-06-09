@@ -1,13 +1,17 @@
 using Spectra.Core.Models.Coverage;
 
-namespace Spectra.CLI.Agent.Copilot;
+namespace Spectra.CLI.Extraction;
 
 /// <summary>
-/// Spec 047: classifies the outcome of a single-document criteria extraction.
+/// Spec 047/069: classifies the outcome of a single-document criteria extraction.
 /// The caller uses this to decide whether the document's content hash is
 /// safe to record in the cache — only <see cref="Extracted"/> is cacheable.
 /// <see cref="EmptyResponse"/> and <see cref="ParseFailure"/> are
 /// transport/parser-class failures and must be re-attempted on the next run.
+///
+/// Spec 069 relocated this enum + <see cref="CriteriaExtractionResult"/> out of the (now-deleted)
+/// <c>Agent/Copilot</c> namespace into the model-free <c>Spectra.CLI.Extraction</c> home so the
+/// classification path carries no GitHub Copilot SDK dependency.
 /// </summary>
 public enum ExtractionOutcome
 {
@@ -30,7 +34,7 @@ public enum ExtractionOutcome
 }
 
 /// <summary>
-/// Spec 047: typed result of <c>CriteriaExtractor.ExtractFromDocumentAsync</c>.
+/// Spec 047/069: typed result of a single-document criteria classification.
 /// <see cref="IsCacheable"/> is the only signal the caller uses to decide
 /// whether to write the document's content-hash cache record.
 /// </summary>

@@ -1,6 +1,7 @@
 #pragma warning disable CS0618 // RequirementDefinition is obsolete project-wide; the docs-index path still produces it pending the full criteria migration. (Throwing legacy semantics removed in Spec 054.)
 using System.Text.Json;
 using GitHub.Copilot.SDK;
+using Spectra.CLI.Extraction;
 using Spectra.Core.Models.Coverage;
 using SpectraProviderConfig = Spectra.Core.Models.Config.ProviderConfig;
 

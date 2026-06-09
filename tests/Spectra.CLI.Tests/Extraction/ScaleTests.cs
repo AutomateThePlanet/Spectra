@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Spectra.CLI.Extraction;
 using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Commands.Docs;
 using Spectra.Core.Models;

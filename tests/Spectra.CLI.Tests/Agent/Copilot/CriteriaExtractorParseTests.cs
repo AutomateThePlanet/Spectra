@@ -1,4 +1,5 @@
 using Spectra.CLI.Agent.Copilot;
+using Spectra.CLI.Extraction;
 
 namespace Spectra.CLI.Tests.Agent.Copilot;
 

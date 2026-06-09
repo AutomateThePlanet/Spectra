@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Agent.Tools;
+using Spectra.CLI.Extraction;
 using Spectra.CLI.Coverage;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Output;

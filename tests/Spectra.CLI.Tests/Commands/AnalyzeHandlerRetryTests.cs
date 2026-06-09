@@ -1,5 +1,6 @@
 using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Commands.Analyze;
+using Spectra.CLI.Extraction;
 using Spectra.Core.Models.Coverage;
 
 namespace Spectra.CLI.Tests.Commands;

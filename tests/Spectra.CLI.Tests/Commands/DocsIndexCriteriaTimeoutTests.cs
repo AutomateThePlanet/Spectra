@@ -1,5 +1,6 @@
 #pragma warning disable CS0618 // RequirementDefinition is obsolete — the docs-index path still produces it.
 using Spectra.CLI.Agent.Copilot;
+using Spectra.CLI.Extraction;
 using Spectra.CLI.Commands.Docs;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Coverage;

@@ -1,4 +1,5 @@
 using Spectra.CLI.Agent.Copilot;
+using Spectra.CLI.Extraction;
 using SpectraProviderConfig = Spectra.Core.Models.Config.ProviderConfig;
 
 namespace Spectra.CLI.Tests.Agent.Copilot;
