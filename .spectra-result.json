@@ -1,0 +1,6 @@
+{
+  "error": "No spectra.config.json found",
+  "command": "analyze-coverage",
+  "status": "failed",
+  "timestamp": "2026-06-08T09:48:36.3613112\u002B00:00"
+}

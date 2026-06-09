@@ -1,0 +1,528 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="cache-control" content="no-cache">
+    <meta http-equiv="pragma" content="no-cache">
+    
+    <title>SPECTRA — Coverage Analysis</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-navy: #1B2A4A;
+            --color-navy-light: #2D3F5E;
+            --color-passed: #16a34a;
+            --color-passed-bg: #dcfce7;
+            --color-failed: #dc2626;
+            --color-failed-bg: #fee2e2;
+            --color-bg: #F9FAFB;
+            --color-card: #ffffff;
+            --color-border: #E5E7EB;
+            --color-text: #1e293b;
+            --color-text-muted: #64748b;
+            --color-primary: #3b82f6;
+            --color-primary-light: #eff6ff;
+            --color-warning: #d97706;
+            --color-warning-bg: #fffbeb;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--color-bg);
+            color: var(--color-text);
+            line-height: 1.6;
+        }
+        .nav {
+            background: linear-gradient(135deg, var(--color-navy) 0%, var(--color-navy-light) 100%);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+        .nav-logo {
+            color: white;
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+        .nav-title {
+            color: rgba(255,255,255,0.7);
+            font-size: 0.9rem;
+            font-weight: 400;
+        }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+
+        /* Phase Stepper */
+        .stepper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: var(--color-card);
+            border-radius: 12px;
+            border: 1px solid var(--color-border);
+        }
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--color-text-muted);
+            font-weight: 500;
+        }
+        .step.active { color: var(--color-primary); font-weight: 600; }
+        .step.done { color: var(--color-passed); }
+        .step.error { color: var(--color-failed); }
+        .step-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--color-border);
+            flex-shrink: 0;
+        }
+        .step.active .step-dot { background: var(--color-primary); box-shadow: 0 0 0 4px rgba(59,130,246,0.2); }
+        .step.done .step-dot { background: var(--color-passed); }
+        .step.error .step-dot { background: var(--color-failed); }
+        .step-line {
+            width: 40px;
+            height: 2px;
+            background: var(--color-border);
+            margin: 0 4px;
+            flex-shrink: 0;
+        }
+        .step-line.done { background: var(--color-passed); }
+
+        /* Status Card */
+        .status-card {
+            background: var(--color-card);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            border: 1px solid var(--color-border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            margin-bottom: 1.5rem;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 1rem;
+        }
+        .status-badge.analyzing, .status-badge.scanning, .status-badge.scanning-tests, .status-badge.scanning-docs, .status-badge.classifying { background: var(--color-primary-light); color: var(--color-primary); }
+        .status-badge.analyzed { background: var(--color-passed-bg); color: var(--color-passed); }
+        .status-badge.generating, .status-badge.indexing, .status-badge.extracting-criteria, .status-badge.extracting, .status-badge.updating, .status-badge.verifying, .status-badge.analyzing-docs, .status-badge.analyzing-criteria, .status-badge.analyzing-automation, .status-badge.building-index, .status-badge.collecting-data, .status-badge.generating-html { background: var(--color-warning-bg); color: var(--color-warning); }
+        .status-badge.completed, .status-badge.success { background: var(--color-passed-bg); color: var(--color-passed); }
+        .status-badge.failed { background: var(--color-failed-bg); color: var(--color-failed); }
+        .status-badge.cancelled { background: #fef3c7; color: #b45309; }
+        .step.cancelled { color: #b45309; }
+        .step.cancelled .step-dot { background: #f59e0b; background-image: repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 6px); }
+        .suite-name { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .status-message {
+            color: var(--color-text-muted);
+            font-size: 0.95rem;
+            margin-bottom: 0.75rem;
+            min-height: 1.5em;
+        }
+        .status-time { color: var(--color-text-muted); font-size: 0.8rem; opacity: 0.7; }
+
+        /* Spinner */
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+        }
+
+        /* Summary Grid */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .summary-card {
+            background: var(--color-card);
+            border-radius: 12px;
+            padding: 1.25rem;
+            text-align: center;
+            border: 1px solid var(--color-border);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .summary-number {
+            font-size: 2.25rem;
+            font-weight: 700;
+            line-height: 1;
+            color: var(--color-primary);
+        }
+        .summary-number.green { color: var(--color-passed); }
+        .summary-number.red { color: var(--color-failed); }
+        .summary-number.muted { color: var(--color-text-muted); }
+        .summary-label {
+            color: var(--color-text-muted);
+            margin-top: 0.5rem;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+
+        /* Analysis Breakdown */
+        .breakdown {
+            background: var(--color-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid var(--color-border);
+            margin-bottom: 1.5rem;
+        }
+        .breakdown h3 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--color-text);
+        }
+        .breakdown-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--color-border);
+            font-size: 0.9rem;
+        }
+        .breakdown-row:last-child { border-bottom: none; }
+        .breakdown-count { font-weight: 600; color: var(--color-primary); }
+
+        /* Files List */
+        .files-section {
+            background: var(--color-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid var(--color-border);
+            margin-bottom: 1.5rem;
+        }
+        .files-section h3 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        .file-item {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            padding: 6px 10px;
+            background: var(--color-bg);
+            border-radius: 6px;
+            margin-bottom: 4px;
+            color: var(--color-text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .file-icon { opacity: 0.5; }
+        a.file-item {
+            text-decoration: none;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+        a.file-item:hover {
+            background: var(--color-primary-light);
+            color: var(--color-primary);
+        }
+
+        /* Spec 041: Live progress bars (generation + verification) */
+        .progress-section {
+            background: var(--color-card);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            border: 1px solid var(--color-border);
+            margin-bottom: 0.75rem;
+            transition: opacity 0.3s ease;
+        }
+        .progress-section.dimmed { opacity: 0.4; }
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--color-text);
+            margin-bottom: 0.5rem;
+        }
+        .progress-label-count {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--color-text-muted);
+            font-weight: 500;
+        }
+        .progress-bar-track {
+            width: 100%;
+            height: 10px;
+            background: var(--color-bg);
+            border-radius: 5px;
+            overflow: hidden;
+            border: 1px solid var(--color-border);
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--color-primary) 0%, #5fa3ff 100%);
+            border-radius: 5px;
+            transition: width 0.4s ease;
+        }
+        .progress-bar-fill.verifying {
+            background: linear-gradient(90deg, #14b8a6 0%, #5eead4 100%);
+        }
+        .progress-detail {
+            font-size: 0.75rem;
+            color: var(--color-text-muted);
+            margin-top: 0.4rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Verification progress */
+        .verification-section {
+            background: var(--color-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid var(--color-border);
+            margin-bottom: 1.5rem;
+        }
+        .verification-section h3 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        .verification-item {
+            font-size: 0.8rem;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            border-left: 3px solid transparent;
+        }
+        .verdict-grounded { background: var(--color-passed-bg); border-left-color: var(--color-passed); }
+        .verdict-partial { background: #fef9c3; border-left-color: #ca8a04; }
+        .verdict-hallucinated { background: var(--color-failed-bg); border-left-color: var(--color-failed); }
+        .verdict-icon { font-weight: 700; font-size: 0.9rem; }
+        .verdict-grounded .verdict-icon { color: var(--color-passed); }
+        .verdict-partial .verdict-icon { color: #ca8a04; }
+        .verdict-hallucinated .verdict-icon { color: var(--color-failed); }
+        .verdict-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: var(--color-text);
+        }
+        .verdict-title { color: var(--color-text); flex: 1; min-width: 0; }
+        .verdict-badge {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            padding: 2px 8px;
+            border-radius: 10px;
+            letter-spacing: 0.03em;
+        }
+        .verdict-grounded .verdict-badge { background: var(--color-passed); color: white; }
+        .verdict-partial .verdict-badge { background: #ca8a04; color: white; }
+        .verdict-hallucinated .verdict-badge { background: var(--color-failed); color: white; }
+        .verdict-reason {
+            width: 100%;
+            font-size: 0.75rem;
+            color: var(--color-text-muted);
+            font-style: italic;
+            padding-left: 24px;
+        }
+
+        /* Rejected tests */
+        .rejected-section {
+            background: var(--color-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid var(--color-border);
+            margin-bottom: 1.5rem;
+        }
+        .rejected-section h3 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--color-failed);
+        }
+        .rejected-item {
+            font-size: 0.8rem;
+            padding: 8px 10px;
+            background: var(--color-failed-bg);
+            border-radius: 6px;
+            margin-bottom: 4px;
+            border-left: 3px solid var(--color-failed);
+        }
+        .rejected-id {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: var(--color-failed);
+        }
+        .rejected-title {
+            color: var(--color-text);
+        }
+        .rejected-reason {
+            font-size: 0.75rem;
+            color: var(--color-text-muted);
+            margin-top: 4px;
+            font-style: italic;
+        }
+
+        /* Error */
+        .error-card {
+            background: var(--color-failed-bg);
+            border: 1px solid var(--color-failed);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .error-card h3 { color: var(--color-failed); margin-bottom: 0.5rem; font-size: 1rem; }
+        .error-card p { color: var(--color-text); font-size: 0.9rem; }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 1.5rem;
+            color: var(--color-text-muted);
+            font-size: 0.8rem;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+        .refresh-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .refresh-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--color-primary);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        /* Responsive — narrow VS Code panels and small screens */
+        @media (max-width: 600px) {
+            .container { padding: 1rem; }
+            .nav { padding: 10px 16px; }
+            .nav-logo { font-size: 1.1rem; }
+            .nav-title { font-size: 0.8rem; }
+
+            .stepper {
+                flex-wrap: wrap;
+                gap: 4px 0;
+                padding: 1rem;
+                justify-content: flex-start;
+            }
+            .step { font-size: 0.75rem; gap: 5px; }
+            .step-line { width: 20px; margin: 0 2px; }
+            .step-dot { width: 10px; height: 10px; }
+
+            .status-card { padding: 1.25rem; }
+            .suite-name { font-size: 1.2rem; }
+            .status-message { font-size: 0.85rem; }
+
+            .summary-grid { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.5rem; }
+            .summary-card { padding: 0.75rem; }
+            .summary-number { font-size: 1.5rem; }
+            .summary-label { font-size: 0.65rem; }
+
+            .breakdown { padding: 1rem; }
+            .files-section { padding: 1rem; }
+            .file-item { font-size: 0.7rem; padding: 5px 8px; }
+        }
+
+        @media (max-width: 400px) {
+            .container { padding: 0.5rem; }
+            .stepper { padding: 0.75rem; }
+            .step { font-size: 0.7rem; }
+            .step-line { width: 12px; }
+            .status-card { padding: 1rem; }
+            .summary-grid { grid-template-columns: 1fr 1fr; }
+        }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <span class="nav-logo">SPECTRA</span>
+        <span class="nav-title">Coverage Analysis</span>
+    </nav>
+    <div class="container" data-workspace="C:/SourceCode/Spectra">
+        <div class="stepper"><div class="step error"><div class="step-dot"></div>Scanning Tests</div><div class="step-line"></div><div class="step "><div class="step-dot"></div>Analyzing Docs</div><div class="step-line"></div><div class="step "><div class="step-dot"></div>Analyzing Criteria</div><div class="step-line"></div><div class="step "><div class="step-dot"></div>Analyzing Automation</div><div class="step-line"></div><div class="step "><div class="step-dot"></div>Completed</div></div><div class="status-card">
+    <div class="status-badge failed"> Failed</div>
+    <div class="suite-name"></div>
+    <div class="status-message"></div>
+    <div class="status-time">Last updated: 12:48:36</div>
+</div><div class="error-card">
+    <h3>Generation Failed</h3>
+    <p>No spectra.config.json found</p>
+</div><div class="footer">
+    <span class="refresh-indicator">
+        Live updates stopped — run complete. Scroll freely.
+    </span>
+</div>
+    </div>
+    <script>
+        // Restore scroll position if we just auto-reloaded.
+        // sessionStorage is per-tab so two parallel runs in different
+        // tabs don't fight each other.
+        (function() {
+            try {
+                var key = 'spectra-progress-scroll';
+                var saved = sessionStorage.getItem(key);
+                if (saved !== null) {
+                    window.scrollTo(0, parseInt(saved, 10) || 0);
+                }
+            } catch (e) { /* sessionStorage may be unavailable */ }
+        })();
+
+        // Auto-refresh policy:
+        //   - In-progress pages: poll every 1.5s, saving scroll position
+        //     before each reload so the user doesn't get bounced to top.
+        //   - Terminal pages (completed/failed): poll every 5s. v1.43.0
+        //     fix: previously this case stopped polling entirely, which
+        //     meant a stale Completed view stayed stale even after the
+        //     user kicked off a new run that rewrote .spectra-progress.html.
+        //     Slow polling lets the page auto-detect the new run without
+        //     requiring the agent to re-open the browser.
+        (function() {
+            var isTerminal = true;
+            if (isTerminal) {
+                try { sessionStorage.removeItem('spectra-progress-scroll'); } catch (e) {}
+            }
+            setInterval(function() {
+                try {
+                    sessionStorage.setItem('spectra-progress-scroll', String(window.scrollY));
+                } catch (e) {}
+                var base = window.location.pathname;
+                window.location.replace(base + '?_=' + Date.now());
+            }, isTerminal ? 5000 : 1500);
+        })();
+
+        // File links: open vscode:// URIs via JavaScript click handler
+        // (browsers block direct <a href="vscode://..."> from file:// pages)
+        document.addEventListener('click', function(e) {
+            var link = e.target.closest('[data-vscode-uri]');
+            if (link) {
+                e.preventDefault();
+                window.location.href = link.getAttribute('data-vscode-uri');
+            }
+        });
+    </script>
+</body>
+</html>
