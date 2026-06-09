@@ -683,34 +683,21 @@ public sealed class InitHandler
 
     private async Task CreateVsCodeMcpConfigAsync(CancellationToken ct)
     {
-        var mcpConfigPath = Path.Combine(_workingDirectory, VsCodeMcpPath);
-        var vsCodeDir = Path.GetDirectoryName(mcpConfigPath)!;
-
-        if (!Directory.Exists(vsCodeDir))
+        // Spec 068 (FR-013/FR-014/FR-018) — merge-by-key on servers.spectra instead of skip-if-exists,
+        // so a peer tool's .vscode/mcp.json (e.g. a BELLATRIX server) is preserved rather than blocking
+        // SPECTRA's registration. Fail loud on an unparseable file (never overwrite it).
+        try
         {
-            Directory.CreateDirectory(vsCodeDir);
+            var path = await Skills.VsCodeMcpConfigInstaller.EnsureInstalledAsync(_workingDirectory, ct);
+            _logger.LogDebug("Ensured VS Code MCP config (merge-by-key on 'spectra'): {Path}", path);
         }
-
-        // Don't overwrite existing MCP config
-        if (File.Exists(mcpConfigPath))
+        catch (Skills.InvalidMcpConfigException ex)
         {
-            _logger.LogDebug("VS Code MCP config already exists, skipping: {Path}", mcpConfigPath);
-            return;
+            _logger.LogError(
+                "Could not update {Path}: {Message} Fix or remove the file and re-run — SPECTRA left it untouched.",
+                VsCodeMcpPath, ex.Message);
+            throw;
         }
-
-        var mcpConfig = """
-            {
-              "servers": {
-                "spectra": {
-                  "command": "spectra-mcp",
-                  "args": ["."]
-                }
-              }
-            }
-            """;
-
-        await File.WriteAllTextAsync(mcpConfigPath, mcpConfig, ct);
-        _logger.LogDebug("Created VS Code MCP config: {Path}", mcpConfigPath);
     }
 
     private async Task UpdateGitIgnoreAsync(CancellationToken ct)

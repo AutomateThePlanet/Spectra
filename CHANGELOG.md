@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — Claude Code migration (v2)
 
+### Changed (Spec 068 — shared-namespace `init` contract: SPECTRA conformance)
+
+- **`spectra init` now merges `.vscode/mcp.json` by key instead of skipping it when present.**
+  The previous writer returned early if the file already existed, so when a peer ATP tool (e.g. a
+  BELLATRIX MCP server) had written `.vscode/mcp.json` first, SPECTRA silently never registered its
+  `spectra` server. The new `VsCodeMcpConfigInstaller` (mirroring `ClaudeSettingsInstaller`) does a
+  read-modify-write that adds/updates only the `servers.spectra` key and preserves every foreign
+  server and top-level key (e.g. `inputs`). It is idempotent — when the entry is already current the
+  file is left byte-unchanged (preserving user comments) — tolerates JSONC (comments/trailing
+  commas), and **fails loud** on an unparseable file rather than overwriting it. Realizes FR-013/
+  FR-014/FR-015/FR-018 of the shared-namespace init contract (zero silent loss when multiple tools
+  scaffold into one repo). Other SPECTRA init behaviors (prefixed `.claude/skills/spectra-*`, the
+  unique `spectra-critic` subagent, manifest-scoped hash-tracked `update-skills`, abort-without-
+  `--force`) were already compliant and are unchanged. New `VsCodeMcpConfigInstallerTests` (10) +
+  `InitVsCodeMcpMergeTests` (2). BELLATRIX-side conformance (FR-020–FR-025) is tracked separately in
+  its own repository.
+
 ### Fixed (execution identity stability)
 
 - **`UserIdentityResolver` now resolves a single, process-stable identity.** It previously shelled out
