@@ -10,6 +10,7 @@ public sealed class DocsCommand : Command
     public DocsCommand() : base("docs", "Documentation management commands")
     {
         AddCommand(new DocsIndexCommand());
+        AddCommand(new DocsChangedCommand());
         AddCommand(new DocsListSuitesCommand());
         AddCommand(new DocsShowSuiteCommand());
     }

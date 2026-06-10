@@ -1,46 +1,84 @@
 ---
 name: spectra-criteria
 description: Extract, import, and browse acceptance criteria for test coverage analysis.
-tools: [{{READONLY_TOOLS}}]
+tools: [{{GENERATE_TOOLS}}]
 ---
 
 # SPECTRA Criteria SKILL
 
-You help users manage acceptance criteria in SPECTRA. Run CLI commands with the Bash tool and present results readably.
+You manage acceptance criteria in SPECTRA. Extraction runs **in this session** through a deterministic
+CLI seam — the CLI never calls a model. It **compiles a grounded prompt** per document, *you* perform the
+extraction turn in your own context (reading the document with your file tools), and the CLI **ingests**
+and validates what you produced. The seam, per document:
+
+```
+docs changed (CLI) → compile-extraction-prompt (CLI) → you extract in-session → ingest-criteria (CLI, fail-loud)
+```
+
+There is **no** `spectra ai analyze --extract-criteria` model call anymore. Do not look for one.
 
 ## Extract acceptance criteria from documentation
 
-**Step 1** — Open the live progress page: Open .spectra-progress.html?nocache=1
+### Step 1 — Find the work-list (deterministic, no model)
 
-**Step 2** — Run with the Bash tool:
 ```
-spectra ai analyze --extract-criteria --no-interaction --output-format json --verbosity quiet
+spectra docs changed --output-format json
 ```
-For full re-extraction (ignore cache), add `--force`.
 
-**Step 3** — Wait for the command to finish. The progress page auto-refreshes — the user can watch live. While it runs, do NOTHING — don't poll the terminal, list directories, or read files; just wait for it to complete.
+Read the `changed` array. Each entry is `{ path, component, status, current_hash, indexed_hash }` with
+`status` = `new` or `changed`. **If `changed` is empty, report "Acceptance criteria are up to date" and
+STOP** — do not extract anything. (Unchanged documents are skipped here, so they never reach a model turn.
+Use `--force`-style full re-extraction by passing `--include-unchanged` and processing every doc only when
+the user explicitly asks to re-extract everything.)
 
-**Step 4** — Read `.spectra-result.json`
+### Step 2 — Per changed document: compile → extract in-session → ingest
 
-**Step 5** — Show: documents processed, criteria extracted, new/updated/unchanged counts. Suggest next steps: "Run coverage analysis?" or "Generate test cases for uncovered criteria?"
+For EACH entry in `changed`, using its `path` and `component`:
+
+**2a. Compile the extraction prompt** (Bash, capture stdout):
+```
+spectra ai compile-extraction-prompt --doc {path} --component {component} --output-format json
+```
+- Exit 0 with a prompt on stdout → proceed to 2b.
+- Exit 0 with `{ "short_circuit": true, "outcome": "Extracted", "criteria": [] }` → the document is
+  empty; nothing to extract. Skip it (no model turn, no ingest needed).
+- Exit 4 (refused) → show the `message` and skip that doc.
+
+**2b. Extract IN-SESSION**: Read the compiled prompt. Use your file tools to read `{path}` and identify
+every testable acceptance criterion exactly as the prompt specifies. Produce ONLY the JSON array the
+prompt describes. **Write it to `.spectra/criteria.json`** with the Write tool.
+
+**2c. Ingest (fail-loud)**:
+```
+spectra ai ingest-criteria --doc {path} --component {component} --from .spectra/criteria.json --output-format json
+```
+- Exit 0 → persisted; record `persisted` count + `ids`.
+- Exit 5 (empty) or exit 6 (unparseable JSON array) → **fail loud, nothing persisted.** Re-read the
+  compiled prompt, regenerate stricter JSON, rewrite `.spectra/criteria.json`, and re-ingest. **Bounded:
+  at most 2 attempts** per document; then record that document as failed and continue with the rest.
+
+### Step 3 — Summarize
+
+Report: documents processed, criteria persisted (new/updated), documents skipped as unchanged (from
+Step 1), and any per-document failures. Suggest next steps: "Run coverage analysis?" or "Generate test
+cases for uncovered criteria?"
 
 ---
 
 ## Import acceptance criteria from external file
 
+Import is fully deterministic — no model call, no AI splitting.
+
 **Step 1** — Run with the Bash tool:
 ```
-spectra ai analyze --import-criteria {path} --no-interaction --output-format json --verbosity quiet
+spectra ai analyze --import-criteria {path} [--replace] --no-interaction --output-format json --verbosity quiet
 ```
+Supported formats: YAML (.yaml/.yml), CSV (.csv), JSON (.json); auto-detected by extension. `--replace`
+overwrites existing criteria instead of merging.
 
-Supported formats: YAML (.yaml/.yml), CSV (.csv), JSON (.json).
-Auto-detects format by extension. Use `--skip-splitting` to disable AI splitting.
+**Step 2** — Read `.spectra-result.json`.
 
-**Step 2** — Wait for the command to finish.
-
-**Step 3** — Read `.spectra-result.json`
-
-**Step 4** — Show: imported count, split count, merge results. Suggest: "List imported criteria?" or "Run coverage analysis?"
+**Step 3** — Show: imported count, merge results. Suggest: "List imported criteria?" or "Run coverage analysis?"
 
 ---
 
@@ -53,28 +91,6 @@ spectra ai analyze --list-criteria --no-interaction --output-format json --verbo
 
 Filter options: `--source-type`, `--component`, `--priority`
 
-**Step 2** — Wait for the command to finish.
+**Step 2** — Read `.spectra-result.json`.
 
-**Step 3** — Read `.spectra-result.json`
-
-**Step 4** — Show criteria grouped by component with coverage status. Suggest: "Generate test cases for uncovered criteria?"
-
----
-
-## Cancel the current run
-
-If the user says "stop", "cancel", "kill it", "stop the analysis", "stop generating":
-
-**Step 1** — Run with the Bash tool:
-```
-spectra cancel --no-interaction --output-format json --verbosity quiet
-```
-
-**Step 2** — Wait for the command to finish, then Read `.spectra-result.json`.
-
-**Step 3** — Report what happened:
-- `status: completed` with `shutdown_path: cooperative` → "Cancelled at phase {phase}. Tests/files written before stopping are preserved."
-- `status: completed` with `shutdown_path: forced` → "Force-killed after grace window."
-- `status: no_active_run` → "Nothing was running."
-
-If the original command's progress page is still open, point the user at it — it now shows the "Cancelled" terminal phase.
+**Step 3** — Show criteria grouped by component with coverage status. Suggest: "Generate test cases for uncovered criteria?"

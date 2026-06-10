@@ -194,8 +194,11 @@ public class SkillsManifestTests : IDisposable
         // compile/ingest seam, whose commands are inherently non-interactive (stdin/args →
         // stdout) and do not take --no-interaction. They are excluded from this legacy-convention
         // check (their per-line flag conformance is not meaningful for seam commands).
+        // Spec 069: spectra-criteria also excluded — its extraction recipe now drives the
+        // compile-extraction-prompt / ingest-criteria / docs-changed seam (stdin/args → stdout),
+        // whose commands do not all take the legacy per-line flags.
         var skillsWithCommands = new[] { "spectra-coverage", "spectra-dashboard",
-            "spectra-validate", "spectra-criteria", "spectra-docs", "spectra-list", "spectra-init-profile" };
+            "spectra-validate", "spectra-docs", "spectra-list", "spectra-init-profile" };
 
         foreach (var skillName in skillsWithCommands)
         {
@@ -215,8 +218,11 @@ public class SkillsManifestTests : IDisposable
     {
         // Spec 063: spectra-update excluded — its seam commands (compile-update-prompt /
         // ingest-update) emit to stdout and do not all take --output-format (mirrors spectra-generate).
+        // Spec 069: spectra-criteria also excluded — its extraction recipe now drives the
+        // compile-extraction-prompt / ingest-criteria / docs-changed seam (stdin/args → stdout),
+        // whose commands do not all take the legacy per-line flags.
         var skillsWithCommands = new[] { "spectra-coverage", "spectra-dashboard",
-            "spectra-validate", "spectra-criteria", "spectra-docs", "spectra-list", "spectra-init-profile" };
+            "spectra-validate", "spectra-docs", "spectra-list", "spectra-init-profile" };
 
         foreach (var skillName in skillsWithCommands)
         {
@@ -235,8 +241,11 @@ public class SkillsManifestTests : IDisposable
     {
         // Spec 063: spectra-update excluded — its seam commands do not all take --verbosity
         // (mirrors spectra-generate).
+        // Spec 069: spectra-criteria also excluded — its extraction recipe now drives the
+        // compile-extraction-prompt / ingest-criteria / docs-changed seam (stdin/args → stdout),
+        // whose commands do not all take the legacy per-line flags.
         var skillsWithCommands = new[] { "spectra-coverage", "spectra-dashboard",
-            "spectra-validate", "spectra-criteria", "spectra-docs", "spectra-list", "spectra-init-profile" };
+            "spectra-validate", "spectra-docs", "spectra-list", "spectra-init-profile" };
 
         foreach (var skillName in skillsWithCommands)
         {
