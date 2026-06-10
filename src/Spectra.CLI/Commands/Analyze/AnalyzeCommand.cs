@@ -54,10 +54,6 @@ public sealed class AnalyzeCommand : Command
             ["--replace"],
             "Replace existing criteria instead of merging");
 
-        var skipSplittingOption = new Option<bool>(
-            ["--skip-splitting"],
-            "Skip AI-powered splitting of compound criteria");
-
         var listCriteriaOption = new Option<bool>(
             ["--list-criteria"],
             "List all acceptance criteria with coverage status");
@@ -88,7 +84,6 @@ public sealed class AnalyzeCommand : Command
         AddOption(importCriteriaOption);
         AddOption(mergeOption);
         AddOption(replaceOption);
-        AddOption(skipSplittingOption);
         AddOption(listCriteriaOption);
         AddOption(sourceTypeOption);
         AddOption(componentOption);
@@ -106,7 +101,6 @@ public sealed class AnalyzeCommand : Command
             var force = context.ParseResult.GetValueForOption(forceOption);
             var importCriteria = context.ParseResult.GetValueForOption(importCriteriaOption);
             var replace = context.ParseResult.GetValueForOption(replaceOption);
-            var skipSplitting = context.ParseResult.GetValueForOption(skipSplittingOption);
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
             var dryRun = context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption);
 
@@ -132,7 +126,6 @@ public sealed class AnalyzeCommand : Command
                 context.ExitCode = await handler.RunImportCriteriaAsync(
                     importCriteria,
                     replace,
-                    skipSplitting,
                     dryRun,
                     context.GetCancellationToken());
             }

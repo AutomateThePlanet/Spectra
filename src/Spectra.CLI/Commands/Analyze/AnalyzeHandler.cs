@@ -824,7 +824,6 @@ public sealed class AnalyzeHandler
     public async Task<int> RunImportCriteriaAsync(
         string importPath,
         bool replace,
-        bool skipSplitting,
         bool dryRun,
         CancellationToken ct = default)
     {
@@ -941,82 +940,11 @@ public sealed class AnalyzeHandler
                 Console.Error.WriteLine($"  Parsed {importedCount} criteria from {Path.GetFileName(fullImportPath)}.");
             }
 
-            // 4. Split compound criteria if needed
+            // 4. Spec 069 (FR-008): import is a deterministic pass-through. Compound-splitting was the
+            // only import-time model call; it is dropped, so imported criteria are persisted verbatim
+            // (a future additive sub-seam may reintroduce splitting if real imports demand it).
             var splitCount = 0;
             var normalizedCount = 0;
-
-            if (!skipSplitting)
-            {
-                var criteriaToSplit = imported
-                    .Where(c => c.Text.Contains("\n- ") || c.Text.Contains("\n* ") ||
-                                c.Text.StartsWith("- ") || c.Text.StartsWith("* "))
-                    .ToList();
-
-                if (criteriaToSplit.Count > 0)
-                {
-                    var provider = config.Ai.Providers.FirstOrDefault(p => p.Enabled);
-                    if (provider is not null)
-                    {
-                        var extractor = new CriteriaExtractor(
-                            provider,
-                            _verbosity >= VerbosityLevel.Normal ? s => Console.Error.WriteLine(s) : null);
-
-                        var expandedList = new List<AcceptanceCriterion>();
-
-                        foreach (var criterion in imported)
-                        {
-                            if (criteriaToSplit.Contains(criterion))
-                            {
-                                try
-                                {
-                                    var splitResults = await extractor.SplitAndNormalizeAsync(
-                                        criterion.Text,
-                                        criterion.Source,
-                                        criterion.Component,
-                                        ct);
-
-                                    if (splitResults.Count > 0)
-                                    {
-                                        // Preserve source metadata on split results
-                                        foreach (var split in splitResults)
-                                        {
-                                            split.Source = criterion.Source;
-                                            split.SourceType = criterion.SourceType;
-                                            split.SourceDoc = criterion.SourceDoc;
-                                        }
-                                        expandedList.AddRange(splitResults);
-                                        splitCount += splitResults.Count;
-                                        normalizedCount++;
-                                    }
-                                    else
-                                    {
-                                        expandedList.Add(criterion);
-                                    }
-                                }
-                                catch (Exception ex) when (ex is not OperationCanceledException)
-                                {
-                                    Spectra.CLI.Infrastructure.ErrorLogger.Write(
-                                        "criteria", $"split criterion={criterion.Id}", ex);
-                                    if (_verbosity >= VerbosityLevel.Normal)
-                                        Console.Error.WriteLine($"  Failed to split criterion: {ex.Message}");
-                                    expandedList.Add(criterion);
-                                }
-                            }
-                            else
-                            {
-                                expandedList.Add(criterion);
-                            }
-                        }
-
-                        imported = expandedList;
-
-                        if (_verbosity >= VerbosityLevel.Normal && normalizedCount > 0)
-                        {
-                            Console.Error.WriteLine($"  Split {normalizedCount} compound criteria into {splitCount} atomic criteria.");
-                        }
-                    }
-                }
-            }
 
             // 5. Assign IDs to criteria that don't have them
             // Build a set of all existing IDs to avoid collisions
