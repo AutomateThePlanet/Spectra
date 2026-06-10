@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — Claude Code migration (v2)
 
+### Changed (Spec 069 — criteria-extraction inversion completion + GitHub Copilot SDK removal)
+
+- **The GitHub Copilot SDK and every in-process model path are gone.** Criteria extraction was the
+  last live consumer of `ai.providers`; it now runs on the existing model-free seam, driven by the
+  `spectra-criteria` skill: `spectra docs changed` (new — deterministic SHA-256 work-list) →
+  `spectra ai compile-extraction-prompt` → an in-session model turn → `spectra ai ingest-criteria`
+  (fail-loud, bounded retry). No `spectra ai analyze --extract-criteria` model call remains.
+- **`spectra docs index` is index-only** — it makes no model call and no longer writes
+  `docs/requirements/_requirements.yaml`; `RequirementsExtractor` is retired and `--skip-criteria` is
+  an accepted no-op.
+- **Import is a deterministic pass-through** — compound-splitting (the last import-time model call) and
+  the `--skip-splitting` flag were removed.
+- **`spectra init` asks no AI-provider question**, and the generated `spectra.config.json` has no
+  `ai.providers`/`ai.critic` block (legacy configs that still carry them load cleanly — unmapped keys
+  are ignored). The `MISSING_PROVIDERS` validation rule, the provider/critic config model
+  (`ProviderConfig`, `AiConfig.Providers/Critic`), `spectra auth`, `AgentFactory`, and
+  `src/Spectra.CLI/Agent/Copilot/` were deleted; the model-free analysis helpers were rescued to
+  `Spectra.CLI.Analysis`, and `Microsoft.Extensions.AI.Abstractions` is now referenced directly
+  (was transitive via the SDK). `.criteria.yaml` / `_criteria_index.yaml` output is byte-compatible.
+
 ### Changed (Spec 068 — shared-namespace `init` contract: SPECTRA conformance)
 
 - **`spectra init` now merges `.vscode/mcp.json` by key instead of skipping it when present.**

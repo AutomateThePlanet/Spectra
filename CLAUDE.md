@@ -3,7 +3,7 @@
 Last updated: 2026-04-30 | Version history in `CHANGELOG.md`
 
 ## Tech Stack
-- C# 12, .NET 8+, Claude Code (AI runtime — authoring orchestration ships as `.claude/skills/` + `.claude/agents/`), System.CommandLine, Spectre.Console, System.Text.Json. Spec 058 retired the in-process **critic** provider chain (the critic is the `spectra-critic` subagent; `ai.critic.model` is its only selector). **Spec 059** inverted **generation** onto the compile→in-session-generate→ingest seam and removed the in-process generator (`CopilotGenerationAgent`, `BehaviorAnalyzer`, `UserDescribedGenerator`, `ProviderChain`, `AgentFactory.CreateAgentAsync`, the `spectra ai generate` command) — generation now runs in the interactive session via the `spectra-generate` skill (`spectra ai compile-prompt` / `compile-analysis-prompt` → ingest). `CopilotService` + `ProviderMapping` + `ai.providers` + the GitHub Copilot SDK are **retained** (still used by the in-process criteria-extraction path and Copilot auth); their removal awaits a spec that also inverts those.
+- C# 12, .NET 8+, Claude Code (AI runtime — authoring orchestration ships as `.claude/skills/` + `.claude/agents/`), System.CommandLine, Spectre.Console, System.Text.Json. Spec 058 retired the in-process **critic** provider chain (the critic is the `spectra-critic` subagent; `ai.critic.model` is its only selector). **Spec 059** inverted **generation** onto the compile→in-session-generate→ingest seam and removed the in-process generator (`CopilotGenerationAgent`, `BehaviorAnalyzer`, `UserDescribedGenerator`, `ProviderChain`, `AgentFactory.CreateAgentAsync`, the `spectra ai generate` command) — generation now runs in the interactive session via the `spectra-generate` skill (`spectra ai compile-prompt` / `compile-analysis-prompt` → ingest). **Spec 069** completed the migration: it inverted **criteria extraction** onto the same compile→in-session→ingest seam (`spectra docs changed` → `compile-extraction-prompt` → in-session turn → `ingest-criteria`, driven by the `spectra-criteria` skill), made `docs index` index-only (retiring `RequirementsExtractor`/`_requirements.yaml`), dropped import compound-splitting, and **deleted the GitHub Copilot SDK entirely** — `CopilotService`, `ProviderMapping`, `CriteriaExtractor`, `Agent/Copilot/`, `AgentFactory`, `spectra auth`, and the `ai.providers`/`ai.critic` config model are gone (model-free analysis helpers were rescued to `Spectra.CLI.Analysis`; `Microsoft.Extensions.AI.Abstractions` is now a direct dependency). All inference is the user's Claude Code session.
 - ASP.NET Core (MCP server), Microsoft.Data.Sqlite, SQLite (`.execution/spectra.db`)
 - YamlDotNet (manifest serialization), Microsoft.Extensions.FileSystemGlobbing (exclusion patterns)
 - CsvHelper (CSV import), dual-model verification (Generator + Critic) — the critic runs as a `context: fork` subagent (`.claude/agents/spectra-critic`)
@@ -17,7 +17,9 @@ Last updated: 2026-04-30 | Version history in `CHANGELOG.md`
 src/
   Spectra.CLI/          # CLI app
     Commands/           # Analyze, Dashboard, Docs, Generate, Update, Run (Spec 065 execution surface)
-    Agent/              # Copilot SDK integration (Copilot/, Critic/)
+    Agent/              # Critic/ (subagent prompt builders), Tools/, Testimize/ — Copilot SDK removed (Spec 069)
+    Analysis/           # Model-free analysis helpers (AnalyzerInputBuilder, DocumentTools, …)
+    Extraction/         # Model-free criteria seam (ExtractionPromptCompiler, CriteriaIngestor, CriteriaResponseClassifier)
     Source/             # Document map, index service
     Index/              # _index.json ops
     Validation/         # Dedup, DuplicateDetector

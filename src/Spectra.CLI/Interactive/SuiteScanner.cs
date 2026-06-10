@@ -11,7 +11,7 @@ public sealed class SuiteScanner
     /// <summary>
     /// Scans the tests directory for suites with their test counts and metadata.
     /// </summary>
-    public async Task<IReadOnlyList<SuiteSummary>> ScanSuitesAsync(
+    public Task<IReadOnlyList<SuiteSummary>> ScanSuitesAsync(
         string testsDirectory,
         CancellationToken ct = default)
     {
@@ -19,7 +19,7 @@ public sealed class SuiteScanner
 
         if (!Directory.Exists(testsDirectory))
         {
-            return summaries;
+            return Task.FromResult<IReadOnlyList<SuiteSummary>>(summaries);
         }
 
         var suiteDirs = Directory.GetDirectories(testsDirectory)
@@ -56,7 +56,7 @@ public sealed class SuiteScanner
             });
         }
 
-        return summaries;
+        return Task.FromResult<IReadOnlyList<SuiteSummary>>(summaries);
     }
 
     /// <summary>

@@ -145,7 +145,7 @@ public sealed class GeneratedTestIngestorTests : IDisposable
     }
 
     [Fact]
-    public async Task ParseAndValidate_IsPure_NoPersistenceNeeded()
+    public void ParseAndValidate_IsPure_NoPersistenceNeeded()
     {
         var ok = GeneratedTestIngestor.ParseAndValidate(ValidTestJson(), new TestValidator());
         Assert.True(ok.IsSuccess);
