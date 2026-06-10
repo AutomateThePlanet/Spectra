@@ -7,19 +7,10 @@ namespace Spectra.Core.Models.Config;
 /// </summary>
 public sealed class AiConfig
 {
-    [JsonPropertyName("providers")]
-    public required IReadOnlyList<ProviderConfig> Providers { get; init; }
-
-    // Spec 058: `fallback_strategy` retired — there is no programmatic provider fallback. A legacy
-    // config that still carries the key deserializes cleanly (unmapped members are ignored) and is
-    // surfaced through a non-blocking notice.
-
-    /// <summary>
-    /// Configuration for the grounding verification critic.
-    /// When enabled, generated tests are verified against source documentation.
-    /// </summary>
-    [JsonPropertyName("critic")]
-    public CriticConfig? Critic { get; init; }
+    // Spec 069: `ai.providers` and `ai.critic` were removed — SPECTRA no longer runs an in-process
+    // model (all inference is the user's Claude Code session), so the config carries no provider or
+    // critic block. Legacy configs that still carry those keys deserialize cleanly (unmapped members
+    // are ignored). Only the surviving cost/telemetry levers remain below.
 
     /// <summary>
     /// Per-batch timeout for the AI generation SDK call, in minutes. Default 5.

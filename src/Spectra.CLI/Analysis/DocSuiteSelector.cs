@@ -1,6 +1,6 @@
 using Spectra.Core.Models.Index;
 
-namespace Spectra.CLI.Agent.Copilot;
+namespace Spectra.CLI.Analysis;
 
 /// <summary>
 /// Maps a user's <c>--suite</c> / <c>--focus</c> / no-filter request to the

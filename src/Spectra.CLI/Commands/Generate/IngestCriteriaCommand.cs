@@ -1,6 +1,5 @@
 using System.CommandLine;
 using System.Text.Json;
-using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Extraction;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;

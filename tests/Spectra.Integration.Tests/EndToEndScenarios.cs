@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Spectra.CLI.Agent.Copilot;
+using Spectra.CLI.Extraction;
 using Spectra.CLI.Commands.Docs;
 using Spectra.CLI.Generation;
 using Spectra.Core.Models;
@@ -71,40 +71,6 @@ public sealed class EndToEndScenarios
         Assert.Contains("AC-011", prompt);
     }
 
-    // 047
-    [Fact]
-    public async Task LargeCorpusExtraction_NoSilentSkip_AfterPartialFailure()
-    {
-        var docs = TestFactory.SyntheticCorpus(5);
-        var failingDoc = docs[2].Path;
-        var firstPassFailed = true;
-
-        Func<DocumentEntry, CancellationToken, Task<RequirementsExtractionResult>> extract =
-            (doc, ct) =>
-            {
-                if (doc.Path == failingDoc && firstPassFailed)
-                    throw new InvalidOperationException("transient extraction failure");
-                return Task.FromResult(new RequirementsExtractionResult(
-                    ExtractionOutcome.Extracted, TestFactory.OneRequirement(doc.Path)));
-            };
-
-        // First pass: the failing doc is reported as failed (NOT cached/skipped silently).
-        var first = await DocsIndexHandler.ExtractCriteriaLoopAsync(
-            docs, existing: [], extractPerDoc: extract,
-            perDocDeadline: TimeSpan.FromSeconds(5),
-            onSlowDoc: null, onDocFailure: null, ct: CancellationToken.None);
-        Assert.Contains(failingDoc, first.FailedDocuments);
-        Assert.Equal(docs.Count - 1, first.Aggregated.Count);
-
-        // Re-run: the previously-failed doc is re-attempted and now succeeds.
-        firstPassFailed = false;
-        var second = await DocsIndexHandler.ExtractCriteriaLoopAsync(
-            docs, existing: [], extractPerDoc: extract,
-            perDocDeadline: TimeSpan.FromSeconds(5),
-            onSlowDoc: null, onDocFailure: null, ct: CancellationToken.None);
-        Assert.Empty(second.FailedDocuments);
-        Assert.Equal(docs.Count, second.Aggregated.Count);
-    }
 
     // 049
     [Fact]
@@ -153,31 +119,6 @@ public sealed class EndToEndScenarios
         // Path C #3 — plural nested under legacy 'filters': actionable error, not whole-suite.
         await Assert.ThrowsAsync<McpInvalidParamsException>(() => ws.BuildStartTool().ExecuteAsync(
             JsonDocument.Parse("""{"suite":"checkout","filters":{"priorities":["high"]}}""").RootElement));
-    }
-
-    // 048
-    [Fact]
-    public async Task CoverageGuards_FireOnRealisticZeroCorpus()
-    {
-        // A realistic corpus where every document extracts to nothing (inconclusive).
-        var docs = TestFactory.SyntheticCorpus(8);
-        // A genuine empty extraction is (Extracted, []) — cacheable, not a failure (parity with
-        // the criteria path), so the corpus zero-criteria guard fires without marking docs failed.
-        Func<DocumentEntry, CancellationToken, Task<RequirementsExtractionResult>> extractNothing =
-            (_, _) => Task.FromResult(new RequirementsExtractionResult(
-                ExtractionOutcome.Extracted, Array.Empty<RequirementDefinition>()));
-
-        var loop = await DocsIndexHandler.ExtractCriteriaLoopAsync(
-            docs, existing: [], extractPerDoc: extractNothing,
-            perDocDeadline: TimeSpan.FromSeconds(5),
-            onSlowDoc: null, onDocFailure: null, ct: CancellationToken.None);
-
-        // Documents indexed, zero criteria → the non-blocking guard fires (success, with warning).
-        Assert.Empty(loop.FailedDocuments);
-        Assert.Empty(loop.Aggregated);
-        var warning = DocsIndexHandler.ComputeCriteriaWarning(docs.Count, loop.Aggregated.Count);
-        Assert.NotNull(warning);
-        Assert.Contains("extract-criteria", warning);
     }
 
     // 048 (criteria suite-match accounting — the basis for the no-criteria note)

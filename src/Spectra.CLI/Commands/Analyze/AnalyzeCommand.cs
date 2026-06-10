@@ -29,19 +29,6 @@ public sealed class AnalyzeCommand : Command
             ["--auto-link"],
             "Scan automation code and update test automated_by fields");
 
-        var extractRequirementsOption = new Option<bool>(
-            ["--extract-requirements"],
-            "Extract testable requirements from documentation")
-        { IsHidden = true };
-
-        var extractCriteriaOption = new Option<bool>(
-            ["--extract-criteria"],
-            "Extract acceptance criteria from documentation");
-
-        var forceOption = new Option<bool>(
-            ["--force"],
-            "Force re-extraction even if document hash is unchanged");
-
         var importCriteriaOption = new Option<string?>(
             ["--import-criteria"],
             "Path to a criteria file to import (YAML, CSV, or JSON)");
@@ -53,10 +40,6 @@ public sealed class AnalyzeCommand : Command
         var replaceOption = new Option<bool>(
             ["--replace"],
             "Replace existing criteria instead of merging");
-
-        var skipSplittingOption = new Option<bool>(
-            ["--skip-splitting"],
-            "Skip AI-powered splitting of compound criteria");
 
         var listCriteriaOption = new Option<bool>(
             ["--list-criteria"],
@@ -82,13 +65,9 @@ public sealed class AnalyzeCommand : Command
         AddOption(formatOption);
         AddOption(coverageOption);
         AddOption(autoLinkOption);
-        AddOption(extractRequirementsOption);
-        AddOption(extractCriteriaOption);
-        AddOption(forceOption);
         AddOption(importCriteriaOption);
         AddOption(mergeOption);
         AddOption(replaceOption);
-        AddOption(skipSplittingOption);
         AddOption(listCriteriaOption);
         AddOption(sourceTypeOption);
         AddOption(componentOption);
@@ -101,12 +80,8 @@ public sealed class AnalyzeCommand : Command
             var format = context.ParseResult.GetValueForOption(formatOption);
             var coverage = context.ParseResult.GetValueForOption(coverageOption);
             var autoLink = context.ParseResult.GetValueForOption(autoLinkOption);
-            var extractReqs = context.ParseResult.GetValueForOption(extractRequirementsOption);
-            var extractCriteria = context.ParseResult.GetValueForOption(extractCriteriaOption);
-            var force = context.ParseResult.GetValueForOption(forceOption);
             var importCriteria = context.ParseResult.GetValueForOption(importCriteriaOption);
             var replace = context.ParseResult.GetValueForOption(replaceOption);
-            var skipSplitting = context.ParseResult.GetValueForOption(skipSplittingOption);
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
             var dryRun = context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption);
 
@@ -132,15 +107,7 @@ public sealed class AnalyzeCommand : Command
                 context.ExitCode = await handler.RunImportCriteriaAsync(
                     importCriteria,
                     replace,
-                    skipSplitting,
                     dryRun,
-                    context.GetCancellationToken());
-            }
-            else if (extractReqs || extractCriteria)
-            {
-                context.ExitCode = await handler.RunExtractCriteriaAsync(
-                    dryRun,
-                    force,
                     context.GetCancellationToken());
             }
             else

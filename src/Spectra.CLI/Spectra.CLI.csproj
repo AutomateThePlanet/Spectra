@@ -11,7 +11,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="GitHub.Copilot.SDK" Version="0.2.1" />
+    <!-- Spec 069: provides Microsoft.Extensions.AI.AIFunction (tool metadata) — was a transitive
+         dependency of the removed GitHub.Copilot.SDK; now referenced directly. -->
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.2.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.5" />
     <PackageReference Include="Spectre.Console" Version="0.55.0" />

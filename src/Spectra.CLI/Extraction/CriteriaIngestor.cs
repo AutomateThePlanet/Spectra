@@ -1,4 +1,3 @@
-using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Infrastructure;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Coverage;
@@ -35,7 +34,7 @@ public sealed class CriteriaIngestor
     /// </summary>
     public static CriteriaIngestResult Classify(string? content, string docPath, string? component)
     {
-        var result = CriteriaExtractor.ClassifyResponse(content, docPath, component);
+        var result = CriteriaResponseClassifier.Classify(content, docPath, component);
         return result.Outcome switch
         {
             ExtractionOutcome.Extracted => CriteriaIngestResult.Extracted(result.Criteria),

@@ -176,39 +176,6 @@ public sealed class ConfigLoader
         return present;
     }
 
-    /// <summary>
-    /// Generates a configuration JSON string with custom provider and model.
-    /// </summary>
-    public static string GenerateConfig(string providerName, string model, string? apiKeyEnv = null, string? baseUrl = null)
-    {
-        var config = new SpectraConfig
-        {
-            Source = new SourceConfig(),
-            Tests = new TestsConfig(),
-            Ai = new AiConfig
-            {
-                Providers =
-                [
-                    new ProviderConfig
-                    {
-                        Name = providerName,
-                        Model = model,
-                        ApiKeyEnv = apiKeyEnv,
-                        BaseUrl = baseUrl,
-                        Enabled = true,
-                        Priority = 1
-                    }
-                ]
-            }
-        };
-
-        return JsonSerializer.Serialize(config, new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-        });
-    }
-
     private static IReadOnlyList<ParseError> Validate(SpectraConfig config, string? filePath)
     {
         var errors = new List<ParseError>();
@@ -225,29 +192,11 @@ public sealed class ConfigLoader
             errors.Add(new ParseError("MISSING_TESTS", "Configuration must have a 'tests' section", filePath));
         }
 
-        // Validate AI configuration
+        // Validate AI configuration. Spec 069: ai.providers / ai.critic were removed — there is no
+        // in-process model — so the only requirement is that an `ai` section exists.
         if (config.Ai is null)
         {
             errors.Add(new ParseError("MISSING_AI", "Configuration must have an 'ai' section", filePath));
-        }
-        else if (config.Ai.Providers is null || config.Ai.Providers.Count == 0)
-        {
-            errors.Add(new ParseError("MISSING_PROVIDERS", "AI configuration must have at least one provider", filePath));
-        }
-        else
-        {
-            // Validate providers
-            foreach (var provider in config.Ai.Providers)
-            {
-                if (string.IsNullOrWhiteSpace(provider.Name))
-                {
-                    errors.Add(new ParseError("INVALID_PROVIDER", "Provider must have a name", filePath));
-                }
-                if (string.IsNullOrWhiteSpace(provider.Model))
-                {
-                    errors.Add(new ParseError("INVALID_PROVIDER", $"Provider '{provider.Name}' must have a model", filePath));
-                }
-            }
         }
 
         return errors;

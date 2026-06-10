@@ -34,21 +34,23 @@ public class ProviderRetirementTests
 
         var result = new ConfigLoader().Load(json);
 
+        // Spec 069: ai.providers and ai.critic were removed from the model — a config that still
+        // carries them deserializes cleanly (unmapped members ignored) and validates. (Retired
+        // assertion: Assert.Equal("claude-sonnet-4-6", Ai.Critic.Model).)
         Assert.True(result.IsSuccess);
-        Assert.Equal("claude-sonnet-4-6", result.Value!.Ai.Critic!.Model);
-        // No retired keys present → no notice.
         Assert.Empty(ConfigLoader.DetectDeprecatedKeys(json));
     }
 
     [Fact]
-    public void CriticWithoutModel_StillValidates_DefaultApplies()
+    public void LegacyCriticBlock_StillValidates_AndIsIgnored()
     {
+        // Spec 069: ai.critic is no longer modeled; a legacy critic block loads but is inert.
+        // (Retired assertions: Ai.Critic.IsValid() / Ai.Critic.Model == null.)
         const string json = """
         {
           "source": { "mode": "local" },
           "tests": { "dir": "test-cases/" },
           "ai": {
-            "providers": [ { "name": "github-models", "model": "gpt-4.1", "enabled": true, "priority": 1 } ],
             "critic": { "enabled": true }
           }
         }
@@ -57,9 +59,6 @@ public class ProviderRetirementTests
         var result = new ConfigLoader().Load(json);
 
         Assert.True(result.IsSuccess);
-        // IsValid no longer requires a provider; model is null → CriticModelResolver supplies the default.
-        Assert.True(result.Value!.Ai.Critic!.IsValid());
-        Assert.Null(result.Value.Ai.Critic.Model);
     }
 
     // ---------- FR-006: old config ignored-with-notice (non-silent) ----------
@@ -182,11 +181,9 @@ public class ProviderRetirementTests
     public void MigratedDemoConfigShape_ValidatesWithNoRetiredKeys(string json)
     {
         var result = new ConfigLoader().Load(json);
+        // Spec 069: these demo configs still carry legacy ai.providers/ai.critic; they load cleanly
+        // (unmapped members ignored) and validate. (Retired assertions: config.Ai.Critic.Model.)
         Assert.True(result.IsSuccess);
         Assert.Empty(ConfigLoader.DetectDeprecatedKeys(json));
-        // The surviving cost/telemetry levers still bind.
-        var config = JsonSerializer.Deserialize<SpectraConfig>(json, Opts)!;
-        Assert.NotNull(config.Ai.Critic);
-        Assert.Equal("claude-sonnet-4-6", config.Ai.Critic!.Model);
     }
 }

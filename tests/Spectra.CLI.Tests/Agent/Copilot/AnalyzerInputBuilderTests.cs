@@ -1,4 +1,4 @@
-using Spectra.CLI.Agent.Copilot;
+using Spectra.CLI.Analysis;
 using Spectra.CLI.Index;
 using Spectra.Core.Index;
 using Spectra.Core.Models;

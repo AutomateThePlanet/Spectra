@@ -67,27 +67,8 @@ public sealed class SpectraConfig
     {
         Source = new SourceConfig(),
         Tests = new TestsConfig(),
-        Ai = new AiConfig
-        {
-            // Generator (in-process, pending Spec 059) defaults to gpt-4.1.
-            Providers =
-            [
-                new ProviderConfig
-                {
-                    Name = "github-models",
-                    Model = "gpt-4.1",
-                    Enabled = true,
-                    Priority = 1
-                }
-            ],
-            // Spec 058: critic runs as the spectra-critic subagent; ai.critic.model is the only
-            // selector (no provider/api_key_env/base_url).
-            Critic = new CriticConfig
-            {
-                Enabled = true,
-                Model = "claude-sonnet-4-6"
-            }
-        },
+        // Spec 069: no ai.providers / ai.critic — inference is the user's Claude Code session.
+        Ai = new AiConfig(),
         Selections = new Dictionary<string, SavedSelectionConfig>
         {
             ["smoke"] = new SavedSelectionConfig
