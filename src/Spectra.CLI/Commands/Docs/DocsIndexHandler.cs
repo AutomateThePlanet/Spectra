@@ -187,18 +187,11 @@ public sealed class DocsIndexHandler
             }
         }
 
-        // ── Criteria extraction phase ──
-        int? criteriaExtracted = null;
-        string? criteriaFile = null;
-        string? criteriaWarning = null;
-        if (!_skipCriteria)
-        {
-            WriteProgressResult("extracting-criteria", "Extracting acceptance criteria...", currentDir, manifestPath,
-                documentsIndexed: newLayout.Manifest.TotalDocuments,
-                documentsTotal: newLayout.Manifest.TotalDocuments);
-
-            (criteriaExtracted, criteriaFile, criteriaWarning) = await TryExtractCriteriaAsync(currentDir, config, ct);
-        }
+        // Spec 069 (FR-006/FR-007): docs index is index-only. Acceptance-criteria extraction is now
+        // the skill-driven compile-extraction-prompt → in-session turn → ingest-criteria seam
+        // (the spectra-criteria skill), not an inline model call — a short-lived non-interactive
+        // process can no longer make a model turn. No docs/requirements/_requirements.yaml is produced.
+        _ = (_skipCriteria, _includeArchived); // retired flags: accepted as no-ops
 
         // ── Final result ──
         var suiteEntries = newLayout.Manifest.Groups
@@ -230,9 +223,6 @@ public sealed class DocsIndexHandler
             Manifest = Path.GetRelativePath(currentDir, manifestPath).Replace('\\', '/'),
             Suites = suiteEntries,
             Migration = migrationRecord,
-            CriteriaExtracted = criteriaExtracted,
-            CriteriaFile = criteriaFile,
-            CriteriaWarning = criteriaWarning,
         };
 
         WriteResultFile(result, isTerminal: true);
@@ -247,108 +237,6 @@ public sealed class DocsIndexHandler
         return ExitCodes.Success;
     }
 
-    private async Task<(int? criteriaCount, string? criteriaFile, string? criteriaWarning)> TryExtractCriteriaAsync(
-        string currentDir, SpectraConfig config, CancellationToken ct)
-    {
-        var provider = config.Ai.Providers.FirstOrDefault(p => p.Enabled);
-        if (provider is null)
-            return (null, null, null);
-
-        var reqsPath = Path.Combine(currentDir, config.Coverage.RequirementsFile);
-
-        // Ensure criteria directory exists
-        var reqsDir = Path.GetDirectoryName(reqsPath);
-        if (!string.IsNullOrEmpty(reqsDir))
-            Directory.CreateDirectory(reqsDir);
-
-        var parser = new RequirementsParser();
-        var existing = await parser.ParseAsync(reqsPath, ct);
-
-        var docBuilder = new DocumentMapBuilder();
-        var documentMap = await docBuilder.BuildAsync(currentDir, ct);
-
-        // Spec 040 §3.7 / FR-015: criteria extraction is AI-facing — drop
-        // documents in skip_analysis suites unless --include-archived was passed.
-        var manifestPath = LegacyIndexMigrator.ResolveManifestPath(currentDir, config.Source);
-        var indexDir = LegacyIndexMigrator.ResolveIndexDir(currentDir, config.Source);
-        documentMap = await ManifestDocumentFilter.FilterAsync(
-            documentMap, manifestPath, indexDir, _includeArchived, ct);
-
-        if (documentMap.Documents.Count == 0)
-            return (0, null, null);
-
-        if (_verbosity >= VerbosityLevel.Normal)
-            _progress.Info($"Extracting acceptance criteria from {documentMap.Documents.Count} document(s)...");
-
-        try
-        {
-            var extractor = new RequirementsExtractor(
-                provider,
-                currentDir,
-                _verbosity >= VerbosityLevel.Normal ? s => _progress.Info(s) : null);
-
-            // Spec 047: per-document deadline (matching AnalyzeHandler) replaces the
-            // 60s corpus deadline. One slow doc no longer aborts the whole corpus.
-            var loopResult = await ExtractCriteriaLoopAsync(
-                documents: documentMap.Documents,
-                existing: existing,
-                extractPerDoc: (doc, token) => extractor.ExtractFromDocumentAsync(doc, existing, token),
-                perDocDeadline: PerDocumentDeadline,
-                onSlowDoc: path => _progress.Warning(
-                    $"Acceptance criteria extraction timed out for {path}. " +
-                    "Run 'spectra ai analyze --extract-criteria' separately for this document."),
-                onDocFailure: (path, ex) =>
-                {
-                    _progress.Warning($"Acceptance criteria extraction failed for {path}: {ex.Message}");
-                    if (_verbosity >= VerbosityLevel.Detailed)
-                        Console.Error.WriteLine(ex.StackTrace);
-                },
-                ct: ct);
-
-            var extracted = loopResult.Aggregated;
-
-            // Spec 048: corpus-wide zero-criteria gate. Fires when we indexed
-            // documents but extraction produced nothing across the whole corpus
-            // (commonly seen on large projects where every per-doc extraction
-            // came back inconclusive; Spec 047 leaves those uncached/uncounted).
-            // Suppressed when --skip-criteria gates this method off entirely.
-            var corpusWarning = ComputeCriteriaWarning(documentMap.Documents.Count, extracted.Count);
-            if (corpusWarning is not null)
-                _progress.Warning(corpusWarning);
-
-            if (extracted.Count == 0)
-            {
-                if (_verbosity >= VerbosityLevel.Normal && corpusWarning is null)
-                    _progress.Info("No new acceptance criteria found in documentation.");
-                return (0, null, corpusWarning);
-            }
-
-            if (_dryRun)
-            {
-                _progress.Info($"Would extract {extracted.Count} acceptance criteria (dry run).");
-                return (extracted.Count, null, null);
-            }
-
-            var writer = new RequirementsWriter();
-            var writeResult = await writer.MergeAndWriteAsync(reqsPath, extracted, ct);
-
-            _progress.Success($"Acceptance criteria extracted: {writeResult.Merged.Count} new, " +
-                              $"{writeResult.SkippedCount} duplicates skipped, {writeResult.TotalInFile} total");
-
-            return (writeResult.TotalInFile, Path.GetRelativePath(currentDir, reqsPath), null);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _progress.Warning($"Acceptance criteria extraction failed: {ex.Message}");
-            if (_verbosity >= VerbosityLevel.Detailed)
-                Console.Error.WriteLine(ex.StackTrace);
-            return (null, null, null);
-        }
-    }
 
     /// <summary>
     /// Spec 048: pure projection from the corpus-level counts to the zero-criteria
