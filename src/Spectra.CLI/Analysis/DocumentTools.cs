@@ -6,7 +6,7 @@ using Spectra.CLI.Source;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 
-namespace Spectra.CLI.Agent.Copilot;
+namespace Spectra.CLI.Analysis;
 
 /// <summary>
 /// AIFunction definitions for document access tools.

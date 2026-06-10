@@ -1,7 +1,7 @@
 using System.CommandLine;
 using System.Text.Json;
 using Spectra.CLI.Agent.Analysis;
-using Spectra.CLI.Agent.Copilot;
+using Spectra.CLI.Analysis;
 using Spectra.CLI.Generation;
 using Spectra.CLI.Index;
 using Spectra.CLI.Infrastructure;

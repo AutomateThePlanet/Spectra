@@ -1,4 +1,4 @@
-using Spectra.CLI.Agent.Copilot;
+using Spectra.CLI.Analysis;
 using Spectra.Core.Models.Index;
 
 namespace Spectra.CLI.Tests.Agent.Copilot;

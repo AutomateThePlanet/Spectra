@@ -8,7 +8,7 @@ using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Validation;
 
-namespace Spectra.CLI.Agent.Copilot;
+namespace Spectra.CLI.Analysis;
 
 /// <summary>
 /// AIFunction definitions for test index access tools.

@@ -3,7 +3,7 @@ using Spectra.Core.Index;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Index;
 
-namespace Spectra.CLI.Agent.Copilot;
+namespace Spectra.CLI.Analysis;
 
 /// <summary>
 /// Bridges the v2 documentation-index layout (manifest + suite files) to the
