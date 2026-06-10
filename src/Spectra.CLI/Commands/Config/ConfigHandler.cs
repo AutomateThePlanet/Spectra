@@ -198,27 +198,7 @@ public sealed class ConfigHandler
             Console.WriteLine($"  ID Prefix: {config.Tests?.IdPrefix ?? "TC"}");
             Console.WriteLine($"  ID Start:  {config.Tests?.IdStart ?? 100}");
 
-            Console.WriteLine();
-            Console.WriteLine("AI:");
-            if (config.Ai?.Providers is { Count: > 0 })
-            {
-                Console.WriteLine("  Providers:");
-                foreach (var provider in config.Ai.Providers)
-                {
-                    Console.WriteLine($"    - {provider.Name}: {provider.Model ?? "(default model)"}");
-                }
-            }
-            else
-            {
-                Console.WriteLine("  Providers: (not configured)");
-            }
-            if (config.Ai?.Critic is { Enabled: true } critic)
-            {
-                // Spec 058: the critic runs as the spectra-critic subagent; ai.critic.model is the
-                // only selector (no provider/api_key_env/base_url).
-                Console.WriteLine($"  Critic model: {critic.Model ?? "(same-family default)"}");
-            }
-
+            // Spec 069: no AI provider/critic section — inference is the user's Claude Code session.
             Console.WriteLine();
             Console.WriteLine("Generation:");
             Console.WriteLine($"  Default count:   {config.Generation?.DefaultCount ?? 15}");

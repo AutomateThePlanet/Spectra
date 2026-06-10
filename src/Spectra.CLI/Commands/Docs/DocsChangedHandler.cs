@@ -30,10 +30,14 @@ public sealed class DocsChangedHandler
     }
 
     public Task<int> ExecuteAsync(CancellationToken ct = default)
-        => ExecuteAsync(Directory.GetCurrentDirectory(), ct);
+        => ExecuteAsync(Directory.GetCurrentDirectory(), Console.Out, ct);
 
-    /// <summary>Testable core: operates on an explicit workspace root rather than the process cwd.</summary>
-    public async Task<int> ExecuteAsync(string currentDir, CancellationToken ct = default)
+    /// <summary>
+    /// Testable core: operates on an explicit workspace root and writes to an explicit
+    /// <see cref="TextWriter"/> (rather than the process cwd / global <c>Console.Out</c>), so tests
+    /// can capture output without a non-thread-safe global console swap.
+    /// </summary>
+    public async Task<int> ExecuteAsync(string currentDir, TextWriter output, CancellationToken ct = default)
     {
         var configPath = Path.Combine(currentDir, "spectra.config.json");
         if (!File.Exists(configPath))
@@ -107,7 +111,7 @@ public sealed class DocsChangedHandler
 
         if (_outputFormat == OutputFormat.Json)
         {
-            Console.Out.WriteLine(JsonSerializer.Serialize(new
+            output.WriteLine(JsonSerializer.Serialize(new
             {
                 command = "docs-changed",
                 status = "success",
@@ -124,13 +128,13 @@ public sealed class DocsChangedHandler
         }
         else if (emitted.Count == 0)
         {
-            Console.WriteLine("All documents up to date — no changed criteria to extract.");
+            output.WriteLine("All documents up to date — no changed criteria to extract.");
         }
         else
         {
             foreach (var e in emitted)
-                Console.WriteLine($"  [{e.Status,-9}] {e.Path}  (component: {e.Component})");
-            Console.WriteLine($"\n{changed.Count} changed, {unchangedCount} unchanged.");
+                output.WriteLine($"  [{e.Status,-9}] {e.Path}  (component: {e.Component})");
+            output.WriteLine($"\n{changed.Count} changed, {unchangedCount} unchanged.");
         }
 
         return ExitCodes.Success;

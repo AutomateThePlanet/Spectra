@@ -144,7 +144,7 @@ public class PromptTemplateLoaderTests : IDisposable
         {
             Source = new SourceConfig(),
             Tests = new TestsConfig(),
-            Ai = new AiConfig { Providers = [] },
+            Ai = new AiConfig(),
             Analysis = new AnalysisConfig
             {
                 Categories =
@@ -167,7 +167,7 @@ public class PromptTemplateLoaderTests : IDisposable
         {
             Source = new SourceConfig(),
             Tests = new TestsConfig(),
-            Ai = new AiConfig { Providers = [] }
+            Ai = new AiConfig()
         };
 
         var categories = PromptTemplateLoader.GetCategories(config);

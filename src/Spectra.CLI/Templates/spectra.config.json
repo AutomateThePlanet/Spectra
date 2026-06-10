@@ -12,34 +12,10 @@
     "id_start": 100
   },
   "ai": {
-    "providers": [
-      {
-        "name": "github-models",
-        "model": "gpt-4.1",
-        "enabled": true,
-        "priority": 1
-      },
-      {
-        "name": "openai",
-        "model": "gpt-4.1",
-        "enabled": false,
-        "priority": 2,
-        "api_key_env": "OPENAI_API_KEY"
-      },
-      {
-        "name": "anthropic",
-        "model": "claude-sonnet-4-5",
-        "enabled": false,
-        "priority": 3,
-        "api_key_env": "ANTHROPIC_API_KEY"
-      }
-    ],
-    "critic": {
-      "enabled": true,
-      "model": "claude-sonnet-4-6",
-      "max_concurrent": 1,
-      "_comment_critic": "Spec 058: the critic runs as the spectra-critic subagent; `model` is the only selector (no provider/api_key_env/base_url). `max_concurrent` (Spec 043): concurrent verification calls, 1 = sequential (default), max 20."
-    }
+    "_comment_ai": "Spec 069: SPECTRA no longer runs an in-process model — all inference is your Claude Code session — so there is no `providers` or `critic` block. Only the timeout/batch levers below apply.",
+    "generation_timeout_minutes": 5,
+    "analysis_timeout_minutes": 2,
+    "generation_batch_size": 30
   },
   "generation": {
     "default_count": 15,

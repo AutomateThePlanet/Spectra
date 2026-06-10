@@ -44,38 +44,13 @@ public class ConfigLoaderTests
         Assert.Equal("docs/", result.Value.Source.LocalDir);
         Assert.Equal("test-cases/", result.Value.Tests.Dir);
         Assert.Equal("TC", result.Value.Tests.IdPrefix);
-        Assert.Single(result.Value.Ai.Providers);
-        Assert.Equal("copilot", result.Value.Ai.Providers[0].Name);
+        // Spec 069: ai.providers was removed from the config model — the legacy "providers" key in
+        // this JSON now deserializes as an ignored unmapped member. (Retired assertions:
+        // Assert.Single(Ai.Providers) / Assert.Equal("copilot", Ai.Providers[0].Name).)
     }
 
-    [Fact]
-    public void Load_WithMultipleProviders_ParsesAll()
-    {
-        // Arrange
-        const string json = """
-            {
-              "source": { "local_dir": "docs/" },
-              "tests": { "dir": "test-cases/" },
-              "ai": {
-                "providers": [
-                  { "name": "copilot", "model": "gpt-4o", "priority": 1 },
-                  { "name": "anthropic", "model": "claude-sonnet-4-5", "api_key_env": "ANTHROPIC_API_KEY", "priority": 2 },
-                  { "name": "openai", "model": "gpt-4-turbo", "api_key_env": "OPENAI_API_KEY", "priority": 3 }
-                ],
-                "fallback_strategy": "auto"
-              }
-            }
-            """;
-
-        // Act
-        var result = _loader.Load(json);
-
-        // Assert
-        Assert.True(result.IsSuccess);
-        Assert.Equal(3, result.Value.Ai.Providers.Count);
-        Assert.Equal("anthropic", result.Value.Ai.Providers[1].Name);
-        Assert.Equal("ANTHROPIC_API_KEY", result.Value.Ai.Providers[1].ApiKeyEnv);
-    }
+    // Spec 069: Load_WithMultipleProviders removed — ai.providers is no longer modeled, so there is
+    // nothing to parse or assert.
 
     [Fact]
     public void Load_WithInvalidJson_ReturnsFailure()
@@ -116,26 +91,21 @@ public class ConfigLoaderTests
     }
 
     [Fact]
-    public void Load_WithMissingProviders_ReturnsFailure()
+    public void Load_WithNoProviders_NowSucceeds()
     {
-        // Arrange
+        // Spec 069: the MISSING_PROVIDERS rule was removed — SPECTRA runs no in-process model, so a
+        // config with no providers is valid. (Retired assertion: IsFailure with code MISSING_PROVIDERS.)
         const string json = """
             {
               "source": { "local_dir": "docs/" },
               "tests": { "dir": "test-cases/" },
-              "ai": {
-                "providers": [],
-                "fallback_strategy": "auto"
-              }
+              "ai": {}
             }
             """;
 
-        // Act
         var result = _loader.Load(json);
 
-        // Assert
-        Assert.True(result.IsFailure);
-        Assert.Contains(result.Errors, e => e.Code == "MISSING_PROVIDERS");
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]

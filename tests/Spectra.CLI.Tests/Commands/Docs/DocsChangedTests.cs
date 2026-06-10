@@ -93,18 +93,9 @@ public sealed class DocsChangedTests : IDisposable
     private async Task<string> CaptureJsonAsync(bool includeUnchanged)
     {
         var handler = new DocsChangedHandler(OutputFormat.Json, includeUnchanged, includeArchived: false);
-        var original = Console.Out;
         var sw = new StringWriter();
-        Console.SetOut(sw);
-        try
-        {
-            var exit = await handler.ExecuteAsync(_dir);
-            Assert.Equal(ExitCodes.Success, exit);
-        }
-        finally
-        {
-            Console.SetOut(original);
-        }
+        var exit = await handler.ExecuteAsync(_dir, sw);
+        Assert.Equal(ExitCodes.Success, exit);
         return sw.ToString();
     }
 }
