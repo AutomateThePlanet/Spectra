@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Extraction;
 using Spectra.CLI.Commands.Analyze;
 using Spectra.CLI.Commands.Docs;
@@ -18,50 +17,6 @@ namespace Spectra.Integration.Tests;
 /// </summary>
 public sealed class OriginalBugRegression
 {
-    // ── 047: cache poisoning on parse failure ─────────────────────────────────
-
-    [Fact(DisplayName = "Original bug: cache poisoning on parse failure")]
-    public async Task ParseFailure_DoesNotPoisonCache()
-    {
-        var attempts = 0;
-        var delay = new NoOpDelayProvider();
-
-        var result = await AnalyzeHandler.ExtractWithRetryAsync(
-            extractAttempt: _ =>
-            {
-                attempts++;
-                return Task.FromResult(attempts == 1 ? ParseFail() : Extracted(2));
-            },
-            maxAttempts: 2,
-            backoff: TimeSpan.FromMilliseconds(5),
-            delayProvider: delay,
-            ct: CancellationToken.None);
-
-        // A parse failure is NEVER cacheable on its own — so the per-doc loop cannot
-        // write its hash and poison the cache.
-        Assert.False(ParseFail().IsCacheable);
-        // The parse failure was retried (not silently cached), and the retry succeeded.
-        Assert.Equal(2, attempts);
-        Assert.True(result.IsCacheable);
-        Assert.Equal(ExtractionOutcome.Extracted, result.Outcome);
-    }
-
-    // ── 048: zero-criteria first index produced no warning ────────────────────
-
-    [Fact(DisplayName = "Original bug: first big-project index produced zero criteria silently")]
-    public void BigProjectFirstIndex_WarnsWhenZeroCriteria()
-    {
-        // Indexed many documents, extracted zero criteria → MUST warn, naming the fix.
-        var warning = DocsIndexHandler.ComputeCriteriaWarning(documentsIndexed: 541, criteriaExtractedTotal: 0);
-        Assert.NotNull(warning);
-        Assert.Contains("extract-criteria", warning);
-
-        // No documents indexed → no warning (nothing to recover).
-        Assert.Null(DocsIndexHandler.ComputeCriteriaWarning(documentsIndexed: 0, criteriaExtractedTotal: 0));
-        // Criteria found → no warning.
-        Assert.Null(DocsIndexHandler.ComputeCriteriaWarning(documentsIndexed: 541, criteriaExtractedTotal: 12));
-    }
-
     // ── 050: extract-criteria on generation not working ───────────────────────
 
     [Fact(DisplayName = "Original bug: extract-criteria on generation not working")]

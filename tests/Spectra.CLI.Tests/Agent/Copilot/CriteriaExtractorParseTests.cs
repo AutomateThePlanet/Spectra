@@ -1,4 +1,3 @@
-using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Extraction;
 
 namespace Spectra.CLI.Tests.Agent.Copilot;
@@ -20,7 +19,7 @@ public class CriteriaExtractorParseTests
             ]
             """;
 
-        var result = CriteriaExtractor.ClassifyResponse(json, source: "docs/payments.md", component: "payments");
+        var result = CriteriaResponseClassifier.Classify(json, source: "docs/payments.md", component: "payments");
 
         Assert.Equal(ExtractionOutcome.Extracted, result.Outcome);
         Assert.True(result.IsCacheable);
@@ -32,7 +31,7 @@ public class CriteriaExtractorParseTests
     [Fact]
     public void Parse_ValidJsonEmptyArray_ReturnsExtractedEmpty()
     {
-        var result = CriteriaExtractor.ClassifyResponse("[]", source: "docs/empty.md", component: "empty");
+        var result = CriteriaResponseClassifier.Classify("[]", source: "docs/empty.md", component: "empty");
 
         Assert.Equal(ExtractionOutcome.Extracted, result.Outcome);
         Assert.True(result.IsCacheable);
@@ -42,7 +41,7 @@ public class CriteriaExtractorParseTests
     [Fact]
     public void Parse_NoDelimiters_ReturnsParseFailure()
     {
-        var result = CriteriaExtractor.ClassifyResponse(
+        var result = CriteriaResponseClassifier.Classify(
             "Sorry, I cannot extract criteria from this document.",
             source: "docs/x.md",
             component: "x");
@@ -60,7 +59,7 @@ public class CriteriaExtractorParseTests
         // null-result branch. Use a top-level `null` wrapped in [...] to force
         // Deserialize<List<...>>(text) to return null when the inner text isn't a list.
         // The cleanest way to drive deserialize-null is to pass JSON whose root is null:
-        var result = CriteriaExtractor.ClassifyResponse("[null]", source: "docs/n.md", component: "n");
+        var result = CriteriaResponseClassifier.Classify("[null]", source: "docs/n.md", component: "n");
 
         // The deserializer returns a list with one null entry; the Where(non-empty Text)
         // filter throws NullReferenceException on i.Text, which the catch maps to
@@ -78,7 +77,7 @@ public class CriteriaExtractorParseTests
         Exception? captured = null;
 
         // Malformed JSON between balanced delimiters — JsonSerializer.Deserialize throws.
-        var result = CriteriaExtractor.ClassifyResponse(
+        var result = CriteriaResponseClassifier.Classify(
             "[ {malformed: not, quoted: properly} ]",
             source: "docs/bad.md",
             component: "bad",
@@ -92,7 +91,7 @@ public class CriteriaExtractorParseTests
     [Fact]
     public void Parse_NullResponseText_ReturnsEmptyResponse()
     {
-        var result = CriteriaExtractor.ClassifyResponse(null, source: "docs/x.md", component: "x");
+        var result = CriteriaResponseClassifier.Classify(null, source: "docs/x.md", component: "x");
         Assert.Equal(ExtractionOutcome.EmptyResponse, result.Outcome);
         Assert.False(result.IsCacheable);
     }

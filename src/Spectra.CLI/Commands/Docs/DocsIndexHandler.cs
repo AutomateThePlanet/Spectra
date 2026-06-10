@@ -1,6 +1,4 @@
-#pragma warning disable CS0618 // RequirementDefinition is obsolete — Spec 047 keeps the legacy extractor; full merge is out of scope.
 using System.Text.Json;
-using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Index;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Output;
@@ -237,100 +235,6 @@ public sealed class DocsIndexHandler
         return ExitCodes.Success;
     }
 
-
-    /// <summary>
-    /// Spec 048: pure projection from the corpus-level counts to the zero-criteria
-    /// warning string. Returns the warning when documents were indexed but zero
-    /// criteria were extracted; null otherwise. Extracted as an internal static so
-    /// the gate is testable in isolation without standing up the full handler.
-    /// </summary>
-    internal static string? ComputeCriteriaWarning(int documentsIndexed, int criteriaExtractedTotal)
-    {
-        if (documentsIndexed <= 0 || criteriaExtractedTotal > 0)
-            return null;
-        return $"Indexed {documentsIndexed} document(s) but extracted 0 acceptance criteria. " +
-               "Test generation will not be able to link criteria. " +
-               "Run: spectra ai analyze --extract-criteria";
-    }
-
-    /// <summary>Spec 047: per-document deadline (mirrors <c>AnalyzeHandler</c>).</summary>
-    internal static readonly TimeSpan PerDocumentDeadline = TimeSpan.FromMinutes(2);
-
-    internal sealed record CriteriaLoopResult(
-        IReadOnlyList<Spectra.Core.Models.Coverage.RequirementDefinition> Aggregated,
-        IReadOnlyList<string> TimedOutDocuments,
-        IReadOnlyList<string> FailedDocuments);
-
-    /// <summary>
-    /// Spec 047: per-document extraction loop with an injectable per-doc deadline
-    /// and extractor delegate. Extracted as <c>internal static</c> so tests can
-    /// drive the loop without standing up a real Copilot session.
-    ///
-    /// One slow document is reported via <paramref name="onSlowDoc"/> and skipped;
-    /// other documents continue. An exception in one document is reported via
-    /// <paramref name="onDocFailure"/> and that document is skipped; remaining
-    /// documents continue. Cancellation propagates.
-    /// </summary>
-    internal static async Task<CriteriaLoopResult> ExtractCriteriaLoopAsync(
-        IReadOnlyList<Spectra.Core.Models.DocumentEntry> documents,
-        IReadOnlyList<Spectra.Core.Models.Coverage.RequirementDefinition> existing,
-        Func<Spectra.Core.Models.DocumentEntry, CancellationToken, Task<RequirementsExtractionResult>> extractPerDoc,
-        TimeSpan perDocDeadline,
-        Action<string>? onSlowDoc,
-        Action<string, Exception>? onDocFailure,
-        CancellationToken ct)
-    {
-        var aggregated = new List<Spectra.Core.Models.Coverage.RequirementDefinition>();
-        var timedOut = new List<string>();
-        var failed = new List<string>();
-
-        foreach (var doc in documents)
-        {
-            ct.ThrowIfCancellationRequested();
-            try
-            {
-                var extractTask = extractPerDoc(doc, ct);
-                var deadlineTask = Task.Delay(perDocDeadline, ct);
-                var completed = await Task.WhenAny(extractTask, deadlineTask);
-
-                if (completed == deadlineTask)
-                {
-                    timedOut.Add(doc.Path);
-                    onSlowDoc?.Invoke(doc.Path);
-                    continue;
-                }
-
-                var perDoc = await extractTask;
-
-                // Spec 054: the extractor no longer throws on empty/parse failure — it returns a
-                // typed outcome. Aggregate only genuine (cacheable) extractions; a non-cacheable
-                // outcome is an inconclusive document, surfaced via the same failed channel that
-                // a thrown exception used to use.
-                if (perDoc.IsCacheable)
-                {
-                    aggregated.AddRange(perDoc.Requirements);
-                }
-                else
-                {
-                    failed.Add(doc.Path);
-                    onDocFailure?.Invoke(
-                        doc.Path,
-                        new InvalidOperationException($"Extraction inconclusive ({perDoc.Outcome})."));
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                failed.Add(doc.Path);
-                onDocFailure?.Invoke(doc.Path, ex);
-            }
-        }
-
-        return new CriteriaLoopResult(aggregated, timedOut, failed);
-    }
 
     private static async Task<SpectraConfig?> LoadConfigAsync(string configPath, CancellationToken ct)
     {

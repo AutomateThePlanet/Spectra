@@ -1,4 +1,3 @@
-using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Extraction;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Parsing;

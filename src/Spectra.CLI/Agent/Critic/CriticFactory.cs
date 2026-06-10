@@ -1,4 +1,3 @@
-using Spectra.CLI.Agent.Copilot;
 using Spectra.CLI.Services;
 using Spectra.Core.Models.Config;
 
