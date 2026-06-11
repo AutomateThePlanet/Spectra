@@ -10,12 +10,12 @@
     <PackageId>Spectra.Execution</PackageId>
     <Authors>Anton Angelov</Authors>
     <Company>Automate The Planet</Company>
-    <Description>Transport-neutral execution engine for SPECTRA — deterministic SQLite-backed test-execution state machine shared by the Spectra CLI and the MCP server.</Description>
+    <Description>Transport-neutral execution engine for SPECTRA — deterministic SQLite-backed test-execution state machine driven by the Spectra CLI (`spectra run`).</Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/AutomateThePlanet/Spectra</PackageProjectUrl>
     <RepositoryUrl>https://github.com/AutomateThePlanet/Spectra</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>testing;test-execution;mcp;qa;spectra</PackageTags>
+    <PackageTags>testing;test-execution;qa;spectra</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
@@ -29,7 +29,6 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Spectra.Execution.Tests" />
-    <InternalsVisibleTo Include="Spectra.MCP.Tests" />
     <InternalsVisibleTo Include="Spectra.CLI.Tests" />
     <InternalsVisibleTo Include="Spectra.Integration.Tests" />
   </ItemGroup>

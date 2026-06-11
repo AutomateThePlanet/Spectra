@@ -22,7 +22,6 @@ public sealed class InitHandler
     private readonly OutputFormat _outputFormat;
 
     private const string ConfigFileName = "spectra.config.json";
-    private const string VsCodeMcpPath = ".vscode/mcp.json";
     private const string DeployWorkflowPath = ".github/workflows/deploy-dashboard.yml";
     private const string DocsDir = "docs";
     private const string TestsDir = "test-cases";
@@ -67,10 +66,6 @@ public sealed class InitHandler
                 // Create bundled SKILL files (incl. the execution skill under .claude/skills/)
                 await CreateBundledSkillFilesAsync(force, ct);
 
-                // Ensure the client-side MCP allowlist (.claude/settings.json) so the execution
-                // loop's mcp__spectra__* tool calls run without per-call permission prompts (Spec 057).
-                await Skills.ClaudeSettingsInstaller.EnsureInstalledAsync(_workingDirectory, ct);
-
                 // Create offline usage guide (USAGE.md)
                 await CreateUsageGuideAsync(force, ct);
             }
@@ -83,9 +78,6 @@ public sealed class InitHandler
 
             // Create dashboard deployment workflow
             await CreateDeployWorkflowAsync(ct);
-
-            // Create VS Code MCP configuration
-            await CreateVsCodeMcpConfigAsync(ct);
 
             // Update .gitignore
             await UpdateGitIgnoreAsync(ct);
@@ -102,7 +94,6 @@ public sealed class InitHandler
             _logger.LogInformation("  - {DocsDir}/", DocsDir);
             _logger.LogInformation("  - {TestsDir}/", TestsDir);
             _logger.LogInformation("  - .claude/skills/spectra-execution/SKILL.md");
-            _logger.LogInformation("  - .claude/settings.json (mcp__spectra__* allowlist)");
             _logger.LogInformation("  - {WorkflowPath}", DeployWorkflowPath);
             _logger.LogInformation("");
             _logger.LogInformation("  - {TemplatePath}", BugReportTemplatePath);
@@ -112,7 +103,6 @@ public sealed class InitHandler
             _logger.LogInformation("");
             _logger.LogInformation("Dashboard auto-deployment workflow created.");
             _logger.LogInformation("See docs/deployment/cloudflare-pages-setup.md for setup instructions.");
-            _logger.LogInformation("  - {McpPath}", VsCodeMcpPath);
 
             // Spec 069: the interactive AI-provider / model-preset / critic setup steps were removed
             // — SPECTRA no longer runs an in-process model, so init asks no AI-provider question.
@@ -376,25 +366,6 @@ public sealed class InitHandler
         manifest.Files[customizationRelative] = Infrastructure.FileHasher.ComputeHash(customizationContent);
 
         await manifestStore.SaveAsync(manifest, ct);
-    }
-
-    private async Task CreateVsCodeMcpConfigAsync(CancellationToken ct)
-    {
-        // Spec 068 (FR-013/FR-014/FR-018) — merge-by-key on servers.spectra instead of skip-if-exists,
-        // so a peer tool's .vscode/mcp.json (e.g. a BELLATRIX server) is preserved rather than blocking
-        // SPECTRA's registration. Fail loud on an unparseable file (never overwrite it).
-        try
-        {
-            var path = await Skills.VsCodeMcpConfigInstaller.EnsureInstalledAsync(_workingDirectory, ct);
-            _logger.LogDebug("Ensured VS Code MCP config (merge-by-key on 'spectra'): {Path}", path);
-        }
-        catch (Skills.InvalidMcpConfigException ex)
-        {
-            _logger.LogError(
-                "Could not update {Path}: {Message} Fix or remove the file and re-run — SPECTRA left it untouched.",
-                VsCodeMcpPath, ex.Message);
-            throw;
-        }
     }
 
     private async Task UpdateGitIgnoreAsync(CancellationToken ct)

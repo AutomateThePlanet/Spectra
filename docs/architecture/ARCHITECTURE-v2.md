@@ -33,14 +33,14 @@ There is no "local layer." Everything is one of three things: deterministic CLI,
 
 ---
 
-## Two surfaces: CLI and MCP (not "either/or")
+## One surface: the CLI
 
-Rule: **stateless transformation → CLI; stateful session → MCP.**
+Rule: **everything is a CLI command — authoring *and* execution.**
 
 - **Authoring path → CLI** (Playwright-style, model-free): `generate-prompt`, `write-test`, `validate`, `coverage`, `list`, criteria scaffold. Transparent and debuggable ("run this command, show the output"), same surface in Claude Code, a bare terminal, and CI.
-- **Execution → MCP, only here.** A state machine with a lifecycle *is* a session by definition; forcing it into stateless CLI calls would mean re-inventing MCP's session model.
+- **Execution → CLI (`spectra run`).** The deterministic state machine runs over `Spectra.Execution` with all run state durable in SQLite (`.execution/spectra.db`, WAL) and a build-time orchestration snapshot, so short-lived CLI processes reconstruct the queue losslessly (Spec 064) — *no live session is required*. Spec 070 removed SPECTRA's own MCP execution adapter; `spectra run` is the sole execution surface.
 
-Maps cleanly onto the demo: authoring = CLI, live driving of the Calculator via BELLATRIX / Nova = MCP. **Do not unify.**
+Maps cleanly onto the demo: authoring = CLI, execution = CLI, live driving of the Calculator via the **separate** BELLATRIX / Nova MCP (a system-under-test driver, not SPECTRA's execution server).
 
 ---
 
@@ -96,12 +96,12 @@ Discipline rules port with full force — same class as the existing `runInTermi
 
 ### Execution loop porting
 
-Ports **conceptually 1:1**, because **state lives in the MCP server, not the agent.** `start_execution_run` creates the run, opaque handles hold position, `advance_test_case` records the verdict, the run survives lost connections (pause/resume/`get_execution_status`). The agent is effectively stateless between turns — so the multi-step pass/fail loop is just *conversational turns with a tool call between them*, Claude Code's native mode.
+Ports **conceptually 1:1**, because **state lives in SQLite, not the agent.** `spectra run start` creates the run, opaque handles hold position, `spectra run advance` records the verdict, the run survives process exits (pause/resume/`spectra run status`) because each short-lived CLI process reconstructs the queue from the durable orchestration snapshot (Spec 064). The agent is effectively stateless between turns — so the multi-step pass/fail loop is just *conversational turns with a command between them*, Claude Code's native mode.
 
-Real risk is the **opposite** of the obvious one: not that Claude Code can't wait, but that an eager agentic model **guesses a verdict and calls `advance_test_case` itself** instead of pausing for the human. The existing guardrails address exactly this and must carry over verbatim in spirit.
+Real risk is the **opposite** of the obvious one: not that Claude Code can't wait, but that an eager agentic model **guesses a verdict and runs `spectra run advance` itself** instead of pausing for the human. The existing guardrails address exactly this and must carry over verbatim in spirit.
 
-**Two setup requirements (confirmed in investigation MD §2–3):**
-- **Pre-approve the MCP server** with `allowedTools: ["mcp__spectra__*"]` in `.claude/settings.json`. Without it, Claude Code's default prompts fire on *every* MCP tool call and shred the loop. This is orthogonal to the intentional human-verdict pause — the pause is the agent asking a text question and waiting (controlled by the skill's instructions), not a permission prompt. Pre-approval removes the friction without removing the pause. This is also what replaces Copilot's `askQuestion` / `askForConfirmation`: plain-text question + wait, so the user answers with a verdict, notes, or a screenshot path.
+**Setup requirement:**
+- **Pre-approve the run commands** (e.g. `Bash(spectra run:*)` in `.claude/settings.json`) so Claude Code's per-call prompts don't fire on every `spectra run` invocation and shred the loop. This is orthogonal to the intentional human-verdict pause — the pause is the agent asking a text question and waiting (controlled by the skill's instructions), not a permission prompt. Pre-approval removes the friction without removing the pause. This is also what replaces Copilot's `askQuestion` / `askForConfirmation`: plain-text question + wait, so the user answers with a verdict, notes, or a screenshot path.
 - **Screenshots: standardize on MCP-saves-to-file + path reference.** The existing `save_clipboard_screenshot` (capture → write file → return path) sidesteps Claude Code's terminal-paste UI entirely; the agent reads the image by path. Native clipboard paste works on **macOS and native Windows** (both in use); it is fragile only under **WSL**, which is not part of the target setup. So the file-path approach is the standard and clipboard paste is an unneeded fallback.
 
 ---
