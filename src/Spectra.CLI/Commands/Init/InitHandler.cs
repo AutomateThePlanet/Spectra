@@ -22,7 +22,6 @@ public sealed class InitHandler
     private readonly OutputFormat _outputFormat;
 
     private const string ConfigFileName = "spectra.config.json";
-    private const string SkillPath = ".github/skills/test-generation/SKILL.md";
     private const string VsCodeMcpPath = ".vscode/mcp.json";
     private const string DeployWorkflowPath = ".github/workflows/deploy-dashboard.yml";
     private const string DocsDir = "docs";
@@ -65,9 +64,6 @@ public sealed class InitHandler
 
             if (!skipSkills)
             {
-                // Create skill file
-                await CreateSkillFileAsync(ct);
-
                 // Create bundled SKILL files (incl. the execution skill under .claude/skills/)
                 await CreateBundledSkillFilesAsync(force, ct);
 
@@ -105,7 +101,6 @@ public sealed class InitHandler
             _logger.LogInformation("  - {ConfigPath}", ConfigFileName);
             _logger.LogInformation("  - {DocsDir}/", DocsDir);
             _logger.LogInformation("  - {TestsDir}/", TestsDir);
-            _logger.LogInformation("  - {SkillPath}", SkillPath);
             _logger.LogInformation("  - .claude/skills/spectra-execution/SKILL.md");
             _logger.LogInformation("  - .claude/settings.json (mcp__spectra__* allowlist)");
             _logger.LogInformation("  - {WorkflowPath}", DeployWorkflowPath);
@@ -176,7 +171,6 @@ public sealed class InitHandler
         {
             Path.Combine(_workingDirectory, DocsDir),
             Path.Combine(_workingDirectory, TestsDir),
-            Path.Combine(_workingDirectory, ".github", "skills", "test-generation"),
             Path.Combine(_workingDirectory, DocsDir, "criteria"),
             Path.Combine(_workingDirectory, TemplatesDir)
         };
@@ -260,21 +254,6 @@ public sealed class InitHandler
         var templateContent = GetEmbeddedTemplate("spectra.config.json");
         await File.WriteAllTextAsync(configPath, templateContent, ct);
         _logger.LogDebug("Created configuration file: {Path}", configPath);
-    }
-
-    private async Task CreateSkillFileAsync(CancellationToken ct)
-    {
-        var skillPath = Path.Combine(_workingDirectory, SkillPath);
-        var skillDir = Path.GetDirectoryName(skillPath)!;
-
-        if (!Directory.Exists(skillDir))
-        {
-            Directory.CreateDirectory(skillDir);
-        }
-
-        var templateContent = GetEmbeddedTemplate("test-generation-skill.md");
-        await File.WriteAllTextAsync(skillPath, templateContent, ct);
-        _logger.LogDebug("Created skill file: {Path}", skillPath);
     }
 
     private async Task CreateBundledSkillFilesAsync(bool force, CancellationToken ct)
@@ -512,27 +491,10 @@ public sealed class InitHandler
         return templateName switch
         {
             "spectra.config.json" => ConfigLoader.GenerateDefaultConfig(),
-            "test-generation-skill.md" => GetDefaultSkillContent(),
             "bug-report.md" => GetDefaultBugReportTemplate(),
             _ => throw new FileNotFoundException($"Template not found: {templateName}")
         };
     }
-
-    private static string GetDefaultSkillContent() => """
-        # Test Generation Skill
-
-        You are an AI assistant specialized in generating comprehensive manual test cases from documentation.
-
-        ## Available Tools
-
-        - `get_document_map`: List all documentation files
-        - `load_source_document`: Read a specific document
-        - `search_source_docs`: Search for relevant content
-        - `read_test_index`: View existing tests in a suite
-        - `get_next_test_ids`: Allocate sequential test IDs
-        - `check_duplicates_batch`: Verify tests are unique
-        - `batch_write_tests`: Submit generated tests
-        """;
 
     private static string GetDefaultBugReportTemplate() => """
         ## {{title}}

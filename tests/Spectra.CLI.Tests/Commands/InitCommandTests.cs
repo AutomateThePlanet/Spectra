@@ -46,9 +46,12 @@ public class InitCommandTests : IDisposable
         Assert.True(Directory.Exists(Path.Combine(_testDir, "docs")), "docs/ should exist");
         Assert.True(Directory.Exists(Path.Combine(_testDir, "test-cases")), "test-cases/ should exist");
 
-        // Verify skill file
-        var skillPath = Path.Combine(_testDir, ".github", "skills", "test-generation", "SKILL.md");
-        Assert.True(File.Exists(skillPath), "SKILL.md should exist");
+        // RETIRED CONTRACT: init used to emit a pre-inversion generation skill at
+        // .github/skills/test-generation/SKILL.md (it named MCP write tools that no longer exist
+        // after the Spec 059 generation inversion). That emit was removed as dead code; generation
+        // now lives in .claude/skills/. Assert the new behaviour: no .github/skills/ is created.
+        Assert.False(Directory.Exists(Path.Combine(_testDir, ".github", "skills")),
+            ".github/skills/ should NOT be created (retired pre-inversion generation skill)");
     }
 
     [Fact]

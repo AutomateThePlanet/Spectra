@@ -301,7 +301,7 @@ data and your branding applied, without needing real test data.
 
 **Critic subagent** (bundled): `spectra-critic` — independent verification of generated tests.
 
-> The test **execution** agent (`.github/agents/spectra-execution.agent.md`) is **not yet ported** to Claude Code — it remains a GitHub Copilot agent until a later spec.
+> The test **execution** agent is now a Claude Code main-session skill at `.claude/skills/spectra-execution/SKILL.md` (ported from its legacy GitHub Copilot agent).
 
 **How to customize**: Edit any `SKILL.md` or the critic subagent file to change how Claude Code
 invokes CLI commands, presents results, or handles multi-step workflows.

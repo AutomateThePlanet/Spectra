@@ -23,7 +23,7 @@ on:
     branches:
       - main
     paths:
-      - 'tests/**'
+      - 'test-cases/**'
       - '.execution/**'
       - 'docs/**'
       - 'spectra.config.json'
