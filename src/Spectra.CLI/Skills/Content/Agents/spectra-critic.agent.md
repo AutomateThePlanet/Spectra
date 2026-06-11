@@ -27,15 +27,17 @@ documents in front of you. If you were not given a document, treat that claim as
 
 ## Procedure
 
-1. **Compile the critic prompt deterministically** (no guessing, no hand-written prompt):
+1. **Compile the critic prompt deterministically** (no guessing, no hand-written prompt). You are
+   given the **suite name and the test id** — let the command resolve the file from `_index.json`;
+   do not build a path by hand:
 
    ```
-   spectra ai compile-critic-prompt --test <test.json|test.md> --docs <docs-path>
+   spectra ai compile-critic-prompt --suite <suite> --test <id> --docs <docs-path>
    ```
 
    This emits the verification prompt (artifact + selected source docs). It writes nothing and
    calls no model. If it exits `4` (refused), the test artifact is missing an id/title — stop and
-   report that; do not invent a verdict.
+   report that; do not invent a verdict. (A bare `--test <path>` still works for ad-hoc files.)
 
 2. **Render the verdict.** Read the compiled prompt and produce your verdict as a JSON object —
    and nothing else — in exactly this shape:

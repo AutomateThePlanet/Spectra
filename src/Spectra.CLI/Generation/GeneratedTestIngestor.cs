@@ -102,6 +102,8 @@ public sealed class GeneratedTestIngestor
                 tests.Add(test);
         }
 
+        // No upper cap on tests.Count by design: the generate `--count` is advisory (it only shapes the
+        // prompt), so ingest accepts however many valid tests were produced. Only zero is an error.
         if (tests.Count == 0)
             return IngestResult.Failure(IngestErrorCode.NoTests,
                 "A JSON array was parsed but contained no valid test objects "

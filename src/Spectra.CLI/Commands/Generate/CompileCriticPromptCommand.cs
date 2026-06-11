@@ -3,7 +3,9 @@ using System.Text.Json;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
 using Spectra.CLI.Verification;
+using Spectra.Core.Index;
 using Spectra.Core.Models;
+using Spectra.Core.Models.Config;
 using Spectra.Core.Parsing;
 
 namespace Spectra.CLI.Commands.Generate;
@@ -27,30 +29,45 @@ public sealed class CompileCriticPromptCommand : Command
         : base("compile-critic-prompt",
             "Compile a critic verification prompt for a generated test (deterministic, no model call)")
     {
-        var testOption = new Option<string?>(["--test", "-t"], "Path to the test artifact to verify (test .md or generated-test JSON)");
+        // Spec 071 (critic-seam cleanup): when --suite is set, --test is interpreted as a test ID
+        // (resolved to test-cases/{suite}/{id}.md via _index.json) instead of a filesystem path. This
+        // closes the ID→path gap the critic step hit. The legacy bare --test <path> form is preserved.
+        var suiteOption = new Option<string?>(["--suite", "-s"], "Suite to resolve the test(s) from (makes --test an ID, not a path; omit --test to emit all)");
+        var testOption = new Option<string?>(["--test", "-t"], "Test artifact: a path (legacy) or, with --suite, the test ID to resolve");
         var docsOption = new Option<string?>(["--docs", "-d"], "Source document(s) to ground against (file or directory)");
 
+        AddOption(suiteOption);
         AddOption(testOption);
         AddOption(docsOption);
 
         this.SetHandler(async (context) =>
         {
+            var suite = context.ParseResult.GetValueForOption(suiteOption);
             var test = context.ParseResult.GetValueForOption(testOption);
             var docs = context.ParseResult.GetValueForOption(docsOption);
             var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
-            context.ExitCode = await RunAsync(test, docs, outputFormat == OutputFormat.Json, context.GetCancellationToken());
+            context.ExitCode = await RunAsync(suite, test, docs, outputFormat == OutputFormat.Json, context.GetCancellationToken());
         });
     }
 
-    private static async Task<int> RunAsync(string? testPath, string? docsPath, bool json, CancellationToken ct)
+    private static async Task<int> RunAsync(string? suite, string? testPath, string? docsPath, bool json, CancellationToken ct)
     {
+        var currentDir = Directory.GetCurrentDirectory();
+
+        // Suite-aware resolution (Spec 071): the agent supplies the suite name (and optionally the test
+        // ID) it already knows; the command resolves the test file(s) from _index.json on disk — no
+        // hand-built paths, no enumeration. This branch runs BEFORE the legacy path check below.
+        if (!string.IsNullOrWhiteSpace(suite))
+        {
+            return await RunSuiteAsync(suite, testPath, docsPath, currentDir, json, ct);
+        }
+
         if (string.IsNullOrWhiteSpace(testPath))
         {
             EmitRefusal(json, "test_artifact", "A test artifact path is required (--test).");
             return ExitRefused;
         }
 
-        var currentDir = Directory.GetCurrentDirectory();
         var testFull = Path.IsPathRooted(testPath) ? testPath : Path.Combine(currentDir, testPath);
         if (!File.Exists(testFull))
         {
@@ -97,6 +114,139 @@ public sealed class CompileCriticPromptCommand : Command
             if (!result.Prompt!.EndsWith('\n')) Console.Out.WriteLine();
         }
         return ExitSuccess;
+    }
+
+    /// <summary>
+    /// Spec 071: resolves the test set for a suite from <c>test-cases/{suite}/_index.json</c> and emits the
+    /// critic prompt(s). With <paramref name="testId"/> set, targets one test BY ID; otherwise emits all.
+    /// Fails loud (exit 1) when the suite/index or the requested id cannot be resolved — never silently skips.
+    /// </summary>
+    private static async Task<int> RunSuiteAsync(
+        string suite, string? testId, string? docsPath, string currentDir, bool json, CancellationToken ct)
+    {
+        var testsDir = await ResolveTestsDirAsync(currentDir, ct);
+        var suitePath = Path.Combine(currentDir, testsDir, suite);
+        var indexPath = IndexWriter.GetIndexPath(suitePath);
+
+        MetadataIndex? index;
+        try
+        {
+            index = await new IndexWriter().ReadAsync(indexPath, ct);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error reading suite index '{indexPath}': {ex.Message}");
+            return ExitError;
+        }
+        if (index is null || index.Tests.Count == 0)
+        {
+            Console.Error.WriteLine($"Suite '{suite}' not found or has no indexed tests ({indexPath}).");
+            return ExitError;
+        }
+
+        IReadOnlyList<TestIndexEntry> targets;
+        if (!string.IsNullOrWhiteSpace(testId))
+        {
+            var entry = index.Tests.FirstOrDefault(t => string.Equals(t.Id, testId, StringComparison.OrdinalIgnoreCase));
+            if (entry is null)
+            {
+                Console.Error.WriteLine($"Test id '{testId}' not found in suite '{suite}' ({indexPath}).");
+                return ExitError;
+            }
+            targets = [entry];
+        }
+        else
+        {
+            targets = index.Tests;
+        }
+
+        IReadOnlyList<SourceDocument> docs;
+        try
+        {
+            docs = await LoadDocumentsAsync(docsPath, currentDir, ct);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error reading documents: {ex.Message}");
+            return ExitError;
+        }
+
+        var compiled = new List<(string Id, string Prompt)>();
+        foreach (var entry in targets)
+        {
+            var full = Path.Combine(suitePath, entry.File);
+            if (!File.Exists(full))
+            {
+                Console.Error.WriteLine($"Test artifact not found for id '{entry.Id}' in suite '{suite}': {full}");
+                return ExitError;
+            }
+
+            TestCase? test;
+            try
+            {
+                test = await LoadTestAsync(full, currentDir, ct);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error reading test artifact '{entry.Id}': {ex.Message}");
+                return ExitError;
+            }
+
+            var result = CriticPromptCompiler.Compile(test, docs);
+            if (!result.IsSuccess)
+            {
+                EmitRefusal(json, result.MissingInput!, result.Message!);
+                return ExitRefused;
+            }
+            compiled.Add((entry.Id, result.Prompt!));
+        }
+
+        if (json)
+        {
+            Console.Out.WriteLine(JsonSerializer.Serialize(new
+            {
+                prompts = compiled.Select(c => new { id = c.Id, prompt = c.Prompt }).ToArray()
+            }));
+        }
+        else if (compiled.Count == 1)
+        {
+            // Byte-identical to the legacy single-prompt output so the critic subagent (raw stdout) is unaffected.
+            Console.Out.Write(compiled[0].Prompt);
+            if (!compiled[0].Prompt.EndsWith('\n')) Console.Out.WriteLine();
+        }
+        else
+        {
+            foreach (var (id, prompt) in compiled)
+            {
+                Console.Out.WriteLine($"===== CRITIC PROMPT: {id} =====");
+                Console.Out.Write(prompt);
+                if (!prompt.EndsWith('\n')) Console.Out.WriteLine();
+            }
+        }
+        return ExitSuccess;
+    }
+
+    /// <summary>
+    /// Resolves the configured tests directory (default <c>test-cases</c>) from spectra.config.json if present.
+    /// Lenient by design: a missing/unparseable config falls back to the default, mirroring the sibling compilers.
+    /// </summary>
+    private static async Task<string> ResolveTestsDirAsync(string currentDir, CancellationToken ct)
+    {
+        var configPath = Path.Combine(currentDir, "spectra.config.json");
+        if (!File.Exists(configPath))
+            return "test-cases";
+
+        try
+        {
+            var configJson = await File.ReadAllTextAsync(configPath, ct);
+            var config = JsonSerializer.Deserialize<SpectraConfig>(configJson,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return config?.Tests?.Dir ?? "test-cases";
+        }
+        catch (JsonException)
+        {
+            return "test-cases";
+        }
     }
 
     private static async Task<TestCase?> LoadTestAsync(string fullPath, string currentDir, CancellationToken ct)

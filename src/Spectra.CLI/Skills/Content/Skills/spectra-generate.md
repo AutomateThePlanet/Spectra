@@ -124,7 +124,7 @@ Shall I proceed?
 
 ### Step 5 — Compile the generation prompt
 
-Keep the SAME `--focus` from analysis. Use `{count}` = the user's explicit number or `recommended`.
+Keep the SAME `--focus` from analysis. Use `{count}` = the user's explicit number or `recommended`. **`recommended` is advisory guidance, not a quota** — generate as many tests as the behavior needs (more or fewer is fine). **Acceptance-criteria coverage is the real adequacy signal**, not hitting the count.
 ```
 spectra ai compile-prompt --suite {suite} --count {count} [--focus "{focus}"] --output-format json
 ```
@@ -153,7 +153,7 @@ For EACH id in the `ingest-tests` `ids` list:
 
 ### Step 8 — Invoke the `spectra-critic` subagent
 
-Invoke it with the Task tool, passing only the test file path and its source docs (no generator state). It compiles the prompt (`spectra ai compile-critic-prompt`), renders a JSON verdict in-session, and ingests it (`spectra ai ingest-verdict`). Act on the gate:
+Invoke it with the Task tool, passing only the **suite name + the test id** (from the `ingest-tests` `ids` list) and its source docs — no generator state, and **never a hand-built file path**. The subagent compiles the prompt (`spectra ai compile-critic-prompt --suite {suite} --test {id}`, which resolves the id→path from `_index.json` on disk), renders a JSON verdict in-session, and ingests it (`spectra ai ingest-verdict`). Act on the gate:
 - gate `pass` (verdict `grounded` / `partial`) → keep the test.
 - gate `drop` (verdict `hallucinated`) → remove it: `spectra delete {id} --force --no-interaction --output-format json --verbosity quiet`.
 - ingest exit `5` (empty), exit `6` (missing/unparseable `verdict`/`score` — **damage**), or compile exit `4` (refused) → **fail loud**, NOT a pass. Regenerate that single test addressing the *specific* error and re-verify. **Bounded by the retry limit (2 attempts).** If it still fails at the limit, STOP and report the failing test and the specific error; never keep an unverified test.

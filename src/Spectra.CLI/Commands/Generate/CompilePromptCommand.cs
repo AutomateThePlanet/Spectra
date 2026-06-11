@@ -123,6 +123,8 @@ public sealed class CompilePromptCommand : Command
 
         var result = PromptCompiler.Compile(
             userPrompt: string.IsNullOrWhiteSpace(focus) ? $"Generate manual test cases for the '{suite}' suite." : focus,
+            // count is ADVISORY by design: it only shapes the prompt text. Generation is in-session and
+            // ingest applies no cap (GeneratedTestIngestor) — the missing cap is intentional, not an oversight.
             requestedCount: count,
             criteriaContext: criteria.Context,
             templateLoader: templateLoader,
