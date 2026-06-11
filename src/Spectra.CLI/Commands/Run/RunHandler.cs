@@ -79,11 +79,12 @@ public sealed class RunHandler
             else
             {
                 var selections = s.SelectionsLoader();
-                if (!selections.TryGetValue(selection!, out _))
+                if (!selections.TryGetValue(selection!, out var sel))
                     return Fail("run start", "SELECTION_NOT_FOUND", $"Selection '{selection}' not found.", ExitCodes.NotFound);
-                var allTests = s.SuiteListLoader().SelectMany(su => s.IndexLoader(su)).ToList();
-                // Reuse the same filter application the MCP selection mode uses via RunFilters on the engine build.
-                entries = allTests;
+                // Apply the saved selection's criteria as RunFilters over the whole corpus — the same
+                // filtered-start the retired MCP selection mode performed (Spec 070).
+                entries = s.SuiteListLoader().SelectMany(su => s.IndexLoader(su)).ToList();
+                filters = RunFilters.From(sel.Priorities?.ToList(), sel.Tags?.ToList(), sel.Components?.ToList());
                 suiteName = $"selection:{selection}";
             }
 

@@ -1,10 +1,8 @@
-using System.Text.Json;
 using Spectra.CLI.Extraction;
-using Spectra.CLI.Commands.Analyze;
-using Spectra.CLI.Commands.Docs;
 using Spectra.CLI.Generation;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Coverage;
+using Spectra.Core.Models.Execution;
 using Spectra.Integration.Tests.Support;
 
 namespace Spectra.Integration.Tests;
@@ -79,13 +77,12 @@ public sealed class OriginalBugRegression
             TestFactory.Make("TC-004", "Low D", Priority.Low, component: "checkout", filePath: "checkout/TC-004.md"),
         });
 
-        var start = ws.BuildStartTool();
-        var response = JsonDocument.Parse(await start.ExecuteAsync(
-            JsonDocument.Parse("""{"suite":"checkout","priorities":["high"]}""").RootElement)).RootElement;
+        var engine = ws.BuildEngine();
+        var (_, queue) = await engine.StartRunAsync(
+            "checkout", ws.IndexLoader("checkout"), filters: new RunFilters { Priorities = ["high"] });
 
-        var count = response.GetProperty("data").GetProperty("test_count").GetInt32();
-        Assert.Equal(2, count);            // exactly the two high-priority tests
-        Assert.NotEqual(4, count);         // NOT the whole suite (the original bug)
+        Assert.Equal(2, queue.TotalCount);     // exactly the two high-priority tests
+        Assert.NotEqual(4, queue.TotalCount);  // NOT the whole suite (the original bug)
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────

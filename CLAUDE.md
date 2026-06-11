@@ -4,7 +4,7 @@ Last updated: 2026-04-30 | Version history in `CHANGELOG.md`
 
 ## Tech Stack
 - C# 12, .NET 8+, Claude Code (AI runtime — authoring orchestration ships as `.claude/skills/` + `.claude/agents/`), System.CommandLine, Spectre.Console, System.Text.Json. Spec 058 retired the in-process **critic** provider chain (the critic is the `spectra-critic` subagent; `ai.critic.model` is its only selector). **Spec 059** inverted **generation** onto the compile→in-session-generate→ingest seam and removed the in-process generator (`CopilotGenerationAgent`, `BehaviorAnalyzer`, `UserDescribedGenerator`, `ProviderChain`, `AgentFactory.CreateAgentAsync`, the `spectra ai generate` command) — generation now runs in the interactive session via the `spectra-generate` skill (`spectra ai compile-prompt` / `compile-analysis-prompt` → ingest). **Spec 069** completed the migration: it inverted **criteria extraction** onto the same compile→in-session→ingest seam (`spectra docs changed` → `compile-extraction-prompt` → in-session turn → `ingest-criteria`, driven by the `spectra-criteria` skill), made `docs index` index-only (retiring `RequirementsExtractor`/`_requirements.yaml`), dropped import compound-splitting, and **deleted the GitHub Copilot SDK entirely** — `CopilotService`, `ProviderMapping`, `CriteriaExtractor`, `Agent/Copilot/`, `AgentFactory`, `spectra auth`, and the `ai.providers`/`ai.critic` config model are gone (model-free analysis helpers were rescued to `Spectra.CLI.Analysis`; `Microsoft.Extensions.AI.Abstractions` is now a direct dependency). All inference is the user's Claude Code session.
-- ASP.NET Core (MCP server), Microsoft.Data.Sqlite, SQLite (`.execution/spectra.db`)
+- Microsoft.Data.Sqlite, SQLite (`.execution/spectra.db`) — execution is CLI-only (`spectra run`); SPECTRA's MCP execution adapter was removed in Spec 070
 - YamlDotNet (manifest serialization), Microsoft.Extensions.FileSystemGlobbing (exclusion patterns)
 - CsvHelper (CSV import), dual-model verification (Generator + Critic) — the critic runs as a `context: fork` subagent (`.claude/agents/spectra-critic`)
 - File-based: test-cases/, docs/, spectra.config.json, _index.json, profiles, .spectra/prompts/
@@ -44,23 +44,20 @@ src/
     Validation/         # Schema validation
     Update/             # TestClassifier
     Index/              # DocumentIndexReader/Writer
-  Spectra.Execution/    # Transport-neutral engine (Spec 065) — shared by CLI + MCP; namespaces preserved
+  Spectra.Execution/    # Transport-neutral engine (Spec 065); sole execution surface drives it via `spectra run` (Spec 070). Namespaces still Spectra.MCP.* (cosmetic, rename out of scope)
     Execution/          # ExecutionEngine, TestQueue, DependencyResolver, StateMachine, QueueReconstructionException (ns Spectra.MCP.Execution)
     Storage/            # ExecutionDb (WAL+busy_timeout), RunRepository, ResultRepository, QueueSnapshotRepository (ns Spectra.MCP.Storage)
     Reports/            # ReportGenerator, ReportWriter (ns Spectra.MCP.Reports), ScreenshotService (Spec 065)
     Identity/           # UserIdentityResolver (ns Spectra.MCP.Identity)
     Infrastructure/     # McpConfig (ns Spectra.MCP.Infrastructure)
-  Spectra.MCP/          # MCP execution server — THIN ADAPTER over Spectra.Execution (Spec 065)
-    Tools/              # RunManagement/, TestExecution/, Reporting/, Data/ (unchanged tool handlers)
-    Server/             # McpServer, ToolRegistry, McpProtocol
-    Infrastructure/     # McpLogging (stays; McpConfig moved to Spectra.Execution)
   Spectra.GitHub/       # GitHub integration (future)
 
 dashboard-site/         # Static template: index.html, styles/, scripts/(app.js, coverage-map.js), functions/(auth)
 tests/
-  Spectra.Core.Tests/   # Unit tests (~462)
-  Spectra.CLI.Tests/    # Integration tests (~466)
-  Spectra.MCP.Tests/    # MCP server tests (~351)
+  Spectra.Core.Tests/   # Unit tests (~557)
+  Spectra.CLI.Tests/    # Integration tests (~1150)
+  Spectra.Execution.Tests/  # Engine + relocated/ported execution tests (Spec 070, ~228)
+  Spectra.Integration.Tests/ # Cross-spec generation→persistence→execution (engine-direct)
   TestFixtures/         # Sample data
 ```
 
@@ -99,7 +96,7 @@ spectra ai analyze --extract-criteria [--force] [--dry-run]
 spectra ai analyze --import-criteria FILE [--replace] [--skip-splitting] [--dry-run]
 spectra ai analyze --list-criteria [--source-type X] [--component X] [--priority X]
 
-# Execution (Spec 065 — CLI execution surface; same engine as MCP, no MCP server required)
+# Execution (Spec 065/070 — `spectra run` is the SOLE execution surface; no MCP server)
 spectra run list-suites|list-active|selections|history [--suite]
 spectra run start <suite> [--priorities --tags --components --test-ids --selection --environment]
 spectra run status|summary [<run-id>]
@@ -129,27 +126,14 @@ spectra config add-automation-dir|remove-automation-dir|list-automation-dirs PAT
 - Nullable reference types enabled
 - xUnit tests with structured results (never throw on validation errors)
 
-## MCP Tools
+## Execution (CLI-only since Spec 070)
 
-**Run Management:** `start_execution_run`, `get_execution_status`, `pause_execution_run`, `resume_execution_run`, `cancel_execution_run`, `finalize_execution_run`, `list_available_suites`
-
-**Test Execution:** `get_test_case_details`, `advance_test_case`, `skip_test_case`, `bulk_record_results`, `add_test_note`, `retest_test_case`, `save_screenshot`, `save_clipboard_screenshot`
-
-**Discovery:** `list_active_runs`, `cancel_all_active_runs`
-
-**Data:** `validate_tests`, `rebuild_indexes`, `analyze_coverage_gaps`, `find_test_cases`, `get_test_execution_history`, `list_saved_selections`
-
-**Reporting:** `get_run_history`, `get_execution_summary`
-
-### Bulk Operations
-```json
-{"status": "SKIPPED", "remaining": true, "reason": "Environment unavailable"}
-{"status": "PASSED", "remaining": true}
-{"status": "FAILED", "test_ids": ["TC-001", "TC-002"], "reason": "API down"}
-```
-
-### Reports
-Generated in JSON, Markdown, HTML. Features: test titles from `_index.json`, human-readable durations, UTC timestamps, expandable non-passing tests, status enums as strings.
+SPECTRA has no MCP server. All execution runs through the `spectra run` command group (see Commands
+above), driving the `Spectra.Execution` engine over `.execution/spectra.db`. Bulk-record accepts
+`--remaining` or `--test-ids a,b` with `--status` and an optional `--reason`. Reports are generated in
+JSON, Markdown, and HTML (test titles from `_index.json`, human-readable durations, UTC timestamps,
+expandable non-passing tests, status enums as strings). The SEPARATE BELLATRIX/Nova MCP that drives the
+system-under-test is unrelated to SPECTRA's removed execution adapter.
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
@@ -159,6 +143,7 @@ Generated in JSON, Markdown, HTML. Features: test titles from `_index.json`, hum
 - File-based (Markdown/YAML/JSON in `test-cases/`, `docs/_index/`, `docs/criteria/`, `_index.json`, `_manifest.yaml`, `_checksums.json`, `_criteria_index.yaml`) (045-doc-index-restructure)
 
 ## Recent Changes
+- **070-remove-mcp-adapter (v2)**: Removed SPECTRA's own MCP execution adapter — `spectra run` is now the **sole** execution surface (reverses 065's "keep MCP as a thin adapter"). Deleted the `Spectra.MCP` project (Server/, Tools/, the 25 tool schemas, `spectra-mcp` dotnet-tool packaging) and `Spectra.MCP.Tests`; removed both from `Spectra.slnx`. `spectra init` no longer emits `.vscode/mcp.json` or the `mcp__spectra__*` allowlist (deleted `VsCodeMcpConfigInstaller`/`ClaudeSettingsInstaller`); a peer `.vscode/mcp.json` is left untouched. The execution skill/agent are CLI-only (removed the optional "drive over the SPECTRA MCP server" fallback; the SEPARATE BELLATRIX/Nova SUT-driver MCP and Azure DevOps bug-log MCP references stay). **Engine untouched** (`Spectra.Execution`, incl. cosmetic `Spectra.MCP.*` namespaces — rename out of scope). **No coverage lost**: 16 engine test files relocated verbatim to `Spectra.Execution.Tests`; the adapter tests' engine substance ported engine-direct there (closing bulk-record/cancel-all/list-active/run-history gaps; Execution.Tests 6→228); transport-only tests (JSON-RPC strictness, ToolRegistry error-code mapping, tool param validation) retired with named survivors; `Spectra.Integration.Tests` re-pointed off the MCP tools to the engine. Latent fix: `spectra run start --selection` now applies the saved selection's filters (was discarding them and running the whole corpus). Canary (Core 557 / CLI / pre-existing Execution.Tests) unmodified and green. `docs/architecture/ARCHITECTURE-v2.md` (+`docs/specs/` copy) updated to "one surface: the CLI". Stale constitution clauses II/III (MCP/provider wording) left for a separate amendment.
 - **065-execution-surface-consolidation (v2)**: Makes the deterministic execution engine a **first-class CLI surface** (`spectra run …`) while keeping `Spectra.MCP` as a thin adapter over the same engine — one `dotnet tool install -g Spectra` for both generation and execution, the 25 MCP tool schemas out of the model context, and zero per-client MCP config for the CLI path. The engine + storage were extracted from the `Spectra.MCP` executable into a new transport-neutral **`Spectra.Execution`** class library referenced by both CLI and MCP. **Decisive design (research R1):** the moved types **keep their existing namespaces** (`Spectra.MCP.Execution/.Storage/.Identity/.Infrastructure/.Reports`), because every protected tool/integration test references them — so the extraction is *file move + project-reference rewiring only*, **zero `using` edits**, and the ~14 transport tests + the whole MCP corpus compile and pass **byte-unchanged** (402/402), which is the behavior-preservation proof (SC-003/SC-004). Moved: `ExecutionEngine`, `TestQueue`, `DependencyResolver`, `StateMachine`, `QueueReconstructionException`, `ExecutionDb`, `RunRepository`, `ResultRepository`, `QueueSnapshotRepository`, `UserIdentityResolver`, `McpConfig` (engine ctor dep, carried), and `ReportGenerator`/`ReportWriter` (the CLI's `finalize` needs them). New `spectra run` group (`Commands/Run/`: `RunCommand`/`RunServices`/`RunHandler`/`RunResult`) is thin adapters over the SAME `ExecutionEngine` over the SAME `.execution/spectra.db` — `start`/`status`/`show`/`advance`/`skip`/`note`/`bulk-record`/`retest`/`screenshot[-clipboard]`/`pause`/`resume`/`cancel`/`cancel-all`/`finalize`/`list-suites`/`list-active`/`history`/`summary`/`selections`; short-lived CLI processes reconstruct the queue losslessly (Spec 064) so behaviour == MCP (FR-007). `QueueReconstructionException` surfaces as a distinct CLI outcome (`error_code: RECONSTRUCTION_FAILED`), never conflated with `RUN_NOT_FOUND` (FR-008). **`ExecutionDb` now sets `PRAGMA journal_mode=WAL; busy_timeout=5000` at open** so concurrent short-lived writers don't hit `SQLITE_BUSY` (FR-004). New `ScreenshotService` (shared encode + OS clipboard capture); MCP screenshot tools left unchanged (behavior-preserving — delegation deferred to protect the green report tests). New `spectra-execute` SKILL + the execution agent re-pointed at `spectra run` (guardrails preserved: present→wait-for-verdict→advance, never fabricate, never auto-advance; MCP kept as optional networked path). +1 project (`Spectra.Execution`), +1 test project (`Spectra.Execution.Tests`); ~20 new tests (run-loop, parity, guardrails, WAL concurrency, skill); `Spectra.Core`/`TestPersistenceService`/MCP transport nets untouched and green.
 - **064-lossless-queue-reconstruction (v2)**: Fixes the single shared root cause that blocked a CLI-driven (short-lived-process) execution surface: the in-memory `TestQueue` was reconstructed from SQLite **lossily** (`TestQueue.AddFromResult` hard-coded `Title=TestId`/`Priority=Medium`/`DependsOn=null`; `ReconstructQueue` re-ordered alphabetically), so any process not holding the original queue silently lost dependency-blocking and ordering. Now a durable **orchestration snapshot** is persisted at run-build into a new `queue_snapshot` table (`run_id,test_id,title,priority,depends_on,order_index`; new `QueueSnapshotEntry` + `QueueSnapshotRepository`), and reconstruction rebuilds the queue **DB-complete** from it — never re-reading the mutable on-disk index, so it is drift-immune. `AddFromResult` was removed in favour of `TestQueue.AddReconstructed`; `ReconstructQueue`/`GetQueueAsync` validate and **fail loud** via new `QueueReconstructionException` (snapshot missing/incomplete/inconsistent or dangling `depends_on`), surfaced centrally in `ToolRegistry` as `RECONSTRUCTION_FAILED` — distinct from the benign null "run not found". `GetStatusAsync`/`StartTestAsync`/`AdvanceTestAsync`/`BulkRecordResultsAsync`/`RetestAsync`/`FinalizeRunAsync` now route through the reconstruct-aware `GetQueueAsync` (warm `_queues` path unchanged), so long-lived == short-lived behaviour, the B-column of process-lifetime tools collapses to 0, and the cross-process `retest` `RUN_NOT_FOUND` bug is fixed. Correctness prerequisite for the follow-on execution-surface consolidation (CLI `spectra run`, `Spectra.Execution` extraction, WAL/busy_timeout — all out of scope here). +3 source files (`QueueSnapshotEntry`, `QueueSnapshotRepository`, `QueueReconstructionException`) + engine/schema/DI edits; +5 test files (~21 tests); `TestQueueReconstructionTests` migrated off the removed lossy primitive. `Spectra.Core` + `TestPersistenceService` test nets untouched and green.
 - **063-targeted-test-updates (v2)**: Adds the missing **update** counterpart of the inverted compile→in-session→ingest seam. Before this, `spectra ai update` only classified tests and never rewrote OUTDATED ones against changed docs (the `spectra-update` skill's "rewrites affected test cases" claim was false). New CLI pair: `spectra ai compile-update-prompt --suite <s> --test-id <id>` (deterministic, model-free **edit** prompt — existing test + changed source/criteria + "edit, don't regenerate; preserve id/structure/manual fields", emits to stdout) and `spectra ai ingest-update <suite> --test-id <id> [--from <file>]` (fail-loud validate+persist through the single `TestPersistenceService` write+index path). `ingest-update` protects invariants deterministically: id **from the original** (no new id allocated; edit not create), pre-existing **`Manual` verdict/grounding** + non-round-tripped fields re-asserted from the original, and a **drift guard** that fails loud (`DRIFT_DETECTED`, exit 5) on a protected-field change not implicated by the doc change (priority/component/tags). New `UpdatePromptCompiler`, `UpdatedTestIngestor` (+`DriftReport`/`DriftEntry`); reuses `GeneratedTestIngestor.ParseAndValidate` verbatim. `test-update.md` template rewritten from classify-and-propose to edit-and-return-whole-test (output = JSON array of one edited test, generation schema). `spectra-update` skill rewritten to drive the loop with bounded fail-loud retry; `TestClassifier` (selector) + `TestPersistenceService` (persist) reused unchanged. SkillsManifest per-line-flag checks exclude `spectra-update` (seam commands take no `--no-interaction`/`--output-format`/`--verbosity`), mirroring `spectra-generate`. +4 source, +3 test files (~28 tests); `usage.md`/`cli-reference.md` corrected.

@@ -9,8 +9,6 @@ using Spectra.MCP.Execution;
 using Spectra.MCP.Identity;
 using Spectra.MCP.Infrastructure;
 using Spectra.MCP.Storage;
-using Spectra.MCP.Tools.Data;
-using Spectra.MCP.Tools.RunManagement;
 
 namespace Spectra.Integration.Tests.Support;
 
@@ -18,10 +16,9 @@ namespace Spectra.Integration.Tests.Support;
 /// Spec 052/059: a temporary project directory wired like a real Spectra workspace
 /// (config + test-cases/ + docs/criteria/ + .spectra/). Composes the same production
 /// persistence the seam's <c>ingest-tests</c> uses — <see cref="TestPersistenceService"/> →
-/// real <see cref="StartExecutionRunTool"/>/<see cref="FindTestCasesTool"/> reading the on-disk
-/// index — so a single test can cross the CLI↔MCP seam offline. (Spec 059 removed the in-process
-/// generator; generation now runs in-session, so these tests persist the produced test directly
-/// rather than driving a hermetic in-process agent.)
+/// the real <see cref="ExecutionEngine"/> reading the on-disk index via <see cref="IndexLoader"/> — so a
+/// single test can cross the generation→persistence→execution seam offline. (Spec 070 removed the MCP
+/// adapter; these tests now drive the engine directly, the same engine the <c>spectra run</c> CLI uses.)
 /// </summary>
 public sealed class IntegrationWorkspace : IAsyncDisposable
 {
@@ -76,13 +73,11 @@ public sealed class IntegrationWorkspace : IAsyncDisposable
             File.ReadAllText(Path.Combine(TestsPath, suite, "_index.json")),
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
 
-    public StartExecutionRunTool BuildStartTool()
-        => new(BuildEngine(), OnDiskIndexLoader.For(TestsPath));
+    /// <summary>Loads a suite's test entries from the on-disk index — the same discovery the CLI run surface uses.</summary>
+    public Func<string, IEnumerable<TestIndexEntry>> IndexLoader => OnDiskIndexLoader.For(TestsPath);
 
-    public FindTestCasesTool BuildFindTool()
-        => new(OnDiskIndexLoader.SuiteList(TestsPath), OnDiskIndexLoader.For(TestsPath));
-
-    private ExecutionEngine BuildEngine()
+    /// <summary>The real execution engine over this workspace's SQLite DB (the engine the <c>spectra run</c> CLI drives).</summary>
+    public ExecutionEngine BuildEngine()
     {
         _db ??= new ExecutionDb(Root);
         var runRepo = new RunRepository(_db);

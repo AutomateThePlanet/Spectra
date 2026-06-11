@@ -1,11 +1,7 @@
-using System.Text.Json;
-using Spectra.CLI.Extraction;
-using Spectra.CLI.Commands.Docs;
 using Spectra.CLI.Generation;
 using Spectra.Core.Models;
-using Spectra.Core.Models.Coverage;
+using Spectra.Core.Models.Execution;
 using Spectra.Integration.Tests.Support;
-using Spectra.MCP.Server;
 
 // ExtractCriteriaLoopAsync aggregates the (obsolete) RequirementDefinition type;
 // these tests must speak that API until the production signature changes.
@@ -42,14 +38,13 @@ public sealed class EndToEndScenarios
         await ws.PersistAsync("checkout", new[] { produced });
         Assert.Contains(ws.ReadIndex("checkout").Tests, e => e.Id == "TC-900");
 
-        // 051: a high-priority filtered run enqueues exactly the new test.
-        var start = ws.BuildStartTool();
-        var data = JsonDocument.Parse(await start.ExecuteAsync(
-            JsonDocument.Parse("""{"suite":"checkout","priorities":["high"]}""").RootElement))
-            .RootElement.GetProperty("data");
+        // 051: a high-priority filtered run enqueues exactly the new test (engine reads the on-disk index).
+        var engine = ws.BuildEngine();
+        var (_, queue) = await engine.StartRunAsync(
+            "checkout", ws.IndexLoader("checkout"), filters: new RunFilters { Priorities = ["high"] });
 
-        Assert.Equal(1, data.GetProperty("test_count").GetInt32());
-        Assert.Equal("TC-900", data.GetProperty("first_test").GetProperty("test_id").GetString());
+        Assert.Equal(1, queue.TotalCount);
+        Assert.Equal("TC-900", queue.GetNext()!.TestId);
     }
 
     // 047 + 050 (criteria flow into the generation prompt — now a seam concern)
@@ -81,12 +76,8 @@ public sealed class EndToEndScenarios
             tags: ["search"], component: "search", filePath: "search/TC-777.md");
         await ws.PersistAsync("search", new[] { produced });
 
-        var find = ws.BuildFindTool();
-        var data = JsonDocument.Parse(await find.ExecuteAsync(
-            JsonDocument.Parse("""{"suites":["search"]}""").RootElement)).RootElement.GetProperty("data");
-
-        Assert.True(data.GetProperty("matched").GetInt32() >= 1);
-        var ids = data.GetProperty("tests").EnumerateArray().Select(t => t.GetProperty("id").GetString()).ToList();
+        // The persisted test is discoverable through the same on-disk index the run surface loads from.
+        var ids = ws.IndexLoader("search").Select(e => e.Id).ToList();
         Assert.Contains("TC-777", ids);
     }
 
@@ -104,21 +95,16 @@ public sealed class EndToEndScenarios
         });
         const int fullSuiteSize = 4;
 
-        // Path C #2 — find_test_cases shape (canonical post-051): filters correctly.
-        var start = ws.BuildStartTool();
-        var count = JsonDocument.Parse(await start.ExecuteAsync(
-                JsonDocument.Parse("""{"suite":"checkout","priorities":["high"]}""").RootElement))
-            .RootElement.GetProperty("data").GetProperty("test_count").GetInt32();
-        Assert.Equal(2, count);
-        Assert.NotEqual(fullSuiteSize, count);
+        // A priority-filtered run enqueues exactly the high-priority tests — no silent whole-suite fallback.
+        var engine = ws.BuildEngine();
+        var (_, queue) = await engine.StartRunAsync(
+            "checkout", ws.IndexLoader("checkout"), filters: new RunFilters { Priorities = ["high"] });
+        Assert.Equal(2, queue.TotalCount);
+        Assert.NotEqual(fullSuiteSize, queue.TotalCount);
 
-        // Path C #1 — top-level singular 'priority': actionable error, not whole-suite.
-        await Assert.ThrowsAsync<McpInvalidParamsException>(() => ws.BuildStartTool().ExecuteAsync(
-            JsonDocument.Parse("""{"suite":"checkout","priority":"high"}""").RootElement));
-
-        // Path C #3 — plural nested under legacy 'filters': actionable error, not whole-suite.
-        await Assert.ThrowsAsync<McpInvalidParamsException>(() => ws.BuildStartTool().ExecuteAsync(
-            JsonDocument.Parse("""{"suite":"checkout","filters":{"priorities":["high"]}}""").RootElement));
+        // (The MCP JSON-RPC param-shape strictness that rejected singular 'priority' / nested 'filters'
+        // was transport-only and was retired with the adapter in Spec 070; the engine takes a typed
+        // RunFilters, so those malformed-JSON paths no longer exist on the surviving surface.)
     }
 
     // 048 (criteria suite-match accounting — the basis for the no-criteria note)

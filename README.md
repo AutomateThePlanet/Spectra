@@ -94,11 +94,12 @@ Deploy to Cloudflare Pages with GitHub OAuth authentication.
 spectra dashboard --output ./site
 ```
 
-### MCP Execution Engine
+### Execution Engine (`spectra run`)
 
-Execute tests through Copilot Chat, Claude, or any MCP client.
-State machine with pause/resume, crash recovery, and three report formats (JSON, Markdown, HTML).
-Inline documentation lookup via Copilot Spaces — testers get answers about test steps without leaving the execution flow.
+Execute tests from the CLI with `spectra run` — no MCP server required.
+Deterministic state machine with pause/resume, durable SQLite state with crash recovery, and three
+report formats (JSON, Markdown, HTML). Run state survives process exits (each short-lived command
+reconstructs the queue from a durable snapshot), so the agent loop is just commands between turns.
 
 ### Copilot Chat Integration
 

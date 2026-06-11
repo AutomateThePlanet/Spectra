@@ -2,7 +2,13 @@
 ================================================================================
 SYNC IMPACT REPORT
 ================================================================================
-Version Change: 1.0.0 → 1.1.0 (Terminology: tests/ → test-cases/)
+Version Change: 1.1.0 → 2.0.0 (Spec 070: de-MCP / de-provider redefinition of Principles II & III)
+
+Rationale for MAJOR: Principles II and III were redefined to remove the now-removed MCP execution
+adapter (Spec 070) and the in-process provider chain / BYOK model (Specs 058/059/069). Principle II
+"Deterministic Execution" now describes the engine + `spectra run` CLI with durable, reconstructable
+state; Principle III "Orchestrator-Agnostic Design" now describes the model-free, command-driven CLI
+surface (no MCP API, no provider chain). No principles added or removed; II & III redefined.
 
 Added Sections:
   - Core Principles (5 principles)
@@ -36,25 +42,26 @@ All test definitions, documentation, and configuration MUST be stored in Git rep
 
 ### II. Deterministic Execution
 
-The MCP execution engine MUST be a deterministic state machine with explicit states and validated transitions:
+The execution engine MUST be a deterministic state machine with explicit states and validated transitions:
 
 - Same inputs MUST produce the same execution queue
 - State transitions MUST be validated before execution — invalid sequences are rejected
-- Every MCP response MUST be self-contained with `run_status`, `progress`, and `next_expected_action`
+- Run state MUST be durable (SQLite) and reconstructable by any short-lived process, so behavior does not depend on a live session
+- Every command response MUST be self-contained with run status, progress, and the next expected action
 - The AI orchestrator MUST never manage state — the engine is the authoritative state machine
 
-**Rationale**: Determinism enables reproducibility, debugging, and trust. LLMs are stateless; the engine must enforce order.
+**Rationale**: Determinism enables reproducibility, debugging, and trust. LLMs are stateless; the engine must enforce order. (Execution is delivered through the `spectra run` CLI; SPECTRA's MCP execution adapter was removed in Spec 070.)
 
 ### III. Orchestrator-Agnostic Design
 
-The MCP API MUST work with any LLM orchestrator (GitHub Copilot, Claude, custom agents):
+SPECTRA's surface MUST work with any LLM orchestrator (Claude Code, custom agents) and equally from a bare terminal or CI:
 
-- Tool responses MUST remain minimal to avoid context overflow
-- Every MCP tool call MUST be self-contained — orchestrators need not remember prior calls
+- Commands MUST be self-contained — an orchestrator need not remember prior calls; each invocation re-derives the state it needs
+- Command output MUST remain minimal and structured (`--output-format json`) to avoid context overflow
 - No bidirectional sync with external test management systems — one-directional integration only
-- Provider chain MUST support BYOK (Bring Your Own Key) for OpenAI, Azure, and Anthropic
+- SPECTRA MUST NOT run an in-process model — all inference is the user's own agent session (the model-free generation/criteria/critic seams of Specs 058/059/069); there is no provider chain or API key to manage
 
-**Rationale**: Teams have different LLM subscriptions and preferences. Single-vendor lock-in limits adoption.
+**Rationale**: Teams have different agent subscriptions and preferences. A model-free, command-driven surface avoids single-vendor lock-in and keeps SPECTRA usable by any orchestrator, terminal, or pipeline.
 
 ### IV. CLI-First Interface
 
@@ -134,4 +141,4 @@ All changes MUST be reviewed before merge:
 
 This Constitution supersedes all other practices when conflicts arise. If a pattern in existing code conflicts with these principles, new code MUST follow the Constitution and technical debt SHOULD be logged for remediation.
 
-**Version**: 1.1.0 | **Ratified**: 2026-03-13 | **Last Amended**: 2026-04-12
+**Version**: 2.0.0 | **Ratified**: 2026-03-13 | **Last Amended**: 2026-06-11

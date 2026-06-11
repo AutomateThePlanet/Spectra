@@ -478,14 +478,14 @@ See [Testimize Integration](testimize-integration.md) for the full guide.
 
 ## Execution Commands
 
-Execution has two interchangeable surfaces over the **same** deterministic engine and the same
-`.execution/spectra.db`: the **`spectra run` CLI** (default — no extra install, no MCP config) and the
-optional **`spectra-mcp` server** (for networked/remote MCP clients). They are behaviorally identical;
-a short-lived `spectra run` process reconstructs run state losslessly from the database.
+Execution runs entirely through the **`spectra run` CLI** over the deterministic engine and
+`.execution/spectra.db` — **no MCP server** (SPECTRA's MCP execution adapter was removed in Spec 070).
+A short-lived `spectra run` process reconstructs run state losslessly from the database, so no live
+session is required.
 
-### `spectra run …` (CLI — no MCP server required)
+### `spectra run …`
 
-Since Spec 065, the single `dotnet tool install -g Spectra` provides execution as well as generation.
+The single `dotnet tool install -g Spectra` provides execution as well as generation.
 Drive a full manual loop from the shell:
 
 ```bash
@@ -514,8 +514,8 @@ spectra run console --stop                       # stop the running console
 A local, human-driven **execution console**: a small detached HTTP server on `127.0.0.1` serving an
 ephemeral, gitignored page (in Spectra's report styling) where a QA engineer drives a run from the
 browser — sees the current test, clicks **PASS / FAIL / BLOCKED**, adds a comment, drops/pastes a
-screenshot. It is a *third transport over the same engine* (sibling of `spectra run …` and the MCP
-tools): **SQLite is the single source of truth; the browser is a view + write-back caller, never a
+screenshot. It is a *second transport over the same engine* (sibling of `spectra run …`):
+**SQLite is the single source of truth; the browser is a view + write-back caller, never a
 store**, so a refresh or reopen loses nothing. Verdict guardrails are enforced server-side (a comment is
 required for FAIL/BLOCKED/SKIP; a verdict is never inferred), identical to `spectra run advance`.
 
@@ -536,67 +536,15 @@ agent reads current state on-call from `spectra run status` (SQLite), never from
 Handle resolution: when `<handle>`/`<run-id>` is omitted, the active run for the current user and its
 in-progress (or next-pending) test are auto-resolved — so the agent rarely needs to pass them explicitly.
 
-### `spectra-mcp` (optional separate tool — networked/remote clients)
+### MCP execution server — removed (Spec 070)
 
-The MCP execution server is a separate global tool packaged as `Spectra.MCP`, retained as a thin adapter
-over the same engine. It is **only** needed for clients that drive execution over MCP; the `spectra run`
-CLI path above requires neither it nor any `.vscode/mcp.json` / `.mcp.json` config.
-
-```bash
-dotnet tool install -g Spectra.MCP
-spectra-mcp                # Started by your MCP client over stdio (JSON-RPC 2.0)
-```
-
-For VS Code Copilot Chat, `spectra init` writes a working `.vscode/mcp.json` that points at `spectra-mcp`. The MCP tools available are grouped below (each maps one-to-one to a `spectra run` subcommand).
-
-#### Run Management Tools
-
-| Tool | Description |
-|------|-------------|
-| `start_execution_run` | Start a new run by suite, test IDs, or saved selection |
-| `get_execution_status` | Get current run status and next test |
-| `pause_execution_run` | Pause execution |
-| `resume_execution_run` | Resume paused execution |
-| `cancel_execution_run` | Cancel execution |
-| `finalize_execution_run` | Complete run and generate reports |
-| `list_available_suites` | List test suites |
-
-#### Test Execution Tools
-
-| Tool | Description |
-|------|-------------|
-| `get_test_case_details` | Get test steps, expected result, preconditions |
-| `advance_test_case` | Record PASSED/FAILED/BLOCKED result |
-| `skip_test_case` | Skip test with reason |
-| `bulk_record_results` | Bulk record results for multiple tests |
-| `add_test_note` | Add notes to a test |
-| `retest_test_case` | Requeue a test for another attempt |
-| `save_screenshot` | Save screenshot attachment |
-
-#### Smart Selection Tools
-
-| Tool | Description |
-|------|-------------|
-| `find_test_cases` | Cross-suite search and filter by query, priority, tags, component, automation status |
-| `get_test_execution_history` | Per-test execution statistics (pass rate, last status, run count) |
-| `list_saved_selections` | List named selections from config with estimated test case counts |
-
-The `find_test_cases` tool supports free-text search (OR across keywords, matching title + description + tags), metadata filters (AND between types, OR within arrays), and returns results ranked by relevance with total estimated duration.
-
-The `start_execution_run` tool supports three mutually exclusive modes:
-- `suite` — run all tests in a suite (with optional filters)
-- `test_ids` — run specific tests from any suites
-- `selection` — run a named saved selection from config
-
-#### Data & Reporting Tools
-
-| Tool | Description |
-|------|-------------|
-| `validate_tests` | Validate test case files |
-| `rebuild_indexes` | Rebuild `_index.json` files |
-| `analyze_coverage_gaps` | Analyze test case coverage |
-| `get_run_history` | Get execution history |
-| `get_execution_summary` | Get summary statistics |
+SPECTRA no longer ships an MCP execution server (`spectra-mcp`). Execution is CLI-only via `spectra run`
+above; `spectra init` no longer writes any `.vscode/mcp.json` or `mcp__spectra__*` allowlist. The former
+MCP tools each map one-to-one to a `spectra run` subcommand — e.g. `start_execution_run` → `spectra run
+start`, `advance_test_case` → `spectra run advance`, `bulk_record_results` → `spectra run bulk-record`,
+`get_run_history` → `spectra run history`. The data tools' operations remain available as their own CLI
+commands (`spectra validate`, `spectra index` / `docs index`, `spectra ai analyze --coverage`). The
+SEPARATE BELLATRIX/Nova MCP that drives the system-under-test is unrelated and unaffected.
 
 ---
 
