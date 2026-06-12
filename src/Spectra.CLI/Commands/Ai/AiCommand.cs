@@ -40,6 +40,9 @@ public sealed class AiCommand : Command
         // in-session → ingest update, fail-loud, preserving id and manual fields, drift-guarded).
         AddCommand(new CompileUpdatePromptCommand());
         AddCommand(new IngestUpdateCommand());
+
+        // Throwaway seam-skill progress poller (superseded when execution console generalises).
+        AddCommand(new InitSeamProgressCommand());
     }
 
     /// <summary>

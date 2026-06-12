@@ -59,7 +59,7 @@ Or more specific:
 
 **What happens behind the scenes:**
 
-- **Phase 1 — Analysis (automatic)**: SPECTRA reads the documentation, identifies testable behaviors, and shows a breakdown before generating anything. A progress page opens in a tab so the user can watch live status.
+- **Phase 1 — Analysis (automatic)**: SPECTRA reads the documentation, identifies testable behaviors, and shows a breakdown before generating anything. A seam progress page is written to `.spectra/seam-progress.html` and opened via VS Code preview (or `spectra open .spectra/seam-progress.html` as fallback) so the user can watch live phase status.
 - **Phase 2 — Generation (after approval)**: Test cases are generated in batches (default batch size 30) and each test case is verified by the critic model for grounding accuracy.
 - **Phase 3 — Review (optional)**: After generation, the system suggests additional test areas. The user can pick suggestions or describe new ones.
 
@@ -67,7 +67,7 @@ Or more specific:
 
 ```
 User: Generate 10 test cases for checkout focusing on payment validation
-Bot:  [opens .spectra-progress.html, runs analysis]
+Bot:  [runs analysis, opens .spectra/seam-progress.html via VS Code preview]
 Bot:  Found 23 testable behaviors in checkout docs.
       8 already covered. Recommending 15 new test cases.
       Want me to generate 10 as requested?
@@ -107,7 +107,7 @@ Or for a full re-extraction:
 
 ```
 User: Extract acceptance criteria from my documentation
-Bot:  [opens progress page, processes docs]
+Bot:  [opens .spectra/seam-progress.html via VS Code preview, processes docs]
 Bot:  Extracted criteria from 5 documents:
       - checkout.md: 12 criteria (8 MUST, 3 SHOULD, 1 MAY)
       - payments.md: 7 criteria (5 MUST, 2 SHOULD)
@@ -352,7 +352,7 @@ Or for a full rebuild:
 
 ```
 User: Index the docs
-Bot:  [opens progress page, indexes]
+Bot:  [runs docs index, opens .spectra-progress.html via VS Code preview once complete]
 Bot:  Documentation index updated:
       - 9 documents cataloged
       - 3 new, 2 changed, 4 unchanged

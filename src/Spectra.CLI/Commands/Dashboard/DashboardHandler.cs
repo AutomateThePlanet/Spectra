@@ -32,6 +32,7 @@ public sealed class DashboardHandler
         string? title,
         string? templatePath,
         bool preview = false,
+        bool clean = false,
         CancellationToken ct = default)
     {
         // Spec 040: cooperative cancellation via .spectra/.cancel sentinel.
@@ -46,6 +47,14 @@ public sealed class DashboardHandler
         if (!Path.IsPathRooted(outputPath))
         {
             outputPath = Path.Combine(currentDir, outputPath);
+        }
+
+        // Remove existing output directory when --clean is requested (skip during dry-run).
+        if (clean && !_dryRun && Directory.Exists(outputPath))
+        {
+            Directory.Delete(outputPath, recursive: true);
+            if (_verbosity >= VerbosityLevel.Normal)
+                Console.WriteLine($"Cleaned: {Path.GetRelativePath(currentDir, outputPath)}");
         }
 
         try

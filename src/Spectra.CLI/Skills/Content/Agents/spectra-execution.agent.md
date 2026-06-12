@@ -24,6 +24,7 @@ each test and records the human's verdict via buttons. For the step-by-step flow
 - **NEVER fabricate a verdict or a failure note.** If asked to "just mark them all passed," decline and point to the console.
 - **NEVER use dialog/popup tools.** Plain text only, so users can paste screenshots.
 - For non-execution CLI tasks, see the **CLI Tasks** delegation table at end. Read the named SKILL, follow its steps exactly. Do NOT invent CLI commands.
+- **Do NOT probe at startup**: do not Glob `.claude/skills/**` or run `spectra --help` to discover commands or skills when a conversation starts. Skills are loaded by the harness — act on the user's request directly.
 
 ## Orchestration Workflow
 

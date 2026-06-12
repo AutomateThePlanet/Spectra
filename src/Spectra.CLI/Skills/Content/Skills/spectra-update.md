@@ -27,22 +27,46 @@ not implicate (priority, component, tags) it rejects the edit and persists nothi
 
 ## Update test cases for a suite
 
+**Step 0** — Set up the live progress monitor.
+
+Run with the Bash tool:
+```
+spectra ai init-seam-progress
+```
+Open `.spectra/seam-progress.html` using the VS Code preview (IDE preview tool). If an IDE preview is not available, run `spectra open .spectra/seam-progress.html`.
+
+Write `.spectra/progress.json` with the Write tool:
+```json
+{"phases":["Step 1 — Classify tests","Step 2 — Edit OUTDATED tests","Step 3 — Report"],"active":0}
+```
+
 **Step 1** — Classify and find the OUTDATED tests.
 
-Open `.spectra-progress.html?nocache=1`, then run with the Bash tool:
+Run with the Bash tool:
 ```
 spectra ai update --suite <suite> --diff --no-interaction --output-format json --verbosity quiet
 ```
 Replace `<suite>` with the suite the user mentions (e.g., "checkout", "login", "payments").
 The progress page auto-refreshes — the user can watch live. While it runs, do NOTHING —
-don't poll the terminal, list directories, or read files; just wait for it to complete.
+don't poll the terminal, list directories, or read files; just wait for it to complete. Once it finishes, open `.spectra-progress.html` using the VS Code preview (IDE preview tool) to see the run summary. If an IDE preview is not available, run `spectra open .spectra-progress.html`.
 
 Then Read `.spectra-result.json`. Collect the ids classified **OUTDATED**.
+
 - UP_TO_DATE → leave untouched.
 - ORPHANED / REDUNDANT → present for the user's review; the edit seam does not touch these.
 - OUTDATED → continue to Step 2 for each.
 
-**Step 2** — For each OUTDATED test, compile its edit prompt with the Bash tool:
+Update `.spectra/progress.json` — N = number of OUTDATED tests:
+```json
+{"phases":["Step 1 — Classify tests","Step 2 — Edit OUTDATED tests","Step 3 — Report"],"active":1,"loop":{"current":0,"total":N,"label":"starting"}}
+```
+
+**Step 2** — For each OUTDATED test (i = 1..N), update progress.json first:
+```json
+{"phases":["Step 1 — Classify tests","Step 2 — Edit OUTDATED tests","Step 3 — Report"],"active":1,"loop":{"current":i,"total":N,"label":"test i/N: <id>"}}
+```
+
+Then compile its edit prompt with the Bash tool:
 ```
 spectra ai compile-update-prompt --suite <suite> --test-id <id>
 ```
@@ -68,7 +92,11 @@ spectra ai ingest-update <suite> --test-id <id> --from .spectra/updated.json --o
 total) for the same test. If it still fails, stop and report the specific error — do not
 loop. On any non-zero exit, nothing was persisted; the original test and indexes are untouched.
 
-**Step 5** — Report. For the suite, summarize: total analyzed, classification breakdown
+**Step 5** — Update progress.json to mark complete, then report.
+```json
+{"phases":["Step 1 — Classify tests","Step 2 — Edit OUTDATED tests","Step 3 — Report"],"active":2}
+```
+For the suite, summarize: total analyzed, classification breakdown
 (UP_TO_DATE / OUTDATED / ORPHANED / REDUNDANT), tests edited (with ids), and any tests
 that failed ingest after retries or were flagged for manual review.
 

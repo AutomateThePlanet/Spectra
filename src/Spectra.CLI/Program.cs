@@ -15,6 +15,7 @@ using Spectra.CLI.Commands.Show;
 using Spectra.CLI.Commands.Prompts;
 using Spectra.CLI.Commands.Run;
 using Spectra.CLI.Commands.Testimize;
+using Spectra.CLI.Commands.Open;
 using Spectra.CLI.Commands.UpdateSkills;
 using Spectra.CLI.Commands.Validate;
 using Spectra.CLI.Options;
@@ -65,6 +66,7 @@ public class Program
         rootCommand.AddCommand(new DeleteCommand());
         rootCommand.AddCommand(new SuiteCommand());
         rootCommand.AddCommand(new RunCommand());
+        rootCommand.AddCommand(new OpenCommand());
 
         return rootCommand;
     }

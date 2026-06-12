@@ -10,19 +10,17 @@ You manage the dashboard by running CLI commands with the Bash tool. **NEVER use
 
 ## "generate the dashboard", "build the dashboard", "regenerate dashboard"
 
-**Step 1** — Open the live progress page: Open .spectra-progress.html?nocache=1
-
-**Step 2** — Run with the Bash tool (deletes old site folder first, then regenerates):
+**Step 1** — Run with the Bash tool:
 ```
-rm -rf site && spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet && spectra dashboard --output ./site --no-interaction --output-format json --verbosity quiet
+spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet && spectra dashboard --clean --output ./site --no-interaction --output-format json --verbosity quiet
 ```
-On Windows use: `if exist site rmdir /s /q site && spectra ai analyze ...`
+(`--clean` removes any existing `site/` folder before regenerating; no platform-specific deletion needed.)
 
-**Step 3** — Wait for the command to finish. The progress page auto-refreshes — the user can watch live. While it runs, do NOTHING — don't poll the terminal, list directories, or read files; just wait for it to complete.
+**Step 2** — Wait for the command to finish. The progress page auto-refreshes — the user can watch live. While it runs, do NOTHING — don't poll the terminal, list directories, or read files; just wait for it to complete. Once it finishes, open `.spectra-progress.html` using the VS Code preview (IDE preview tool) to see the run summary. If an IDE preview is not available, run `spectra open .spectra-progress.html` to open it in the default browser.
 
-**Step 4** — Read `.spectra-result.json`
+**Step 3** — Read `.spectra-result.json`
 
-**Step 5** — ALWAYS open the dashboard after generation: Open site/index.html?nocache=1
+**Step 4** — ALWAYS open the dashboard after generation: open `site/index.html` using the VS Code preview (IDE preview tool). If an IDE preview is not available, run `spectra open site/index.html` to open it in the default browser.
 
 Report: "Dashboard generated." Show suite count and test case count from the result JSON.
 
@@ -30,7 +28,7 @@ Report: "Dashboard generated." Show suite count and test case count from the res
 
 ## "open the dashboard", "show me the dashboard"
 
-Open site/index.html
+Open `site/index.html` using the VS Code preview (IDE preview tool). If an IDE preview is not available, run `spectra open site/index.html` to open it in the default browser.
 
 Report: "Say 'regenerate dashboard' to rebuild with latest data."
 

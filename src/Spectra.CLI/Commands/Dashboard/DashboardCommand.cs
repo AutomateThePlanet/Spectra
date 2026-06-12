@@ -28,10 +28,15 @@ public sealed class DashboardCommand : Command
             ["--preview"],
             "Generate dashboard with sample data for branding verification");
 
+        var cleanOption = new Option<bool>(
+            ["--clean"],
+            "Remove the output directory before generating (ensures a fresh build)");
+
         AddOption(outputOption);
         AddOption(titleOption);
         AddOption(templateOption);
         AddOption(previewOption);
+        AddOption(cleanOption);
 
         this.SetHandler(async (context) =>
         {
@@ -39,13 +44,14 @@ public sealed class DashboardCommand : Command
             var title = context.ParseResult.GetValueForOption(titleOption);
             var template = context.ParseResult.GetValueForOption(templateOption);
             var preview = context.ParseResult.GetValueForOption(previewOption);
+            var clean = context.ParseResult.GetValueForOption(cleanOption);
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
             var dryRun = context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption);
 
             var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
 
             var handler = new DashboardHandler(verbosity, dryRun, outputFormat);
-            context.ExitCode = await handler.ExecuteAsync(output, title, template, preview, context.GetCancellationToken());
+            context.ExitCode = await handler.ExecuteAsync(output, title, template, preview, clean, context.GetCancellationToken());
         });
     }
 }

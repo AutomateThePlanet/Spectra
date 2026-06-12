@@ -10,18 +10,16 @@ You analyze test coverage by running a CLI command with the Bash tool.
 
 ## Run coverage analysis
 
-**Step 1** — Open the live progress page: Open .spectra-progress.html?nocache=1
-
-**Step 2** — Run with the Bash tool:
+**Step 1** — Run with the Bash tool:
 ```
 spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet
 ```
 
-**Step 3** — Wait for the command to finish. The progress page auto-refreshes — the user can watch live. While it runs, do NOTHING — don't poll the terminal, list directories, or read files; just wait for it to complete.
+**Step 2** — Wait for the command to finish. The progress page auto-refreshes — the user can watch live. While it runs, do NOTHING — don't poll the terminal, list directories, or read files; just wait for it to complete. Once it finishes, open `.spectra-progress.html` using the VS Code preview (IDE preview tool) to see the run summary. If an IDE preview is not available, run `spectra open .spectra-progress.html` to open it in the default browser.
 
-**Step 4** — Read `.spectra-result.json`
+**Step 3** — Read `.spectra-result.json`
 
-**Step 5** — Show the three coverage sections from the result:
+**Step 4** — Show the three coverage sections from the result:
 - **Documentation coverage**: X% (N/M documents) — list uncovered docs
 - **Acceptance criteria coverage**: X% (N/M criteria) — list untested acceptance criteria
 - **Automation coverage**: X% (N/M test cases) — list unlinked test cases

@@ -19,6 +19,17 @@ There is **no** `spectra ai analyze --extract-criteria` model call anymore. Do n
 
 ## Extract acceptance criteria from documentation
 
+**Progress setup** — before Step 1, initialize the live monitor:
+```
+spectra ai init-seam-progress
+```
+Open `.spectra/seam-progress.html` using the VS Code preview (IDE preview tool). If an IDE preview is not available, run `spectra open .spectra/seam-progress.html`.
+
+Write `.spectra/progress.json` with the Write tool:
+```json
+{"phases":["Step 1 — Find changed docs","Step 2 — Extract criteria","Step 3 — Summarize"],"active":0}
+```
+
 ### Step 1 — Find the work-list (deterministic, no model)
 
 ```
@@ -31,9 +42,19 @@ STOP** — do not extract anything. (Unchanged documents are skipped here, so th
 Use `--force`-style full re-extraction by passing `--include-unchanged` and processing every doc only when
 the user explicitly asks to re-extract everything.)
 
+Update `.spectra/progress.json` — N = number of changed docs:
+```json
+{"phases":["Step 1 — Find changed docs","Step 2 — Extract criteria","Step 3 — Summarize"],"active":1,"loop":{"current":0,"total":N,"label":"starting"}}
+```
+
 ### Step 2 — Per changed document: compile → extract in-session → ingest
 
-For EACH entry in `changed`, using its `path` and `component`:
+For EACH entry in `changed` (i = 1..N), update progress.json first:
+```json
+{"phases":["Step 1 — Find changed docs","Step 2 — Extract criteria","Step 3 — Summarize"],"active":1,"loop":{"current":i,"total":N,"label":"doc i/N: <path>"}}
+```
+
+Then, using its `path` and `component`:
 
 **2a. Compile the extraction prompt** (Bash, capture stdout):
 ```
@@ -56,6 +77,8 @@ spectra ai ingest-criteria --doc {path} --component {component} --from .spectra/
 - Exit 5 (empty) or exit 6 (unparseable JSON array) → **fail loud, nothing persisted.** Re-read the
   compiled prompt, regenerate stricter JSON, rewrite `.spectra/criteria.json`, and re-ingest. **Bounded:
   at most 2 attempts** per document; then record that document as failed and continue with the rest.
+
+Update `.spectra/progress.json`: `{"active":2}` after the loop completes.
 
 ### Step 3 — Summarize
 

@@ -75,6 +75,17 @@ The ONLY time you skip analysis is when the user describes a single concrete sce
 - Otherwise leave count blank — the analyze step gives you `recommended` to use.
 - NEVER fall back to "5". There is no default.
 
+**Progress setup** — before Step 1, initialize the live monitor:
+```
+spectra ai init-seam-progress
+```
+Open `.spectra/seam-progress.html` using the VS Code preview (IDE preview tool). If an IDE preview is not available, run `spectra open .spectra/seam-progress.html`.
+
+Write `.spectra/progress.json` with the Write tool:
+```json
+{"phases":["Step 1 — Compile analysis","Step 2 — Identify behaviors","Step 3 — Ingest analysis","Step 4 — Review (waiting for approval)","Step 5 — Compile generation","Step 6 — Generate tests","Step 7 — Ingest","Step 8 — Critic","Step 9 — Report"],"active":0}
+```
+
 ### Step 1 — Compile the analysis prompt
 
 Run with the Bash tool and capture stdout:
@@ -85,9 +96,13 @@ spectra ai compile-analysis-prompt --suite {suite} --doc-suite {docSuite} [--foc
 - Exit 1 → tell the user the error.
 - Exit 0 → stdout is the compiled analysis prompt. Proceed.
 
+Update `.spectra/progress.json`: `{"active":1}`
+
 ### Step 2 — Identify behaviors IN-SESSION
 
 Read the compiled prompt. It instructs you to identify the distinct testable behaviors in the named documentation, each tagged with a category and an ISTQB technique. Do that now, in this turn, using your file tools to read the referenced docs as needed. Produce a JSON array (or `{"behaviors":[…]}`) exactly as the prompt specifies. **Write that JSON to `.spectra/analysis.json`** with the Write tool.
+
+Update `.spectra/progress.json`: `{"active":2}`
 
 ### Step 3 — Ingest the analysis
 
@@ -96,6 +111,8 @@ spectra ai ingest-analysis --suite {suite} --from .spectra/analysis.json --outpu
 ```
 - Exit 5 (empty) or 6 (unparseable) → your behavior JSON was rejected. Re-read the compiled prompt, regenerate stricter JSON, and re-ingest. **Bounded: at most 2 attempts**, then STOP and report.
 - Exit 0 → the JSON holds the recommendation.
+
+Update `.spectra/progress.json`: `{"active":3}`
 
 ### Step 4 — Present the recommendation and STOP
 
@@ -122,6 +139,8 @@ Shall I proceed?
 
 ## After user approves
 
+Update `.spectra/progress.json`: `{"active":4}`
+
 ### Step 5 — Compile the generation prompt
 
 Keep the SAME `--focus` from analysis. Use `{count}` = the user's explicit number or `recommended`. **`recommended` is advisory guidance, not a quota** — generate as many tests as the behavior needs (more or fewer is fine). **Acceptance-criteria coverage is the real adequacy signal**, not hitting the count.
@@ -131,9 +150,13 @@ spectra ai compile-prompt --suite {suite} --count {count} [--focus "{focus}"] --
 - Exit 4 → refuse-to-emit; the `missing_input`/`message` names what's missing (e.g. no acceptance criteria resolved). Show it and follow the guidance.
 - Exit 0 → stdout is the compiled generation prompt.
 
+Update `.spectra/progress.json`: `{"active":5}`
+
 ### Step 6 — Generate the tests IN-SESSION
 
 Read the compiled prompt and generate the requested test cases now, in this turn. **You have file access — read the relevant documents under `docs/` so every test is grounded in real product behavior**; never invent generic patterns. When acceptance criteria appear in the prompt under "ACCEPTANCE CRITERIA — MANDATORY", every test MUST map at least one criterion ID in its `criteria` array. Your output must be ONLY the JSON array of test cases the prompt's schema describes. **Write that JSON array to `.spectra/generated.json`** with the Write tool.
+
+Update `.spectra/progress.json`: `{"active":6}`
 
 ### Step 7 — Ingest (fail-loud)
 
@@ -151,6 +174,11 @@ Verification is **mandatory and explicit — never skipped, never auto-invoked**
 
 For EACH id in the `ingest-tests` `ids` list:
 
+For each id in the `ingest-tests` `ids` list, update `.spectra/progress.json` before invoking the critic:
+```json
+{"phases":["Step 1 — Compile analysis","Step 2 — Identify behaviors","Step 3 — Ingest analysis","Step 4 — Review (waiting for approval)","Step 5 — Compile generation","Step 6 — Generate tests","Step 7 — Ingest","Step 8 — Critic","Step 9 — Report"],"active":7,"loop":{"current":i,"total":N,"label":"critic for <id>"}}
+```
+
 ### Step 8 — Invoke the `spectra-critic` subagent
 
 Invoke it with the Task tool, passing only the **suite name + the test id** (from the `ingest-tests` `ids` list) and its source docs — no generator state, and **never a hand-built file path**. The subagent compiles the prompt (`spectra ai compile-critic-prompt --suite {suite} --test {id}`, which resolves the id→path from `_index.json` on disk), renders a JSON verdict in-session, and ingests it (`spectra ai ingest-verdict`). Act on the gate:
@@ -158,9 +186,11 @@ Invoke it with the Task tool, passing only the **suite name + the test id** (fro
 - gate `drop` (verdict `hallucinated`) → remove it: `spectra delete {id} --force --no-interaction --output-format json --verbosity quiet`.
 - ingest exit `5` (empty), exit `6` (missing/unparseable `verdict`/`score` — **damage**), or compile exit `4` (refused) → **fail loud**, NOT a pass. Regenerate that single test addressing the *specific* error and re-verify. **Bounded by the retry limit (2 attempts).** If it still fails at the limit, STOP and report the failing test and the specific error; never keep an unverified test.
 
+Update `.spectra/progress.json`: `{"active":8}` (marks Step 9 active — complete sentinel is `active >= 9`).
+
 ### Step 9 — Report
 
-"Generated **{kept}** verified test cases ({dropped} dropped as hallucinated, {failed} unresolved)." List the kept ids. If kept < requested, say "Run again to generate more." Never present a test as accepted unless its critic step passed.
+"Generated **{kept}** verified test cases ({dropped} dropped as hallucinated, {failed} unresolved)." List the kept ids. If the ingest output contains a non-blocking `notes` entry (e.g. criteria coverage), surface it verbatim here. If kept < requested, say "Run again to generate more." Never present a test as accepted unless its critic step passed.
 
 ---
 

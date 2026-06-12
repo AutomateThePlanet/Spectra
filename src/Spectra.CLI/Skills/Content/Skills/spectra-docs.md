@@ -14,9 +14,7 @@ token counts, content hashes) for efficient test generation and coverage analysi
 
 ## Index / reindex documentation
 
-**Step 1** — Show the live progress page: Open .spectra-progress.html?nocache=1
-
-**Step 2** — Run with the Bash tool:
+**Step 1** — Run with the Bash tool:
 ```
 spectra docs index --no-interaction --output-format json --verbosity quiet
 ```
@@ -33,9 +31,9 @@ To skip acceptance criteria extraction (index only):
 spectra docs index --skip-criteria --no-interaction --output-format json --verbosity quiet
 ```
 
-**Step 3** — Wait for the command to finish. The progress page auto-refreshes — the user can watch live. While it runs, do NOTHING — don't poll the terminal, list directories, or read files; just wait for it to complete.
+**Step 2** — Wait for the command to finish. The progress page auto-refreshes — the user can watch live. While it runs, do NOTHING — don't poll the terminal, list directories, or read files; just wait for it to complete. Once it finishes, open `.spectra-progress.html` using the VS Code preview (IDE preview tool) to see the run summary. If an IDE preview is not available, run `spectra open .spectra-progress.html` to open it in the default browser.
 
-**Step 4** — Read `.spectra-result.json`. **Never re-run the command** — if result shows status "completed", present the results and stop.
+**Step 3** — Read `.spectra-result.json`. **Never re-run the command** — if result shows status "completed", present the results and stop.
 
 From the JSON result, show:
 - Documents indexed vs skipped vs total
