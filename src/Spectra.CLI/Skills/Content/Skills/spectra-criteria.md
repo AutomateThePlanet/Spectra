@@ -86,6 +86,8 @@ Report: documents processed, criteria persisted (new/updated), documents skipped
 Step 1), and any per-document failures. Suggest next steps: "Run coverage analysis?" or "Generate test
 cases for uncovered criteria?"
 
+Write `.spectra/progress.json`: `{"active":3}` (terminal — seam-progress page renders Complete).
+
 ---
 
 ## Import acceptance criteria from external file

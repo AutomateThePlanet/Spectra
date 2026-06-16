@@ -192,6 +192,8 @@ Update `.spectra/progress.json`: `{"active":8}` (marks Step 9 active — complet
 
 "Generated **{kept}** verified test cases ({dropped} dropped as hallucinated, {failed} unresolved)." List the kept ids. If the ingest output contains a non-blocking `notes` entry (e.g. criteria coverage), surface it verbatim here. If kept < requested, say "Run again to generate more." Never present a test as accepted unless its critic step passed.
 
+Write `.spectra/progress.json`: `{"active":9}` (terminal — seam-progress page renders Complete).
+
 ---
 
 ## When the user wants to create a specific test case

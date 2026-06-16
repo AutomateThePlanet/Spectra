@@ -37,6 +37,7 @@ public static class CriticPromptCompiler
     public static CriticPromptCompileResult Compile(
         TestCase? test,
         IReadOnlyList<SourceDocument>? documents = null,
+        string? criteriaContext = null,
         PromptTemplateLoader? templateLoader = null)
     {
         if (test is null || string.IsNullOrWhiteSpace(test.Id) || string.IsNullOrWhiteSpace(test.Title))
@@ -46,7 +47,7 @@ public static class CriticPromptCompiler
                 "A test artifact with an id and title is required to compile a critic prompt.");
         }
 
-        var prompt = Assemble(test, documents ?? [], templateLoader);
+        var prompt = Assemble(test, documents ?? [], criteriaContext, templateLoader);
         return CriticPromptCompileResult.Success(prompt);
     }
 
@@ -57,6 +58,7 @@ public static class CriticPromptCompiler
     public static string Assemble(
         TestCase test,
         IReadOnlyList<SourceDocument> documents,
+        string? criteriaContext = null,
         PromptTemplateLoader? templateLoader = null)
     {
         ArgumentNullException.ThrowIfNull(test);
@@ -65,7 +67,7 @@ public static class CriticPromptCompiler
         var builder = new CriticPromptBuilder();
         builder.SetTemplateLoader(templateLoader);
 
-        var system = builder.BuildSystemPrompt();
+        var system = builder.BuildSystemPrompt(criteriaContext);
         var user = builder.BuildUserPrompt(test, documents);
         return $"{system}\n\n---\n\n{user}";
     }

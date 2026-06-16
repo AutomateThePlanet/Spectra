@@ -33,10 +33,10 @@ public static class CriteriaContextLoader
     public static async Task<CriteriaContextResult> LoadCriteriaContextAsync(
         string basePath,
         string suiteName,
-        SpectraConfig config,
+        SpectraConfig? config,
         CancellationToken ct)
     {
-        var criteriaDir = Path.Combine(basePath, config.Coverage?.CriteriaDir ?? "docs/criteria");
+        var criteriaDir = Path.Combine(basePath, config?.Coverage?.CriteriaDir ?? "docs/criteria");
         if (!Directory.Exists(criteriaDir))
             return new CriteriaContextResult(null, 0, 0);
 

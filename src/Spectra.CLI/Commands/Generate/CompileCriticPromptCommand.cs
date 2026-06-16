@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Text.Json;
+using Spectra.CLI.Generation;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
 using Spectra.CLI.Verification;
@@ -124,7 +125,7 @@ public sealed class CompileCriticPromptCommand : Command
     private static async Task<int> RunSuiteAsync(
         string suite, string? testId, string? docsPath, string currentDir, bool json, CancellationToken ct)
     {
-        var testsDir = await ResolveTestsDirAsync(currentDir, ct);
+        var (testsDir, config) = await ResolveTestsDirAndConfigAsync(currentDir, ct);
         var suitePath = Path.Combine(currentDir, testsDir, suite);
         var indexPath = IndexWriter.GetIndexPath(suitePath);
 
@@ -160,16 +161,25 @@ public sealed class CompileCriticPromptCommand : Command
             targets = index.Tests;
         }
 
-        IReadOnlyList<SourceDocument> docs;
-        try
+        // When --docs is provided, load once and share across all tests. Otherwise docs are resolved
+        // per-test from each test's source_refs (P1: auto-grounding from the test frontmatter).
+        IReadOnlyList<SourceDocument>? sharedDocs = null;
+        if (!string.IsNullOrWhiteSpace(docsPath))
         {
-            docs = await LoadDocumentsAsync(docsPath, currentDir, ct);
+            try
+            {
+                sharedDocs = await LoadDocumentsAsync(docsPath, currentDir, ct);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error reading documents: {ex.Message}");
+                return ExitError;
+            }
         }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Error reading documents: {ex.Message}");
-            return ExitError;
-        }
+
+        // Load criteria for this suite once — mirrors the generation path (CompilePromptCommand).
+        var criteria = await CriteriaContextLoader.LoadCriteriaContextAsync(
+            currentDir, suite, config, ct);
 
         var compiled = new List<(string Id, string Prompt)>();
         foreach (var entry in targets)
@@ -192,7 +202,30 @@ public sealed class CompileCriticPromptCommand : Command
                 return ExitError;
             }
 
-            var result = CriticPromptCompiler.Compile(test, docs);
+            // Resolve the source docs for this test: --docs override > auto-resolve from source_refs.
+            IReadOnlyList<SourceDocument> docs;
+            if (sharedDocs is not null)
+            {
+                docs = sharedDocs;
+            }
+            else if (test?.SourceRefs.Count > 0)
+            {
+                try
+                {
+                    docs = await LoadDocumentsFromRefsAsync(test.SourceRefs, currentDir, ct);
+                }
+                catch (FileNotFoundException ex)
+                {
+                    Console.Error.WriteLine(ex.Message);
+                    return ExitError;
+                }
+            }
+            else
+            {
+                docs = [];
+            }
+
+            var result = CriticPromptCompiler.Compile(test, docs, criteria.Context);
             if (!result.IsSuccess)
             {
                 EmitRefusal(json, result.MissingInput!, result.Message!);
@@ -230,22 +263,23 @@ public sealed class CompileCriticPromptCommand : Command
     /// Resolves the configured tests directory (default <c>test-cases</c>) from spectra.config.json if present.
     /// Lenient by design: a missing/unparseable config falls back to the default, mirroring the sibling compilers.
     /// </summary>
-    private static async Task<string> ResolveTestsDirAsync(string currentDir, CancellationToken ct)
+    private static async Task<(string Dir, SpectraConfig? Config)> ResolveTestsDirAndConfigAsync(
+        string currentDir, CancellationToken ct)
     {
         var configPath = Path.Combine(currentDir, "spectra.config.json");
         if (!File.Exists(configPath))
-            return "test-cases";
+            return ("test-cases", null);
 
         try
         {
             var configJson = await File.ReadAllTextAsync(configPath, ct);
             var config = JsonSerializer.Deserialize<SpectraConfig>(configJson,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return config?.Tests?.Dir ?? "test-cases";
+            return (config?.Tests?.Dir ?? "test-cases", config);
         }
         catch (JsonException)
         {
-            return "test-cases";
+            return ("test-cases", null);
         }
     }
 
@@ -298,6 +332,37 @@ public sealed class CompileCriticPromptCommand : Command
                 if (item.GetString() is string s) values.Add(s);
         }
         return values;
+    }
+
+    /// <summary>
+    /// Resolves each source_ref to its file on disk (stripping any fragment) and loads its content.
+    /// Deduplicates by resolved path. Throws <see cref="FileNotFoundException"/> when a ref cannot
+    /// be found — callers should surface this as a distinct error (not a silent empty list).
+    /// </summary>
+    private static async Task<IReadOnlyList<SourceDocument>> LoadDocumentsFromRefsAsync(
+        IReadOnlyList<string> sourceRefs, string currentDir, CancellationToken ct)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var docs = new List<SourceDocument>();
+        foreach (var r in sourceRefs)
+        {
+            var file = r.Split('#')[0].Trim();
+            if (string.IsNullOrWhiteSpace(file))
+                continue;
+            var full = Path.IsPathRooted(file) ? file : Path.Combine(currentDir, file);
+            if (!seen.Add(Path.GetFullPath(full)))
+                continue;
+            if (!File.Exists(full))
+                throw new FileNotFoundException($"Source ref not found: {r}", full);
+            var content = await File.ReadAllTextAsync(full, ct);
+            docs.Add(new SourceDocument
+            {
+                Path = Path.GetRelativePath(currentDir, full).Replace('\\', '/'),
+                Title = Path.GetFileNameWithoutExtension(full),
+                Content = content
+            });
+        }
+        return docs;
     }
 
     private static async Task<IReadOnlyList<SourceDocument>> LoadDocumentsAsync(

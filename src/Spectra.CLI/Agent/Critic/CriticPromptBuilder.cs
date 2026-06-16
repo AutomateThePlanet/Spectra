@@ -23,7 +23,7 @@ public sealed class CriticPromptBuilder
     /// <summary>
     /// Builds the system prompt for the critic model.
     /// </summary>
-    public string BuildSystemPrompt()
+    public string BuildSystemPrompt(string? criteriaContext = null)
     {
         if (_templateLoader is not null)
         {
@@ -32,7 +32,7 @@ public sealed class CriticPromptBuilder
             {
                 ["test_case"] = "",
                 ["source_document"] = "",
-                ["acceptance_criteria"] = ""
+                ["acceptance_criteria"] = criteriaContext ?? ""
             };
             return PromptTemplateLoader.Resolve(template, values);
         }
@@ -105,6 +105,13 @@ public sealed class CriticPromptBuilder
         {
             sb.AppendLine("**Test Data**:");
             sb.AppendLine(test.TestData);
+            sb.AppendLine();
+        }
+
+        if (!string.IsNullOrWhiteSpace(test.ScenarioFromDoc))
+        {
+            sb.AppendLine("**Source Quote**:");
+            sb.AppendLine($"> {test.ScenarioFromDoc}");
             sb.AppendLine();
         }
 

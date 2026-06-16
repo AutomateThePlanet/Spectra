@@ -100,6 +100,8 @@ For the suite, summarize: total analyzed, classification breakdown
 (UP_TO_DATE / OUTDATED / ORPHANED / REDUNDANT), tests edited (with ids), and any tests
 that failed ingest after retries or were flagged for manual review.
 
+Write `.spectra/progress.json`: `{"active":3}` (terminal — seam-progress page renders Complete).
+
 ## Update all suites
 
 When the user says "update all": list suites with

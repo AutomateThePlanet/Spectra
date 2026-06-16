@@ -32,8 +32,12 @@ documents in front of you. If you were not given a document, treat that claim as
    do not build a path by hand:
 
    ```
-   spectra ai compile-critic-prompt --suite <suite> --test <id> --docs <docs-path>
+   spectra ai compile-critic-prompt --suite <suite> --test <id>
    ```
+
+   Source documents are auto-resolved from the test's `source_refs` frontmatter — no `--docs`
+   required. Use `--docs <dir>` only as an explicit override for ad-hoc verification against a
+   different document set.
 
    This emits the verification prompt (artifact + selected source docs). It writes nothing and
    calls no model. If it exits `4` (refused), the test artifact is missing an id/title — stop and
@@ -70,10 +74,11 @@ documents in front of you. If you were not given a document, treat that claim as
    - Generic UI actions (click, navigate, type) do not need documentation; specific behaviors,
      values, and business rules MUST be documented.
 
-3. **Hand the verdict to the deterministic boundary**:
+3. **Hand the verdict to the deterministic boundary**. Write your verdict JSON to
+   `.spectra/critic-verdict.json` with the Write tool, then ingest it:
 
    ```
-   echo '<your verdict JSON>' | spectra ai ingest-verdict
+   spectra ai ingest-verdict --from .spectra/critic-verdict.json
    ```
 
    Exit codes: `0` = a verdict was classified (the gate is `drop` iff `hallucinated`, otherwise
