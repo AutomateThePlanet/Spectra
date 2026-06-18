@@ -19,11 +19,12 @@ There is **no** `spectra ai analyze --extract-criteria` model call anymore. Do n
 
 ## Extract acceptance criteria from documentation
 
-**Progress setup** — before Step 1, initialize the live monitor:
+**Step 0 — Initialize live progress.** Run this FIRST, before anything else:
+
+Run with the Bash tool:
 ```
 spectra ai init-seam-progress
 ```
-Open `.spectra/seam-progress.html` using the VS Code preview (IDE preview tool). If an IDE preview is not available, run `spectra open .spectra/seam-progress.html`.
 
 Write `.spectra/progress.json` with the Write tool:
 ```json

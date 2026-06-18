@@ -1,6 +1,6 @@
 ---
 name: spectra-help
-description: Shows all available SPECTRA commands and prompts you can use in Copilot Chat.
+description: Shows all available SPECTRA commands and prompts available in Claude Code.
 tools: []
 ---
 

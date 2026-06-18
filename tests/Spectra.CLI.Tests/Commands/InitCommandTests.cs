@@ -171,17 +171,17 @@ public class InitCommandTests : IDisposable
         // Assert
         Assert.Equal(ExitCodes.Success, exitCode);
 
-        // Spec 057: the execution agent installs as a single Claude Code skill under .claude/skills/.
-        var agentPath = Path.Combine(_testDir, ".claude", "skills", "spectra-execution", "SKILL.md");
-        Assert.True(File.Exists(agentPath), "Execution skill file should exist under .claude/skills/");
+        // skill-pair-merge: merged spectra-execute skill (not old spectra-execution agent) installs here.
+        var agentPath = Path.Combine(_testDir, ".claude", "skills", "spectra-execute", "SKILL.md");
+        Assert.True(File.Exists(agentPath), "Execute skill file should exist under .claude/skills/spectra-execute/");
 
         var content = await File.ReadAllTextAsync(agentPath);
-        Assert.Contains("spectra-execution", content);
-        Assert.Contains("Test Execution Agent", content);
-        // De-Copilot'd: no GPT-4o pin, no Copilot Spaces.
+        Assert.Contains("spectra-execute", content);
+        Assert.Contains("SPECTRA Execute SKILL", content);
+        // No GPT-4o pin, no Copilot Spaces.
         Assert.DoesNotContain("GPT-4o", content);
         Assert.DoesNotContain("copilot_space", content);
-        // And no duplicate .github/ install remains.
+        // No .github/ install remains.
         Assert.False(File.Exists(Path.Combine(_testDir, ".github", "agents", "spectra-execution.agent.md")));
     }
 
@@ -197,14 +197,14 @@ public class InitCommandTests : IDisposable
         // Assert
         Assert.Equal(ExitCodes.Success, exitCode);
 
-        // Spec 057: execution agent + skill are consolidated into the one .claude/skills/ file;
-        // the legacy separate .github/skills/spectra-execution/ install is retired.
-        var skillPath = Path.Combine(_testDir, ".claude", "skills", "spectra-execution", "SKILL.md");
-        Assert.True(File.Exists(skillPath), "Execution skill file should exist under .claude/skills/");
+        // skill-pair-merge: merged spectra-execute skill installs under .claude/skills/spectra-execute/.
+        var skillPath = Path.Combine(_testDir, ".claude", "skills", "spectra-execute", "SKILL.md");
+        Assert.True(File.Exists(skillPath), "Execute skill file should exist under .claude/skills/spectra-execute/");
 
         var content = await File.ReadAllTextAsync(skillPath);
-        Assert.Contains("spectra-execution", content);
-        Assert.False(File.Exists(Path.Combine(_testDir, ".github", "skills", "spectra-execution", "SKILL.md")));
+        Assert.Contains("spectra-execute", content);
+        Assert.False(File.Exists(Path.Combine(_testDir, ".github", "skills", "spectra-execute", "SKILL.md")));
+        Assert.False(File.Exists(Path.Combine(_testDir, ".claude", "skills", "spectra-execution", "SKILL.md")));
     }
 
     [Fact]
@@ -213,8 +213,8 @@ public class InitCommandTests : IDisposable
         // Arrange
         var handler = new InitHandler(_logger, _testDir);
 
-        // Create existing execution skill file (Spec 057: .claude/skills/ install target)
-        var agentDir = Path.Combine(_testDir, ".claude", "skills", "spectra-execution");
+        // Create existing execute skill file (skill-pair-merge: .claude/skills/spectra-execute/ install target)
+        var agentDir = Path.Combine(_testDir, ".claude", "skills", "spectra-execute");
         Directory.CreateDirectory(agentDir);
         var agentPath = Path.Combine(agentDir, "SKILL.md");
         await File.WriteAllTextAsync(agentPath, "# Custom Agent Content");
@@ -236,8 +236,8 @@ public class InitCommandTests : IDisposable
         // Arrange
         var handler = new InitHandler(_logger, _testDir);
 
-        // Create existing execution skill file (Spec 057: .claude/skills/ install target)
-        var agentDir = Path.Combine(_testDir, ".claude", "skills", "spectra-execution");
+        // Create existing execute skill file (skill-pair-merge: .claude/skills/spectra-execute/ install target)
+        var agentDir = Path.Combine(_testDir, ".claude", "skills", "spectra-execute");
         Directory.CreateDirectory(agentDir);
         var agentPath = Path.Combine(agentDir, "SKILL.md");
         await File.WriteAllTextAsync(agentPath, "# Custom Agent Content");
@@ -248,9 +248,9 @@ public class InitCommandTests : IDisposable
         // Assert
         Assert.Equal(ExitCodes.Success, exitCode);
 
-        // Verify content was overwritten
+        // Verify content was overwritten with the merged execute skill content.
         var content = await File.ReadAllTextAsync(agentPath);
-        Assert.Contains("SPECTRA Test Execution Agent", content);
+        Assert.Contains("SPECTRA Execute SKILL", content);
     }
 
     [Fact]
@@ -265,9 +265,10 @@ public class InitCommandTests : IDisposable
         // Assert
         Assert.Equal(ExitCodes.Success, exitCode);
 
-        var agentPath = Path.Combine(_testDir, ".claude", "skills", "spectra-execution", "SKILL.md");
+        // skill-pair-merge: merged skill installs as spectra-execute.
+        var agentPath = Path.Combine(_testDir, ".claude", "skills", "spectra-execute", "SKILL.md");
         var content = await File.ReadAllTextAsync(agentPath);
-        Assert.Contains("name: spectra-execution", content);
+        Assert.Contains("name: spectra-execute", content);
     }
 
     [Fact]

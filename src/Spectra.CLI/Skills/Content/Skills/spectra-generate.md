@@ -1,6 +1,6 @@
 ---
 name: spectra-generate
-description: Generates test cases from documentation with AI verification and gap analysis.
+description: Generate test cases from documentation — analyze behaviors, get approval, generate, and verify with the mandatory spectra-critic subagent. No `spectra ai generate` command; uses the compile→in-session→ingest seam.
 tools: [{{GENERATE_TOOLS}}]
 ---
 
@@ -16,7 +16,17 @@ compile (CLI, deterministic)  →  you generate in-session  →  ingest (CLI, fa
 
 There is **no** `spectra ai generate` command anymore. Do not look for one. The commands you use are `spectra ai compile-prompt`, `compile-analysis-prompt`, `ingest-tests`, `ingest-analysis`, plus the critic's `compile-critic-prompt` / `ingest-verdict`.
 
+**ISTQB techniques**: SPECTRA's behavior analysis applies six ISTQB techniques (EP, BVA, DT, ST, EG, UC). The `ingest-analysis` recommendation includes a `technique_breakdown` map alongside `breakdown`. When you present the analyze recommendation, show BOTH the category breakdown and the technique breakdown so the user sees, e.g., how many BVA boundary test cases will be generated.
+
+**Boundary-coverage gaps (Spec 062)**: `ingest-analysis` also surfaces a `boundary_gaps` array — boundary/edge conditions the docs imply should be tested (min/max, off-by-one, empty/null, overflow, timeout) that aren't covered by existing/planned tests. When non-empty, present these **alongside** the two breakdowns as an advisory list ("These edges look untested: …") so the user can decide whether to generate them. It is **advisory only** — it never blocks generation and never changes the recommended count. This is the analysis phase's completeness check; it is distinct from the `spectra-critic` grounding check (which only judges whether each claim traces to the docs).
+
 **ALWAYS follow the full analyze → approve → generate flow. Never skip the analysis step.**
+
+## IMPORTANT RULES
+
+- **HELP**: If user asks "help", "what can I do", or "what commands": follow the **`spectra-help`** SKILL. Read it and reply with its content.
+- **QUICKSTART**: If user asks "how do I get started", "walk me through", "tutorial", "quickstart", "I'm new": follow the **`spectra-quickstart`** SKILL.
+- **Do NOT probe at startup**: do not Glob `.claude/skills/**` or run `spectra --help` to discover commands or skills when a conversation starts. Skills are loaded by the harness — act on the user's request directly.
 
 ## MANDATORY: Analyze first, every time
 
@@ -75,11 +85,12 @@ The ONLY time you skip analysis is when the user describes a single concrete sce
 - Otherwise leave count blank — the analyze step gives you `recommended` to use.
 - NEVER fall back to "5". There is no default.
 
-**Progress setup** — before Step 1, initialize the live monitor:
+**Step 0 — Initialize live progress.** Run this FIRST, before anything else:
+
+Run with the Bash tool:
 ```
 spectra ai init-seam-progress
 ```
-Open `.spectra/seam-progress.html` using the VS Code preview (IDE preview tool). If an IDE preview is not available, run `spectra open .spectra/seam-progress.html`.
 
 Write `.spectra/progress.json` with the Write tool:
 ```json
@@ -181,7 +192,7 @@ For each id in the `ingest-tests` `ids` list, update `.spectra/progress.json` be
 
 ### Step 8 — Invoke the `spectra-critic` subagent
 
-Invoke it with the Task tool, passing only the **suite name + the test id** (from the `ingest-tests` `ids` list) and its source docs — no generator state, and **never a hand-built file path**. The subagent compiles the prompt (`spectra ai compile-critic-prompt --suite {suite} --test {id}`, which resolves the id→path from `_index.json` on disk), renders a JSON verdict in-session, and ingests it (`spectra ai ingest-verdict`). Act on the gate:
+Invoke it with the Task tool, passing only the **suite name + the test id** (from the `ingest-tests` `ids` list) and its source docs — no generator state, and **never a hand-built file path**. The subagent compiles the prompt (`spectra ai compile-critic-prompt --suite {suite} --test {id}`, which resolves the id→path from `_index.json` on disk), renders a JSON verdict in-session, and ingests it (`spectra ai ingest-verdict --from .spectra/verdicts/critic-verdict.json --output-format json`). Act on the gate:
 - gate `pass` (verdict `grounded` / `partial`) → keep the test.
 - gate `drop` (verdict `hallucinated`) → remove it: `spectra delete {id} --force --no-interaction --output-format json --verbosity quiet`.
 - ingest exit `5` (empty), exit `6` (missing/unparseable `verdict`/`score` — **damage**), or compile exit `4` (refused) → **fail loud**, NOT a pass. Regenerate that single test addressing the *specific* error and re-verify. **Bounded by the retry limit (2 attempts).** If it still fails at the limit, STOP and report the failing test and the specific error; never keep an unverified test.
@@ -231,6 +242,38 @@ From the ingest + critic output, show: test id and title; the suite; linked acce
 
 ---
 
+## Test Creation Intent Routing
+
+### Intent 1: Explore a feature area → use `--focus`
+
+**Signals**: topic words ("error handling", "negative test cases", "payment module"), no specific scenario described, request implies multiple test cases, plural ("test cases").
+
+**Examples**:
+- "Generate test cases for checkout error handling"
+- "I need negative test cases for the auth module"
+- "Cover the refund policy with test cases"
+- "Generate 10 test cases for payments"
+
+**Action**: Use the main analyze → approve → generate flow with `--focus "{topic}"`.
+
+### Intent 2: Create a specific test → use `--from-description`
+
+**Signals**: describes a concrete behavior (you could read it as a test title), single scenario, action + expected outcome pattern, singular ("a test").
+
+**Examples**:
+- "Add a test for double-click submit creating duplicate orders"
+- "Create a test case where expired session redirects to login"
+- "I need a test that verifies IBAN validation rejects invalid checksums"
+- "Add a test: guest checkout with PayPal completes successfully"
+
+**Action**: Use the from-description flow ("When the user wants to create a specific test case"). **Produces exactly 1 test. No analysis needed. No count question.**
+
+### Ambiguous intent
+
+If unclear whether the user wants to explore an area or create a specific test, default to `--from-description` if they described a behavior, or `--focus` if they named a topic. **Don't stop to ask about count or scope** — the topic-vs-scenario shape is the only signal needed, so proceed without a needless confirmation round-trip.
+
+---
+
 ## How to choose between generation flows
 
 | User intent | Signal | Flow |
@@ -239,6 +282,28 @@ From the ingest + critic output, show: test id and title; the suite; linked acce
 | Create a specific test case | "Add a test case for...", "Create a test case where...", "I need a test case that verifies..." | From-description flow (`compile-prompt --from-description`) |
 
 **Key rule**: If you can read the user's request as a single test case title, it's `--from-description`. If it's a topic to explore, it's the main flow. Do NOT ask the user about count or scope to disambiguate — the topic-vs-scenario shape is the only signal you need.
+
+---
+
+## Other tasks (delegation)
+
+Read the named SKILL first, then follow its steps exactly. Do NOT invent CLI commands — the commands below are the ONLY valid forms.
+
+| Task | SKILL | CLI command |
+|------|-------|-------------|
+| Update test cases | `spectra-update` | `spectra ai update --suite {suite} --no-interaction --output-format json --verbosity quiet` |
+| Coverage analysis | `spectra-coverage` | `spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet` |
+| Dashboard | `spectra-dashboard` | `spectra ai analyze --coverage --auto-link ... && spectra dashboard --output ./site ...` |
+| Extract criteria | `spectra-criteria` | `spectra ai analyze --extract-criteria --no-interaction --output-format json --verbosity quiet` |
+| Validate test cases | `spectra-validate` | `spectra validate --no-interaction --output-format json --verbosity quiet` |
+| List / show test cases | `spectra-list` | `spectra list --no-interaction --output-format json --verbosity quiet` |
+| Docs index | `spectra-docs` | `spectra docs index [--force] --no-interaction --output-format json --verbosity quiet` |
+| Delete test case(s) | `spectra-delete` | `spectra delete {id...} --dry-run/--force --no-interaction --output-format json --verbosity quiet` |
+| Suite list/rename/delete | `spectra-suite` | `spectra suite list/rename/delete ... --no-interaction --output-format json --verbosity quiet` |
+| Stop a running operation | (this skill) | `spectra cancel --no-interaction --output-format json --verbosity quiet` |
+| Diagnose test ID issues | `spectra-help` | `spectra doctor ids [--fix] --no-interaction --output-format json --verbosity quiet` |
+
+**Never re-run a command that completed successfully.** If the result shows it persisted, present the results and stop. **Dashboard**: after results, also open `site/index.html` to show the dashboard.
 
 ---
 

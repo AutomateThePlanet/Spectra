@@ -341,7 +341,7 @@ public sealed class ReportWriter
                         <span class=""status-badge blocked"">BLOCKED</span>
                     </summary>
                     <div class=""test-details"">
-                        <div class=""detail-row""><strong>Blocked By:</strong> {Escape(t.BlockedBy ?? "Unknown")}</div>
+                        <div class=""detail-row""><strong>Blocked By Test:</strong> {Escape(t.BlockedBy ?? "(manual block)")}</div>
                         {(string.IsNullOrEmpty(t.Notes) ? "" : $@"<div class=""detail-row""><strong>Reason:</strong> {Escape(t.Notes)}</div>")}
                         {RenderTestContent(t, _reportsPath)}
                     </div>

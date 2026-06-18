@@ -1,7 +1,7 @@
 ---
 name: spectra-critic
 description: Verifies a single generated test against its source documents and returns a JSON verdict. Runs in a fresh, isolated context (artifact + docs only). Invoked explicitly as a mandatory step — never auto-invoked.
-tools: [{{READONLY_TOOLS}}]
+tools: [{{READONLY_TOOLS}}, Write]
 model: claude-sonnet-4-6
 disable-model-invocation: true
 context: fork
@@ -74,12 +74,23 @@ documents in front of you. If you were not given a document, treat that claim as
    - Generic UI actions (click, navigate, type) do not need documentation; specific behaviors,
      values, and business rules MUST be documented.
 
+   **`evidence` discipline**: `evidence` MUST be a VERBATIM quote copied from the source
+   documentation — nothing else. If a claim is grounded, `evidence` is the exact doc sentence(s)
+   that ground it. If a claim is NOT grounded (unverified or hallucinated), `evidence` MUST be
+   `null` and the explanation goes in `reason`. NEVER put your own reasoning, math, or descriptions
+   (e.g. "mathematically correct", "generic observation step") in `evidence` — that belongs in
+   `reason`. If you cannot point to a real doc sentence, the status is `unverified` or
+   `hallucinated`, not `grounded`.
+
 3. **Hand the verdict to the deterministic boundary**. Write your verdict JSON to
-   `.spectra/critic-verdict.json` with the Write tool, then ingest it:
+   `.spectra/verdicts/critic-verdict.json` with the Write tool, then ingest it:
 
    ```
-   spectra ai ingest-verdict --from .spectra/critic-verdict.json
+   spectra ai ingest-verdict --from .spectra/verdicts/critic-verdict.json
    ```
+
+   The ONLY valid flags for `ingest-verdict` are `--from` and `--output-format`. Do NOT add
+   `--suite` or `--test` — `ingest-verdict` is a pure classifier and takes no test identity.
 
    Exit codes: `0` = a verdict was classified (the gate is `drop` iff `hallucinated`, otherwise
    `pass`); `5` = empty response; `6` = missing/unparseable `verdict`/`score` (damage — fix your

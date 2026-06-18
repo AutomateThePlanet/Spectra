@@ -62,6 +62,7 @@ public sealed class ConsoleServer : IAsyncDisposable
             var method = ctx.Request.HttpMethod;
 
             if (method == "GET" && path == "/") { await WriteHtmlAsync(ctx, ConsolePage.Render()); return; }
+            if (method == "GET" && path.StartsWith("/reports/")) { await ServeReportFileAsync(ctx, path["/reports/".Length..]); return; }
 
             ConsoleResponse resp;
             if (method == "GET" && path == "/current") resp = await _endpoints.GetCurrentAsync();
@@ -69,6 +70,7 @@ public sealed class ConsoleServer : IAsyncDisposable
             else if (method == "POST" && path == "/note") { var b = await ReadJsonAsync(ctx); resp = await _endpoints.NoteAsync(Str(b, "note")); }
             else if (method == "POST" && path == "/finalize") { var b = await ReadJsonAsync(ctx); resp = await _endpoints.FinalizeAsync(Bool(b, "force")); }
             else if (method == "POST" && path == "/screenshot") resp = await _endpoints.ScreenshotAsync(await ReadImageBytesAsync(ctx));
+            else if (method == "POST" && path == "/retest") { var b = await ReadJsonAsync(ctx); resp = await _endpoints.RetestAsync(Str(b, "testId")); }
             else resp = new ConsoleResponse(404, new ConsoleError("NOT_FOUND", $"No route for {method} {path}."));
 
             await WriteJsonAsync(ctx, resp.StatusCode, resp.Body);
@@ -131,6 +133,50 @@ public sealed class ConsoleServer : IAsyncDisposable
         var bytes = Encoding.UTF8.GetBytes(html);
         ctx.Response.StatusCode = 200;
         ctx.Response.ContentType = "text/html; charset=utf-8";
+        ctx.Response.ContentLength64 = bytes.Length;
+        await ctx.Response.OutputStream.WriteAsync(bytes);
+        ctx.Response.Close();
+    }
+
+    /// <summary>
+    /// Serves a file from the reports directory. Validates that the resolved path is inside
+    /// <c>.execution/reports/</c> (path-traversal guard) and that the extension is in the allowed set.
+    /// Handles both top-level report files (e.g. <c>run-XYZ.html</c>) and screenshot sub-paths
+    /// (e.g. <c>{runId}/attachments/screenshot_0.png</c>).
+    /// </summary>
+    private async Task ServeReportFileAsync(HttpListenerContext ctx, string subPath)
+    {
+        subPath = Uri.UnescapeDataString(subPath);
+        var reportsDir = Path.GetFullPath(_services.Config.ReportsPath);
+        var fullPath = Path.GetFullPath(Path.Combine(reportsDir, subPath));
+
+        // Path-traversal guard: resolved path must be inside the reports directory
+        if (!fullPath.StartsWith(reportsDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Response.StatusCode = 403;
+            ctx.Response.Close();
+            return;
+        }
+
+        var ext = Path.GetExtension(fullPath).ToLowerInvariant();
+        var contentType = ext switch
+        {
+            ".html"          => "text/html; charset=utf-8",
+            ".json"          => "application/json",
+            ".md"            => "text/markdown",
+            ".png"           => "image/png",
+            ".jpg" or ".jpeg"=> "image/jpeg",
+            ".webp"          => "image/webp",
+            ".gif"           => "image/gif",
+            _                => null
+        };
+
+        if (contentType is null) { ctx.Response.StatusCode = 403; ctx.Response.Close(); return; }
+        if (!File.Exists(fullPath)) { ctx.Response.StatusCode = 404; ctx.Response.Close(); return; }
+
+        var bytes = await File.ReadAllBytesAsync(fullPath);
+        ctx.Response.StatusCode = 200;
+        ctx.Response.ContentType = contentType;
         ctx.Response.ContentLength64 = bytes.Length;
         await ctx.Response.OutputStream.WriteAsync(bytes);
         ctx.Response.Close();

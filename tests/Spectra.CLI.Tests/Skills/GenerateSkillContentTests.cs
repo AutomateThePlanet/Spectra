@@ -9,7 +9,8 @@ namespace Spectra.CLI.Tests.Skills;
 public class GenerateSkillContentTests
 {
     private static string SkillContentText => SkillContent.Generate;
-    private static string AgentContentText => AgentContent.GenerationAgent;
+    // skill-pair-merge: intent routing content merged into spectra-generate skill.
+    private static string AgentContentText => SkillContent.Generate;
 
     // -- spectra-generate SKILL ---------------------------------------------
 

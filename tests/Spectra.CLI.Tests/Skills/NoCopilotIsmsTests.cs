@@ -39,10 +39,11 @@ public sealed class NoCopilotIsmsTests
     [Fact]
     public void GenerationAgent_HasNoCopilotIsm()
     {
-        var content = AgentContent.GenerationAgent;
+        // skill-pair-merge: generation agent content merged into spectra-generate skill.
+        var content = SkillContent.Generate;
         foreach (var token in Forbidden)
             Assert.False(content.Contains(token, StringComparison.Ordinal),
-                $"Generation agent still contains Copilot-ism '{token}'.");
+                $"Generation skill still contains Copilot-ism '{token}'.");
     }
 
     [Fact]

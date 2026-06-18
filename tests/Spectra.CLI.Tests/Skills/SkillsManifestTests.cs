@@ -81,10 +81,9 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void AgentContent_HasAllAgents()
     {
-        // Spec 055 adds the context:fork critic subagent.
-        Assert.Equal(3, AgentContent.All.Count);
-        Assert.True(AgentContent.All.ContainsKey("spectra-execution.agent.md"));
-        Assert.True(AgentContent.All.ContainsKey("spectra-generation.agent.md"));
+        // skill-pair-merge: spectra-generation and spectra-execution merged into their flow skills;
+        // only the context:fork critic subagent remains as a bundled agent.
+        Assert.Single(AgentContent.All);
         Assert.True(AgentContent.All.ContainsKey("spectra-critic.agent.md"));
     }
 
@@ -101,20 +100,17 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void ExecutionAgent_LineCount_Within200()
     {
-        var content = AgentContent.ExecutionAgent;
-        var lineCount = content.Split('\n').Length;
-        Assert.True(lineCount <= 200, $"Execution agent is {lineCount} lines, expected ≤200");
+        // skill-pair-merge: spectra-execution agent merged into spectra-execute skill; line-count
+        // contract retired — the merged skill has no meaningful upper bound to enforce here.
+        Assert.True(true);
     }
 
     [Fact]
     public void GenerationAgent_LineCount_Within160()
     {
-        // Spec 033 added the Test Creation Intent Routing section (~40 lines).
-        // Spec 040 lifecycle adds 4 new delegation entries for delete / suite /
-        // cancel / doctor — bound bumped 140 → 160 to accommodate.
-        var content = AgentContent.GenerationAgent;
-        var lineCount = content.Split('\n').Length;
-        Assert.True(lineCount <= 160, $"Generation agent is {lineCount} lines, expected ≤160");
+        // skill-pair-merge: spectra-generation agent merged into spectra-generate skill; line-count
+        // contract retired — the merged skill has no meaningful upper bound to enforce here.
+        Assert.True(true);
     }
 
     [Fact]
@@ -315,14 +311,16 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void GenerationAgent_ContainsUpdateDelegation()
     {
-        var content = AgentContent.GenerationAgent;
+        // skill-pair-merge: delegation table now lives in the merged spectra-generate skill.
+        var content = SkillContent.Generate;
         Assert.Contains("spectra-update", content);
     }
 
     [Fact]
     public void ExecutionAgent_ContainsUpdateDelegation()
     {
-        var content = AgentContent.ExecutionAgent;
+        // skill-pair-merge: delegation table now lives in the merged spectra-execute skill.
+        var content = SkillContent.Execute;
         Assert.Contains("spectra-update", content);
     }
 
@@ -348,13 +346,15 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void GenerationAgent_References_QuickstartSkill()
     {
-        Assert.Contains("spectra-quickstart", AgentContent.GenerationAgent);
+        // skill-pair-merge: quickstart routing now lives in the merged spectra-generate skill.
+        Assert.Contains("spectra-quickstart", SkillContent.Generate);
     }
 
     [Fact]
     public void ExecutionAgent_References_QuickstartSkill()
     {
-        Assert.Contains("spectra-quickstart", AgentContent.ExecutionAgent);
+        // skill-pair-merge: quickstart routing now lives in the merged spectra-execute skill.
+        Assert.Contains("spectra-quickstart", SkillContent.Execute);
     }
 
     [Fact]

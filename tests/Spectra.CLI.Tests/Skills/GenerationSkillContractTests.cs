@@ -65,8 +65,9 @@ public sealed class GenerationSkillContractTests
     [Fact]
     public void GenerationAgent_References_MandatoryCriticStep()
     {
-        var agent = AgentContent.GenerationAgent;
-        Assert.Contains("spectra-critic", agent);
-        Assert.Contains("mandatory", agent, StringComparison.OrdinalIgnoreCase);
+        // skill-pair-merge: mandatory critic step now verified in the merged spectra-generate skill.
+        var skill = SkillContent.Generate;
+        Assert.Contains("spectra-critic", skill);
+        Assert.Contains("mandatory", skill, StringComparison.OrdinalIgnoreCase);
     }
 }

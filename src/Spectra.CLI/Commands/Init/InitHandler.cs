@@ -79,6 +79,9 @@ public sealed class InitHandler
             // Create dashboard deployment workflow
             await CreateDeployWorkflowAsync(ct);
 
+            // Emit .claude/settings.json with spectra CLI + .spectra/ write permissions
+            await Skills.ClaudeSettingsInstaller.EnsureInstalledAsync(_workingDirectory, ct);
+
             // Update .gitignore
             await UpdateGitIgnoreAsync(ct);
 
@@ -93,7 +96,7 @@ public sealed class InitHandler
             _logger.LogInformation("  - {ConfigPath}", ConfigFileName);
             _logger.LogInformation("  - {DocsDir}/", DocsDir);
             _logger.LogInformation("  - {TestsDir}/", TestsDir);
-            _logger.LogInformation("  - .claude/skills/spectra-execution/SKILL.md");
+            _logger.LogInformation("  - .claude/skills/spectra-execute/SKILL.md");
             _logger.LogInformation("  - {WorkflowPath}", DeployWorkflowPath);
             _logger.LogInformation("");
             _logger.LogInformation("  - {TemplatePath}", BugReportTemplatePath);
@@ -383,7 +386,15 @@ public sealed class InitHandler
             ".spectra/.pid",
             ".spectra/.cancel",
             ".spectra/id-allocator.lock",
-            ".spectra/id-allocator.json"
+            ".spectra/id-allocator.json",
+            ".spectra/progress.json",
+            ".spectra/analysis.json",
+            ".spectra/generated.json",
+            ".spectra/updated.json",
+            ".spectra/criteria.json",
+            ".spectra/critic-verdict.json",
+            ".spectra/seam-progress.html",
+            ".spectra/skills-manifest.json",
         };
         var newEntries = new List<string>();
 

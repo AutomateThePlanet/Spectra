@@ -203,6 +203,23 @@ public sealed class ConsoleEndpoints
         return Ok(new { saved = saved.RelativePath, screenshotPaths = refreshed?.ScreenshotPaths ?? new List<string>() });
     });
 
+    // ---- POST /retest -------------------------------------------------------
+
+    /// <summary>
+    /// Exposes <see cref="ExecutionEngine.RetestAsync"/> to the console — no new engine mechanics,
+    /// pure delegation. The engine appends a new attempt row and requeues the test as Pending.
+    /// </summary>
+    public Task<ConsoleResponse> RetestAsync(string? testId) => GuardAsync(async () =>
+    {
+        if (string.IsNullOrWhiteSpace(testId))
+            return Err(400, "TEST_ID_REQUIRED", "testId is required.");
+        var run = await _s.Engine.GetActiveRunAsync();
+        if (run is null) return Err(404, "NO_ACTIVE_RUN", "No active run.");
+        var result = await _s.Engine.RetestAsync(run.RunId, testId);
+        if (result is null) return Err(404, "NOT_FOUND", $"Test '{testId}' not found in run or has no prior attempt.");
+        return Ok(new { queued = new { testId = result.TestId, attempt = result.Attempt }, current = await CurrentBodyAsync() });
+    });
+
     // ---- helpers ------------------------------------------------------------
 
     private async Task<object?> CurrentBodyAsync()

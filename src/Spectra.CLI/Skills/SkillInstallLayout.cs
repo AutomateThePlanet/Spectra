@@ -18,9 +18,8 @@ public static class SkillInstallLayout
     /// </summary>
     public static string AgentPath(string root, string agentFileName) => agentFileName switch
     {
-        "spectra-generation.agent.md" => Path.Combine(root, ".claude", "skills", "spectra-generation", "SKILL.md"),
-        "spectra-execution.agent.md" => Path.Combine(root, ".claude", "skills", "spectra-execution", "SKILL.md"),
         "spectra-critic.agent.md" => Path.Combine(root, ".claude", "agents", "spectra-critic.agent.md"),
+        // skill-pair-merge: generation + execution agents merged into their flow skills; no agent install paths for them.
         // Fallback for any future not-yet-ported agent.
         _ => Path.Combine(root, ".github", "agents", agentFileName),
     };

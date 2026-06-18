@@ -37,13 +37,15 @@ public sealed class ClaudeSkillsInstallTests : IDisposable
     {
         Assert.Equal(Path.Combine(_dir, ".claude", "skills", "spectra-coverage", "SKILL.md"),
             SkillInstallLayout.SkillPath(_dir, "spectra-coverage"));
-        Assert.Equal(Path.Combine(_dir, ".claude", "skills", "spectra-generation", "SKILL.md"),
-            SkillInstallLayout.AgentPath(_dir, "spectra-generation.agent.md"));
+        // skill-pair-merge: generation + execution agents merged into flow skills; flow skills
+        // install via SkillPath to .claude/skills/<name>/SKILL.md.
+        Assert.Equal(Path.Combine(_dir, ".claude", "skills", "spectra-generate", "SKILL.md"),
+            SkillInstallLayout.SkillPath(_dir, "spectra-generate"));
+        Assert.Equal(Path.Combine(_dir, ".claude", "skills", "spectra-execute", "SKILL.md"),
+            SkillInstallLayout.SkillPath(_dir, "spectra-execute"));
+        // The critic subagent still routes to .claude/agents/.
         Assert.Equal(Path.Combine(_dir, ".claude", "agents", "spectra-critic.agent.md"),
             SkillInstallLayout.AgentPath(_dir, "spectra-critic.agent.md"));
-        // Spec 057: the execution agent is now a main-session skill under .claude/skills/.
-        Assert.Equal(Path.Combine(_dir, ".claude", "skills", "spectra-execution", "SKILL.md"),
-            SkillInstallLayout.AgentPath(_dir, "spectra-execution.agent.md"));
     }
 
     // ---------- end-to-end install ----------
@@ -54,9 +56,10 @@ public sealed class ClaudeSkillsInstallTests : IDisposable
         var exit = await new InitHandler(_logger, _dir).HandleAsync(force: false);
         Assert.Equal(ExitCodes.Success, exit);
 
-        // A representative authoring skill + the generation skill land under .claude/skills/.
+        // A representative authoring skill + the merged generate skill land under .claude/skills/.
         Assert.True(File.Exists(Path.Combine(_dir, ".claude", "skills", "spectra-coverage", "SKILL.md")));
-        Assert.True(File.Exists(Path.Combine(_dir, ".claude", "skills", "spectra-generation", "SKILL.md")));
+        // skill-pair-merge: merged generate/execute flow skills (not agent names) land here.
+        Assert.True(File.Exists(Path.Combine(_dir, ".claude", "skills", "spectra-generate", "SKILL.md")));
         // The critic subagent lands under .claude/agents/.
         Assert.True(File.Exists(Path.Combine(_dir, ".claude", "agents", "spectra-critic.agent.md")));
     }
@@ -74,14 +77,15 @@ public sealed class ClaudeSkillsInstallTests : IDisposable
     }
 
     [Fact]
-    public async Task Install_PlacesExecutionAgent_UnderClaudeSkills()
+    public async Task Install_PlacesExecuteSkill_UnderClaudeSkills()
     {
         var exit = await new InitHandler(_logger, _dir).HandleAsync(force: false);
         Assert.Equal(ExitCodes.Success, exit);
 
-        // Spec 057: the execution agent is ported to a .claude/skills/ main-session skill...
-        Assert.True(File.Exists(Path.Combine(_dir, ".claude", "skills", "spectra-execution", "SKILL.md")));
-        // ...and the legacy .github/ install (agent + skill) is retired.
+        // skill-pair-merge: the merged spectra-execute skill (not the old agent) installs here.
+        Assert.True(File.Exists(Path.Combine(_dir, ".claude", "skills", "spectra-execute", "SKILL.md")));
+        // The old agent-named paths must not exist.
+        Assert.False(File.Exists(Path.Combine(_dir, ".claude", "skills", "spectra-execution", "SKILL.md")));
         Assert.False(File.Exists(Path.Combine(_dir, ".github", "agents", "spectra-execution.agent.md")));
         Assert.False(File.Exists(Path.Combine(_dir, ".github", "skills", "spectra-execution", "SKILL.md")));
     }

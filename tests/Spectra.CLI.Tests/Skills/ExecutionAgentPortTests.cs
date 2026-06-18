@@ -12,7 +12,8 @@ namespace Spectra.CLI.Tests.Skills;
 /// </summary>
 public sealed class ExecutionAgentPortTests
 {
-    private static string Agent() => AgentContent.ExecutionAgent;
+    // skill-pair-merge: execution agent content merged into spectra-execute skill.
+    private static string Agent() => SkillContent.Execute;
 
     // ---------- preserved from spec 057 (no Copilot-isms, native doc lookup) ----------
 

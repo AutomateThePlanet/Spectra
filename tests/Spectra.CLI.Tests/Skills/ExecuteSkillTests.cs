@@ -58,7 +58,8 @@ public class ExecuteSkillTests
     [Fact]
     public void ExecutionAgent_DrivesCli_NotMcpToolsByDefault()
     {
-        var content = AgentContent.ExecutionAgent;
+        // skill-pair-merge: execution agent content merged into spectra-execute skill.
+        var content = SkillContent.Execute;
         Assert.Contains("spectra run", content);
         // The default flow no longer instructs raw mcp__spectra__* tool calls in the workflow steps.
         Assert.Contains("spectra run list-active", content);
@@ -69,7 +70,8 @@ public class ExecuteSkillTests
     {
         // Spec 070 (FR-008/SC-003): the optional "drive execution over the SPECTRA MCP server" fallback
         // is removed, and no mcp__spectra__* execution tool is referenced — execution is CLI-only.
-        var content = AgentContent.ExecutionAgent;
+        // skill-pair-merge: execution agent content merged into spectra-execute skill.
+        var content = SkillContent.Execute;
         Assert.DoesNotContain("SPECTRA MCP server", content);
         Assert.DoesNotContain("mcp__spectra__", content);
         // The SEPARATE bug-logging MCP (Azure DevOps) is a different component and is preserved.

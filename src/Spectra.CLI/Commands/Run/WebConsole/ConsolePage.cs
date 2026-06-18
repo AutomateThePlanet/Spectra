@@ -57,6 +57,8 @@ public static class ConsolePage
   .test .tid { font-family: 'JetBrains Mono', monospace; color: var(--color-text-muted); font-size: .85rem; }
   .field { margin-top: 1rem; } .field .k { font-weight: 600; font-size: .8rem; text-transform: uppercase; color: var(--color-text-muted); }
   .field .v { white-space: pre-wrap; margin-top: .25rem; }
+  .steps { padding-left: 1.4rem; margin-top: .25rem; }
+  .steps li { padding: .1rem 0; white-space: pre-wrap; }
   .btns { display: flex; gap: .6rem; margin-top: 1.5rem; flex-wrap: wrap; }
   button { font: inherit; font-weight: 600; border: none; border-radius: 8px; padding: .7rem 1.4rem; cursor: pointer; color: #fff; }
   button:disabled { opacity: .5; cursor: not-allowed; }
@@ -69,19 +71,44 @@ public static class ConsolePage
           text-align: center; color: var(--color-text-muted); font-size: .85rem; }
   .drop.over { border-color: var(--color-primary); background: var(--color-primary-light); }
   .shots { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .75rem; }
-  .shots span { font-family: 'JetBrains Mono', monospace; font-size: .75rem; background: var(--color-bg); padding: .2rem .5rem; border-radius: 4px; }
+  .thumb { max-height: 80px; max-width: 120px; border-radius: 6px; border: 1px solid var(--color-border); cursor: pointer; }
   .msg { margin-top: 1rem; padding: .7rem 1rem; border-radius: 8px; font-size: .9rem; display: none; }
   .msg.err { display: block; background: var(--color-failed-bg); color: var(--color-failed); }
   .msg.ok { display: block; background: var(--color-passed-bg); color: var(--color-passed); }
   .empty { text-align: center; padding: 3rem; color: var(--color-text-muted); }
+  #kbhelp { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px;
+    padding: 1.5rem 2rem; z-index: 1000; min-width: 260px; box-shadow: 0 8px 32px rgba(0,0,0,.15); }
+  #kbhelp h3 { margin-bottom: .75rem; }
+  #kbhelp table { border-collapse: collapse; width: 100%; }
+  #kbhelp td { padding: .3rem .5rem; font-size: .9rem; }
+  #kbhelp td:first-child { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--color-primary); width: 2.5rem; }
 </style>
 </head>
 <body>
-  <div class="nav"><h1>Spectra — Execution Console</h1><div class="meta" id="meta"></div></div>
+  <div class="nav">
+    <h1>Spectra — Execution Console</h1>
+    <div style="display:flex;align-items:center;gap:1rem">
+      <div class="meta" id="meta"></div>
+      <button onclick="toggleHelp()" style="padding:.3rem .7rem;font-size:.8rem;background:rgba(255,255,255,.15);font-weight:400" title="Keyboard shortcuts (?)">?</button>
+    </div>
+  </div>
   <div class="container">
     <div class="summary-grid" id="summary"></div>
     <div id="panel"><div class="empty">Loading…</div></div>
+    <div id="results"></div>
     <div class="msg" id="msg"></div>
+  </div>
+  <div id="kbhelp">
+    <h3>Keyboard shortcuts</h3>
+    <table>
+      <tr><td>P</td><td>Record PASS</td></tr>
+      <tr><td>F</td><td>Record FAIL</td></tr>
+      <tr><td>B</td><td>Record BLOCKED</td></tr>
+      <tr><td>S</td><td>Record SKIP</td></tr>
+      <tr><td>?</td><td>Toggle this help</td></tr>
+    </table>
+    <p style="margin-top:.75rem;font-size:.8rem;color:var(--color-text-muted)">Disabled while typing in the comment box.</p>
   </div>
 <script>
 // The browser holds NO run state (FR-002/FR-003). Every render derives from the latest /current payload.
@@ -103,9 +130,16 @@ async function refresh() {
 
 function counts(d) {
   const c = d.counts || {};
+  const total = d.total || 0;
+  const pending = (c.PENDING || 0) + (c.INPROGRESS || 0);
+  const executed = total - pending;
+  const pct = total > 0 ? Math.round(executed * 100 / total) : 0;
+  const progressBar = total > 0
+    ? `<div style="margin-bottom:.75rem"><div style="font-size:.8rem;color:var(--color-text-muted);margin-bottom:.3rem">${executed} of ${total} executed (${pct}%)</div><div style="height:6px;background:var(--color-border);border-radius:3px"><div style="height:6px;background:var(--color-primary);border-radius:3px;width:${pct}%"></div></div></div>`
+    : '';
   const cell = (cls, n, l) => `<div class="card ${cls}"><div class="n">${n}</div><div class="l">${l}</div></div>`;
-  $('summary').innerHTML =
-    cell('total', d.total || 0, 'Total') +
+  $('summary').innerHTML = progressBar +
+    cell('total', total, 'Total') +
     cell('passed', c.PASSED || 0, 'Passed') +
     cell('failed', c.FAILED || 0, 'Failed') +
     cell('blocked', c.BLOCKED || 0, 'Blocked') +
@@ -115,6 +149,7 @@ function counts(d) {
 function render(d) {
   $('meta').textContent = d.runId ? `${d.suite} · ${d.runStatus} · ${d.runId.slice(0,8)}` : '';
   counts(d);
+  renderResults(d);
   const panel = $('panel');
   if (d.runStatus === 'none') { panel.innerHTML = `<div class="empty">${d.message || 'No active run.'}</div>`; return; }
   if (!d.current) {
@@ -123,8 +158,21 @@ function render(d) {
     return;
   }
   const t = d.current;
-  const fld = (k, v) => v ? `<div class="field"><div class="k">${k}</div><div class="v">${esc(v)}</div></div>` : '';
-  const shots = (t.screenshotPaths || []).map(p => `<span>${esc(p)}</span>`).join('');
+  const fld = (k, v) => {
+    if (!v || (Array.isArray(v) && v.length === 0)) return '';
+    const body = Array.isArray(v)
+      ? `<ol class="steps">${v.map(s => `<li>${esc(s)}</li>`).join('')}</ol>`
+      : `<div class="v">${esc(v)}</div>`;
+    return `<div class="field"><div class="k">${k}</div>${body}</div>`;
+  };
+  const shots = (t.screenshotPaths || []).map(p =>
+    `<a href="/reports/${esc(p)}" target="_blank"><img src="/reports/${esc(p)}" class="thumb" alt="screenshot"></a>`
+  ).join('');
+
+  // Snapshot comment before re-render so the poll doesn't clobber live input (Fix 1)
+  const prevComment = $('comment')?.value ?? '';
+  const wasFocused = document.activeElement?.id === 'comment';
+
   panel.innerHTML = `<div class="test">
     <h2>${esc(t.title || t.testId)}</h2>
     <div class="tid">${esc(t.testId)}${t.priority ? ' · ' + esc(t.priority) : ''}${t.component ? ' · ' + esc(t.component) : ''}</div>
@@ -138,10 +186,27 @@ function render(d) {
       <button class="blocked" onclick="advance('blocked')">BLOCKED</button>
       <button class="skip" onclick="advance('skip')">SKIP</button>
     </div>
-    <div class="drop" id="drop">Drop or paste a screenshot here to attach it</div>
+    <div class="drop" id="drop">Drop or paste a screenshot — or <button type="button" onclick="$('fp').click()" style="display:inline;padding:.15rem .7rem;font-size:.8rem;background:var(--color-primary)">Browse…</button><input type="file" id="fp" accept="image/*" style="display:none"></div>
     <div class="shots">${shots}</div>
   </div>`;
   wireDrop();
+
+  // Restore comment text and focus after re-render (Fix 1)
+  const commentEl = $('comment');
+  if (commentEl && prevComment) { commentEl.value = prevComment; if (wasFocused) commentEl.focus(); }
+}
+
+function renderResults(d) {
+  const completed = (d.results || []).filter(r => r.status !== 'PENDING' && r.status !== 'INPROGRESS');
+  if (!completed.length) { $('results').innerHTML = ''; return; }
+  const statusColor = s => ({PASSED:'var(--color-passed)',FAILED:'var(--color-failed)',BLOCKED:'var(--color-blocked)',SKIPPED:'var(--color-skipped)'})[s] || 'var(--color-text-muted)';
+  $('results').innerHTML = `<div class="test" style="margin-top:1rem">
+    <div class="k" style="font-size:.8rem;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:.5rem">Completed (${completed.length})</div>` +
+    completed.map(r => `<div style="display:flex;align-items:center;gap:.5rem;padding:.35rem 0;border-bottom:1px solid var(--color-border)">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:.8rem">${esc(r.testId)}</span>
+      <span style="padding:.1rem .4rem;font-size:.7rem;border-radius:4px;font-weight:600;color:#fff;background:${statusColor(r.status)}">${esc(r.status)}</span>
+      <button onclick="retest('${esc(r.testId)}')" style="margin-left:auto;padding:.2rem .6rem;font-size:.75rem;background:var(--color-text-muted)">Retest</button>
+    </div>`).join('') + `</div>`;
 }
 
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -167,7 +232,17 @@ async function finalize() {
   const res = await post('/finalize', { force: false });
   busy = false;
   if (!res.ok) { showMsg(res.d.message || 'Error', 'err'); return; }
-  showMsg('Run finalized: ' + (res.d.report || ''), 'ok');
+  showMsg('Run finalized. Opening report…', 'ok');
+  if (res.d.report) window.location.href = '/reports/' + encodeURIComponent(res.d.report);
+  else refresh();
+}
+
+async function retest(testId) {
+  if (busy) return; busy = true;
+  const res = await post('/retest', { testId });
+  busy = false;
+  if (!res.ok) { showMsg(res.d.message || 'Retest failed', 'err'); return; }
+  showMsg('Queued retest for ' + testId, 'ok');
   refresh();
 }
 
@@ -177,6 +252,7 @@ function wireDrop() {
   drop.addEventListener('dragleave', () => drop.classList.remove('over'));
   drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over');
     const f = e.dataTransfer.files[0]; if (f) sendFile(f); });
+  const fp = $('fp'); if (fp) fp.onchange = () => { if (fp.files[0]) { sendFile(fp.files[0]); fp.value = ''; } };
 }
 
 document.addEventListener('paste', e => {
@@ -193,6 +269,21 @@ function sendFile(file) {
   };
   reader.readAsDataURL(file);
 }
+
+let helpVisible = false;
+function toggleHelp() {
+  helpVisible = !helpVisible;
+  $('kbhelp').style.display = helpVisible ? 'block' : 'none';
+}
+
+document.addEventListener('keydown', e => {
+  const tag = document.activeElement?.tagName?.toUpperCase();
+  if (tag === 'TEXTAREA' || tag === 'INPUT') return;
+  if (e.key === '?') { toggleHelp(); return; }
+  const map = { p: 'pass', f: 'fail', b: 'blocked', s: 'skip' };
+  const action = map[e.key.toLowerCase()];
+  if (action) advance(action);
+});
 
 refresh();
 setInterval(refresh, 1800);

@@ -1,12 +1,12 @@
 ---
 name: spectra-quickstart
-description: Guided onboarding and workflow walkthroughs for SPECTRA via Copilot Chat. Use this when the user asks for help getting started, a tutorial, or wants to see what SPECTRA can do.
+description: Guided onboarding and workflow walkthroughs for SPECTRA via Claude Code. Use this when the user asks for help getting started, a tutorial, or wants to see what SPECTRA can do.
 tools: []
 ---
 
 # SPECTRA Quickstart Guide
 
-You help users learn how to use SPECTRA through VS Code Copilot Chat. When a user asks how to get started, what SPECTRA can do, or for a walkthrough of a specific workflow, present the overview below and then drill into whichever workflow they pick. Use exact example prompts they can copy and re-send.
+You help users learn how to use SPECTRA through Claude Code. When a user asks how to get started, what SPECTRA can do, or for a walkthrough of a specific workflow, present the overview below and then drill into whichever workflow they pick. Use exact example prompts they can copy and re-send.
 
 > **What's new in spec 037**: behavior analysis now applies six ISTQB test
 > design techniques (EP, BVA, DT, ST, EG, UC) and the analysis output includes
@@ -418,7 +418,7 @@ Re-run coverage analysis (Workflow 4) followed by dashboard generation (Workflow
 - "I'm new, what do I do?"
 - "Quickstart"
 - "Tutorial"
-- "How to use SPECTRA from Copilot Chat"
+- "How to use SPECTRA from Claude Code"
 - "Step by step guide"
 - "Onboarding"
 
