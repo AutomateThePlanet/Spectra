@@ -63,7 +63,7 @@ public static class ConsolePage
   button { font: inherit; font-weight: 600; border: none; border-radius: 8px; padding: .7rem 1.4rem; cursor: pointer; color: #fff; }
   button:disabled { opacity: .5; cursor: not-allowed; }
   .pass { background: var(--color-passed); } .fail { background: var(--color-failed); }
-  .blocked { background: var(--color-blocked); } .skip { background: var(--color-skipped); }
+  button.blocked { background: var(--color-blocked); } .skip { background: var(--color-skipped); }
   .finalize { background: var(--color-primary); }
   textarea { width: 100%; margin-top: 1rem; border: 1px solid var(--color-border); border-radius: 8px;
              padding: .7rem; font: inherit; resize: vertical; min-height: 70px; }
@@ -72,7 +72,7 @@ public static class ConsolePage
   .drop.over { border-color: var(--color-primary); background: var(--color-primary-light); }
   .shots { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .75rem; }
   .thumb { max-height: 80px; max-width: 120px; border-radius: 6px; border: 1px solid var(--color-border); cursor: pointer; }
-  .msg { margin-top: 1rem; padding: .7rem 1rem; border-radius: 8px; font-size: .9rem; display: none; }
+  .msg { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); padding: .7rem 1.4rem; border-radius: 8px; font-size: .9rem; display: none; z-index: 500; box-shadow: 0 4px 16px rgba(0,0,0,.12); white-space: nowrap; }
   .msg.err { display: block; background: var(--color-failed-bg); color: var(--color-failed); }
   .msg.ok { display: block; background: var(--color-passed-bg); color: var(--color-passed); }
   .empty { text-align: center; padding: 3rem; color: var(--color-text-muted); }
@@ -97,8 +97,8 @@ public static class ConsolePage
     <div class="summary-grid" id="summary"></div>
     <div id="panel"><div class="empty">Loading…</div></div>
     <div id="results"></div>
-    <div class="msg" id="msg"></div>
   </div>
+  <div class="msg" id="msg"></div>
   <div id="kbhelp">
     <h3>Keyboard shortcuts</h3>
     <table>
@@ -113,6 +113,9 @@ public static class ConsolePage
 <script>
 // The browser holds NO run state (FR-002/FR-003). Every render derives from the latest /current payload.
 let busy = false;
+let resultsPage = 0;
+const RESULTS_PAGE = 10;
+let lastData = null;
 const $ = (id) => document.getElementById(id);
 
 function showMsg(text, kind) {
@@ -147,6 +150,7 @@ function counts(d) {
 }
 
 function render(d) {
+  lastData = d;
   $('meta').textContent = d.runId ? `${d.suite} · ${d.runStatus} · ${d.runId.slice(0,8)}` : '';
   counts(d);
   renderResults(d);
@@ -186,7 +190,8 @@ function render(d) {
       <button class="blocked" onclick="advance('blocked')">BLOCKED</button>
       <button class="skip" onclick="advance('skip')">SKIP</button>
     </div>
-    <div class="drop" id="drop">Drop or paste a screenshot — or <button type="button" onclick="$('fp').click()" style="display:inline;padding:.15rem .7rem;font-size:.8rem;background:var(--color-primary)">Browse…</button><input type="file" id="fp" accept="image/*" style="display:none"></div>
+    <div class="drop" id="drop">Drop or paste a screenshot — or <button type="button" onclick="$('fp').click()" style="display:inline;padding:.15rem .7rem;font-size:.8rem;background:var(--color-primary)">Browse…</button></div>
+    <input type="file" id="fp" accept="image/*" multiple style="display:none">
     <div class="shots">${shots}</div>
   </div>`;
   wireDrop();
@@ -199,14 +204,23 @@ function render(d) {
 function renderResults(d) {
   const completed = (d.results || []).filter(r => r.status !== 'PENDING' && r.status !== 'INPROGRESS');
   if (!completed.length) { $('results').innerHTML = ''; return; }
+  const totalPages = Math.ceil(completed.length / RESULTS_PAGE);
+  resultsPage = Math.min(resultsPage, totalPages - 1);
+  const page = resultsPage;
+  const slice = completed.slice(page * RESULTS_PAGE, (page + 1) * RESULTS_PAGE);
   const statusColor = s => ({PASSED:'var(--color-passed)',FAILED:'var(--color-failed)',BLOCKED:'var(--color-blocked)',SKIPPED:'var(--color-skipped)'})[s] || 'var(--color-text-muted)';
+  const prevDisabled = page === 0 ? ' disabled' : '';
+  const nextDisabled = page >= totalPages - 1 ? ' disabled' : '';
+  const nav = totalPages > 1
+    ? `<div style="display:flex;gap:.5rem;align-items:center;margin-top:.5rem"><button onclick="resultsPage--;renderResults(lastData)"${prevDisabled} style="padding:.2rem .6rem;font-size:.75rem;background:var(--color-text-muted)">Prev</button><span style="font-size:.8rem;color:var(--color-text-muted)">Page ${page+1} of ${totalPages}</span><button onclick="resultsPage++;renderResults(lastData)"${nextDisabled} style="padding:.2rem .6rem;font-size:.75rem;background:var(--color-text-muted)">Next</button></div>`
+    : '';
   $('results').innerHTML = `<div class="test" style="margin-top:1rem">
     <div class="k" style="font-size:.8rem;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:.5rem">Completed (${completed.length})</div>` +
-    completed.map(r => `<div style="display:flex;align-items:center;gap:.5rem;padding:.35rem 0;border-bottom:1px solid var(--color-border)">
+    slice.map(r => `<div style="display:flex;align-items:center;gap:.5rem;padding:.35rem 0;border-bottom:1px solid var(--color-border)">
       <span style="font-family:'JetBrains Mono',monospace;font-size:.8rem">${esc(r.testId)}</span>
       <span style="padding:.1rem .4rem;font-size:.7rem;border-radius:4px;font-weight:600;color:#fff;background:${statusColor(r.status)}">${esc(r.status)}</span>
       <button onclick="retest('${esc(r.testId)}')" style="margin-left:auto;padding:.2rem .6rem;font-size:.75rem;background:var(--color-text-muted)">Retest</button>
-    </div>`).join('') + `</div>`;
+    </div>`).join('') + nav + `</div>`;
 }
 
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -224,6 +238,7 @@ async function advance(status) {
   busy = false;
   if (!res.ok) { showMsg(res.d.message || res.d.error_code || 'Error', 'err'); return; }
   showMsg('Recorded ' + status.toUpperCase(), 'ok');
+  const c = $('comment'); if (c) c.value = '';
   if (res.d.current) render(res.d.current); else refresh();
 }
 
@@ -252,7 +267,7 @@ function wireDrop() {
   drop.addEventListener('dragleave', () => drop.classList.remove('over'));
   drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over');
     const f = e.dataTransfer.files[0]; if (f) sendFile(f); });
-  const fp = $('fp'); if (fp) fp.onchange = () => { if (fp.files[0]) { sendFile(fp.files[0]); fp.value = ''; } };
+  const fp = $('fp'); if (fp) fp.onchange = () => { Array.from(fp.files).forEach(f => sendFile(f)); fp.value = ''; };
 }
 
 document.addEventListener('paste', e => {

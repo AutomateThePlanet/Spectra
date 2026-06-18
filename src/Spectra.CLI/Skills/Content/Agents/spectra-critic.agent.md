@@ -35,6 +35,9 @@ documents in front of you. If you were not given a document, treat that claim as
    spectra ai compile-critic-prompt --suite <suite> --test <id>
    ```
 
+   Run WITHOUT `--output-format` — the plain-text prompt is emitted to stdout. Read it directly
+   from the command output. Do NOT add `--output-format json` and do NOT pipe through python or jq.
+
    Source documents are auto-resolved from the test's `source_refs` frontmatter — no `--docs`
    required. Use `--docs <dir>` only as an explicit override for ad-hoc verification against a
    different document set.
@@ -83,7 +86,8 @@ documents in front of you. If you were not given a document, treat that claim as
    `hallucinated`, not `grounded`.
 
 3. **Hand the verdict to the deterministic boundary**. Write your verdict JSON to
-   `.spectra/verdicts/critic-verdict.json` with the Write tool, then ingest it:
+   `.spectra/verdicts/critic-verdict.json` with the Write tool (the Write tool creates parent
+   directories automatically — do NOT run `mkdir`), then ingest it:
 
    ```
    spectra ai ingest-verdict --from .spectra/verdicts/critic-verdict.json
