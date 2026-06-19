@@ -14,8 +14,8 @@ namespace Spectra.CLI.Commands.Generate;
 /// only <c>hallucinated</c> drops (FR-005).
 ///
 /// Mirrors <see cref="IngestTestsCommand"/> / <see cref="IngestCriteriaCommand"/>. Unlike those, it
-/// persists nothing (the grounding write-back stays in the reused <c>CreateTestWithGrounding</c>),
-/// so it needs no config.
+/// persists nothing — grounding write-back is handled by <see cref="IngestGroundingCommand"/> (Spec 071)
+/// which activates the TestFileWriter grounding path. This command is advisory-gate only.
 /// </summary>
 public sealed class IngestVerdictCommand : Command
 {

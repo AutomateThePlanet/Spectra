@@ -1,6 +1,7 @@
 using System.CommandLine;
 using Spectra.CLI.Commands.Analyze;
 using Spectra.CLI.Commands.Generate;
+using Spectra.CLI.Commands.Review;
 using Spectra.CLI.Commands.Update;
 
 namespace Spectra.CLI.Commands.Ai;
@@ -40,6 +41,12 @@ public sealed class AiCommand : Command
         // in-session → ingest update, fail-loud, preserving id and manual fields, drift-guarded).
         AddCommand(new CompileUpdatePromptCommand());
         AddCommand(new IngestUpdateCommand());
+
+        // Spec 071: verdict disposition — grounding write-back, drop trail, repair prompt, review.
+        AddCommand(new IngestGroundingCommand());
+        AddCommand(new RecordDropCommand());
+        AddCommand(new CompileRepairPromptCommand());
+        AddCommand(new ReviewFlaggedCommand());
 
         // Throwaway seam-skill progress poller (superseded when execution console generalises).
         AddCommand(new InitSeamProgressCommand());

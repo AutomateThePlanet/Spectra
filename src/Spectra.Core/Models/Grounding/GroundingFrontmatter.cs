@@ -26,6 +26,18 @@ public sealed class GroundingFrontmatter
     [YamlMember(Alias = "unverified_claims")]
     public List<string> UnverifiedClaims { get; set; } = [];
 
+    [YamlMember(Alias = "flagged_for_review")]
+    public bool FlaggedForReview { get; set; }
+
+    [YamlMember(Alias = "repair_attempts")]
+    public int RepairAttempts { get; set; }
+
+    [YamlMember(Alias = "repaired")]
+    public bool Repaired { get; set; }
+
+    [YamlMember(Alias = "condensed_findings")]
+    public List<CondensedFindingFrontmatter> CondensedFindings { get; set; } = [];
+
     [YamlMember(Alias = "source")]
     public string? Source { get; set; }
 
@@ -83,7 +95,14 @@ public sealed class GroundingFrontmatter
             Generator = Generator,
             Critic = Critic,
             VerifiedAt = verifiedAt,
-            UnverifiedClaims = UnverifiedClaims
+            UnverifiedClaims = UnverifiedClaims,
+            FlaggedForReview = FlaggedForReview,
+            RepairAttempts = RepairAttempts,
+            Repaired = Repaired,
+            CondensedFindings = CondensedFindings
+                .Where(f => !string.IsNullOrWhiteSpace(f.Element))
+                .Select(f => new CondensedFinding { Element = f.Element!, Reason = f.Reason ?? "" })
+                .ToList()
         };
     }
 

@@ -125,6 +125,25 @@ public sealed class TestFileWriter
                     sb.AppendLine($"    - \"{EscapeYamlString(claim)}\"");
                 }
             }
+
+            if (testCase.Grounding.FlaggedForReview)
+                sb.AppendLine("  flagged_for_review: true");
+
+            if (testCase.Grounding.RepairAttempts > 0)
+                sb.AppendLine($"  repair_attempts: {testCase.Grounding.RepairAttempts}");
+
+            if (testCase.Grounding.Repaired)
+                sb.AppendLine("  repaired: true");
+
+            if (testCase.Grounding.CondensedFindings.Count > 0)
+            {
+                sb.AppendLine("  condensed_findings:");
+                foreach (var finding in testCase.Grounding.CondensedFindings)
+                {
+                    sb.AppendLine($"    - element: \"{EscapeYamlString(finding.Element)}\"");
+                    sb.AppendLine($"      reason: \"{EscapeYamlString(finding.Reason)}\"");
+                }
+            }
         }
 
         sb.AppendLine("---");

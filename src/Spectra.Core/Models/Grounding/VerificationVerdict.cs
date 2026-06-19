@@ -13,13 +13,15 @@ public enum VerificationVerdict
 
     /// <summary>
     /// Some claims are verified but others are unverified assumptions.
-    /// Test is written with warning marker and unverified_claims list.
+    /// Test is kept on disk with a partial grounding block; the critic's condensed findings
+    /// are embedded in the frontmatter. A bounded repair attempt is made automatically.
     /// </summary>
     Partial,
 
     /// <summary>
-    /// Test contains invented behaviors or undocumented claims.
-    /// Test is rejected and NOT written to disk.
+    /// Test contains invented behaviors that contradict the source documentation.
+    /// The contradicting claim is recorded in the drop trail (.spectra/dropped-tests.json),
+    /// then the test is deleted via the three-phase clean delete (index, depends_on, file).
     /// </summary>
     Hallucinated,
 

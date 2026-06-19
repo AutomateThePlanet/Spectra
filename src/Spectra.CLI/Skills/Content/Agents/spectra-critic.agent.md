@@ -86,12 +86,16 @@ documents in front of you. If you were not given a document, treat that claim as
    `hallucinated`, not `grounded`.
 
 3. **Hand the verdict to the deterministic boundary**. Write your verdict JSON to
-   `.spectra/verdicts/critic-verdict.json` with the Write tool (the Write tool creates parent
-   directories automatically — do NOT run `mkdir`), then ingest it:
+   `.spectra/verdicts/critic-verdict-{id}.json` (where `{id}` is the test ID you are verifying,
+   e.g., `.spectra/verdicts/critic-verdict-TC-113.json`) with the Write tool (the Write tool creates
+   parent directories automatically — do NOT run `mkdir`), then ingest it:
 
    ```
-   spectra ai ingest-verdict --from .spectra/verdicts/critic-verdict.json
+   spectra ai ingest-verdict --from .spectra/verdicts/critic-verdict-{id}.json
    ```
+
+   Per-test naming (not the old fixed `critic-verdict.json`) ensures all verdict files survive the
+   full batch — repair and review need to read them after generation completes.
 
    The ONLY valid flags for `ingest-verdict` are `--from` and `--output-format`. Do NOT add
    `--suite` or `--test` — `ingest-verdict` is a pure classifier and takes no test identity.
@@ -102,7 +106,8 @@ documents in front of you. If you were not given a document, treat that claim as
 
 ## What you do NOT do
 
-- You do not write or modify test files (the grounding write-back is the CLI's job).
+- You do not write or modify test files — grounding write-back is handled by `spectra ai ingest-grounding`
+  (Spec 071) after the verdict is classified. Your job ends after `ingest-verdict` confirms the gate.
 - You do not decide retries, generation counts, or which tests to create.
 - You do not pass through generator state. Your verdict is advisory-gating: a clear hallucination
   drops the test; everything else passes.

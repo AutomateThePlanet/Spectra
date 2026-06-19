@@ -133,6 +133,50 @@ Classifies every test case in the suite as **UP_TO_DATE**, **OUTDATED**, **ORPHA
 
 ---
 
+## Verdict Disposition (Spec 071)
+
+The critic assigns every generated test a verdict — **grounded**, **partial**, or **hallucinated** — and the `spectra-generate` skill now makes those verdicts durable and visible.
+
+### What happens automatically (in-batch)
+
+| Verdict | Automatic action |
+|---------|-----------------|
+| **grounded** | Condensed `grounding:` block written into the test's `.md` frontmatter (`verdict: grounded`, `score`, `verified_at`). Full JSON in `.spectra/verdicts/critic-verdict-{id}.json`. |
+| **partial** | One bounded repair attempt (compile-repair → agent patches → re-critic). If upgraded to grounded: grounded block + `repaired: true`. If still partial: partial block with condensed findings + `flagged_for_review: true`. Batch continues without prompting. |
+| **hallucinated** | Trail entry appended to `.spectra/dropped-tests.json` (`id`, `reason`, `contradicting_claim`, `timestamp`). Then clean three-phase delete (index entry removed, `depends_on` stripped, file deleted). |
+
+The batch report shows four counts: kept-grounded, repaired-to-grounded, flagged-partial, dropped-hallucinated.
+
+### Human review phase (for flagged tests)
+
+After a batch run, review tests still marked `flagged_for_review: true`:
+
+> "Review flagged tests for the checkout suite"
+
+The `spectra-review-flagged` skill lists each flagged test with its condensed verdict and lets you choose per test:
+- **Accept as-is** — clears `flagged_for_review`, keeps the partial block as acknowledged.
+- **Retry repair** — one more bounded `compile-repair-prompt` cycle.
+- **Delete** — writes a `user_decided` trail entry then performs the clean three-phase delete.
+
+To list flagged tests without an interactive session:
+
+```bash
+spectra ai review-flagged --suite checkout --no-interaction --output-format json
+```
+
+### What gets persisted where
+
+| Store | grounded | partial | hallucinated |
+|-------|----------|---------|--------------|
+| `test-cases/<suite>/<id>.md` | block added | block added (flagged) | file deleted |
+| `_index.json` entry | kept | kept | removed |
+| `.spectra/verdicts/critic-verdict-{id}.json` | written | written | written (then test deleted) |
+| `.spectra/dropped-tests.json` trail | — | — | entry appended |
+
+`.spectra/verdicts/` and `.spectra/dropped-tests.json` are gitignored scratch — they survive the run but are not committed.
+
+---
+
 ## Executing Tests via MCP
 
 > "Run the smoke test selection"

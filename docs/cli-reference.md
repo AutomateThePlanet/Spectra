@@ -269,8 +269,7 @@ spectra ai compile-critic-prompt --test ./tc-900.json --docs ./docs/checkout
 ### `spectra ai ingest-verdict` (Spec 055 — fail-loud boundary)
 
 Classifies an agent-produced critic JSON into a typed outcome and reports the verdict + gate
-decision. Content is read from `--from <file>` or stdin. The verification analogue of
-`ingest-tests`; it persists nothing (the grounding write-back stays in generation).
+decision. Content is read from `--from <file>` or stdin.
 
 ```bash
 echo '{"verdict":"hallucinated","score":0.1,"findings":[]}' | spectra ai ingest-verdict
@@ -281,6 +280,69 @@ spectra ai ingest-verdict --from ./verdict.json --output-format json
 - **Fail loud on damage**: a missing/unparseable `verdict` or `score` is a `ParseFailure` with a
   specific error — **never** a silent `partial`/`0.5` soft pass. Empty input is `EmptyResponse`.
 - Exit codes: `0` verdict classified, `5` `EmptyResponse`, `6` `ParseFailure`, `1` env error.
+
+### `spectra ai ingest-grounding` (Spec 071 — durable verdict write-back)
+
+Writes a condensed grounding block into the test's `.md` frontmatter from a critic verdict JSON.
+Called by the `spectra-generate` skill after `ingest-verdict`, once per test.
+
+```bash
+spectra ai ingest-grounding --suite reporting --test TC-113 \
+  --from .spectra/verdicts/critic-verdict-TC-113.json
+# After repair (upgraded to grounded):
+spectra ai ingest-grounding --suite reporting --test TC-113 \
+  --from .spectra/verdicts/critic-verdict-TC-113.json --repaired --repair-attempts 1
+```
+
+- **grounded** → condensed "verified clean" block (`verdict: grounded`, `score`, `verified_at`).
+- **partial** → block with condensed findings + `flagged_for_review: true` (the `spectra-review-flagged` skill then dispositions it).
+- **hallucinated** → refuses (exit 4); use `record-drop` + `spectra delete` instead.
+- Exit codes: `0` written, `4` hallucinated refused, `5` empty verdict, `6` parse failure, `1` env error.
+
+### `spectra ai record-drop` (Spec 071 — drop audit trail)
+
+Appends a hallucinated-test entry to `.spectra/dropped-tests.json` before the three-phase clean
+delete (`spectra delete`). The trail is append-only NDJSON, gitignored scratch.
+
+```bash
+spectra ai record-drop --suite reporting --test TC-138 \
+  --from .spectra/verdicts/critic-verdict-TC-138.json
+# Manual user decision during review:
+spectra ai record-drop --suite reporting --test TC-138 --reason user_decided
+```
+
+- Fields written: `id`, `suite`, `title`, `drop_reason` (hallucinated|user_decided), `contradicting_claim` (from verdict), `doc_ref`, `critic_model`, `timestamp`, `source` (critic|review).
+- Exit codes: `0` appended, `1` error.
+
+### `spectra ai compile-repair-prompt` (Spec 071 — repair seam)
+
+Compiles a plain-text repair prompt for a partial test, injecting the original test artifact,
+the critic's non-grounded findings, and relevant source docs. Emits to stdout (mirrors
+`compile-critic-prompt`). Called by the `spectra-generate` and `spectra-review-flagged` skills.
+
+```bash
+spectra ai compile-repair-prompt --suite reporting --test TC-113 \
+  --from .spectra/verdicts/critic-verdict-TC-113.json
+```
+
+- Refuses (exit 4) if verdict is not `partial` or if no non-grounded findings exist.
+- The agent patches in-session, then `ingest-update` + re-critic + `ingest-grounding` close the loop.
+- Exit codes: `0` emitted, `4` refused (not partial / no findings), `5` verdict empty, `6` parse failure, `1` error.
+
+### `spectra ai review-flagged` (Spec 071 — human review phase)
+
+Lists tests flagged for review (still-partial-after-repair) and allows per-test disposition:
+**accept** (clear `flagged_for_review`, keep partial block), **delete** (trail + clean delete).
+Retry-repair requires the `spectra-review-flagged` skill (needs agent inference).
+
+```bash
+spectra ai review-flagged --suite reporting                     # interactive
+spectra ai review-flagged --suite reporting --no-interaction --output-format json  # list only
+```
+
+- Interactive mode: `[A]ccept`, `[D]elete`, `[S]kip`, `[Q]uit` per flagged test.
+- Non-interactive / `--output-format json`: exits `2` if undisposed flagged tests remain.
+- Exit codes: `0` all dispositioned, `2` undisposed remain (non-interactive), `1` error.
 
 > **Note (Spec 059):** there is no longer a `spectra ai generate` command. Generation runs **in your
 > interactive Claude Code session** via the `spectra-generate` skill, which drives the deterministic
@@ -306,6 +368,10 @@ supporting `--output-format json`) are:
 | `spectra ai compile-prompt --suite <s> --from-description "<text>" [--context <text>]` | Emit a single-test prompt from a plain-language description (count forced to 1; Spec 050 criteria injected). |
 | `spectra ai ingest-tests <suite> [--from <file>]` | Validate + persist the agent-generated tests (fail-loud: exit 5 content-invalid, 6 schema-invalid). |
 | `spectra ai compile-critic-prompt` / `spectra ai ingest-verdict` | The mandatory `spectra-critic` verification step (Spec 055). |
+| `spectra ai ingest-grounding --suite <s> --test <id> [--repaired] [--repair-attempts <n>]` | Write the durable condensed verdict block into the test `.md` frontmatter (Spec 071). |
+| `spectra ai compile-repair-prompt --suite <s> --test <id>` | Emit a repair prompt for a partial test (critic findings + source docs); plain text to stdout (Spec 071). |
+| `spectra ai record-drop --suite <s> --test <id> [--reason user_decided]` | Append a drop-trail entry before deleting a hallucinated or user-decided-to-drop test (Spec 071). |
+| `spectra ai review-flagged [--suite <s>]` | List and disposition flagged (still-partial) tests: accept, delete, or (via skill) retry repair (Spec 071). |
 
 ISTQB techniques (EP, BVA, DT, ST, EG, UC) and coverage-aware analysis (Spec 044 — existing
 `_index.json` / criteria / doc sections inform the recommended gap count) are applied inside the

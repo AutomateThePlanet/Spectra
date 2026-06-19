@@ -37,6 +37,29 @@ public sealed record GroundingMetadata
     public IReadOnlyList<string> UnverifiedClaims { get; init; } = [];
 
     /// <summary>
+    /// True when verdict is Partial and the test awaits human review.
+    /// Only valid when Verdict == Partial.
+    /// </summary>
+    public bool FlaggedForReview { get; init; }
+
+    /// <summary>
+    /// Number of automatic repair attempts applied (0 = no repair attempted).
+    /// </summary>
+    public int RepairAttempts { get; init; }
+
+    /// <summary>
+    /// True when a repair cycle upgraded the test from partial to grounded.
+    /// Only valid when Verdict == Grounded.
+    /// </summary>
+    public bool Repaired { get; init; }
+
+    /// <summary>
+    /// Condensed non-grounded findings for human scanning (element + one-line reason).
+    /// Full findings remain in the per-test verdict JSON file.
+    /// </summary>
+    public IReadOnlyList<CondensedFinding> CondensedFindings { get; init; } = [];
+
+    /// <summary>
     /// Validates the metadata has valid values.
     /// </summary>
     public bool IsValid()
@@ -48,6 +71,15 @@ public sealed record GroundingMetadata
             return false;
 
         if (Verdict == VerificationVerdict.Partial && UnverifiedClaims.Count == 0)
+            return false;
+
+        if (FlaggedForReview && Verdict != VerificationVerdict.Partial)
+            return false;
+
+        if (Repaired && Verdict != VerificationVerdict.Grounded)
+            return false;
+
+        if (RepairAttempts < 0)
             return false;
 
         return true;

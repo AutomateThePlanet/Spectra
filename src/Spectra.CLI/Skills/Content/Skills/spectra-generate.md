@@ -192,16 +192,61 @@ For each id in the `ingest-tests` `ids` list, update `.spectra/progress.json` be
 
 ### Step 8 — Invoke the `spectra-critic` subagent
 
-Invoke it with the Task tool, passing only the **suite name + the test id** (from the `ingest-tests` `ids` list) and its source docs — no generator state, and **never a hand-built file path**. The subagent compiles the prompt (`spectra ai compile-critic-prompt --suite {suite} --test {id}`, which resolves the id→path from `_index.json` on disk), renders a JSON verdict in-session, and ingests it (`spectra ai ingest-verdict --from .spectra/verdicts/critic-verdict.json --output-format json`). Act on the gate:
-- gate `pass` (verdict `grounded` / `partial`) → keep the test.
-- gate `drop` (verdict `hallucinated`) → remove it: `spectra delete {id} --force --no-interaction --output-format json --verbosity quiet`.
-- ingest exit `5` (empty), exit `6` (missing/unparseable `verdict`/`score` — **damage**), or compile exit `4` (refused) → **fail loud**, NOT a pass. Regenerate that single test addressing the *specific* error and re-verify. **Bounded by the retry limit (2 attempts).** If it still fails at the limit, STOP and report the failing test and the specific error; never keep an unverified test.
+Invoke it with the Task tool, passing only the **suite name + the test id** (from the `ingest-tests` `ids` list) and its source docs — no generator state, and **never a hand-built file path**. The subagent compiles the prompt (`spectra ai compile-critic-prompt --suite {suite} --test {id}`, which resolves the id→path from `_index.json` on disk), renders a JSON verdict in-session, and writes it to `.spectra/verdicts/critic-verdict-{id}.json` (per-test file — NOT the old fixed name), then ingests it:
+
+```
+spectra ai ingest-verdict --from .spectra/verdicts/critic-verdict-{id}.json --output-format json
+```
+
+**Act on the gate:**
+
+**gate `pass` (verdict `grounded`):**
+```
+spectra ai ingest-grounding --suite {suite} --test {id} \
+  --from .spectra/verdicts/critic-verdict-{id}.json --output-format json
+```
+→ The test .md gets a condensed grounding block. Add to kept-grounded count.
+
+**gate `pass` (verdict `partial`) — bounded repair attempt:**
+```
+spectra ai compile-repair-prompt --suite {suite} --test {id}
+```
+→ Read the repair prompt from stdout. Patch the test in-session (rewrite ONLY the ungrounded elements; preserve id and structure). Write patched test JSON array to `.spectra/repaired.json`.
+```
+spectra ai ingest-update {suite} --test-id {id} --from .spectra/repaired.json --output-format json
+```
+→ Re-invoke the `spectra-critic` subagent for `{id}` (same procedure — writes `.spectra/verdicts/critic-verdict-{id}.json` again):
+```
+spectra ai ingest-verdict --from .spectra/verdicts/critic-verdict-{id}.json --output-format json
+```
+→ Read re-verdict gate:
+  - re-verdict `grounded`: `spectra ai ingest-grounding --suite {suite} --test {id} --from .spectra/verdicts/critic-verdict-{id}.json --repaired --repair-attempts 1 --output-format json` → Add to repaired-to-grounded count.
+  - re-verdict `partial`: `spectra ai ingest-grounding --suite {suite} --test {id} --from .spectra/verdicts/critic-verdict-{id}.json --repair-attempts 1 --output-format json` → Test flagged for review. Add to flagged-partial count.
+  - re-verdict `hallucinated`: `spectra ai record-drop --suite {suite} --test {id} --from .spectra/verdicts/critic-verdict-{id}.json --output-format json` then `spectra delete {id} --force --no-interaction --output-format json --verbosity quiet` → Add to dropped count.
+
+**gate `drop` (verdict `hallucinated`):**
+```
+spectra ai record-drop --suite {suite} --test {id} \
+  --from .spectra/verdicts/critic-verdict-{id}.json --output-format json
+spectra delete {id} --force --no-interaction --output-format json --verbosity quiet
+```
+→ Trail written before delete. Add to dropped count.
+
+**ingest exit `5` (empty), exit `6` (missing/unparseable `verdict`/`score` — damage), or compile exit `4` (refused):** **fail loud**, NOT a pass. Regenerate that single test addressing the *specific* error and re-verify. **Bounded by the retry limit (2 attempts).** If it still fails at the limit, STOP and report the failing test and the specific error; never keep an unverified test.
 
 Update `.spectra/progress.json`: `{"active":8}` (marks Step 9 active — complete sentinel is `active >= 9`).
 
 ### Step 9 — Report
 
-"Generated **{kept}** verified test cases ({dropped} dropped as hallucinated, {failed} unresolved)." List the kept ids. If the ingest output contains a non-blocking `notes` entry (e.g. criteria coverage), surface it verbatim here. If kept < requested, say "Run again to generate more." Never present a test as accepted unless its critic step passed.
+Report the four-bucket counts:
+- Kept grounded: {kept-grounded count} — list ids
+- Repaired to grounded: {repaired count} — list ids
+- Flagged partial (awaiting review): {flagged count} — list ids
+- Dropped hallucinated: {dropped count}
+
+If {flagged} > 0: "Run `spectra ai review-flagged --suite {suite}` to accept, retry repair, or delete flagged tests."
+
+If the ingest output contains a non-blocking `notes` entry (e.g. criteria coverage), surface it verbatim. If total-kept < requested, say "Run again to generate more." Never present a test as accepted unless its critic step passed.
 
 Write `.spectra/progress.json`: `{"active":9}` (terminal — seam-progress page renders Complete).
 

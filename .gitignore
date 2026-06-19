@@ -33,6 +33,10 @@ coverage/
 # SPECTRA lock files
 .spectra.lock
 
+# SPECTRA per-session verdict files and drop trail (scratch, not committed)
+.spectra/verdicts/
+.spectra/dropped-tests.json
+
 # Node (for runner-ui)
 node_modules/
 dist/
