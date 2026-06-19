@@ -81,7 +81,8 @@ public sealed class ShowHandler
                 {
                     var testPath = Path.Combine(testsDir, testEntry.File);
                     var suiteName = Path.GetFileName(suiteDir);
-                    return await DisplayTestAsync(testPath, suiteName, showRaw, ct);
+                    var filePath = Path.GetRelativePath(basePath, testPath).Replace('\\', '/');
+                    return await DisplayTestAsync(testPath, suiteName, filePath, showRaw, ct);
                 }
             }
 
@@ -112,7 +113,7 @@ public sealed class ShowHandler
         }
     }
 
-    private async Task<int> DisplayTestAsync(string testPath, string suiteName, bool showRaw, CancellationToken ct)
+    private async Task<int> DisplayTestAsync(string testPath, string suiteName, string? filePath, bool showRaw, CancellationToken ct)
     {
         if (!File.Exists(testPath))
         {
@@ -156,6 +157,7 @@ public sealed class ShowHandler
                     Title = test.Title,
                     Priority = test.Priority.ToString().ToLowerInvariant(),
                     Suite = suiteName,
+                    File = filePath,
                     Component = test.Component,
                     Tags = test.Tags.ToList(),
                     SourceRefs = test.SourceRefs.ToList(),

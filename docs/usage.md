@@ -175,6 +175,23 @@ spectra ai review-flagged --suite checkout --no-interaction --output-format json
 
 `.spectra/verdicts/` and `.spectra/dropped-tests.json` are gitignored scratch — they survive the run but are not committed.
 
+### Repair Batch & Resume (Spec 072)
+
+When a batch has many partials, the `spectra-generate` skill's Step 8 runs a **manifest-driven** repair loop that completes reliably across sessions:
+
+1. `spectra ai compile-repair-batch --suite <s>` → reads all partial verdict JSONs, filters to those without a grounding block, compiles every repair prompt in one pass, and emits a JSON manifest. Model-free, deterministic.
+2. For each manifest entry: the agent reads the prompt, patches the test, drives the `spectra-critic` subagent, then `ingest-update --from repaired-{id}.json` + `ingest-grounding`.
+3. On interruption or session exhaustion: re-run from step 1 — the filter skips already-grounded tests automatically. Never restarts from scratch; never double-processes.
+
+**Resume oracle:** `spectra ai audit-grounding --suite <s>` reports per-test grounding state (id, verdict, score, grounding_written, flagged, action_needed) and summary counts. Run it to see exactly which tests still need repair before re-invoking the batch.
+
+```bash
+spectra ai audit-grounding --suite smoke --output-format json   # resume checkpoint: grounding_written==false → still needs repair
+spectra ai compile-repair-batch --suite smoke                   # re-run: emits only the remaining ungrounded partials
+```
+
+The grounding block in `.md` frontmatter is the done-marker — a test is skipped once its block is written. Every repair step is either a `Write` to a spectra path or a `Bash(spectra *)` call — no shell improvisation, no allowlist prompts mid-run.
+
 ---
 
 ## Executing Tests via MCP

@@ -22,6 +22,10 @@ public sealed class TestDetail
     [JsonPropertyName("suite")]
     public required string Suite { get; init; }
 
+    [JsonPropertyName("file")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? File { get; init; }
+
     [JsonPropertyName("component")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Component { get; init; }
