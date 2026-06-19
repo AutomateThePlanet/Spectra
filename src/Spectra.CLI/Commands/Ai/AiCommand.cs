@@ -48,6 +48,11 @@ public sealed class AiCommand : Command
         AddCommand(new CompileRepairPromptCommand());
         AddCommand(new ReviewFlaggedCommand());
 
+        // Spec 072: repair-orchestration hardening — grounding audit (resume oracle + inspection),
+        // repair batch manifest.
+        AddCommand(new AuditGroundingCommand());
+        AddCommand(new CompileRepairBatchCommand());
+
         // Throwaway seam-skill progress poller (superseded when execution console generalises).
         AddCommand(new InitSeamProgressCommand());
     }

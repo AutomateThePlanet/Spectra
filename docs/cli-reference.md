@@ -344,6 +344,46 @@ spectra ai review-flagged --suite reporting --no-interaction --output-format jso
 - Non-interactive / `--output-format json`: exits `2` if undisposed flagged tests remain.
 - Exit codes: `0` all dispositioned, `2` undisposed remain (non-interactive), `1` error.
 
+### `spectra ai audit-grounding` (Spec 072 — resume oracle + inspection)
+
+Reports per-test grounding state for a suite. Serves as both the human inspection surface and the
+**resume oracle** for `compile-repair-batch`: a test with `grounding_written: false` still needs repair.
+
+```bash
+spectra ai audit-grounding --suite smoke                        # human-readable table
+spectra ai audit-grounding --suite smoke --output-format json  # machine-readable (resume oracle)
+```
+
+Output per test: `id`, `verdict`, `score`, `grounding_written` (bool), `flagged_for_review` (bool),
+`action_needed` (`repair` / `review` / `none`). Plus a summary line: total / grounded / pending-repair / flagged.
+
+- `grounding_written: true` — the durable grounding block is in the `.md` frontmatter.
+- `action_needed: repair` — partial verdict, no grounding yet; feed to `compile-repair-batch`.
+- `action_needed: review` — partial, grounding written, but `flagged_for_review: true`; use `review-flagged`.
+- `action_needed: none` — grounded and clean.
+- Exit codes: `0` success, `1` suite not found.
+
+### `spectra ai compile-repair-batch` (Spec 072 — deterministic batch repair manifest)
+
+Reads all partial verdict JSONs for the suite, **filters to those without a grounding block** (the
+resume checkpoint — already-repaired tests are skipped automatically), compiles every repair prompt in
+one pass via the same logic as `compile-repair-prompt`, and emits a JSON manifest to stdout.
+Model-free and idempotent.
+
+```bash
+spectra ai compile-repair-batch --suite smoke                  # emits JSON manifest to stdout
+```
+
+Each manifest entry: `id`, `prompt` (full repair prompt text), `source_refs`, `file` (relative path to
+the test `.md`). The agent processes the manifest: for each entry, patch the test, drive the
+`spectra-critic` subagent, then `ingest-update --from repaired-{id}.json` + `ingest-grounding`.
+
+**Resume model:** re-running `compile-repair-batch` after an interrupted session emits only the
+remaining ungrounded tests. The grounding block in `.md` frontmatter is the done-marker — a test is
+skipped once its block is written. Never double-processes a completed test; never restarts from scratch.
+
+- Exit codes: `0` (manifest emitted, possibly empty), `1` suite index not found.
+
 > **Note (Spec 059):** there is no longer a `spectra ai generate` command. Generation runs **in your
 > interactive Claude Code session** via the `spectra-generate` skill, which drives the deterministic
 > model-free seam below: the CLI compiles a grounded prompt, Claude generates in-session, and the CLI
@@ -372,6 +412,8 @@ supporting `--output-format json`) are:
 | `spectra ai compile-repair-prompt --suite <s> --test <id>` | Emit a repair prompt for a partial test (critic findings + source docs); plain text to stdout (Spec 071). |
 | `spectra ai record-drop --suite <s> --test <id> [--reason user_decided]` | Append a drop-trail entry before deleting a hallucinated or user-decided-to-drop test (Spec 071). |
 | `spectra ai review-flagged [--suite <s>]` | List and disposition flagged (still-partial) tests: accept, delete, or (via skill) retry repair (Spec 071). |
+| `spectra ai compile-repair-batch --suite <s>` | Compile a batch repair manifest for all ungrounded partials (Spec 072, model-free, resume-aware). |
+| `spectra ai audit-grounding --suite <s> [--output-format json]` | Report per-test grounding state (id, verdict, grounding_written, flagged, action_needed) — resume oracle + inspection (Spec 072). |
 
 ISTQB techniques (EP, BVA, DT, ST, EG, UC) and coverage-aware analysis (Spec 044 — existing
 `_index.json` / criteria / doc sections inform the recommended gap count) are applied inside the

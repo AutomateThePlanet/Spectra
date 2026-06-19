@@ -33,9 +33,10 @@ coverage/
 # SPECTRA lock files
 .spectra.lock
 
-# SPECTRA per-session verdict files and drop trail (scratch, not committed)
+# SPECTRA per-session verdict files, drop trail, and repair scratch (scratch, not committed)
 .spectra/verdicts/
 .spectra/dropped-tests.json
+.spectra/repairs/
 
 # Node (for runner-ui)
 node_modules/
