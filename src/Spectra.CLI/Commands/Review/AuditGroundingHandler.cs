@@ -88,7 +88,7 @@ public sealed class AuditGroundingHandler
 
             if (indexLookup.TryGetValue(id, out var testEntry))
             {
-                var testFilePath = Path.Combine(testsPath, testEntry.File);
+                var testFilePath = Path.Combine(suitePath, testEntry.File);
                 filePath = Path.GetRelativePath(_currentDir, testFilePath).Replace('\\', '/');
 
                 if (File.Exists(testFilePath))

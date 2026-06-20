@@ -90,9 +90,9 @@ public sealed class CompileRepairBatchCommand : Command
             var verResult = classification.Result!;
             if (verResult.Verdict != VerificationVerdict.Partial) continue;
 
-            // Resolve test file — entry.File is relative to testsPath (e.g., "smoke/TC-401.md")
+            // Resolve test file — entry.File is relative to suitePath (e.g., "TC-401.md") — matches GeneratedTestIngestor.ParseTestCase
             if (!indexLookup.TryGetValue(testId, out var testEntry)) continue;
-            var testFilePath = Path.Combine(testsPath, testEntry.File);
+            var testFilePath = Path.Combine(suitePath, testEntry.File);
             if (!File.Exists(testFilePath)) continue;
 
             // Resume checkpoint: skip if grounding block already written

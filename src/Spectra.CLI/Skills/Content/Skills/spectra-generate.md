@@ -63,6 +63,13 @@ The ONLY time you skip analysis is when the user describes a single concrete sce
 | `ingest-analysis --suite {name} --from {file}` | Turns your behavior JSON into a recommendation (deterministic accounting). |
 | `config --raw` | Returns the resolved config JSON — use this instead of `cat spectra.config.json` (command already exists, no shell needed). |
 | `audit-grounding --suite {name}` | **Spec 072** Per-test grounding state: id, verdict, grounding_written, flagged, action_needed, summary counts. Use instead of `ls .spectra/verdicts/` improvisation. |
+| `ingest-grounding --suite {name} --all` | **Spec 073** Batch form: write grounding blocks for all eligible tests in one call. Without `--repaired`: writes grounded verdicts only (partial-pre-repair filter). With `--repaired --repair-attempts N`: writes all ungrounded tests after repair. Idempotent — skips already-written blocks. |
+
+**Shell improvisation is forbidden.** SPECTRA provides CLI verbs for all state reads. Never improvise with shell commands:
+- Grounding state: `spectra ai audit-grounding --suite {suite} --output-format json` — NOT `ls .spectra/verdicts/`, NOT `grep grounding`
+- Test file path: `test-cases/{suite}/{id}.md` — test IDs always map to `{id}.md` in the suite directory. Never `find test-cases -name {id}.md`; never guess a flat path like `test-cases/{id}.md`
+- Resolved config: `spectra config --raw` — NOT `cat spectra.config.json`
+- Test file content: Read `test-cases/{suite}/{id}.md` directly with the Read tool — NOT `cat` or `grep`
 
 **There is NO `--priority`, `--type`, or `--category` flag.** Use `--focus` for ALL filtering by type, priority, or category. Capture the user's FULL intent in `--focus`:
 - "generate 15 negative test cases" → `--focus "negative tests"` (count 15)
@@ -177,7 +184,7 @@ Update `.spectra/progress.json`: `{"active":6}`
 spectra ai ingest-tests {suite} --from .spectra/generated.json --output-format json
 ```
 - Exit 0 → `{ persisted, ids }`. The tests are written and the index updated. Proceed to the MANDATORY critic step.
-- Exit 5 (`EMPTY_CONTENT`/`MALFORMED_JSON`/`TRUNCATED`/`NO_TESTS`) or exit 6 (`SCHEMA_INVALID`) → **fail loud, nothing was persisted.** Read the `error_code` + `errors`, regenerate addressing that *specific* error, rewrite `.spectra/generated.json`, and re-ingest. **Bounded: at most 2 attempts.** If it still fails, STOP and report the error; never present unverified tests as done.
+- Exit 5 (`EMPTY_CONTENT`/`MALFORMED_JSON`/`TRUNCATED`/`NO_TESTS`) or exit 6 (`SCHEMA_INVALID`) → **fail loud, nothing was persisted.** Read the `error_code` + `errors`, Regenerate addressing that *specific* error, rewrite `.spectra/generated.json`, and re-ingest. **Bounded retry: at most 2 attempts (retry limit = 2).** If it still fails, STOP and report the error; never present unverified tests as done.
 
 ---
 
@@ -200,12 +207,7 @@ For each id in the `ingest-tests` `ids` list, update `.spectra/progress.json` be
    ```
    spectra ai ingest-verdict --from .spectra/verdicts/critic-verdict-{id}.json --output-format json
    ```
-2. **gate `pass` (verdict `grounded`):**
-   ```
-   spectra ai ingest-grounding --suite {suite} --test {id} \
-     --from .spectra/verdicts/critic-verdict-{id}.json --output-format json
-   ```
-   → Grounding block written. Add to kept-grounded count. **Continue to the next test.**
+2. **gate `pass` (verdict `grounded`):** Add to kept-grounded count. **Continue to the next test.** (Grounding blocks are written in one batch call after this loop — see post-8a step below.)
 3. **gate `partial`:** Note the id. Continue to next test — repair is batched in step 8b.
 4. **gate `drop` (verdict `hallucinated`):**
    ```
@@ -215,6 +217,12 @@ For each id in the `ingest-tests` `ids` list, update `.spectra/progress.json` be
    ```
    → Trail written before delete. Add to dropped count.
 5. **ingest exit `5`/`6` or compile exit `4`:** fail loud. Regenerate that single test (bounded 2 attempts), then re-verify from step 1. Never keep an unverified test.
+
+**After 8a loop completes — batch grounding-ingest for grounded tests (one call, no loop):**
+```
+spectra ai ingest-grounding --suite {suite} --all --output-format json
+```
+Writes grounding blocks for all grounded tests in one pass; skips partial tests (pre-repair filter — their blocks are written after 8b). Test files are at `test-cases/{suite}/{id}.md` (never use `find` or `cat` to locate them).
 
 **8b — Manifest-driven repair (for partials).** After the per-test critic loop completes, compile the batch manifest in a single deterministic call:
 
@@ -237,9 +245,15 @@ For EACH entry in the manifest (numbered steps — do NOT skip, do NOT prose-dri
    spectra ai ingest-verdict --from .spectra/verdicts/critic-verdict-{id}.json --output-format json
    ```
 5. Act on re-verdict:
-   - `grounded`: `spectra ai ingest-grounding --suite {suite} --test {id} --from .spectra/verdicts/critic-verdict-{id}.json --repaired --repair-attempts 1 --output-format json` → Add to repaired-to-grounded count.
-   - `partial`: `spectra ai ingest-grounding --suite {suite} --test {id} --from .spectra/verdicts/critic-verdict-{id}.json --repair-attempts 1 --output-format json` → Test flagged for review. Add to flagged-partial count. **Continue to next entry — do NOT stop the batch.**
+   - `grounded`: Add to repaired-to-grounded count. (Grounding block written in batch after 8b.)
+   - `partial`: Add to flagged-partial count. **Continue to next entry — do NOT stop the batch.** (Grounding block written in batch after 8b.)
    - `hallucinated`: `spectra ai record-drop --suite {suite} --test {id} --from .spectra/verdicts/critic-verdict-{id}.json --output-format json` then `spectra delete {id} --force --no-interaction --output-format json --verbosity quiet` → Add to dropped count.
+
+**After 8b loop completes — batch grounding-ingest for all repair-attempted tests (one call, no loop):**
+```
+spectra ai ingest-grounding --suite {suite} --all --repaired --repair-attempts 1 --output-format json
+```
+Writes grounding blocks for all tests that went through repair: `grounded` blocks for successfully repaired tests, `partial` blocks (`flagged_for_review: true` unless repaired) for those still unresolved. Tests already grounded from the post-8a call are skipped (idempotent).
 
 **Resume note:** If the repair loop is interrupted (session end, cancellation), re-run `compile-repair-batch` after re-invoking the generate skill. The command skips tests whose grounding block is already written — it resumes from where it left off, never restarts from scratch, never double-processes a completed test. Run `spectra ai audit-grounding --suite {suite}` first to see what remains.
 

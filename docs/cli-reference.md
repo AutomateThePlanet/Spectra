@@ -281,11 +281,12 @@ spectra ai ingest-verdict --from ./verdict.json --output-format json
   specific error — **never** a silent `partial`/`0.5` soft pass. Empty input is `EmptyResponse`.
 - Exit codes: `0` verdict classified, `5` `EmptyResponse`, `6` `ParseFailure`, `1` env error.
 
-### `spectra ai ingest-grounding` (Spec 071 — durable verdict write-back)
+### `spectra ai ingest-grounding` (Spec 071 + 073 — durable verdict write-back)
 
 Writes a condensed grounding block into the test's `.md` frontmatter from a critic verdict JSON.
-Called by the `spectra-generate` skill after `ingest-verdict`, once per test.
+`grounding_written` reflects the **actual on-disk `.md` frontmatter** — the writer and oracle always agree on `test-cases/{suite}/{id}.md` and the `grounding:` field (Spec 073 oracle fix).
 
+**Per-test mode (used inside the repair loop):**
 ```bash
 spectra ai ingest-grounding --suite reporting --test TC-113 \
   --from .spectra/verdicts/critic-verdict-TC-113.json
@@ -294,8 +295,20 @@ spectra ai ingest-grounding --suite reporting --test TC-113 \
   --from .spectra/verdicts/critic-verdict-TC-113.json --repaired --repair-attempts 1
 ```
 
+**Batch mode — Spec 073 (replaces per-test shell loops entirely):**
+```bash
+# After 8a critic loop — write all grounded tests in one call (partial skipped: pre-repair filter)
+spectra ai ingest-grounding --suite reporting --all --output-format json
+# After 8b repair loop — write all repair-attempted tests (grounded + still-partial)
+spectra ai ingest-grounding --suite reporting --all --repaired --repair-attempts 1 --output-format json
+```
+
+`--all` scans `.spectra/verdicts/critic-verdict-*.json`, filters to the named suite via `_index.json`, and writes each eligible block in one pass. **Idempotent** — tests whose `.md` already has a `grounding:` block are skipped (`skipped_already_written`). Without `--repaired`, partial verdicts are skipped (`skipped_partial_pre_repair`) — they need one repair attempt first. With `--repaired`, all ungrounded tests (both `grounded` and `partial` re-verdicts) are written.
+
+Batch output (JSON): `{ command, mode:"batch", suite, written, skipped_already_written, skipped_partial_pre_repair, errors }`.
+
 - **grounded** → condensed "verified clean" block (`verdict: grounded`, `score`, `verified_at`).
-- **partial** → block with condensed findings + `flagged_for_review: true` (the `spectra-review-flagged` skill then dispositions it).
+- **partial** → block with condensed findings + `flagged_for_review: true` (unless `--repaired`; the `spectra-review-flagged` skill then dispositions flagged tests).
 - **hallucinated** → refuses (exit 4); use `record-drop` + `spectra delete` instead.
 - Exit codes: `0` written, `4` hallucinated refused, `5` empty verdict, `6` parse failure, `1` env error.
 
@@ -409,6 +422,7 @@ supporting `--output-format json`) are:
 | `spectra ai ingest-tests <suite> [--from <file>]` | Validate + persist the agent-generated tests (fail-loud: exit 5 content-invalid, 6 schema-invalid). |
 | `spectra ai compile-critic-prompt` / `spectra ai ingest-verdict` | The mandatory `spectra-critic` verification step (Spec 055). |
 | `spectra ai ingest-grounding --suite <s> --test <id> [--repaired] [--repair-attempts <n>]` | Write the durable condensed verdict block into the test `.md` frontmatter (Spec 071). |
+| `spectra ai ingest-grounding --suite <s> --all [--repaired] [--repair-attempts <n>]` | **Spec 073** Batch form: write grounding blocks for all eligible tests in one pass. Without `--repaired`: grounded only. With `--repaired`: all ungrounded (grounded + partial re-verdicts). Idempotent. |
 | `spectra ai compile-repair-prompt --suite <s> --test <id>` | Emit a repair prompt for a partial test (critic findings + source docs); plain text to stdout (Spec 071). |
 | `spectra ai record-drop --suite <s> --test <id> [--reason user_decided]` | Append a drop-trail entry before deleting a hallucinated or user-decided-to-drop test (Spec 071). |
 | `spectra ai review-flagged [--suite <s>]` | List and disposition flagged (still-partial) tests: accept, delete, or (via skill) retry repair (Spec 071). |

@@ -51,7 +51,7 @@ public sealed class AuditGroundingCommandTests : IDisposable
             All good
             """);
         File.WriteAllText(Path.Combine(dir, "_index.json"),
-            $$"""{"suite":"{{suite}}","generated_at":"2026-06-19T00:00:00Z","tests":[{"id":"{{id}}","title":"Test {{id}}","priority":"medium","file":"{{suite}}/{{id}}.md"}]}""");
+            $$"""{"suite":"{{suite}}","generated_at":"2026-06-19T00:00:00Z","tests":[{"id":"{{id}}","title":"Test {{id}}","priority":"medium","file":"{{id}}.md"}]}""");
     }
 
     private void WriteVerdictFile(string id, string verdict, double score)
@@ -210,7 +210,7 @@ public sealed class AuditGroundingCommandTests : IDisposable
             WriteTestMd("smoke", "TC-312", withGrounding: true, flagged: true);
             File.WriteAllText(
                 Path.Combine(_dir, "test-cases", "smoke", "_index.json"),
-                """{"suite":"smoke","generated_at":"2026-06-19T00:00:00Z","tests":[{"id":"TC-310","title":"Test TC-310","priority":"medium","file":"smoke/TC-310.md"},{"id":"TC-311","title":"Test TC-311","priority":"medium","file":"smoke/TC-311.md"},{"id":"TC-312","title":"Test TC-312","priority":"medium","file":"smoke/TC-312.md"}]}""");
+                """{"suite":"smoke","generated_at":"2026-06-19T00:00:00Z","tests":[{"id":"TC-310","title":"Test TC-310","priority":"medium","file":"TC-310.md"},{"id":"TC-311","title":"Test TC-311","priority":"medium","file":"TC-311.md"},{"id":"TC-312","title":"Test TC-312","priority":"medium","file":"TC-312.md"}]}""");
             WriteVerdictFile("TC-310", "grounded", 0.95);
             WriteVerdictFile("TC-311", "partial", 0.60);
             WriteVerdictFile("TC-312", "partial", 0.50);
