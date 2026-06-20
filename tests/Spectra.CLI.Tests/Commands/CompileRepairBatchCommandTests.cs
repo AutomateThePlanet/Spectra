@@ -53,7 +53,7 @@ public sealed class CompileRepairBatchCommandTests : IDisposable
             Page loads correctly
             """);
         File.WriteAllText(Path.Combine(dir, "_index.json"),
-            $$"""{"suite":"{{suite}}","generated_at":"2026-06-19T00:00:00Z","tests":[{"id":"{{id}}","title":"Test {{id}}","priority":"medium","file":"{{suite}}/{{id}}.md"}]}""");
+            $$"""{"suite":"{{suite}}","generated_at":"2026-06-19T00:00:00Z","tests":[{"id":"{{id}}","title":"Test {{id}}","priority":"medium","file":"{{id}}.md"}]}""");
     }
 
     private void AppendTestToIndex(string suite, string id)
@@ -64,7 +64,7 @@ public sealed class CompileRepairBatchCommandTests : IDisposable
             .Select(f => Path.GetFileNameWithoutExtension(f))
             .ToList();
         var entries = string.Join(",", existingIds.Select(tid =>
-            $$$"""{"id":"{{{tid}}}","title":"Test {{{tid}}}","priority":"medium","file":"{{{suite}}}/{{{tid}}}.md"}"""));
+            $$$"""{"id":"{{{tid}}}","title":"Test {{{tid}}}","priority":"medium","file":"{{{tid}}}.md"}"""));
         File.WriteAllText(Path.Combine(dir, "_index.json"),
             $$"""{"suite":"{{suite}}","generated_at":"2026-06-19T00:00:00Z","tests":[{{entries}}]}""");
     }

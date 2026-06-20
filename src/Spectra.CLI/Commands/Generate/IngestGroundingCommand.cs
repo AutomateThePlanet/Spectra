@@ -5,14 +5,17 @@ using Spectra.CLI.IO;
 using Spectra.CLI.Options;
 using Spectra.Core.Index;
 using Spectra.Core.Models.Config;
+using Spectra.Core.Parsing;
 
 namespace Spectra.CLI.Commands.Generate;
 
 /// <summary>
 /// Spec 071: <c>spectra ai ingest-grounding</c>. Reads a per-test critic verdict JSON and writes
-/// the condensed grounding block into the named test's .md file. Activates the previously dead
-/// TestFileWriter grounding code path. Deterministic and model-free; never calls a model.
+/// the condensed grounding block into the named test's .md file. Deterministic and model-free.
 /// Refuses hallucinated verdicts (exit 4) — those must be handled by record-drop + delete.
+/// Spec 073: adds <c>--all</c> batch form to write grounding for all eligible tests in one pass,
+/// eliminating per-test shell loops. Partial verdicts are skipped unless <c>--repaired</c> is set
+/// (pre-repair filter: a partial test needs one repair attempt before its block is written).
 /// </summary>
 public sealed class IngestGroundingCommand : Command
 {
@@ -26,13 +29,15 @@ public sealed class IngestGroundingCommand : Command
         : base("ingest-grounding", "Write critic verdict as grounding block to a test .md file (Spec 071, no model call)")
     {
         var suiteOption = new Option<string>(["--suite", "-s"], "Suite name to resolve the test from") { IsRequired = true };
-        var testOption = new Option<string>(["--test", "-t"], "Test ID to write grounding for (e.g., TC-113)") { IsRequired = true };
+        var testOption = new Option<string?>(["--test", "-t"], "Test ID to write grounding for (e.g., TC-113); omit when using --all");
+        var allFlag = new Option<bool>("--all", "Batch mode: write grounding for all eligible tests in the suite (Spec 073)");
         var fromOption = new Option<string?>("--from", "Verdict JSON file path (default: .spectra/verdicts/critic-verdict-{id}.json)");
         var repairedFlag = new Option<bool>("--repaired", "Mark test as repaired (sets repaired: true in the grounding block)");
         var repairAttemptsOption = new Option<int>("--repair-attempts", () => 0, "Number of repair attempts performed");
 
         AddOption(suiteOption);
         AddOption(testOption);
+        AddOption(allFlag);
         AddOption(fromOption);
         AddOption(repairedFlag);
         AddOption(repairAttemptsOption);
@@ -40,14 +45,146 @@ public sealed class IngestGroundingCommand : Command
         this.SetHandler(async (context) =>
         {
             var suite = context.ParseResult.GetValueForOption(suiteOption)!;
-            var testId = context.ParseResult.GetValueForOption(testOption)!;
+            var testId = context.ParseResult.GetValueForOption(testOption);
+            var all = context.ParseResult.GetValueForOption(allFlag);
             var from = context.ParseResult.GetValueForOption(fromOption);
             var repaired = context.ParseResult.GetValueForOption(repairedFlag);
             var repairAttempts = context.ParseResult.GetValueForOption(repairAttemptsOption);
             var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
-            context.ExitCode = await RunAsync(suite, testId, from, repaired, repairAttempts,
-                outputFormat == OutputFormat.Json, context.GetCancellationToken());
+            var json = outputFormat == OutputFormat.Json;
+
+            if (all)
+            {
+                context.ExitCode = await RunBatchAsync(suite, repaired, repairAttempts, json, context.GetCancellationToken());
+            }
+            else if (!string.IsNullOrEmpty(testId))
+            {
+                context.ExitCode = await RunAsync(suite, testId, from, repaired, repairAttempts, json, context.GetCancellationToken());
+            }
+            else
+            {
+                Console.Error.WriteLine("Either --test <id> or --all must be specified.");
+                context.ExitCode = ExitError;
+            }
         });
+    }
+
+    private static async Task<int> RunBatchAsync(
+        string suite, bool repaired, int repairAttempts, bool json, CancellationToken ct)
+    {
+        var currentDir = Directory.GetCurrentDirectory();
+        var testsDir = await ResolveTestsDirAsync(currentDir, ct);
+        var suitePath = Path.Combine(currentDir, testsDir, suite);
+        var indexPath = IndexWriter.GetIndexPath(suitePath);
+
+        var index = await new IndexWriter().ReadAsync(indexPath, ct);
+        if (index is null)
+        {
+            Console.Error.WriteLine($"Suite index not found: {indexPath}");
+            return ExitError;
+        }
+
+        var verdictDir = Path.Combine(currentDir, ".spectra", "verdicts");
+        if (!Directory.Exists(verdictDir))
+        {
+            EmitBatchResult(json, suite, 0, 0, 0, 0);
+            return ExitSuccess;
+        }
+
+        var indexLookup = index.Tests
+            .ToDictionary(t => t.Id, t => t, StringComparer.OrdinalIgnoreCase);
+
+        var parser = new TestCaseParser();
+        var service = new GroundingWriteBackService(new TestFileWriter());
+        int written = 0, skippedAlreadyWritten = 0, skippedPartialPreRepair = 0, errors = 0;
+
+        var verdictFiles = Directory.GetFiles(verdictDir, "critic-verdict-*.json").OrderBy(f => f);
+        foreach (var vf in verdictFiles)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var fileName = Path.GetFileNameWithoutExtension(vf);
+            var testId = fileName.StartsWith("critic-verdict-", StringComparison.OrdinalIgnoreCase)
+                ? fileName["critic-verdict-".Length..] : null;
+            if (string.IsNullOrEmpty(testId)) continue;
+
+            // Filter to this suite via index lookup
+            if (!indexLookup.TryGetValue(testId, out var testEntry)) continue;
+
+            // Resolve test file — uses suitePath (matches GeneratedTestIngestor.ParseTestCase format)
+            var testFilePath = Path.Combine(suitePath, testEntry.File);
+            if (!File.Exists(testFilePath)) continue; // hallucinated — file gone, skip silently
+
+            // Idempotent: skip tests whose .md already has a grounding block
+            try
+            {
+                var existingContent = await File.ReadAllTextAsync(testFilePath, ct);
+                var rel = Path.GetRelativePath(suitePath, testFilePath);
+                var parsedExisting = parser.Parse(existingContent, rel);
+                if (parsedExisting.IsSuccess && parsedExisting.Value is { } existing && existing.Grounding is not null)
+                {
+                    skippedAlreadyWritten++;
+                    continue;
+                }
+            }
+            catch { /* on parse error, attempt write */ }
+
+            string verdictJson;
+            try { verdictJson = await File.ReadAllTextAsync(vf, ct); }
+            catch { errors++; continue; }
+            if (string.IsNullOrWhiteSpace(verdictJson)) { errors++; continue; }
+
+            // Pre-repair filter: without --repaired, skip partial verdicts.
+            // Partial tests need one repair attempt before their grounding block is written.
+            if (!repaired)
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(verdictJson);
+                    var verdictStr = doc.RootElement.TryGetProperty("verdict", out var v)
+                        ? v.GetString() ?? "" : "";
+                    if (string.Equals(verdictStr, "partial", StringComparison.OrdinalIgnoreCase))
+                    {
+                        skippedPartialPreRepair++;
+                        continue;
+                    }
+                }
+                catch { /* if unparseable, fall through and let WriteAsync refuse it */ }
+            }
+
+            // Write grounding block — reuses same service as per-test mode (no code duplication)
+            var result = await service.WriteAsync(testFilePath, verdictJson, repairAttempts, repaired, ct);
+            if (result.IsSuccess) written++;
+            else errors++;
+        }
+
+        EmitBatchResult(json, suite, written, skippedAlreadyWritten, skippedPartialPreRepair, errors);
+        return ExitSuccess;
+    }
+
+    private static void EmitBatchResult(bool json, string suite, int written,
+        int skippedAlreadyWritten, int skippedPartialPreRepair, int errors)
+    {
+        if (json)
+        {
+            Console.Out.WriteLine(JsonSerializer.Serialize(new
+            {
+                command = "ingest-grounding",
+                mode = "batch",
+                suite,
+                written,
+                skipped_already_written = skippedAlreadyWritten,
+                skipped_partial_pre_repair = skippedPartialPreRepair,
+                errors
+            }));
+        }
+        else
+        {
+            Console.Out.WriteLine(
+                $"Batch grounding-ingest for suite '{suite}': written={written} " +
+                $"skipped_already_written={skippedAlreadyWritten} " +
+                $"skipped_partial_pre_repair={skippedPartialPreRepair} errors={errors}");
+        }
     }
 
     private static async Task<int> RunAsync(
@@ -80,7 +217,6 @@ public sealed class IngestGroundingCommand : Command
             return ExitError;
         }
 
-        // Resolve verdict file path
         var verdictPath = from ?? Path.Combine(currentDir, ".spectra", "verdicts", $"critic-verdict-{testId}.json");
         if (!File.Exists(verdictPath))
         {
