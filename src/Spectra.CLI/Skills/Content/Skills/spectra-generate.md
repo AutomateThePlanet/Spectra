@@ -64,6 +64,8 @@ The ONLY time you skip analysis is when the user describes a single concrete sce
 | `config --raw` | Returns the resolved config JSON — use this instead of `cat spectra.config.json` (command already exists, no shell needed). |
 | `audit-grounding --suite {name}` | **Spec 072** Per-test grounding state: id, verdict, grounding_written, flagged, action_needed, summary counts. Use instead of `ls .spectra/verdicts/` improvisation. |
 | `ingest-grounding --suite {name} --all` | **Spec 073** Batch form: write grounding blocks for all eligible tests in one call. Without `--repaired`: writes grounded verdicts only (partial-pre-repair filter). With `--repaired --repair-attempts N`: writes all ungrounded tests after repair. Idempotent — skips already-written blocks. |
+| `ingest-verdict --suite {name} --all` | **Spec 077** Batch form: classify all verdict files for the suite in one call; emits summary `{grounded, partial, hallucinated, errors}`. Replaces per-test `--from` loops. Advisory-gate only — no file writes. |
+| `ingest-update {suite} --all` | **Spec 077** Batch form: ingest all staged update files from `.spectra/updates/{suite}/updated-{id}.json` in one call; emits `{written, skipped_no_original, errors}`. Replaces per-entry `--test-id` loops. |
 
 **Shell improvisation is forbidden.** SPECTRA provides CLI verbs for all state reads. Never improvise with shell commands:
 - Grounding state: `spectra ai audit-grounding --suite {suite} --output-format json` — NOT `ls .spectra/verdicts/`, NOT `grep grounding`
@@ -178,6 +180,22 @@ Read the compiled prompt and generate the requested test cases now, in this turn
 
 Update `.spectra/progress.json`: `{"active":6}`
 
+---
+
+## NON-STOP CONTRACT — Steps 7–9
+
+**Every step in this section must be a single `Bash(spectra *)` call or a `Write` to a spectra-authored path.** If no single `spectra` call covers a step, **STOP and report a missing affordance** — never work around it.
+
+**Prohibited behaviors (each is a missing-affordance signal, not a license to improvise):**
+- **(a) Shell loops over per-test verbs** — `for id in …; do spectra …; done` — NEVER. Use the corresponding `--all` batch verb.
+- **(b) Piping spectra output to any interpreter** — `python -c "…"`, `jq`, `node -e`, or any data-transform shell — NEVER. Read the output file with the Read tool and iterate in-context.
+- **(c) Manual `.md` file editing** — rewriting test content directly instead of using `ingest-update` — NEVER.
+- **(d) Verdict / grounding field rewrites by hand** — writing `grounding:`, `verdict:`, or `score:` frontmatter directly instead of using `ingest-grounding` / `record-drop` — NEVER.
+
+**Never accept a "scripting for all projects" allowlist option** — that is the inverse of this contract. The per-seam guards below (e.g., the grounding `written:0` check) are specific instances of this general rule.
+
+---
+
 ### Step 7 — Ingest (fail-loud)
 
 ```
@@ -203,9 +221,9 @@ For each id in the `ingest-tests` `ids` list, update `.spectra/progress.json` be
 
 **8a — Per-test critic.** For EACH id in the `ingest-tests` `ids` list:
 
-1. Update progress, then invoke the `spectra-critic` subagent with the Task tool — suite + test id only, no generator state, **never a hand-built file path**. The subagent compiles the prompt (`spectra ai compile-critic-prompt --suite {suite} --test {id}`, resolves id→path from `_index.json`) and writes `.spectra/verdicts/critic-verdict-{id}.json`, then ingests it:
+1. Update progress, then invoke the `spectra-critic` subagent with the Task tool — suite + test id only, no generator state, **never a hand-built file path**. The subagent compiles the prompt (`spectra ai compile-critic-prompt --suite {suite} --test {id}`, resolves id→path from `_index.json`) and writes `.spectra/verdicts/critic-verdict-{id}.json`. After the subagent returns, read the verdict file to determine routing:
    ```
-   spectra ai ingest-verdict --from .spectra/verdicts/critic-verdict-{id}.json --output-format json
+   Read .spectra/verdicts/critic-verdict-{id}.json
    ```
 2. **gate `pass` (verdict `grounded`):** Add to kept-grounded count. **Continue to the next test.** (Grounding blocks are written in one batch call after this loop — see post-8a step below.)
 3. **gate `partial`:** Note the id. Continue to next test — repair is batched in step 8b.
@@ -218,7 +236,13 @@ For each id in the `ingest-tests` `ids` list, update `.spectra/progress.json` be
    → Trail written before delete. Add to dropped count.
 5. **ingest exit `5`/`6` or compile exit `4`:** fail loud. Regenerate that single test (bounded 2 attempts), then re-verify from step 1. Never keep an unverified test.
 
-**After 8a loop completes — batch grounding-ingest for grounded tests (one call, no loop):**
+**After 8a loop completes — batch verdict-ingest for all suite verdicts (one call, no loop):**
+```
+spectra ai ingest-verdict --suite {suite} --all --output-format json
+```
+Classifies all verdict files for the suite in one call; emits `{grounded, partial, hallucinated, errors}` summary. No per-test `--from` loop needed.
+
+**After batch verdict-ingest — batch grounding-ingest for grounded tests (one call, no loop):**
 ```
 spectra ai ingest-grounding --suite {suite} --all --output-format json
 ```
@@ -246,24 +270,35 @@ spectra ai compile-repair-batch --suite {suite} --output-format json
 
 The command reads all partial verdict JSONs, **skips tests whose grounding block is already written** (the resume checkpoint — idempotent re-run), and emits a JSON array. If the array is empty, skip to Step 9.
 
-For EACH entry in the manifest (numbered steps — do NOT skip, do NOT prose-drift):
+**Manifest consumption:** If `compile-repair-batch` output exceeded inline capacity and was saved to a tool-results file by the harness, use the **Read tool** to read the file. Iterate over the JSON entries **in-context** — do NOT pipe the manifest to `python -c`, `jq`, or any interpreter. The full `prompt` field per entry is needed and must be read in-context, not extracted via shell. Never accept a "scripting for all projects" allowlist option — that is the inverse of the non-stop contract.
 
-1. Read the `prompt` field (or the persisted file path the harness saved) from the manifest entry.
-2. Patch the test in-session: rewrite ONLY the elements the critic found ungrounded; preserve `id` and structure. Write the corrected test JSON array to `.spectra/repairs/repaired-{id}.json` (per-test name — no fixed-name overwrite collisions).
-3. Ingest the repair:
-   ```
-   spectra ai ingest-update {suite} --test-id {id} --from .spectra/repairs/repaired-{id}.json --output-format json
-   ```
-4. Invoke the `spectra-critic` subagent again for `{id}` (same Task-tool procedure as 8a.1). Subagent writes `.spectra/verdicts/critic-verdict-{id}.json`.
-   ```
-   spectra ai ingest-verdict --from .spectra/verdicts/critic-verdict-{id}.json --output-format json
-   ```
+**Repair phase — For EACH entry in the manifest (patch and stage only — no CLI calls per entry):**
+
+1. Read the `prompt` field from the manifest entry (from inline result or via Read tool on the spilled file).
+2. Patch the test in-session: rewrite ONLY the elements the critic found ungrounded; preserve `id` and structure.
+3. Write the corrected test JSON array to `.spectra/updates/{suite}/updated-{id}.json` with the Write tool.
+
+**After all repairs staged — batch ingest (one call, no loop):**
+```
+spectra ai ingest-update {suite} --all --output-format json
+```
+Ingests all staged updates from `.spectra/updates/{suite}/` in one pass; emits `{written, skipped_no_original, errors}`.
+
+**Re-critic phase — For EACH repaired test (critic subagents, irreducibly per-test):**
+
+4. Invoke the `spectra-critic` subagent again for `{id}` (same Task-tool procedure as 8a.1). Subagent writes `.spectra/verdicts/critic-verdict-{id}.json`. After subagent returns, read the verdict file.
 5. Act on re-verdict:
    - `grounded`: Add to repaired-to-grounded count. (Grounding block written in batch after 8b.)
    - `partial`: Add to flagged-partial count. **Continue to next entry — do NOT stop the batch.** (Grounding block written in batch after 8b.)
    - `hallucinated`: `spectra ai record-drop --suite {suite} --test {id} --from .spectra/verdicts/critic-verdict-{id}.json --output-format json` then `spectra delete {id} --force --no-interaction --output-format json --verbosity quiet` → Add to dropped count.
 
-**After 8b loop completes — batch grounding-ingest for all repair-attempted tests (one call, no loop):**
+**After re-critic phase completes — batch verdict-ingest (one call, no loop):**
+```
+spectra ai ingest-verdict --suite {suite} --all --output-format json
+```
+Classifies all verdict files (including re-verdicts) in one call; emits updated `{grounded, partial, hallucinated, errors}` counts.
+
+**After batch verdict-ingest — batch grounding-ingest for all repair-attempted tests (one call, no loop):**
 ```
 spectra ai ingest-grounding --suite {suite} --all --repaired --repair-attempts 1 --output-format json
 ```
