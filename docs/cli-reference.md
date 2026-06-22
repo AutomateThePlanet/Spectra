@@ -427,6 +427,8 @@ supporting `--output-format json`) are:
 | `spectra ai compile-critic-prompt` / `spectra ai ingest-verdict` | The mandatory `spectra-critic` verification step (Spec 055). |
 | `spectra ai ingest-grounding --suite <s> --test <id> [--repaired] [--repair-attempts <n>]` | Write the durable condensed verdict block into the test `.md` frontmatter (Spec 071). |
 | `spectra ai ingest-grounding --suite <s> --all [--repaired] [--repair-attempts <n>]` | **Spec 073** Batch form: write grounding blocks for all eligible tests in one pass. Without `--repaired`: grounded only. With `--repaired`: all ungrounded (grounded + partial re-verdicts). Idempotent. |
+| `spectra ai ingest-verdict --suite <s> --all` | **Spec 077** Batch form: classify all `.spectra/verdicts/critic-verdict-*.json` files for the suite in one call; emits `{grounded, partial, hallucinated, errors}` summary. Advisory-gate only — no file writes. Replaces per-test `--from` loops. |
+| `spectra ai ingest-update <suite> --all` | **Spec 077** Batch form: ingest all staged update files from `.spectra/updates/<suite>/updated-<id>.json` in one call; emits `{written, skipped_no_original, errors}`. Per-entry `--test-id --from` mode unchanged. |
 | `spectra ai compile-repair-prompt --suite <s> --test <id>` | Emit a repair prompt for a partial test (critic findings + source docs); plain text to stdout (Spec 071). |
 | `spectra ai record-drop --suite <s> --test <id> [--reason user_decided]` | Append a drop-trail entry before deleting a hallucinated or user-decided-to-drop test (Spec 071). |
 | `spectra ai review-flagged [--suite <s>]` | List and disposition flagged (still-partial) tests: accept, delete, or (via skill) retry repair (Spec 071). |
