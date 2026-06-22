@@ -224,6 +224,20 @@ spectra ai ingest-grounding --suite {suite} --all --output-format json
 ```
 Writes grounding blocks for all grounded tests in one pass; skips partial tests (pre-repair filter — their blocks are written after 8b). Test files are at `test-cases/{suite}/{id}.md` (never use `find` or `cat` to locate them).
 
+**After batch grounding-ingest — check the result before proceeding to 8b (MANDATORY):**
+
+Parse the JSON result of the batch call. Check `written` against the `kept-grounded` count tracked during the 8a loop:
+
+- **If `written == 0` AND `kept-grounded > 0`:** STOP immediately. Do NOT proceed to 8b. Emit a diagnostic:
+  > GROUNDING-INGEST ANOMALY: `ingest-grounding --all` returned `written: 0` but {kept-grounded} tests were marked grounded in the critic loop. This means the grounding blocks were not written. Likely causes: `_index.json` file paths are suite-prefixed (path-doubling bug) or the suite directory could not be resolved. **STOP — do not proceed to 8b, do not edit `.md` files by hand, do not rewrite verdict fields by hand.** Run `spectra ai audit-grounding --suite {suite}` to diagnose the current grounding state, then report the anomaly to the user and halt.
+
+- **If `written != kept-grounded`** (partial write — `written > 0` but less than expected): Surface a warning before continuing:
+  > GROUNDING-INGEST WARNING: expected {kept-grounded} grounding blocks written, got {written}. Continuing to 8b — run `spectra ai audit-grounding --suite {suite}` to inspect which tests are missing their grounding block.
+
+- **If `written == kept-grounded`** (or `kept-grounded == 0`): Proceed to 8b normally.
+
+**NON-STOP CONTRACT (restated):** A broken or zero-result CLI verb is a STOP signal — it is NEVER a license to do the work by hand. Manual editing of `.md` files, rewriting of `grounding:` frontmatter, and synthesizing verdict fields are PROHIBITED regardless of how blocked you are. If a CLI verb returns an anomaly, stop and report. Do not improvise.
+
 **8b — Manifest-driven repair (for partials).** After the per-test critic loop completes, compile the batch manifest in a single deterministic call:
 
 ```

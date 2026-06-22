@@ -61,12 +61,29 @@ surface in the analyze recommendation.
 | **Grounding** | `spectra-critic` subagent | Does each claim trace to the docs? | Retrospective (after generation) |
 | **Boundary/edge completeness** | Analysis phase (`ingest-analysis`) | Are the implied edges covered? | Proactive (before generation) |
 
+## Arithmetic Verification (Spec 075)
+
+When a test's expected result is a **computed value** — a unit conversion result, formula output,
+scientific-notation magnitude, or derived constant — the critic **must independently compute the
+value and compare it** to what the test asserts. Documenting the *principle* (e.g. "use scientific
+notation", "convert via the SI factor") is not sufficient if the *number* is wrong.
+
+**Rule:** principle in docs AND number arithmetically correct → eligible for `grounded`. Principle
+in docs BUT number arithmetically wrong → NOT `grounded` (use `partial` or `hallucinated` with an
+`unverified` or `hallucinated` finding on the Expected Result element).
+
+This is additive to the existing doc-presence rules, not a replacement.
+
+Example: a test asserting `1×10⁻⁹ km → 1E-9 nm` would NOT be `grounded` — the correct result is
+`1000 nm` (1 km = 10¹² nm, so 1×10⁻⁹ km = 10³ nm), even if the scientific-notation convention is
+documented. The arithmetic error must surface in a finding.
+
 ## Verdicts
 
 | Verdict | Meaning | Action |
 |---------|---------|--------|
-| `grounded` | All steps trace to documentation | Written as-is |
-| `partial` | Some steps have assumptions | Written with warnings |
+| `grounded` | All steps trace to documentation AND any computed expected values are arithmetically correct | Written as-is |
+| `partial` | Some steps have assumptions or an expected value is flagged | Written with warnings |
 | `hallucinated` | Contains invented behaviors | Rejected |
 
 ## Grounding Metadata
