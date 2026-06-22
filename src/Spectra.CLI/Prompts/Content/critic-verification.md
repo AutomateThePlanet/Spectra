@@ -65,3 +65,38 @@ transition, or decision-table condition combination, apply ISTQB-aware checks:
 - **DT tests**: Verify the condition combinations match documented business
   rules. If the test uses a condition not mentioned in docs, flag as
   HALLUCINATED.
+
+## Arithmetic Verification
+
+When a test's expected result is a **computed value** — a unit conversion
+result, formula output, scientific-notation magnitude, derived constant, or any
+number produced by calculation — you MUST independently compute the value and
+compare it to what the test asserts. Documentation grounding the *principle*
+(e.g. "use scientific notation", "convert via the SI factor") is NOT sufficient
+if the *number* is wrong.
+
+**Rule**: Principle in docs AND number arithmetically correct → eligible for
+`grounded`. Principle in docs BUT number arithmetically wrong → NOT `grounded`
+(use `partial` or `hallucinated` as appropriate, with an `unverified` or
+`hallucinated` finding on the Expected Result element).
+
+**What counts as a computed value**:
+- Unit conversions (e.g. km → nm, °F → K, bytes → megabytes)
+- Formula outputs (e.g. F = (9/5)C + 32, ΔG = ΔH − TΔS)
+- Conversion-factor products (e.g. 1 km × 10¹² pm/km)
+- Derived constants (e.g. speed of light in nm/s)
+- Scientific-notation magnitudes asserted as exact results
+
+**How to verify**: Compute the expected result yourself using the documented
+conversion factor or formula. Compare your result to the test's asserted value.
+
+**Example of a wrong computed value** (must NOT be `grounded`):
+- Test asserts: input `1×10⁻⁹ km`, expected result `1E-9 nm`
+- Your computation: `1 km = 10¹² nm`, so `1×10⁻⁹ km = 1×10⁻⁹ × 10¹² nm = 10³ nm = 1000 nm`
+- The asserted value `1E-9 nm` ≠ `1000 nm` → arithmetic error → NOT `grounded`
+- Finding: `{ "element": "Expected Result", "claim": "1×10⁻⁹ km → 1E-9 nm", "status": "unverified", "evidence": null, "reason": "Arithmetic error: 1×10⁻⁹ km = 1000 nm, not 1E-9 nm (off by 10¹²)" }`
+
+**Example of a correct computed value** (can be `grounded` if principle is also documented):
+- Test asserts: input `−459.67°F`, expected result `0 K`
+- Your computation: K = (°F − 32) × 5/9 + 273.15 = (−459.67 − 32) × 5/9 + 273.15 = −491.67 × 5/9 + 273.15 = −273.15 + 273.15 = 0 K ✓
+- Arithmetic is correct → this claim is eligible for `grounded` (if the conversion formula is in the docs)

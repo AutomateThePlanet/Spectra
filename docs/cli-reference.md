@@ -203,6 +203,10 @@ cat ./generated.json | spectra ai ingest-tests reporting
 - **Batch-atomic**: one invalid test fails the whole batch.
 - Valid content persists via the unchanged `TestPersistenceService` (writes
   `.md` files + regenerates `_index.json`).
+- **Bare-filename convention (Spec 075):** `_index.json` `file` fields are always the bare filename
+  (e.g. `TC-100.md`), never suite-prefixed (`unit-converter/TC-100.md`). `ingest-tests` and
+  `ingest-update` both enforce this on every round, including second-round re-ingests where
+  existing test files are picked up from disk.
 - Exit codes: `0` success, `5` content-class failure, `6` schema-invalid.
 
 ### `spectra ai compile-extraction-prompt` (Spec 054 — criteria re-homing)

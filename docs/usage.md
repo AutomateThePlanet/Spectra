@@ -179,12 +179,21 @@ spectra ai review-flagged --suite checkout --no-interaction --output-format json
 
 When a batch has many partials, the `spectra-generate` skill's Step 8 runs a **manifest-driven** repair loop that completes reliably across sessions:
 
-**8a — Per-test critic loop + one-call grounding-ingest for grounded tests (Spec 073):**
+**8a — Per-test critic loop + one-call grounding-ingest for grounded tests (Spec 073 + 075):**
 ```bash
 # After the 8a critic loop completes, write all grounded tests in one batch call:
 spectra ai ingest-grounding --suite <s> --all --output-format json
 # (partial tests are skipped by the pre-repair filter — their blocks are written after 8b)
 ```
+
+**After the batch call, check `written` against kept-grounded count (Spec 075 — mandatory):**
+- `written == kept-grounded` → proceed to 8b normally.
+- `written == 0` AND `kept-grounded > 0` → **STOP and report** the anomaly. Likely cause: `_index.json` paths are suite-prefixed (path-doubling bug). Run `spectra ai audit-grounding --suite <s>` to diagnose, then report to the user. Do NOT proceed to 8b. Do NOT edit `.md` files by hand.
+- `written < kept-grounded` (partial write) → surface a warning, then continue to 8b. Run `audit-grounding` to identify missing blocks.
+
+**NON-STOP CONTRACT:** A zero-result or broken CLI verb is a STOP signal — never a license to do
+the work by hand. Manual `.md` editing, rewriting `grounding:` frontmatter, and synthesizing verdict
+fields are prohibited regardless of the blocking condition. Stop, report, and let the user decide.
 
 **8b — Manifest-driven repair loop + one-call grounding-ingest for repair-attempted tests:**
 1. `spectra ai compile-repair-batch --suite <s>` → reads all partial verdict JSONs, filters to those without a grounding block, compiles every repair prompt in one pass, emits a JSON manifest. Model-free, deterministic.

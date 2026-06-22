@@ -163,7 +163,7 @@ public sealed class IngestUpdateCommand : Command
         foreach (var file in files)
         {
             var fileContent = await File.ReadAllTextAsync(file, ct);
-            var relativePath = Path.GetRelativePath(testsPath, file);
+            var relativePath = Path.GetRelativePath(suitePath, file);
             var parsed = parser.Parse(fileContent, relativePath);
             if (parsed.IsSuccess)
                 tests.Add(parsed.Value!);
