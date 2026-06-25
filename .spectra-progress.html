@@ -6,7 +6,7 @@
     <meta http-equiv="cache-control" content="no-cache">
     <meta http-equiv="pragma" content="no-cache">
     
-    <title>SPECTRA — Coverage Analysis</title>
+    <title>SPECTRA — Validation</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -460,20 +460,18 @@
 <body>
     <nav class="nav">
         <span class="nav-logo">SPECTRA</span>
-        <span class="nav-title">Coverage Analysis</span>
+        <span class="nav-title">Validation</span>
     </nav>
     <div class="container" data-workspace="C:/SourceCode/Spectra">
-        <div class="stepper"><div class="step error"><div class="step-dot"></div>Scanning Tests</div><div class="step-line"></div><div class="step "><div class="step-dot"></div>Analyzing Docs</div><div class="step-line"></div><div class="step "><div class="step-dot"></div>Analyzing Criteria</div><div class="step-line"></div><div class="step "><div class="step-dot"></div>Analyzing Automation</div><div class="step-line"></div><div class="step "><div class="step-dot"></div>Completed</div></div><div class="status-card">
-    <div class="status-badge failed"> Failed</div>
+        <div class="stepper"><div class="step "><div class="step-dot"></div>Analyzing</div><div class="step-line"></div><div class="step "><div class="step-dot"></div>Analyzed</div><div class="step-line"></div><div class="step "><div class="step-dot"></div>Generating</div><div class="step-line"></div><div class="step "><div class="step-dot"></div>Verifying</div><div class="step-line"></div><div class="step "><div class="step-dot"></div>Completed</div></div><div class="status-card">
+    <div class="status-badge starting"><span class="spinner"></span> starting</div>
     <div class="suite-name"></div>
-    <div class="status-message"></div>
-    <div class="status-time">Last updated: 12:48:36</div>
-</div><div class="error-card">
-    <h3>Generation Failed</h3>
-    <p>No spectra.config.json found</p>
+    <div class="status-message">Initializing...</div>
+    <div class="status-time">Last updated: 21:12:04</div>
 </div><div class="footer">
     <span class="refresh-indicator">
-        Live updates stopped — run complete. Scroll freely.
+        <span class="refresh-dot"></span>
+        Auto-refreshing every 1.5 seconds
     </span>
 </div>
     </div>
@@ -501,7 +499,7 @@
         //     Slow polling lets the page auto-detect the new run without
         //     requiring the agent to re-open the browser.
         (function() {
-            var isTerminal = true;
+            var isTerminal = false;
             if (isTerminal) {
                 try { sessionStorage.removeItem('spectra-progress-scroll'); } catch (e) {}
             }
