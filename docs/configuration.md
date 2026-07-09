@@ -43,12 +43,12 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 | `mode` | string | `"local"` | Source mode (`local` or `spaces`) |
 | `local_dir` | string | `"docs/"` | Path to documentation directory |
 | `space_name` | string | — | Copilot Space name (when `mode: "spaces"`) |
-| `doc_index_dir` | string | `"docs/_index"` | **Spec 040** Directory containing the v2 index layout (`_manifest.yaml`, `_checksums.json`, `groups/{suite}.index.md`). |
+| `doc_index_dir` | string | `"docs/_index"` | Directory containing the v2 index layout (`_manifest.yaml`, `_checksums.json`, `groups/{suite}.index.md`). |
 | `doc_index` | string | — | Legacy single-file path. Used only by the auto-migrator on first run after upgrading. New writes always use `doc_index_dir`. |
-| `group_overrides` | object | `{}` | **Spec 040** Per-document suite overrides: `{ "docs/path.md": "suite-id" }`. Consulted after frontmatter overrides and before the directory-default rule. |
+| `group_overrides` | object | `{}` | Per-document suite overrides: `{ "docs/path.md": "suite-id" }`. Consulted after frontmatter overrides and before the directory-default rule. |
 | `max_file_size_kb` | int | `50` | Maximum file size to process |
 | `include_patterns` | string[] | `["**/*.md"]` | Glob patterns for files to include |
-| `exclude_patterns` | string[] | `["**/CHANGELOG.md"]` | Glob patterns for files to exclude (does NOT touch the analyzer-input filter — see `coverage.analysis_exclude_patterns` for that) |
+| `exclude_patterns` | string[] | `["**/CHANGELOG.md"]` | Glob patterns for files to exclude (does NOT touch the analyzer-input filter; see `coverage.analysis_exclude_patterns` for that) |
 
 ## `tests` — Test Case Output
 
@@ -60,8 +60,8 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 
 ## `ai` — Generation Pacing (no provider/model routing anymore)
 
-> **Spec 069 (v2):** `ai.providers` and `ai.critic` (as a config block) were removed entirely along
-> with the GitHub Copilot SDK. SPECTRA makes no model calls of its own — generation and analysis
+> `ai.providers` and `ai.critic` (as a config block) were removed entirely along
+> with the GitHub Copilot SDK. SPECTRA makes no model calls of its own. Generation and analysis
 > run as ordinary turns in your interactive Claude Code session, and the critic runs as the
 > `spectra-critic` subagent. There is nothing left here to route to a provider or pick a generator
 > model; a legacy config with `ai.providers`/`ai.critic` still loads (the keys are simply ignored).
@@ -81,16 +81,16 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `generation_batch_size` | int | `30` | Number of tests requested per generation turn (`compile-prompt` → turn → `ingest-tests`). Larger batches mean fewer round-trips, at the cost of a bigger single response. Values ≤ 0 fall back to the default. |
-| `generation_timeout_minutes` | int | `5` | Bounds the deterministic CLI side of the generation seam (parsing, validation, index writes) — not the model turn itself, which runs in your own session. |
+| `generation_timeout_minutes` | int | `5` | Bounds the deterministic CLI side of the generation seam (parsing, validation, index writes), not the model turn itself, which runs in your own session. |
 | `analysis_timeout_minutes` | int | `2` | Same, for the behavior-analysis seam. |
 
-**Choosing a model**: pick it the same way you'd pick a model for any other Claude Code work
-(`/model`, or your plan's default) — whatever your session is running when you drive
+To choose a model, pick it the same way you'd pick a model for any other Claude Code work
+(`/model`, or your plan's default), because whatever your session is running when you drive
 `spectra-generate`/`spectra-criteria`/`spectra-update` **is** the model doing that turn. See the
 [AI Models & Cost Guide](ai-models-cost-guide.md#choosing-a-session-model) for guidance on
 Haiku/Sonnet/Opus trade-offs.
 
-**Critic model**: fixed by the `model:` frontmatter field in
+The critic model is fixed by the `model:` frontmatter field in
 `.claude/agents/spectra-critic.agent.md` (shipped as `claude-sonnet-4-6`), not by
 `spectra.config.json`. Edit that file directly to change it.
 
@@ -98,23 +98,23 @@ Haiku/Sonnet/Opus trade-offs.
 
 Pre-v2, `.spectra-debug.log` recorded one line per SDK call (`ANALYSIS START/OK`, `BATCH
 START/OK`, `CRITIC START/OK`) with model, provider, and elapsed time, because SPECTRA's own
-process made those calls and could observe them. **As of Spec 069, SPECTRA doesn't make those
-calls anymore** — generation/analysis run as turns in your own Claude Code session, invisible to
+process made those calls and could observe them. **SPECTRA doesn't make those
+calls anymore**, since generation/analysis run as turns in your own Claude Code session, invisible to
 the CLI process. There is nothing left for SPECTRA to time or log for those phases; `debug.enabled`
 still exists (see [the `debug` section](#debug)) but the AI-call timing lines it used to produce
-no longer apply. Track actual usage/cost through Claude Code's own session/usage indicators — see
+no longer apply. Track actual usage/cost through Claude Code's own session/usage indicators. See
 the [AI Models & Cost Guide](ai-models-cost-guide.md#tracking-what-youve-spent).
 
-**Testimize lifecycle lines** are unaffected — Testimize is an in-process NuGet library (not an
+**Testimize lifecycle lines** are unaffected, because Testimize is an in-process NuGet library (not an
 AI call), so `TESTIMIZE DISABLED/HEALTHY/DISPOSED` etc. still log normally when `debug.enabled` is
 set.
 
-### `ai.critic` — removed (Spec 058/069)
+### `ai.critic` — removed
 
 There is no `ai.critic` config block anymore. Grounding verification runs as the `spectra-critic`
 subagent (`.claude/agents/spectra-critic.agent.md`), whose `model:` frontmatter field is the only
 model selector, and whose `timeout`/concurrency come from how Claude Code itself schedules subagent
-calls — not from `spectra.config.json`. See [Grounding Verification](grounding-verification.md)
+calls, not from `spectra.config.json`. See [Grounding Verification](grounding-verification.md)
 and [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md). A legacy config
 that still carries `ai.critic.*` loads unchanged; the keys are ignored.
 
@@ -139,7 +139,7 @@ for domain-specific examples.
 | `categories` | object[] | (6 built-in) | Behavior classification taxonomy injected into the analysis prompt. |
 | `categories[].name` | string | — | Category identifier (used in tags and breakdown). |
 | `categories[].description` | string | — | One-line description injected into the AI prompt to guide classification. |
-| `max_prompt_tokens` | int | `96000` | **Spec 040** Pre-flight budget for the behavior-analysis prompt. When the estimated prompt exceeds this, the command exits cleanly with code `4` and an actionable error naming every candidate suite + token cost. Set to 0 to disable the check. Default leaves a 32K margin under the 128K context window for response + prompt template + ancillary content. |
+| `max_prompt_tokens` | int | `96000` | Pre-flight budget for the behavior-analysis prompt. When the estimated prompt exceeds this, the command exits cleanly with code `4` and an actionable error naming every candidate suite + token cost. Set to 0 to disable the check. Default leaves a 32K margin under the 128K context window for response + prompt template + ancillary content. |
 
 Default categories:
 
@@ -229,9 +229,9 @@ See [Coverage](coverage.md) for how these settings are used.
 | `criteria_import.auto_split` | bool | `true` | Automatically split compound criteria into atomic ones during import |
 | `criteria_import.normalize_rfc2119` | bool | `true` | Normalize RFC 2119 keywords (MUST, SHALL, SHOULD) in imported criteria |
 | `criteria_import.id_prefix` | string | `"AC"` | Prefix for auto-generated acceptance criteria IDs |
-| `analysis_exclude_patterns` | string[] | see below | **Spec 040** Glob patterns whose matched documents are still indexed and counted in coverage but whose suites are flagged `skip_analysis: true` and excluded from AI analyzer prompts by default. Pass `--include-archived` on `spectra ai generate` / `spectra ai analyze` / `spectra docs index` to override. The list **replaces** rather than merges with defaults — set to `[]` to disable all default exclusions. |
-| `coverage_exclude_patterns` | string[] | `[]` (empty) | **Spec 060** Glob patterns whose matched documents are dropped from the **documentation-coverage denominator only**. Excluded docs remain fully present in the document map for generation, analysis, and indexing, and are reported with a distinct `excluded` status. Defaults to empty (no implicit patterns) — unconfigured workspaces see unchanged coverage output. See [the three exclusion mechanisms](#the-three-exclusion-mechanisms) below. |
-| `max_suite_tokens` | int | `80000` | **Spec 040** Spillover threshold. When a single suite's `tokens_estimated` exceeds this, the indexer additionally writes per-doc files at `docs/_index/docs/{sanitized}.index.md` so finer-grained loading is possible (Spec 041 prep). |
+| `analysis_exclude_patterns` | string[] | see below | Glob patterns whose matched documents are still indexed and counted in coverage but whose suites are flagged `skip_analysis: true` and excluded from AI analyzer prompts by default. Pass `--include-archived` on `spectra ai generate` / `spectra ai analyze` / `spectra docs index` to override. The list **replaces** rather than merges with defaults; set to `[]` to disable all default exclusions. |
+| `coverage_exclude_patterns` | string[] | `[]` (empty) | Glob patterns whose matched documents are dropped from the **documentation-coverage denominator only**. Excluded docs remain fully present in the document map for generation, analysis, and indexing, and are reported with a distinct `excluded` status. Defaults to empty (no implicit patterns), so unconfigured workspaces see unchanged coverage output. See [the three exclusion mechanisms](#the-three-exclusion-mechanisms) below. |
+| `max_suite_tokens` | int | `80000` | Spillover threshold. When a single suite's `tokens_estimated` exceeds this, the indexer additionally writes per-doc files at `docs/_index/docs/{sanitized}.index.md` so finer-grained loading is possible. |
 
 ### Default `analysis_exclude_patterns`
 
@@ -251,7 +251,7 @@ See [Coverage](coverage.md) for how these settings are used.
 }
 ```
 
-Documents matching these patterns are still counted in coverage reports — the exclusion only removes them from analyzer-facing prompts. To opt a single document back in despite a pattern match, add `analyze: true` to its frontmatter (planned for a future release; see Spec 040 §3.6).
+Documents matching these patterns are still counted in coverage reports, though the exclusion only removes them from analyzer-facing prompts. To opt a single document back in despite a pattern match, add `analyze: true` to its frontmatter (planned for a future release).
 
 ### Example: `coverage_exclude_patterns`
 
@@ -266,15 +266,15 @@ Documents matching these patterns are still counted in coverage reports — the 
 }
 ```
 
-Documents matching these patterns are dropped from the documentation-coverage **denominator** and reported with a distinct `excluded` status. They remain in the document map for generation, analysis, and indexing — only the coverage percentage ignores them. The default is empty (`[]`): with no patterns configured, coverage output is identical to before Spec 060.
+Documents matching these patterns are dropped from the documentation-coverage **denominator** and reported with a distinct `excluded` status. They remain in the document map for generation, analysis, and indexing; only the coverage percentage ignores them. The default is empty (`[]`): with no patterns configured, coverage output is unchanged from earlier releases.
 
 ### The three exclusion mechanisms
 
-Spectra has **three** independent document-exclusion mechanisms. They are evaluated separately — matching a document under one has no effect on the others. Choose by the scope you want to affect:
+Spectra has **three** independent document-exclusion mechanisms. They are evaluated separately, so matching a document under one has no effect on the others. Choose by the scope you want to affect:
 
 | Config key | Scope of effect | What it does | Default |
 |------------|-----------------|--------------|---------|
-| `source.exclude_patterns` | **Everything** | Total removal at discovery — the document never enters the document map. Invisible to generation, analysis, indexing, **and** coverage. | `["**/CHANGELOG.md"]` |
+| `source.exclude_patterns` | **Everything** | Total removal at discovery, so the document never enters the document map. Invisible to generation, analysis, indexing, **and** coverage. | `["**/CHANGELOG.md"]` |
 | `coverage.analysis_exclude_patterns` | **Index / AI analysis** | The document is still indexed and **still counts in coverage**, but its suite is flagged `skip_analysis: true` and it is dropped from AI analyzer prompts. | `["**/Old/**", "**/old/**", "**/legacy/**", "**/archive/**", "**/release-notes/**", "**/CHANGELOG*", "**/SUMMARY.md"]` |
 | `coverage.coverage_exclude_patterns` | **Coverage % only** | The document is dropped from the documentation-coverage denominator and reported `excluded`. It remains in the map for generation, analysis, and indexing. | `[]` (empty) |
 
@@ -320,9 +320,9 @@ The default configuration includes a `smoke` selection that matches all high-pri
 
 ## `execution` — Execution Settings
 
-This section currently has no configurable fields. During a run, the execution agent answers tester questions about a test step or expected result by reading that test case's `source_refs` documentation files directly — no configuration is required.
+This section currently has no configurable fields. During a run, the execution agent answers tester questions about a test step or expected result by reading that test case's `source_refs` documentation files directly, so no configuration is required.
 
-> The former `copilot_space` / `copilot_space_owner` fields were removed and no longer have any effect. Existing config files that still carry these keys keep working — the keys are simply ignored.
+> The former `copilot_space` / `copilot_space_owner` fields were removed and no longer have any effect. Existing config files that still carry these keys keep working, because the keys are simply ignored.
 
 ## `validation` — Test Validation Rules
 
@@ -379,7 +379,7 @@ guide, how-it-works flow, and ABC tuning reference.
 | `settings_file` | string? | `null` | Path to a `testimizeSettings.json` with per-type equivalence classes and ABC tuning. |
 | `abc_settings` | object? | `null` | Optional ABC algorithm tuning. See [Testimize Integration > abc_settings](testimize-integration.md#abc_settings-optional-tuning). |
 
-## `debug` — Debug Logging (Spec 040)
+## `debug` — Debug Logging
 
 Controls the append-only `.spectra-debug.log` diagnostic file. **Disabled by
 default.** When off, no file is created and no disk I/O occurs for debug
@@ -387,22 +387,22 @@ logging, eliminating stale-file accumulation in CI environments.
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `enabled` | bool | `false` | Historically, every AI call (analyze, generate, critic, criteria extraction) wrote a timestamped line to the debug log. **As of Spec 069, SPECTRA makes none of those calls itself** — generation/analysis/criteria/critic all run as turns/subagent calls in your own Claude Code session, invisible to this log. Testimize lifecycle lines (a non-AI, in-process library) still write normally. Best-effort; never blocks the calling code. |
+| `enabled` | bool | `false` | Historically, every AI call (analyze, generate, critic, criteria extraction) wrote a timestamped line to the debug log. **SPECTRA makes none of those calls itself**, since generation/analysis/criteria/critic all run as turns/subagent calls in your own Claude Code session, invisible to this log. Testimize lifecycle lines (a non-AI, in-process library) still write normally. Best-effort; never blocks the calling code. |
 | `log_file` | string | `".spectra-debug.log"` | Path to the log file. Relative paths resolve against the repo root. |
-| `error_log_file` | string | `".spectra-errors.log"` | **Spec 043:** path to the dedicated error log. Written only when `enabled` is `true` AND at least one error occurs during the run. On a clean run the file is not created or modified. Captures full exception type, message, response body (truncated to 500 chars), `Retry-After` header, and stack trace per failure. Follows the same `mode` semantics as `log_file`. |
+| `error_log_file` | string | `".spectra-errors.log"` | Path to the dedicated error log. Written only when `enabled` is `true` AND at least one error occurs during the run. On a clean run the file is not created or modified. Captures full exception type, message, response body (truncated to 500 chars), `Retry-After` header, and stack trace per failure. Follows the same `mode` semantics as `log_file`. |
 | `mode` | string | `"append"` | Controls how the file is opened at run start. `"append"` prepends a separator + header block before each new run (useful for comparing multiple runs). `"overwrite"` truncates the file and writes just the header (keeps only the latest run). Any other value falls back to `"append"`. |
 
 ### What still gets logged (v2)
 
 The AI-call line format (`model=… provider=… tokens_in=… tokens_out=…`), the per-run Run Summary
 cost panel, and the dedicated error log (`.spectra-errors.log`) all described SPECTRA observing
-its *own* SDK calls — pre-Spec-069 behavior. None of it applies anymore: SPECTRA doesn't make those
+its *own* SDK calls, which was pre-v2 behavior. None of it applies anymore: SPECTRA doesn't make those
 calls, so it has nothing to time, count, or attribute cost to. What's left:
 
 - **Testimize lifecycle lines** (`DISABLED`/`START`/`NOT_INSTALLED`/`UNHEALTHY`/`HEALTHY`/
-  `DISPOSED`) still write normally — Testimize is an in-process library call, not a model call.
+  `DISPOSED`) still write normally, since Testimize is an in-process library call, not a model call.
 - **`--verbosity diagnostic`** still force-enables `debug.enabled` for a single invocation.
 
 To see what a generation/analysis/criteria/update run actually cost, use Claude Code's own usage
-surfaces (your plan's usage indicator, or the API/Console token dashboard) — see
+surfaces (your plan's usage indicator, or the API/Console token dashboard); see
 [Tracking what you've spent](ai-models-cost-guide.md#tracking-what-youve-spent).

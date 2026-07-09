@@ -1,11 +1,11 @@
 ---
 layout: default
-title: "Migration: Spec 040 — Document Index Restructure"
+title: "Migration: Document Index Restructure (v1.51.0)"
 parent: Migration Guides
 nav_order: 40
 ---
 
-# Migration: Spec 040 — Document Index Restructure
+# Migration: Document Index Restructure (v1.51.0)
 
 **Affects releases:** 1.51.0 and later
 **Breaking change:** No (auto-migration on first run)
@@ -29,10 +29,10 @@ docs/_index/
 ### Why
 
 On large projects (500+ docs), the legacy single-file index grew to ~46K
-tokens — over a third of the model's 128K context window. Combined with the
+tokens, over a third of the model's 128K context window. Combined with the
 analyzer's per-doc previews, the prompt routinely exceeded 200K tokens and
 hit a hard `400 prompt token count exceeds the limit of 128000` error from
-the model. The new layout is per-suite, so `spectra ai generate --suite X`
+the model. The new layout is per-suite, so generating tests scoped to suite X
 loads only suite X's entries.
 
 A new pre-flight token-budget check fails fast with an actionable error
@@ -63,7 +63,7 @@ would any generated artifact.
 
 ### Reviewing default exclusion patterns
 
-Spec 040 introduces `coverage.analysis_exclude_patterns` (defaults below).
+This migration introduces `coverage.analysis_exclude_patterns` (defaults below).
 Documents matching these globs are still indexed and counted in coverage,
 but their suites are flagged `skip_analysis: true` and the AI analyzer
 excludes them from prompt input by default.
@@ -100,7 +100,7 @@ Or globally by editing `coverage.analysis_exclude_patterns` in
 
 | Flag | Affects | Behavior |
 |---|---|---|
-| `--include-archived` | `spectra docs index`, `spectra ai generate`, `spectra ai analyze` | Includes skip-analysis suites in the AI input |
+| `--include-archived` | `spectra docs index`, `spectra ai compile-analysis-prompt`, `spectra ai analyze` | Includes skip-analysis suites in the AI input |
 | `--no-migrate` | `spectra docs index` | Errors out instead of auto-migrating a legacy file |
 | `--suites <ids>` | `spectra docs index` | Re-indexes only the named suites |
 
@@ -139,7 +139,7 @@ spectra docs show-suite SM_GSG_Topics
 
 | Code | Meaning |
 |---|---|
-| `4` | Pre-flight budget exceeded — narrow with `--suite` or raise `ai.analysis.max_prompt_tokens` |
+| `4` | Pre-flight budget exceeded; narrow with `--suite` or raise `ai.analysis.max_prompt_tokens` |
 
 ## Troubleshooting
 
@@ -174,11 +174,3 @@ a config override:
 The migrator only runs when (a) `docs/_index.md` exists AND (b)
 `docs/_index/_manifest.yaml` does not. If both are present, migration is
 skipped. To force a re-migration, delete `docs/_index/` and re-run.
-
-## Related specs
-
-- Spec 010 (the original Document Index — superseded in part)
-- Spec 023 (Criteria Extraction Overhaul — same migration ergonomics)
-- Spec 026 (Criteria Folder Rename — same single-version cutover pattern)
-- Spec 041 (Iterative Behavior Analysis — out of scope here; consumes the
-  spillover format defined in this spec)

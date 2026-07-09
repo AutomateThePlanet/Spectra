@@ -95,11 +95,11 @@ Added automatically when [grounding verification](grounding-verification.md) is 
 
 After the frontmatter, tests use standard Markdown:
 
-- **`# Title`** — Test case name (first H1 heading)
-- **`## Preconditions`** — Setup requirements before test execution
-- **`## Steps`** — Numbered list of test steps
-- **`## Expected Result`** — What should happen after executing the steps
-- **`## Test Data`** *(optional)* — Specific data values needed
+- **`# Title`** is the test case name (first H1 heading)
+- **`## Preconditions`** lists setup requirements before test execution
+- **`## Steps`** is the numbered list of test steps
+- **`## Expected Result`** describes what should happen after executing the steps
+- **`## Test Data`** *(optional)* holds specific data values needed
 
 ## Test ID Allocation
 
@@ -137,21 +137,21 @@ Each suite directory contains an `_index.json` with metadata for all tests:
 
 The `description`, `estimated_duration`, `criteria`, and `automated_by` fields are only included when populated.
 
-### Index population invariant (Spec 049, v1.52.3+)
+### Index population invariant (v1.52.3+)
 
-Every generation path — batch (`spectra ai generate <suite> [--count N]`), interactive (gap-driven), and `--from-description` — registers each new test in the suite's `_index.json` as part of the generation command itself. No separate `spectra index` step is required after generation. All three flows route through a single `TestPersistenceService` so the write-file + update-index sequence is one operation by construction.
+Every generation path, whether batch (`spectra ai compile-prompt --suite <s> --count <n>`), analysis-driven, or `--from-description`, registers each new test in the suite's `_index.json` as part of the `ingest-tests` step. No separate `spectra index` step is required after generation. All three flows route through a single `TestPersistenceService` so the write-file + update-index sequence is one operation by construction.
 
 If you have on-disk `.md` files that are missing from `_index.json` (e.g. from a workspace generated before this guarantee landed), run `spectra index --rebuild` to reconstruct the index from the files of record.
 
 ---
 
-## Test ID allocation and the high-water-mark (Spec 040, v1.52.0+)
+## Test ID allocation and the high-water-mark (v1.52.0+)
 
 Test IDs are **globally unique across all suites**. Concurrent generation runs and stale `_index.json` files cannot produce overlapping ID ranges.
 
 ### How it works
 
-`spectra ai generate` (and any other path that allocates new IDs) goes through `Spectra.Core.IdAllocation.PersistentTestIdAllocator`, which:
+Test generation (and any other path that allocates new IDs) goes through `Spectra.Core.IdAllocation.PersistentTestIdAllocator`, which:
 
 1. Acquires an exclusive cross-process lock at `.spectra/id-allocator.lock` (10 s timeout).
 2. Reads the persisted high-water-mark from `.spectra/id-allocator.json`.
@@ -168,7 +168,7 @@ Test IDs are **globally unique across all suites**. Concurrent generation runs a
 
 Both files are workspace-local, gitignored, and regenerable:
 
-- **`.spectra/id-allocator.json`** — schema:
+- **`.spectra/id-allocator.json`** uses this schema:
   ```json
   {
     "version": 1,
@@ -179,7 +179,7 @@ Both files are workspace-local, gitignored, and regenerable:
   ```
   If corrupted, missing, or recorded by an unknown future version, the allocator treats it as "absent" and re-seeds from the index + filesystem scan. The "deleted IDs never reused" guarantee is restored on the next allocation.
 
-- **`.spectra/id-allocator.lock`** — empty file used as the cross-process mutex. Released automatically on process exit (including crash).
+- **`.spectra/id-allocator.lock`** is an empty file used as the cross-process mutex. It is released automatically on process exit (including crash).
 
 ### Diagnosing problems
 

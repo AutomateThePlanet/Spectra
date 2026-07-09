@@ -11,7 +11,7 @@ Related: [Getting Started](getting-started.md) | [CLI Reference](cli-reference.m
 
 ---
 
-> **v2 note:** the `Spectra.MCP` project was removed entirely in Spec 070 — execution is CLI-only
+> As of v2, the `Spectra.MCP` project was removed entirely, so execution is now CLI-only
 > (`spectra run`). If you're looking for MCP server build/run instructions from an older version of
 > this page, they no longer apply. See
 > [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md).
@@ -32,8 +32,8 @@ spectra --help
 
 - .NET 8.0+ SDK
 - Git
-- [Claude Code](https://claude.com/claude-code) — needed to actually drive generation/analysis/
-  criteria/update/verification turns; the CLI alone only does the deterministic bookkeeping
+- [Claude Code](https://claude.com/claude-code), which is needed to actually drive generation/analysis/
+  criteria/update/verification turns, since the CLI alone only does the deterministic bookkeeping
 
 ## Project Structure
 
@@ -80,7 +80,7 @@ dotnet run --project src/Spectra.CLI -- dashboard --output ./site
 dotnet run --project src/Spectra.CLI -- run start checkout --priorities high
 ```
 
-There is no `dotnet run … -- ai generate …` anymore — generation is skill-driven from inside
+There is no `dotnet run … -- ai generate …` anymore, because generation is skill-driven from inside
 Claude Code, not a standalone CLI command. See
 [Generation (in-session via the `spectra-generate` skill)](cli-reference.md#generation-in-session-via-the-spectra-generate-skill).
 
@@ -144,7 +144,7 @@ spectra init
 
 ### A generation/analysis/criteria/update turn doesn't seem to be running
 
-There's no AI provider to check — SPECTRA makes no model calls of its own. Make sure you're
+There's no AI provider to check, since SPECTRA makes no model calls of its own. Make sure you're
 actually driving the flow from inside Claude Code (e.g. "generate test cases for the checkout
 suite"), not calling `spectra ai compile-prompt`/`ingest-tests` outside a session with nothing to
 answer the compiled prompt.

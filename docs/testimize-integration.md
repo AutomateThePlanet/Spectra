@@ -10,8 +10,8 @@ that adds **algorithmic test data optimization** to SPECTRA's AI generation
 pipeline: precise boundary value analysis, equivalence partitioning,
 pairwise covering arrays, and ABC heuristic optimization.
 
-> **Disabled by default.** SPECTRA works fine without Testimize — the AI
-> applies ISTQB techniques (spec 037) and approximates boundary values from
+> Testimize is disabled by default, and SPECTRA works fine without it, since the AI
+> applies ISTQB techniques and approximates boundary values from
 > documentation. Testimize adds *algorithmic precision* on top: exact min-1/
 > min/max/max+1 boundaries, security-focused invalid patterns (XSS, SQLi,
 > SSTI), and optimized multi-field combinations.
@@ -19,7 +19,7 @@ pairwise covering arrays, and ABC heuristic optimization.
 ## Prerequisites
 
 - SPECTRA v1.48.3+
-- No separate installation needed — the Testimize library ships as a bundled
+- No separate installation is needed, because the Testimize library ships as a bundled
   NuGet dependency inside `Spectra.CLI`. When you install `spectra`, Testimize
   is included automatically.
 
@@ -58,32 +58,32 @@ pairwise covering arrays, and ABC heuristic optimization.
 ## How it works
 
 When `testimize.enabled` is `true`, SPECTRA runs the Testimize engine
-**in-process** during test generation — no child process, no MCP server, no
+**in-process** during test generation, with no child process, no MCP server, and no
 JSON-RPC. The flow integrates into the existing generation pipeline:
 
-1. **Behavior analysis** (AI step, unchanged) — the AI analyzes your
+1. Behavior analysis (AI step, unchanged) is where the AI analyzes your
    documentation and identifies testable behaviors. When Testimize is enabled,
    the prompt also asks the AI to emit a `field_specs[]` array listing every
    constrained input field it finds (name, type, min/max, required, allowed
    values, expected error messages).
 
-2. **Field spec extraction** — SPECTRA parses the AI's `field_specs` from the
+2. Field spec extraction is where SPECTRA parses the AI's `field_specs` from the
    response JSON. If the AI returned none (e.g., the documentation describes a
    button-tap UI with no text inputs), a local regex fallback
    (`FieldSpecAnalysisTools.Analyze`) scans the raw documentation for patterns
    like "3 to 20 characters" or "between 18 and 100".
 
-3. **TestimizeRunner** — maps each field spec to a Testimize parameter type
+3. `TestimizeRunner` maps each field spec to a Testimize parameter type
    (`IntegerDataParameter`, `EmailDataParameter`, `DateDataParameter`, etc.)
    and calls `TestimizeEngine.Configure(...).Generate()` in-process:
-   - **Single field**: bypasses generators entirely and reads the pre-computed
-     BVA boundary values + invalid equivalence classes directly from the
+   - For a single field, it bypasses generators entirely and reads the pre-computed
+     BVA boundary values and invalid equivalence classes directly from the
      parameter's `TestValues` (populated at construction time by the field's
-     strategy). Produces e.g., 4 boundary values + security-focused invalids.
-   - **Multiple fields (2+)**: runs the full Pairwise or Hybrid-ABC generator
+     strategy), producing e.g. 4 boundary values plus security-focused invalids.
+   - For multiple fields (2+), it runs the full Pairwise or Hybrid-ABC generator
      for optimized cross-field combinations.
 
-4. **Prompt embedding** — the pre-computed test data is rendered as a literal
+4. Prompt embedding is where the pre-computed test data is rendered as a literal
    YAML block in the test-generation prompt, attributed to Testimize:
 
    ```
@@ -91,10 +91,10 @@ JSON-RPC. The flow integrates into the existing generation pipeline:
    ```
 
    The AI uses these exact values verbatim in the generated test cases. It does
-   not need to "decide" to call a tool — the data is already in the prompt as
+   not need to "decide" to call a tool, since the data is already in the prompt as
    authoritative facts.
 
-5. **Generation + critic** — proceed normally. Test steps reference the exact
+5. Generation and critic verification proceed normally, with test steps referencing the exact
    boundary values and expected error messages from the Testimize data.
 
 ### What Testimize computes vs what the AI handles
@@ -148,9 +148,9 @@ Example with tuning:
 ## Without Testimize
 
 SPECTRA does not require Testimize. When disabled (the default), the AI
-generation pipeline uses spec 037's ISTQB technique-driven prompts and
+generation pipeline uses its ISTQB technique-driven prompts and
 approximates boundary values from documentation. You get systematic boundary
-coverage either way — Testimize makes the boundary values mathematically
+coverage either way, though Testimize makes the boundary values mathematically
 precise (exact min-1/max+1) and adds security-focused invalid patterns the
 AI might not consistently include.
 
@@ -159,7 +159,7 @@ AI might not consistently include.
 If `testimize.enabled` is `true` but the engine produces no usable data
 (no field specs found, engine error, etc.), SPECTRA logs a diagnostic line
 and proceeds with normal AI-only generation. The run always completes
-successfully — Testimize failures never block test generation.
+successfully, because Testimize failures never block test generation.
 
 Skip reasons logged to `.spectra-debug.log`:
 
@@ -167,10 +167,10 @@ Skip reasons logged to `.spectra-debug.log`:
 |----------|---------|
 | `TESTIMIZE SKIP reason=disabled` | `testimize.enabled` is `false` in config |
 | `TESTIMIZE SKIP reason=no_field_specs suite=X` | Neither AI nor regex fallback found any constrained fields |
-| `TESTIMIZE SKIP reason=insufficient_fields fields=1 suite=X` | Only 1 field found but it's a type that needs generators (rare — most single fields use direct BVA extraction) |
+| `TESTIMIZE SKIP reason=insufficient_fields fields=1 suite=X` | Only 1 field found but it's a type that needs generators (rare; most single fields use direct BVA extraction) |
 | `TESTIMIZE FALLBACK source=regex fields=N` | AI returned no field specs; regex extractor recovered N fields from raw docs |
 | `TESTIMIZE ERROR exception=Type message="..."` | Engine threw; generation continues without Testimize data |
-| `TESTIMIZE OK strategy=X fields=N test_data_sets=M elapsed=Xs` | Success — N fields produced M test data rows |
+| `TESTIMIZE OK strategy=X fields=N test_data_sets=M elapsed=Xs` | Success, with N fields producing M test data rows |
 
 ## Health check
 

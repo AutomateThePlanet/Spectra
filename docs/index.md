@@ -8,7 +8,7 @@ permalink: /
 # SPECTRA
 
 **AI-native test case generation and execution framework.**
-From documentation to verified, grounded test cases — automatically.
+From documentation to verified, grounded test cases, automatically.
 {: .fs-6 .fw-300 }
 
 [Get Started](getting-started){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
@@ -33,26 +33,26 @@ From documentation to verified, grounded test cases — automatically.
 Your docs → spectra ai generate → AI analysis → critic verification → test-cases/*.md
 ```
 
-Or just say it in Copilot Chat: **"Generate test cases for checkout"**
+Or just say it in Claude Code: **"Generate test cases for checkout"**
 
 ## Key capabilities
 
-- **AI Test Case Generation** — iterative sessions with dual-model verification
-- **Acceptance Criteria Extraction** — MUST/SHOULD/MAY from docs with SHA-256 change tracking
-- **Three-Dimensional Coverage** — docs × criteria × automation in one dashboard
-- **MCP Execution Engine** — execute through Copilot Chat, Claude, or any MCP client
-- **Testimize Integration** — optional algorithmic test data optimization (BVA, EP, pairwise)
-- **Git-native** — Markdown + YAML, no database, no vendor lock-in
+- **AI Test Case Generation** driven from your Claude Code session, with independent critic verification
+- **Acceptance Criteria Extraction** using MUST/SHOULD/MAY from docs with SHA-256 change tracking
+- **Three-Dimensional Coverage** spanning docs, criteria, and automation in one dashboard
+- **CLI-Native Execution** through `spectra run`, plus an optional local web console for manual verdicts
+- **Testimize Integration** for optional algorithmic test data optimization (BVA, EP, pairwise)
+- **Git-native** storage as Markdown and YAML, with no database and no vendor lock-in
 
 ## Quick install
 
 ```bash
 dotnet tool install -g Spectra.CLI
 spectra init
-spectra ai generate
 ```
 
-See [Getting Started](getting-started) for prerequisites and authentication setup.
+Then open Claude Code in your project and ask it to generate test cases. See
+[Getting Started](getting-started) for the full walkthrough.
 
 ## Part of the Automate The Planet ecosystem
 

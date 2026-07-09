@@ -14,42 +14,42 @@ Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md) |
 
 ## Overview
 
-When AI generates test cases, it can hallucinate — invent steps, expected results, or behaviors that don't exist in your documentation. SPECTRA's grounding verification uses a second AI model (the "critic") to verify each test case against the source documentation.
+When AI generates test cases, it can hallucinate, inventing steps, expected results, or behaviors that don't exist in your documentation. SPECTRA's grounding verification uses a second AI model (the "critic") to verify each test case against the source documentation.
 
 ## How It Works
 
 1. **Generator** creates draft test cases from your documentation
 2. **Critic** verifies each test case against the same docs. The critic runs in a fresh, isolated
-   (`context: fork`) context — it sees only the test artifact and its selected source documents,
+   (`context: fork`) context, so it sees only the test artifact and its selected source documents,
    never the generator's prompt, reasoning, tool calls, or token usage.
 3. Test cases receive a verdict: `grounded`, `partial`, or `hallucinated`
 4. Only grounded and partial test cases are written to disk
 
 ### Advisory verdict, fail-loud damage
 
-The verdict is **advisory-gating**: a clear `hallucinated` verdict drops the test; `grounded`,
+The verdict is advisory-gating, meaning a clear `hallucinated` verdict drops the test while `grounded`,
 `partial`, and manually-marked tests pass through. But the critic's *damage* paths fail loud rather
 than silently passing:
 
 - A critic response missing its `verdict` or `score`, or otherwise unparseable, is surfaced as a
-  specific error — it is **not** smoothed into a soft `partial` / `0.5` pass.
+  specific error. It is **not** smoothed into a soft `partial` / `0.5` pass.
 - A critic *call* that fails or times out is non-blocking (the test is marked unverified and
   generation continues) but is recorded **distinctly** from a malformed response, so a failed
   critic and a bad critic response are never conflated.
 
-### Grounding vs. boundary/edge completeness — two distinct checks
+### Grounding vs. boundary/edge completeness: two distinct checks
 
 Grounding answers **"does each claim in a generated test trace back to the docs?"** It is a
-*retrospective, per-artifact* check, and it is **deliberately scoped to grounding only**: the critic
+*retrospective, per-artifact* check, and it is deliberately scoped to grounding only: the critic
 judges what is in front of it and treats anything it wasn't given as `unverified`, never as a missing
 test. It does **not** ask whether the edges that *should* be tested are covered.
 
-That second question — **"are the boundary/edge conditions the docs imply actually covered?"** — is
-**completeness**, and it lives in the **analysis phase**, not the critic (Spec 062). When you run the
-analyze step, `ingest-analysis` reports **boundary-coverage gaps** (min/max, off-by-one, empty/null,
+That second question, **"are the boundary/edge conditions the docs imply actually covered?"**, is
+completeness, and it lives in the analysis phase rather than the critic. When you run the
+analyze step, `ingest-analysis` reports boundary-coverage gaps (min/max, off-by-one, empty/null,
 overflow, timeout) implied by the docs/criteria but not covered by existing or planned tests, in a
-`boundary_gaps` array alongside the `technique_breakdown`. It is *proactive* (surface the gap so the
-edge case gets generated) and **advisory** — it never blocks generation and never changes the critic's
+`boundary_gaps` array alongside the `technique_breakdown`. It is *proactive*, surfacing the gap so the
+edge case gets generated, and advisory: it never blocks generation and never changes the critic's
 verdict.
 
 Keeping these separate is intentional: folding completeness into the critic would erode its clean
@@ -61,10 +61,10 @@ surface in the analyze recommendation.
 | **Grounding** | `spectra-critic` subagent | Does each claim trace to the docs? | Retrospective (after generation) |
 | **Boundary/edge completeness** | Analysis phase (`ingest-analysis`) | Are the implied edges covered? | Proactive (before generation) |
 
-## Arithmetic Verification (Spec 075)
+## Arithmetic Verification
 
-When a test's expected result is a **computed value** — a unit conversion result, formula output,
-scientific-notation magnitude, or derived constant — the critic **must independently compute the
+When a test's expected result is a **computed value** (a unit conversion result, formula output,
+scientific-notation magnitude, or derived constant), the critic **must independently compute the
 value and compare it** to what the test asserts. Documenting the *principle* (e.g. "use scientific
 notation", "convert via the SI factor") is not sufficient if the *number* is wrong.
 
@@ -74,7 +74,7 @@ in docs BUT number arithmetically wrong → NOT `grounded` (use `partial` or `ha
 
 This is additive to the existing doc-presence rules, not a replacement.
 
-Example: a test asserting `1×10⁻⁹ km → 1E-9 nm` would NOT be `grounded` — the correct result is
+Example: a test asserting `1×10⁻⁹ km → 1E-9 nm` would NOT be `grounded`, because the correct result is
 `1000 nm` (1 km = 10¹² nm, so 1×10⁻⁹ km = 10³ nm), even if the scientific-notation convention is
 documented. The arithmetic error must surface in a finding.
 
@@ -94,11 +94,16 @@ Verified test cases include grounding metadata in their frontmatter:
 grounding:
   verdict: grounded
   score: 0.95
-  generator: claude-sonnet-4
-  critic: gemini-2.0-flash
+  generator: claude-code-session
+  critic: claude-sonnet-4-6
   verified_at: 2026-03-19T10:30:00Z
   unverified_claims: []
 ```
+
+`generator` is always `claude-code-session`. There's no specific generator model to name, since
+generation runs as a turn in whatever your Claude Code session happens to be running. `critic` names
+the model that actually verified the test (from the `spectra-critic` subagent's `model:`
+frontmatter).
 
 For partial verdicts, `unverified_claims` lists what couldn't be verified:
 
@@ -136,49 +141,17 @@ Generating test cases...
 
 ## Configuration
 
-Configure the critic in `spectra.config.json`:
+There's no `spectra.config.json` block for the critic anymore. Grounding verification runs as the
+`spectra-critic` subagent (`.claude/agents/spectra-critic.agent.md`), a Claude Code `context: fork`
+subagent invoked by the generation skill after generation, not an in-process model call, and not
+something `ai.providers`/`ai.critic` route to. (A legacy config that still carries those keys loads
+unchanged; `spectra validate` surfaces a non-blocking notice naming them.)
 
-```json
-{
-  "ai": {
-    "critic": {
-      "enabled": true,
-      "model": "claude-sonnet-4-6",
-      "timeout_seconds": 120,
-      "max_concurrent": 5
-    }
-  }
-}
-```
+The critic model is set by the `model:` field in `.claude/agents/spectra-critic.agent.md` (shipped as
+`claude-sonnet-4-6`). Edit that file directly to change it, and re-apply the edit after
+`spectra update-skills` if you've customized it. There's no separate provider/timeout/concurrency
+config; Claude Code itself schedules subagent calls.
 
-> **Spec 058 — the critic is the spectra-critic subagent:** grounding verification runs as the
-> **spectra-critic subagent** (`.claude/agents/spectra-critic`), a Claude Code `context: fork`
-> subagent invoked by the generation skill after generation — not an in-process model call.
-> `ai.critic.model` is the only critic selector. The retired `provider`, `api_key_env`, and
-> `base_url` keys are ignored (`spectra validate` emits a non-blocking notice if they are still
-> present). **Spec 069:** the generator no longer runs in-process either — `ai.providers` was
-> removed along with the GitHub Copilot SDK. Generation now runs as an ordinary turn in your
-> Claude Code session, driven by the `spectra-generate` skill over the compile→ingest seam. See
-> [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md).
-
-> **Spec 043 — parallel verification:** `max_concurrent` (default `1`) controls how many critic verification calls run concurrently. Setting it to `5` typically cuts the critic phase to ~1/5 of sequential time on a large suite without changing any output (results are written in original input order). Clamped to `[1, 20]`. Values >10 emit a rate-limit-risk warning at run start. If you start hitting rate limits, the Run Summary panel surfaces a `Rate limits` count with a hint pointing back at this knob.
-
-> **Spec 055 — single model selector:** `ai.critic.model` is the single source of truth for the critic model. When it is set, that value is used; when it is unset, one same-family default applies (target: Sonnet 4.6). Flipping the critic model is a config change, never a code change — which is what lets a post-migration bake-off compare model choices without touching code.
-
-## Skip Verification
-
-```bash
-spectra ai generate checkout --skip-critic
-```
-
-Or disable globally in config:
-
-```json
-{
-  "ai": {
-    "critic": {
-      "enabled": false
-    }
-  }
-}
-```
+The generator isn't configurable either. Generation runs as an ordinary turn in your own Claude
+Code session, driven by the `spectra-generate` skill over the compile→ingest seam. See
+[Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) for the full picture.

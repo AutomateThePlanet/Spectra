@@ -16,13 +16,13 @@ Related: [CLI Reference](cli-reference.md) | [Test Format](test-format.md) | [Co
 
 Profiles control test generation **style**: detail level, negative scenario count, step formatting, domain-specific considerations, and more. They're optional but recommended for consistent output.
 
-> **Profiles vs prompt templates vs Testimize** — three orthogonal customization layers:
+> Profiles, prompt templates, and Testimize are three orthogonal customization layers:
 >
 > | Layer | What it controls | Where it lives | Default |
 > |-------|-----------------|---------------|---------|
 > | **Profile** | Output format and style (step granularity, priority defaults, domain hints) | `profiles/_default.yaml` | Built-in default |
-> | **Prompt template** | Reasoning strategy (which ISTQB techniques to apply, which categories to use, how to structure analysis) — see [spec 037](../specs/037-istqb-test-techniques/spec.md) | `.spectra/prompts/*.md` | ISTQB-enhanced built-ins |
-> | **Testimize** (optional) | Test data values (boundary numbers, equivalence class examples, pairwise combinations) — see [spec 038](testimize-integration.md) | `testimize` section in `spectra.config.json` | Disabled |
+> | **Prompt template** | Reasoning strategy (which ISTQB techniques to apply, which categories to use, how to structure analysis) | `.spectra/prompts/*.md` | ISTQB-enhanced built-ins |
+> | **Testimize** (optional) | Test data values (boundary numbers, equivalence class examples, pairwise combinations), see [Testimize Integration](testimize-integration.md) | `testimize` section in `spectra.config.json` | Disabled |
 >
 > A typical setup uses the default profile, the default ISTQB prompts, and
 > leaves Testimize disabled. Power users mix and match independently.
@@ -90,7 +90,7 @@ This creates `test-cases/checkout/_profile.md` that inherits from and overrides 
 
 ## Profile Resolution Order
 
-When running `spectra ai generate checkout --count 10`:
+When generating tests for the `checkout` suite:
 
 1. `test-cases/checkout/_profile.md` (suite override)
 2. `spectra.profile.md` (repository profile)

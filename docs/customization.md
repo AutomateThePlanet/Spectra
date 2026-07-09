@@ -9,7 +9,7 @@ nav_order: 10
 This guide covers every way you can customize SPECTRA's behavior, from test case
 output format to AI reasoning strategy.
 
-> **Looking for workflow how-tos instead of customization?** See [`USAGE.md`](USAGE.md) — the workflow guide for using SPECTRA from Claude Code.
+> **Looking for workflow how-tos instead of customization?** See [`USAGE.md`](USAGE.md), the workflow guide for using SPECTRA from Claude Code.
 
 ---
 
@@ -22,35 +22,35 @@ output format to AI reasoning strategy.
 | Behavior categories | `spectra.config.json` → `analysis.categories` | Add/remove categories with descriptions |
 | Coverage settings | `spectra.config.json` → `coverage` | Configure dirs, patterns, criteria paths |
 | Generation pacing (batch size, timeouts) | `spectra.config.json` → `ai` | `generation_batch_size`, `generation_timeout_minutes`, `analysis_timeout_minutes` |
-| Session model used for generation/analysis | Your Claude Code session | Pick the model for your session (`/model`) — generation runs as a turn in it, there's no separate config |
+| Session model used for generation/analysis | Your Claude Code session | Pick the model for your session (`/model`); generation runs as a turn in it, so there's no separate config |
 | Critic model | `.claude/agents/spectra-critic.agent.md` → `model:` frontmatter | Edit the subagent file directly (re-apply after `spectra update-skills` if customized) |
 | Dashboard branding | `spectra.config.json` → `dashboard.branding` | Logo, colors, company name, theme |
 | Claude Code integration | `.claude/skills/<name>/SKILL.md`, `.claude/agents/spectra-critic.agent.md` | Edit authoring SKILL files / critic subagent |
 
 ---
 
-## 1. Test Case Format — `profiles/_default.yaml`
+## 1. Test Case Format: `profiles/_default.yaml`
 
-**What it controls**: The JSON schema the AI must follow when producing test
-cases. This determines what fields appear in YAML frontmatter and how test case
+This section controls the JSON schema the AI must follow when producing test
+cases. It determines what fields appear in YAML frontmatter and how test case
 steps/expected results are structured.
 
-**File**: `profiles/_default.yaml`
+The file to edit is `profiles/_default.yaml`.
 
-**How to customize**:
+To customize it:
 
 1. Open `profiles/_default.yaml`.
-2. Edit the `format` field — this is the JSON template the AI receives.
-3. Re-run `spectra ai generate` — new test cases follow the new schema.
+2. Edit the `format` field, which is the JSON template the AI receives.
+3. Re-run `spectra ai generate` so new test cases follow the new schema.
 
-**Common modifications**:
+Common modifications include:
 
 - Add custom frontmatter fields (e.g., `regulatory_reference`, `test_data_class`)
 - Change step format (numbered vs. action/expected pairs)
 - Add environment or browser fields
 - Enforce specific tag taxonomies
 
-**Example — adding a `test_data` field**:
+For example, here's how to add a `test_data` field:
 
 ```yaml
 format: |
@@ -72,18 +72,18 @@ format: |
   ]
 ```
 
-**Resolution order**: `profiles/_default.yaml` on disk > built-in embedded
-default. Missing or malformed files fall back gracefully to the embedded
-default — generation never crashes due to a profile error.
+The resolution order is `profiles/_default.yaml` on disk, falling back to the
+built-in embedded default. Missing or malformed files fall back gracefully to
+the embedded default, so generation never crashes due to a profile error.
 
 ---
 
-## 2. AI Reasoning — Root Prompt Templates
+## 2. AI Reasoning: Root Prompt Templates
 
-**What it controls**: How the AI thinks — analysis strategy, test case writing
-approach, verification rigor, criteria extraction depth.
+This section controls how the AI thinks: analysis strategy, test case writing
+approach, verification rigor, and criteria extraction depth.
 
-**Files**: `.spectra/prompts/*.md`
+The relevant files are `.spectra/prompts/*.md`.
 
 | Template | Controls | Used by |
 |----------|----------|---------|
@@ -93,11 +93,11 @@ approach, verification rigor, criteria extraction depth.
 | `critic-verification.md` | How generated test cases are verified against sources | Grounding verification |
 | `test-update.md` | How existing test cases are classified and rewritten | `spectra ai update` |
 
-**How to customize**: Edit any `.md` file directly. The prompt body uses
-`{{placeholders}}` for dynamic content injected at runtime. Available
+To customize, edit any `.md` file directly. The prompt body uses
+`{{placeholders}}` for dynamic content injected at runtime, and available
 placeholders are listed in each file's YAML frontmatter.
 
-**Example — adding domain focus to behavior analysis**:
+For example, here's how to add domain focus to behavior analysis:
 
 Open `.spectra/prompts/behavior-analysis.md` and add after the persona section:
 
@@ -110,24 +110,24 @@ When analyzing documentation, pay special attention to:
 - Rate limiting and abuse prevention on public APIs
 ```
 
-**Coverage-aware analysis**: The `behavior-analysis.md` template includes a
-`{{coverage_context}}` placeholder (spec 044). When an existing suite has
+For coverage-aware analysis, the `behavior-analysis.md` template includes a
+`{{coverage_context}}` placeholder. When an existing suite has
 coverage data, this resolves to a markdown block listing covered/uncovered
 criteria and doc sections, directing the AI to focus on gaps. If your custom
 template omits this placeholder, coverage context is simply not injected.
 
-**Safe updates**: `spectra update-skills` refreshes unmodified templates to
-the latest version. Modified templates are preserved. Use
+Updates are safe: `spectra update-skills` refreshes unmodified templates to
+the latest version, and modified templates are preserved. Use
 `spectra prompts reset {template}` to restore a template to default.
 
 ---
 
 ## 3. Behavior Categories
 
-**What it controls**: The classification taxonomy for analyzed behaviors.
+This section controls the classification taxonomy for analyzed behaviors.
 Categories appear in test case frontmatter as tags and drive coverage distribution.
 
-**File**: `spectra.config.json` → `analysis.categories`
+The relevant file is `spectra.config.json`, under `analysis.categories`.
 
 ```json
 {
@@ -144,7 +144,7 @@ Categories appear in test case frontmatter as tags and drive coverage distributi
 }
 ```
 
-**Domain-specific examples**:
+Here are some domain-specific examples:
 
 ```json
 // Fintech
@@ -166,10 +166,10 @@ the AI what to look for. Specific descriptions produce targeted behaviors.
 
 ## 4. Coverage Settings
 
-**What it controls**: Which directories are scanned, what file patterns
+This section controls which directories are scanned, what file patterns
 match, and where acceptance criteria live.
 
-**File**: `spectra.config.json` → `coverage`
+The relevant file is `spectra.config.json`, under `coverage`.
 
 ```json
 {
@@ -183,18 +183,18 @@ match, and where acceptance criteria live.
 }
 ```
 
-**Key settings**:
+Key settings include:
 
-- `automation_dirs` — directories scanned for `automated_by` links. Add more
+- `automation_dirs` names the directories scanned for `automated_by` links. Add more
   with `spectra config add-automation-dir ../integration-tests`.
-- `scan_patterns` — glob patterns for automation code files.
-- `criteria_dir` — where per-document `.criteria.yaml` files are stored.
-- `criteria_file` — path to the master criteria index.
-- `requirements_file` — path to the requirements YAML index (default:
-  `"docs/requirements/_requirements.yaml"`). Used by requirements coverage
+- `scan_patterns` sets the glob patterns for automation code files.
+- `criteria_dir` is where per-document `.criteria.yaml` files are stored.
+- `criteria_file` is the path to the master criteria index.
+- `requirements_file` is the path to the requirements YAML index (default:
+  `"docs/requirements/_requirements.yaml"`), used by requirements coverage
   analysis.
-- `report_orphans` / `report_broken_links` / `report_mismatches` — boolean
-  flags (all default `true`) controlling which coverage report sections are
+- `report_orphans` / `report_broken_links` / `report_mismatches` are boolean
+  flags (all default `true`) that control which coverage report sections are
   generated. Set to `false` to suppress noisy sections in large repos.
 
 **Criteria import tuning** (`coverage.criteria_import`):
@@ -212,29 +212,29 @@ match, and where acceptance criteria live.
 }
 ```
 
-- `auto_split` — when importing compound acceptance criteria from CSV/YAML,
-  automatically split them into atomic criteria.
-- `normalize_rfc2119` — normalize RFC 2119 keywords (MUST, SHALL, SHOULD) to
+- `auto_split` automatically splits compound acceptance criteria into atomic
+  ones when importing from CSV/YAML.
+- `normalize_rfc2119` normalizes RFC 2119 keywords (MUST, SHALL, SHOULD) to
   a consistent form during import.
-- `id_prefix` — prefix for auto-generated acceptance criteria IDs (default: `"AC"`).
+- `id_prefix` is the prefix for auto-generated acceptance criteria IDs (default: `"AC"`).
 
 ---
 
 ## 5. AI Model & Batch Tuning
 
-**What it controls**: How generation/analysis turns are shaped and paced, and which model
+This section controls how generation/analysis turns are shaped and paced, and which model
 verifies them.
 
-**File**: `spectra.config.json` → `ai`
+The relevant file is `spectra.config.json`, under `ai`.
 
-> **Spec 069 (v2):** there is no provider or model-routing config here anymore. The GitHub Copilot
-> SDK, `ai.providers`, and `ai.critic` (as a config block) were removed outright — SPECTRA makes no
+> There is no provider or model-routing config here anymore. The GitHub Copilot
+> SDK, `ai.providers`, and `ai.critic` (as a config block) were removed outright, since SPECTRA makes no
 > model calls of its own. Generation and analysis run as ordinary turns in your own Claude Code
 > session; the model is whatever your session is using (`/model`), not something
 > `spectra.config.json` selects. See
 > [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) and the
 > [AI Models & Cost Guide](ai-models-cost-guide.md) for the full picture. A pre-v2 config with
-> `ai.providers`/`ai.critic` still loads — the keys are simply ignored.
+> `ai.providers`/`ai.critic` still loads; the keys are simply ignored.
 
 ```json
 {
@@ -246,12 +246,12 @@ verifies them.
 }
 ```
 
-- `generation_batch_size` — tests requested per generation turn (default 30). Fewer, larger
-  batches mean fewer `compile-prompt`/`ingest-tests` round-trips.
-- `generation_timeout_minutes` / `analysis_timeout_minutes` — bound the deterministic CLI side of
+- `generation_batch_size` sets the number of tests requested per generation turn (default 30).
+  Fewer, larger batches mean fewer `compile-prompt`/`ingest-tests` round-trips.
+- `generation_timeout_minutes` / `analysis_timeout_minutes` bound the deterministic CLI side of
   the seam (parsing, validation, index writes), not the model turn itself.
 
-**Critic model**: the `spectra-critic` subagent's model is a static `model:` field in
+The critic model, meaning the `spectra-critic` subagent's model, is a static `model:` field in
 `.claude/agents/spectra-critic.agent.md` (shipped as `claude-sonnet-4-6`), not a
 `spectra.config.json` setting. Edit that file directly to change it, and re-apply your edit after
 `spectra update-skills` if you've customized it.
@@ -260,9 +260,9 @@ verifies them.
 
 ## 6. Dashboard Branding
 
-**What it controls**: Visual appearance of the generated coverage dashboard.
+This section controls the visual appearance of the generated coverage dashboard.
 
-**File**: `spectra.config.json` → `dashboard.branding`
+The relevant file is `spectra.config.json`, under `dashboard.branding`.
 
 ```json
 {
@@ -284,33 +284,33 @@ verifies them.
 }
 ```
 
-**Preview**: `spectra dashboard --preview` shows the dashboard with sample
+To preview it, `spectra dashboard --preview` shows the dashboard with sample
 data and your branding applied, without needing real test data.
 
 ---
 
 ## 7. Claude Code Integration
 
-**What it controls**: How Claude Code interacts with SPECTRA CLI.
+This section controls how Claude Code interacts with the SPECTRA CLI.
 
-**Files**:
-- `.claude/skills/<name>/SKILL.md` — authoring SKILL files (one per command group)
-- `.claude/agents/spectra-critic.agent.md` — critic subagent (`context: fork`), run as a mandatory step by the generation SKILL
-- `.vscode/mcp.json` — MCP server connection for the execution agent
+The relevant files are:
+- `.claude/skills/<name>/SKILL.md`, the authoring SKILL files (one per command group)
+- `.claude/agents/spectra-critic.agent.md`, the critic subagent (`context: fork`), run as a mandatory step by the generation SKILL
+- `.vscode/mcp.json`, the MCP server connection for the execution agent
 
 **SKILLs** (bundled, authoring set): `spectra-generate`, `spectra-update`, `spectra-coverage`,
 `spectra-dashboard`, `spectra-validate`, `spectra-list`, `spectra-init-profile`,
 `spectra-help`, `spectra-criteria`, `spectra-docs`, `spectra-prompts`, `spectra-quickstart`.
 
-**Critic subagent** (bundled): `spectra-critic` — independent verification of generated tests.
+The bundled critic subagent is `spectra-critic`, which performs independent verification of generated tests.
 
-> The test **execution** agent is now a Claude Code main-session skill at `.claude/skills/spectra-execution/SKILL.md` (ported from its legacy GitHub Copilot agent).
+> The test **execution** agent is a Claude Code main-session skill at `.claude/skills/spectra-execute/SKILL.md`.
 
-**How to customize**: Edit any `SKILL.md` or the critic subagent file to change how Claude Code
+To customize, edit any `SKILL.md` or the critic subagent file to change how Claude Code
 invokes CLI commands, presents results, or handles multi-step workflows.
 
-**Safe updates**: Same hash-tracking as prompt templates. `spectra update-skills`
-refreshes unmodified files, preserves your edits.
+Updates are safe here too, using the same hash-tracking as prompt templates: `spectra update-skills`
+refreshes unmodified files and preserves your edits.
 
 ---
 
@@ -340,9 +340,9 @@ All user files are created by `spectra init` and tracked by
 
 ### "I want better test case quality for my domain"
 
-1. Edit `.spectra/prompts/behavior-analysis.md` — add domain-specific focus.
+1. Edit `.spectra/prompts/behavior-analysis.md` to add domain-specific focus.
 2. Add domain categories to `spectra.config.json` → `analysis.categories`.
-3. Run `spectra ai generate --suite {name} --count 5` and evaluate.
+3. Generate a handful of tests for the suite and evaluate the result.
 
 ### "I want to change the test case output format"
 
@@ -351,13 +351,12 @@ All user files are created by `spectra init` and tracked by
 
 ### "I want stricter verification"
 
-1. Edit `.spectra/prompts/critic-verification.md` — tighten verdict rules.
-2. Consider using a stronger model for critic in config → `ai.critic`.
+Edit `.spectra/prompts/critic-verification.md` to tighten verdict rules, or switch to a stronger critic model by editing the `model:` field in `.claude/agents/spectra-critic.agent.md`.
 
 ### "I want the AI to focus on specific areas"
 
-Use `--focus` at runtime:
-`spectra ai generate --suite checkout --focus "payment validation, error handling"`
+Use `--focus` when compiling the generation prompt:
+`spectra ai compile-prompt --suite checkout --count <n> --focus "payment validation, error handling"`
 
 Or permanently: edit the behavior analysis prompt template to always
 prioritize those areas.

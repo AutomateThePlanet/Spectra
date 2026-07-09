@@ -8,7 +8,7 @@ nav_order: 7
 
 Pre-built per-suite documentation index for efficient AI test generation.
 
-Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md) | [Migration Spec 040](migration-040.md)
+Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md) | [Migration Guide](migration-040.md)
 
 ---
 
@@ -26,18 +26,18 @@ docs/_index/
     └── ...
 ```
 
-The manifest is small and always loaded; per-suite files are lazy-loaded only for the suite the user is working with. This is what unblocks `spectra ai generate` on large corpora — the analyzer no longer carries every document's preview into every prompt.
+The manifest is small and always loaded; per-suite files are lazy-loaded only for the suite the user is working with. This is what unblocks `spectra ai generate` on large corpora, because the analyzer no longer carries every document's preview into every prompt.
 
 ## How It Works
 
-1. **Migration check** — On first run after upgrading from a release that wrote a single-file `docs/_index.md`, the indexer auto-migrates: parses the legacy file, groups entries by suite, writes the new layout, and renames the legacy file to `docs/_index.md.bak` for safekeeping. No flag required.
-2. **Discovery** — Scans the configured `source.local_dir` for Markdown files (default `docs/`) using `source.include_patterns` / `source.exclude_patterns`.
-3. **Extraction** — For each changed file, extracts: title, H2/H3 sections with 200-char summaries, key entities (code spans, capitalized phrases, API paths, quoted strings), word count, token estimate (`words × 1.3`), file size, SHA-256 content hash.
-4. **Suite resolution** — Assigns each document to a suite by priority: per-doc frontmatter `suite:` override → `source.group_overrides` config → first directory segment under `local_dir` → `_root` fallback.
-5. **Exclusion patterns** — Documents matching `coverage.analysis_exclude_patterns` (default `**/Old/**`, `**/legacy/**`, `**/archive/**`, `**/release-notes/**`, `**/CHANGELOG*`, `**/SUMMARY.md`) are still indexed and counted in coverage but their suites are flagged `skip_analysis: true` so the AI analyzer skips them by default.
-6. **Spillover** — When a single suite's `tokens_estimated` exceeds `coverage.max_suite_tokens` (default 80,000), per-doc spillover files land at `docs/_index/docs/{sanitized}.index.md` and the suite's manifest entry gains a `spillover_files` list.
-7. **Incremental updates** — Subsequent runs reuse entries whose checksum is unchanged. Only modified files re-extract their metadata.
-8. **Acceptance criteria extraction** — After indexing, `spectra docs index` automatically extracts testable acceptance criteria from the analyzable documents using the configured AI provider and writes to `_criteria_index.yaml`. Use `--skip-criteria` to skip.
+1. On the migration check, the first run after upgrading from a release that wrote a single-file `docs/_index.md` triggers an auto-migration: the indexer parses the legacy file, groups entries by suite, writes the new layout, and renames the legacy file to `docs/_index.md.bak` for safekeeping. No flag required.
+2. Discovery scans the configured `source.local_dir` for Markdown files (default `docs/`) using `source.include_patterns` / `source.exclude_patterns`.
+3. Extraction pulls, for each changed file: title, H2/H3 sections with 200-char summaries, key entities (code spans, capitalized phrases, API paths, quoted strings), word count, token estimate (`words × 1.3`), file size, and SHA-256 content hash.
+4. Suite resolution assigns each document to a suite by priority: per-doc frontmatter `suite:` override, then `source.group_overrides` config, then the first directory segment under `local_dir`, then the `_root` fallback.
+5. Exclusion patterns matter because documents matching `coverage.analysis_exclude_patterns` (default `**/Old/**`, `**/legacy/**`, `**/archive/**`, `**/release-notes/**`, `**/CHANGELOG*`, `**/SUMMARY.md`) are still indexed and counted in coverage, but their suites are flagged `skip_analysis: true` so the AI analyzer skips them by default.
+6. Spillover kicks in when a single suite's `tokens_estimated` exceeds `coverage.max_suite_tokens` (default 80,000): per-doc spillover files land at `docs/_index/docs/{sanitized}.index.md` and the suite's manifest entry gains a `spillover_files` list.
+7. Incremental updates mean subsequent runs reuse entries whose checksum is unchanged, so only modified files re-extract their metadata.
+8. Acceptance criteria extraction happens after indexing: `spectra docs index` automatically extracts testable acceptance criteria from the analyzable documents using the configured AI provider and writes to `_criteria_index.yaml`. Use `--skip-criteria` to skip.
 
 ## Usage
 
@@ -164,7 +164,7 @@ Read every `spectra docs index` run for incremental detection but **never** sent
 }
 ```
 
-Updating this file does not rewrite any per-suite Markdown content — incremental updates touch only the files whose hashes changed.
+Updating this file does not rewrite any per-suite Markdown content, since incremental updates touch only the files whose hashes changed.
 
 ## Frontmatter overrides
 
@@ -209,7 +209,7 @@ suite: my-custom-suite
 }
 ```
 
-Setting `coverage.analysis_exclude_patterns: []` disables all default exclusions. The list **replaces** rather than merges with defaults — explicit `[]` means "exclude nothing".
+Setting `coverage.analysis_exclude_patterns: []` disables all default exclusions. The list **replaces** rather than merges with defaults, so an explicit `[]` means "exclude nothing".
 
 ## Migrating from a legacy `docs/_index.md`
 
@@ -223,7 +223,7 @@ Just run `spectra docs index`. Migration is automatic, atomic, and reversible:
 
 Subsequent runs skip migration (the legacy file is gone) and do incremental updates.
 
-See [Migration: Spec 040](migration-040.md) for the full migration guide.
+See the [Document Index migration guide](migration-040.md) for full details.
 
 ## Pre-flight token budget
 

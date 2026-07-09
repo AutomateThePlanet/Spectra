@@ -7,4 +7,4 @@ permalink: /user-guide
 
 # User Guide
 
-Reference documentation for SPECTRA's CLI commands, configuration, test format, generation profiles, grounding verification, coverage analysis, and Copilot Chat integration.
+Reference documentation for SPECTRA's CLI commands, configuration, test format, generation profiles, grounding verification, coverage analysis, and Claude Code integration.

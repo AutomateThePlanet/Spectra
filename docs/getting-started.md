@@ -9,15 +9,15 @@ Install SPECTRA, authenticate, and generate your first test case suite.
 
 Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md)
 
-> **New in spec 037**: behavior analysis applies six ISTQB test design
-> techniques (EP, BVA, DT, ST, EG, UC) and the analysis output now includes a
+> **Behavior analysis** applies six ISTQB test design
+> techniques (EP, BVA, DT, ST, EG, UC), and the analysis output includes a
 > technique breakdown alongside the category breakdown. Existing projects can
-> adopt the new templates by running `spectra prompts reset --all` — your
+> adopt the latest templates by running `spectra prompts reset --all`; your
 > customized templates are preserved.
 
-> **Optional**: SPECTRA can integrate with [Testimize](testimize-integration.md) for *algorithmic*
-> test data optimization (BVA, EP, pairwise, ABC). Disabled by default, and runs **in-process**
-> as a NuGet dependency — no separate install or MCP server (v1.48.3 moved it off the old
+> SPECTRA can optionally integrate with [Testimize](testimize-integration.md) for *algorithmic*
+> test data optimization (BVA, EP, pairwise, ABC). It's disabled by default, and runs **in-process**
+> as a NuGet dependency, with no separate install or MCP server needed (v1.48.3 moved it off the old
 > `Testimize.MCP.Server` child-process model). Set `testimize.enabled` to `true` in
 > `spectra.config.json`, then verify with `spectra testimize check`. SPECTRA works fine without it.
 
@@ -29,7 +29,7 @@ Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md)
 - Git
 - [Claude Code](https://claude.com/claude-code), installed and signed in to your account
 
-That's the whole list. SPECTRA (v2) makes no model calls of its own — generation, analysis, and
+That's the whole list. SPECTRA (v2) makes no model calls of its own, since generation, analysis, and
 verification all run as turns/subagent calls inside your own Claude Code session, so there's no
 separate AI provider, API key, or authentication step to configure. See
 [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) if you're upgrading
@@ -54,7 +54,7 @@ This creates:
 my-project/
 ├── spectra.config.json                          # Configuration
 ├── docs/                                        # Put your documentation here
-│   └── _index/                                  # Document index v2 (Spec 040, auto-built)
+│   └── _index/                                  # Document index v2 (auto-built)
 │       ├── _manifest.yaml                       # Always loaded into AI prompts (~2-5K tokens)
 │       ├── _checksums.json                      # Hash table; never sent to AI
 │       └── groups/{suite}.index.md              # Per-suite index files, lazy-loaded
@@ -75,20 +75,20 @@ my-project/
 │       ├── spectra-help/SKILL.md                # Help and command reference
 │       ├── spectra-criteria/SKILL.md            # Manage acceptance criteria
 │       ├── spectra-docs/SKILL.md                # Index documentation via Claude Code
-│       └── spectra-execution/SKILL.md           # Drive test execution via Claude Code (launches the run console)
+│       └── spectra-execute/SKILL.md             # Drive test execution via Claude Code (launches the run console)
 └── templates/bug-report.md                      # Bug report template
 ```
 
 `spectra init` also merges `.claude/settings.json` with the permissions Claude Code needs to drive
 SPECTRA: `Bash(spectra *)` plus write/edit access to the `.spectra/` scratch directory. There is no
-MCP allowlist — execution is CLI-only (Spec 070). See [Skills Integration](skills-integration.md).
+MCP allowlist, because execution is CLI-only. See [Skills Integration](skills-integration.md).
 
-> **Manual test runs:** ask the agent to run a suite and it starts the run, launches the local web
-> console (`spectra run console`), and hands you a `http://127.0.0.1:<port>/` URL. You record verdicts —
-> PASS / FAIL / BLOCKED, comment, screenshot — in the browser; the agent stays on-call. See
+> For manual test runs, ask the agent to run a suite and it starts the run, launches the local web
+> console (`spectra run console`), and hands you a `http://127.0.0.1:<port>/` URL. You record verdicts
+> (PASS / FAIL / BLOCKED, comment, screenshot) in the browser, and the agent stays on-call. See
 > [CLI Reference](cli-reference.md) (`spectra run console`).
 
-> The test **execution** agent is a native Claude Code skill (`.claude/skills/spectra-execution/`); it
+> The test **execution** agent is a native Claude Code skill (`.claude/skills/spectra-execute/`); it
 > orchestrates the run and launches the web console rather than driving a per-test loop in chat.
 
 Use `spectra init --skip-skills` if you don't use Claude Code.
@@ -131,7 +131,7 @@ Edit `spectra.config.json` to point to your docs. See [Configuration Reference](
 ```
 
 > There's no generator/critic model to pick here anymore. The `ai` block only paces the
-> deterministic CLI side of generation (batch size, timeouts) — the model doing the actual work is
+> deterministic CLI side of generation (batch size, timeouts); the model doing the actual work is
 > whatever your Claude Code session is running. The `spectra-critic` subagent's model is set in
 > `.claude/agents/spectra-critic.agent.md`. See [Configuration Reference](configuration.md#ai--generation-pacing-no-providermodel-routing-anymore).
 

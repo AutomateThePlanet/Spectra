@@ -17,20 +17,19 @@ Related: [Claude Code v2 vs. the GitHub Copilot SDK v1](../claude-code-v2-migrat
 
 | Subsystem | Purpose | Can be used independently |
 |-----------|---------|--------------------------|
-| **Authoring (generate/update/analyze)** | Generate, update, and analyze test cases from documentation, driven by Claude Code skills over a deterministic CLI seam | Yes — test cases are useful even without the execution engine |
-| **Execution (`spectra run`)** | Execute test cases through a deterministic state machine over SQLite | Yes — works with any Markdown test cases, not just AI-generated ones |
+| **Authoring (generate/update/analyze)** | Generate, update, and analyze test cases from documentation, driven by Claude Code skills over a deterministic CLI seam | Yes, test cases are useful even without the execution engine |
+| **Execution (`spectra run`)** | Execute test cases through a deterministic state machine over SQLite | Yes, works with any Markdown test cases, not just AI-generated ones |
 
-Neither subsystem runs its own AI session anymore. There is **no MCP server** (removed in Spec
-070) and **no in-process model runtime** (the GitHub Copilot SDK was deleted in Spec 069) —
-every model call, on either side, is a turn (or subagent call) inside your interactive Claude Code
-session.
+Neither subsystem runs its own AI session anymore. There is **no MCP server** (removed) and **no
+in-process model runtime** (the GitHub Copilot SDK is gone), so every model call, on either side, is
+a turn (or subagent call) inside your interactive Claude Code session.
 
 ## System Flow
 
 ```
 docs/                              <- Source documentation
   |
-docs/_index/                       <- Per-suite manifest + checksums (Spec 040 v2 layout)
+docs/_index/                       <- Per-suite manifest + checksums (v2 layout)
   |
 spectra ai compile-prompt          <- Deterministic prompt, no model call
   |
@@ -53,11 +52,11 @@ Azure DevOps / Jira / Teams        <- Bug logging via their own separate MCPs
 ## Tech Stack
 
 - **Language:** C# 12, .NET 8+
-- **AI Runtime:** Claude Code (the user's interactive session) — SPECTRA makes no model calls of
+- **AI Runtime:** Claude Code (the user's interactive session). SPECTRA makes no model calls of
   its own; authoring orchestration ships as `.claude/skills/` + `.claude/agents/`
 - **CLI Framework:** System.CommandLine + Spectre.Console
 - **Serialization:** System.Text.Json (data), YamlDotNet (frontmatter)
-- **Execution store:** Microsoft.Data.Sqlite, WAL mode (`.execution/spectra.db`) — CLI-only, no
+- **Execution store:** Microsoft.Data.Sqlite, WAL mode (`.execution/spectra.db`), CLI-only with no
   server process
 - **Storage:** file system (test cases, docs, reports)
 
@@ -73,13 +72,13 @@ src/
 
 ## Key Design Decisions
 
-- **No in-process AI runtime**: every model-touching flow (generation, analysis, criteria
+- SPECTRA has no in-process AI runtime: every model-touching flow (generation, analysis, criteria
   extraction, updates, grounding verification) is a deterministic `compile-*` → in-session turn →
-  `ingest-*` seam. SPECTRA never opens a model session itself.
-- **File-based test case storage**: Test cases are Markdown files with YAML frontmatter. No database for test case definitions.
-- **Deterministic execution**: `spectra run` drives a state machine over SQLite; the AI orchestrator (or the browser console) doesn't hold execution state itself.
-- **Three coverage dimensions**: Documentation, Acceptance Criteria, and Automation coverage are analyzed independently and reported together.
-- **Isolated critic verification**: the `spectra-critic` subagent runs in a fresh, forked context per test — it sees only the artifact and its source docs, never the generator's reasoning.
+  `ingest-*` seam, and SPECTRA never opens a model session itself.
+- Test case storage is file-based: test cases are Markdown files with YAML frontmatter, and there's no database for test case definitions.
+- Execution is deterministic: `spectra run` drives a state machine over SQLite, and the AI orchestrator (or the browser console) doesn't hold execution state itself.
+- Coverage spans three dimensions: Documentation, Acceptance Criteria, and Automation coverage are analyzed independently and reported together.
+- Critic verification is isolated: the `spectra-critic` subagent runs in a fresh, forked context per test, so it sees only the artifact and its source docs, never the generator's reasoning.
 
 For the full history of how this replaced the pre-v2 architecture, see
 [Claude Code v2 vs. the GitHub Copilot SDK v1](../claude-code-v2-migration.md).
