@@ -5,7 +5,94 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — Claude Code migration (v2)
+## [2.4.0] - 2026-07-09 — Claude Code migration (v2)
+
+### Added (Spec 077 — non-stop seam coverage: batch verbs, manifest consumption, general contract preamble)
+
+- **`spectra ai ingest-verdict` gains `--suite --all` batch mode** — enumerates every
+  `.spectra/verdicts/critic-verdict-*.json` for a suite, classifies each, and emits a single
+  `{grounded, partial, hallucinated, errors}` summary, replacing per-test `--from` shell loops.
+- **`spectra ai ingest-update` gains `--all` batch mode** — ingests every staged
+  `.spectra/updates/{suite}/updated-{id}.json` patch in one call and reports
+  `{written, skipped_no_original, errors}`; `--test-id` is now optional when `--all` is set.
+- **`spectra-generate` skill rewritten around the batch verbs** — Step 8a issues one
+  `ingest-verdict --suite --all` call after the critic loop instead of per-test ingestion; Step
+  8b writes repair patches to the new `.spectra/updates/{suite}/updated-{id}.json` staging
+  convention, then batches the ingest, re-critics, and re-ingests verdicts in bulk.
+- **A general "NON-STOP CONTRACT" preamble** now precedes the skill's execution steps, naming
+  four prohibited behaviors (shell loops, interpreter pipes, manual `.md` edits, verdict field
+  rewrites) and requiring the agent to STOP and report whenever no single `spectra` call covers
+  a step, instead of improvising. Manifest files must be read in-context with the Read tool —
+  never piped through `python -c` / `jq` / another interpreter.
+
+### Fixed (Spec 075/076 — critic arithmetic mandate, index-writer path fix, skill failure-branch guard)
+
+- **The critic now independently verifies computed values.** `critic-verification.md` gained an
+  explicit Arithmetic Verification section: whenever an expected result is a computed value
+  (unit conversion, formula output, derived constant), the critic must recompute it itself — a
+  wrong number is never `grounded` just because the underlying principle is documented.
+- **Fixed a poisoned-index bug in the ingest writers.** `IngestTestsCommand` and
+  `IngestUpdateCommand` computed each test's index path relative to the *tests* directory
+  instead of the *suite* directory, corrupting `_index.json` entries on every round after the
+  first. Both now match the bare-filename convention already used by
+  `GeneratedTestIngestor.ParseTestCase`.
+- **`spectra-generate` gained a failure-branch guard** — the post-repair `ingest-grounding --all`
+  result is checked against the kept-grounded count; `written == 0` with `kept-grounded > 0`
+  stops the run and reports rather than silently proceeding or hand-editing test files.
+- Version bumped to 2.3.0 (Spec 075) then finalized at 2.3.x cleanup (Spec 076) with no further
+  functional change beyond the fixes above.
+
+### Fixed (Spec 073/074 — grounding-oracle batch fix)
+
+- **Fixed `audit-grounding`/`compile-repair-batch` always reporting `grounding_written: false`**
+  even when the grounding block existed on disk — both read the test's file path relative to the
+  tests directory instead of the suite directory. Test fixtures were updated to match the real
+  `GeneratedTestIngestor.ParseTestCase` output format.
+- **`spectra ai ingest-grounding` gained a `--suite <s> --all` batch form** — scans
+  `.spectra/verdicts/`, filters by suite, and writes every eligible grounding block in one pass
+  (plain, or `--repaired --repair-attempts N` for post-repair re-verdicts). Idempotent.
+- **`spectra-generate` Steps 8–9 restructured** around the two batch calls instead of per-test
+  `ingest-grounding`, with an explicit shell-improvisation prohibition (no `find`/`grep`/`cat`/`ls`
+  — use `audit-grounding`, `ingest-grounding --all`, `config --raw`, or the Read tool).
+- Version bumped to 2.2.1 (Spec 074) alongside these fixes.
+
+### Added (Spec 072 — repair-orchestration hardening & inspection surface)
+
+- **`spectra ai compile-repair-batch --suite <s>`** — a model-free, resume-aware command that
+  reads every partial verdict, filters to tests still missing a grounding block, and compiles all
+  repair prompts in a single pass as a JSON manifest. Idempotent across resumes.
+- **`spectra ai audit-grounding --suite <s>`** — single source of truth for per-test grounding
+  state (verdict, score, `grounding_written`, `flagged_for_review`, `action_needed`) used both as
+  the repair-loop resume checkpoint and for human inspection, replacing `ls`/grep-frontmatter
+  improvisation.
+- **`spectra show <id>` gained a `file` field** in its result, closing the last reason an agent
+  might reach for `cat _index.json | python -c ...`.
+- `spectra-generate` Step 8 rewritten around a manifest-driven numbered repair loop. Version
+  bumped to 2.2.0.
+
+### Added (Spec 071 — verdict disposition policy)
+
+- **Critic verdicts are now durable and visible.** `grounded` verdicts write a condensed
+  `grounding:` block into the test's frontmatter (verdict, score, verified_at) plus the full
+  verdict JSON under `.spectra/verdicts/`. `partial` verdicts get one bounded repair attempt
+  (compile-repair-prompt → in-session patch → ingest-update → re-critic → ingest-grounding)
+  without blocking the batch. `hallucinated` verdicts are recorded in a
+  `.spectra/dropped-tests.json` trail before the existing clean delete.
+- New CLI verbs: `ingest-grounding`, `record-drop`, `compile-repair-prompt`, `review-flagged`,
+  and a new `spectra-review-flagged` skill.
+
+### Removed (Spec 070 — MCP execution adapter removal)
+
+- **SPECTRA no longer ships its own MCP execution server.** `spectra run` is now the sole
+  execution surface, reversing Spec 065's "keep MCP as a thin adapter." The `Spectra.MCP` project
+  (server, tools, the 25 tool schemas, `spectra-mcp` packaging) and `Spectra.MCP.Tests` were
+  deleted outright; `Spectra.slnx` no longer references them.
+- **`spectra init` no longer emits `.vscode/mcp.json` or an `mcp__spectra__*` allowlist** — the
+  execution skill/agent talk to the engine exclusively through `spectra run`. The separate
+  BELLATRIX/Nova SUT-driver MCP and the Azure DevOps bug-log MCP are unrelated and unaffected.
+- The engine itself (`Spectra.Execution`) is untouched — no coverage was lost; every relevant
+  test was relocated or ported into `Spectra.Execution.Tests`. Latent fix along the way:
+  `spectra run start --selection` now actually applies the saved selection's filters.
 
 ### Changed (Spec 069 — criteria-extraction inversion completion + GitHub Copilot SDK removal)
 
@@ -43,6 +130,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--force`) were already compliant and are unchanged. New `VsCodeMcpConfigInstallerTests` (10) +
   `InitVsCodeMcpMergeTests` (2). BELLATRIX-side conformance (FR-020–FR-025) is tracked separately in
   its own repository.
+
+### Added (Spec 067 — execution agent/SKILL revision: orchestrate, don't drive the loop)
+
+- **The execution agent and skill were rewritten from per-test loop-driver to orchestrator +
+  on-call**, now that the console (Spec 066) owns the verdict loop. The agent selects tests, runs
+  `spectra run start`, launches `spectra run console`, hands over the local URL, and stays
+  on-call — it never presents tests or records verdicts in chat itself.
+- The show→wait→record loop, the Test Presentation block, and the verdict-mapping table were
+  removed from `spectra-execute.md`/`spectra-execution.agent.md` in favor of a console-launch
+  step and an On-call section. A follow-up pass purged remaining chat-driven-loop prose from the
+  quickstart and help skills and corrected a stale doc claim that the execution agent was an
+  unported GitHub Copilot agent.
+
+### Added (Spec 066 — execution console: local detached web server)
+
+- **`spectra run console`** — a local, detached HTTP server (`System.Net.HttpListener`, no
+  ASP.NET Core) serving an ephemeral page where a QA engineer drives a manual run from the
+  browser: current test, PASS/FAIL/BLOCKED, comment, screenshot. It's a third transport over the
+  same `ExecutionEngine`/SQLite store, sibling to the CLI handler and the (now-removed) MCP
+  tools — SQLite stays the single source of truth, so refreshing or reopening the page loses
+  nothing.
+- Confirmed to survive its launcher exiting on Windows; binds `127.0.0.1` with no elevation;
+  `spectra run console --stop` terminates it cleanly.
+
+### Added (Spec 065 — execution surface consolidation: CLI run + MCP-as-adapter)
+
+- **`spectra run …` became a first-class CLI surface** over the same deterministic execution
+  engine used by the (now-removed) MCP server. The engine and storage were extracted into the
+  transport-neutral `Spectra.Execution` class library so short-lived CLI processes and the MCP
+  adapter shared identical behavior — including lossless queue reconstruction (Spec 064).
+- `ExecutionDb` now opens with `PRAGMA journal_mode=WAL; busy_timeout=5000` so concurrent
+  short-lived writers no longer hit `SQLITE_BUSY`.
+
+### Added (Spec 064 — lossless execution-queue reconstruction)
+
+- **Fixed the root cause blocking a CLI-driven execution surface**: the in-memory `TestQueue` was
+  previously reconstructed from SQLite *lossily* (hard-coded priority, no dependency chain,
+  alphabetical re-ordering), so any process that didn't hold the original queue silently lost
+  dependency-blocking and ordering. A durable `queue_snapshot` table now persists the full
+  orchestration state at run-build time, and reconstruction is DB-complete and fails loud
+  (`QueueReconstructionException` / `RECONSTRUCTION_FAILED`) on a missing or inconsistent
+  snapshot instead of silently degrading.
 
 ### Fixed (execution identity stability)
 
@@ -103,6 +232,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Spectra.Core` (558) and `Spectra.MCP` (381) test corpora unchanged and green; CLI corpus gains new
   boundary-gap, ingest-command, and critic-unchanged guard tests.
 
+### Added (Spec 061 — execution report enrichment)
+
+- **Post-run execution reports (JSON/Markdown/HTML) now carry per-test fields already present on
+  the source test case but previously dropped**: priority, tags, component, linked
+  acceptance-criteria IDs, and source-doc refs, plus a run-level timing breakdown. Purely
+  additive — populated from data already passed into the report generator, no new plumbing.
+
+### Added (Spec 060 — coverage-scoped doc exclusions)
+
+- **New `coverage.coverage_exclude_patterns` config** — a third, coverage-scoped document
+  exclusion that drops matched docs from the documentation-coverage denominator only. Excluded
+  docs stay in the document map for generation/analysis/indexing and are reported with a
+  distinct "excluded" status rather than silently vanishing from the count.
+
 ### Changed (Spec 059 — generation-skill inversion + completion)
 
 - **Generation now runs in the interactive session, not in-process.** The `spectra-generate` skill
@@ -142,6 +285,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   generation skill onto the `compile-prompt`/`ingest-tests` seam — is deferred to Spec 059.
 - Surviving config (`analysis.max_prompt_tokens`, `debug.enabled`) and the entire `Spectra.MCP`
   server are unchanged. Both demo repos were migrated to the cleaned schema.
+
+### Summary
+
+v2.4.0 closes out the Claude Code migration: the GitHub Copilot SDK and every in-process model
+path are gone, execution runs entirely through the `spectra run` CLI surface (no MCP server),
+and all generation/criteria/update/critic inference happens in the user's interactive Claude Code
+session via the deterministic compile → in-session → ingest seam. See
+[Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) for a full usage and
+functionality comparison against pre-migration releases, and the
+[AI Models & Cost Guide](ai-models-cost-guide.md) for the updated cost model.
 
 ## [1.52.6] - 2026-06-03 — Test reliability & filter binding hardening (047–051)
 
