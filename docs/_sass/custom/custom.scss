@@ -58,6 +58,11 @@
 .site-footer a:link,
 .site-footer a:visited,
 .site-footer a:hover {
-  color: $spectra-teal-light !important;
+  // Hardcoded (not $spectra-teal-light): this file is compiled into every
+  // Just the Docs color-scheme entry point, including just-the-docs-dark.scss,
+  // which doesn't import our custom "spectra" color scheme — a Sass variable
+  // reference here fails the whole site build with "Undefined variable" on
+  // that entry point.
+  color: #4dd0e1 !important; // == $spectra-teal-light in _sass/color_schemes/spectra.scss
   text-decoration: underline !important;
 }

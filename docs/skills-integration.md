@@ -18,18 +18,22 @@ SPECTRA ships its authoring orchestration — the generation agent plus 13 autho
 
 The critic runs as a Claude Code subagent defined at `.claude/agents/spectra-critic.agent.md` (a `context: fork` subagent). The generation SKILL invokes `spectra-critic` as a **mandatory, explicit step** before a generated test is accepted.
 
-> **Not yet ported (later spec):** the test **execution** agent is still a GitHub Copilot agent at `.github/agents/spectra-execution.agent.md`. Its port to Claude Code is scheduled for a later spec. The in-process GitHub Copilot SDK generation path is also retained transitionally and will be retired in a later provider-retirement spec.
+> **Fully ported (Spec 057/059/069):** the test **execution** agent is a native Claude Code skill/agent
+> (`.claude/skills/spectra-execute/`), not a GitHub Copilot agent. The in-process GitHub Copilot SDK
+> generation path was removed entirely in Spec 069 — there is no transitional in-process path left.
+> See [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) for the full
+> before/after picture.
 
 ## Architecture
 
 ```
-User (Claude Code) → SKILL file → CLI command → JSON output → response
+User (Claude Code) → SKILL file → deterministic CLI commands → a turn in your session → CLI ingest → response
 ```
 
 1. User asks: "Generate test cases for the checkout suite"
-2. The SKILL matches the request and builds: `spectra ai generate --suite checkout --output-format json --verbosity quiet`
-3. The CLI executes and outputs structured JSON
-4. The SKILL parses JSON, runs the mandatory `spectra-critic` subagent step, and presents: "Generated 10 test cases (8 grounded, 1 partial, 1 rejected)"
+2. The `spectra-generate` SKILL runs `spectra ai compile-prompt --suite checkout --count <n>`, which emits a deterministic prompt to stdout — no model call yet
+3. The prompt is answered as an ordinary turn in the user's own Claude Code session
+4. The SKILL persists the result via `spectra ai ingest-tests`, runs the mandatory `spectra-critic` subagent verification step per test, and presents: "Generated 10 test cases (8 grounded, 1 partial, 1 rejected)"
 
 ## Bundled SKILLs
 

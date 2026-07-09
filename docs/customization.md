@@ -21,8 +21,9 @@ output format to AI reasoning strategy.
 | AI reasoning (analysis, generation, verification) | `.spectra/prompts/*.md` | Edit markdown prompt templates |
 | Behavior categories | `spectra.config.json` → `analysis.categories` | Add/remove categories with descriptions |
 | Coverage settings | `spectra.config.json` → `coverage` | Configure dirs, patterns, criteria paths |
-| AI provider & model | `spectra.config.json` → `ai.providers` | Change provider/model |
-| Critic strictness | `spectra.config.json` → `ai.critic` | Change critic model, or skip with `--skip-critic` |
+| Generation pacing (batch size, timeouts) | `spectra.config.json` → `ai` | `generation_batch_size`, `generation_timeout_minutes`, `analysis_timeout_minutes` |
+| Session model used for generation/analysis | Your Claude Code session | Pick the model for your session (`/model`) — generation runs as a turn in it, there's no separate config |
+| Critic model | `.claude/agents/spectra-critic.agent.md` → `model:` frontmatter | Edit the subagent file directly (re-apply after `spectra update-skills` if customized) |
 | Dashboard branding | `spectra.config.json` → `dashboard.branding` | Logo, colors, company name, theme |
 | Claude Code integration | `.claude/skills/<name>/SKILL.md`, `.claude/agents/spectra-critic.agent.md` | Edit authoring SKILL files / critic subagent |
 
@@ -219,39 +220,41 @@ match, and where acceptance criteria live.
 
 ---
 
-## 5. AI Provider & Model
+## 5. AI Model & Batch Tuning
 
-**What it controls**: Which AI model generates test cases and verifies them.
+**What it controls**: How generation/analysis turns are shaped and paced, and which model
+verifies them.
 
 **File**: `spectra.config.json` → `ai`
+
+> **Spec 069 (v2):** there is no provider or model-routing config here anymore. The GitHub Copilot
+> SDK, `ai.providers`, and `ai.critic` (as a config block) were removed outright — SPECTRA makes no
+> model calls of its own. Generation and analysis run as ordinary turns in your own Claude Code
+> session; the model is whatever your session is using (`/model`), not something
+> `spectra.config.json` selects. See
+> [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) and the
+> [AI Models & Cost Guide](ai-models-cost-guide.md) for the full picture. A pre-v2 config with
+> `ai.providers`/`ai.critic` still loads — the keys are simply ignored.
 
 ```json
 {
   "ai": {
-    "providers": [
-      {
-        "name": "azure-anthropic",
-        "model": "claude-sonnet-4-5",
-        "enabled": true
-      }
-    ],
-    "critic": {
-      "enabled": true,
-      "model": "claude-sonnet-4-6"
-    }
+    "generation_batch_size": 30,
+    "generation_timeout_minutes": 5,
+    "analysis_timeout_minutes": 2
   }
 }
 ```
 
-> Spec 058: the critic runs as the spectra-critic subagent; `ai.critic.model` is the only critic selector. The retired critic `provider`/`api_key_env`/`base_url` keys are ignored.
+- `generation_batch_size` — tests requested per generation turn (default 30). Fewer, larger
+  batches mean fewer `compile-prompt`/`ingest-tests` round-trips.
+- `generation_timeout_minutes` / `analysis_timeout_minutes` — bound the deterministic CLI side of
+  the seam (parsing, validation, index writes), not the model turn itself.
 
-**Supported generator providers**: `github-models`, `azure-openai`, `azure-anthropic`,
-`openai`, `anthropic` — all through the GitHub Copilot SDK. (These apply to `ai.providers`, the
-in-process generator, not the critic.)
-
-**Tip**: Use a stronger model for the critic than the generator. The critic
-catches hallucinations the generator introduces — a weaker critic defeats
-the purpose.
+**Critic model**: the `spectra-critic` subagent's model is a static `model:` field in
+`.claude/agents/spectra-critic.agent.md` (shipped as `claude-sonnet-4-6`), not a
+`spectra.config.json` setting. Edit that file directly to change it, and re-apply your edit after
+`spectra update-skills` if you've customized it.
 
 ---
 

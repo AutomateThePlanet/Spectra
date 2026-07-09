@@ -73,15 +73,12 @@ spectra index
 spectra index --rebuild
 ```
 
-### `spectra auth`
+### `spectra auth` — removed (Spec 069)
 
-Check authentication status for all configured providers.
-
-```bash
-spectra auth
-spectra auth -p github-models
-spectra auth -p openai
-```
+There is no `spectra auth` command anymore, and nothing to authenticate separately. SPECTRA makes
+no model calls of its own — inference runs as ordinary turns in your interactive Claude Code
+session, under whichever account is already signed in there. See
+[Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md).
 
 ### `spectra update-skills`
 
@@ -401,14 +398,16 @@ skipped once its block is written. Never double-processes a completed test; neve
 
 - Exit codes: `0` (manifest emitted, possibly empty), `1` suite index not found.
 
-> **Note (Spec 059):** there is no longer a `spectra ai generate` command. Generation runs **in your
-> interactive Claude Code session** via the `spectra-generate` skill, which drives the deterministic
-> model-free seam below: the CLI compiles a grounded prompt, Claude generates in-session, and the CLI
-> ingests/validates the result, with the `spectra-critic` subagent verifying every test. The retired
-> critic keys (`ai.critic.provider`/`api_key_env`/`base_url`, `ai.fallback_strategy`) are ignored with
-> a non-blocking `spectra validate` notice; `ai.critic.model` (default `claude-sonnet-4-6`) is the only
-> critic selector. `ai.providers` and the GitHub Copilot SDK are still used by the in-process
-> criteria-extraction path and Copilot auth (their retirement is a future spec).
+> **Note (Spec 059/069):** there is no longer a `spectra ai generate` command. Generation runs **in
+> your interactive Claude Code session** via the `spectra-generate` skill, which drives the
+> deterministic model-free seam below: the CLI compiles a grounded prompt, Claude generates
+> in-session, and the CLI ingests/validates the result, with the `spectra-critic` subagent verifying
+> every test. The retired critic keys (`ai.critic.provider`/`api_key_env`/`base_url`,
+> `ai.fallback_strategy`) are ignored with a non-blocking `spectra validate` notice;
+> `ai.critic.model` (default `claude-sonnet-4-6`) is the only critic selector. As of Spec 069,
+> `ai.providers` and the GitHub Copilot SDK are gone entirely — criteria extraction runs on this
+> same seam too (`spectra docs changed` → `compile-extraction-prompt` → in-session turn →
+> `ingest-criteria`), and there is no `spectra auth`/Copilot authentication step anymore.
 
 ### Generation (in-session via the `spectra-generate` skill)
 

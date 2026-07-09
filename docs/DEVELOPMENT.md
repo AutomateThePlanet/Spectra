@@ -11,40 +11,45 @@ Related: [Getting Started](getting-started.md) | [CLI Reference](cli-reference.m
 
 ---
 
+> **v2 note:** the `Spectra.MCP` project was removed entirely in Spec 070 — execution is CLI-only
+> (`spectra run`). If you're looking for MCP server build/run instructions from an older version of
+> this page, they no longer apply. See
+> [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md).
+
 ## Quick Start
 
 ```bash
-# Build and install tools
+# Build and install the tool
 dotnet build -c Release -p:NoWarn=CA1062
 dotnet pack src/Spectra.CLI/Spectra.CLI.csproj -c Release -p:NoWarn=CA1062
-dotnet pack src/Spectra.MCP/Spectra.MCP.csproj -c Release -p:NoWarn=CA1062
 dotnet tool install -g --add-source src/Spectra.CLI/nupkg Spectra.CLI
-dotnet tool install -g --add-source src/Spectra.MCP/nupkg Spectra.MCP
 
 # Verify
 spectra --help
-spectra-mcp --help
 ```
 
 ## Prerequisites
 
 - .NET 8.0+ SDK
 - Git
+- [Claude Code](https://claude.com/claude-code) — needed to actually drive generation/analysis/
+  criteria/update/verification turns; the CLI alone only does the deterministic bookkeeping
 
 ## Project Structure
 
 ```
 src/
-├── Spectra.CLI/       # AI test generation CLI
-├── Spectra.MCP/       # MCP execution server
-├── Spectra.Core/      # Shared library (parsing, validation, models, coverage)
-└── Spectra.GitHub/    # GitHub integration (future)
+├── Spectra.CLI/        # CLI: authoring commands (compile-*/ingest-* seam) + spectra run
+├── Spectra.Core/        # Shared library (parsing, validation, models, coverage)
+├── Spectra.Execution/    # Transport-neutral execution engine, driven solely by spectra run
+└── Spectra.GitHub/       # GitHub integration (future)
 
 tests/
-├── Spectra.CLI.Tests/     # CLI unit/integration tests
-├── Spectra.MCP.Tests/     # MCP server tests
-├── Spectra.Core.Tests/    # Core library tests
-└── TestFixtures/          # Sample test data
+├── Spectra.CLI.Tests/          # CLI unit/integration tests
+├── Spectra.Core.Tests/         # Core library tests
+├── Spectra.Execution.Tests/    # Execution engine tests
+├── Spectra.Integration.Tests/  # Cross-spec generation→persistence→execution
+└── TestFixtures/                # Sample test data
     ├── docs/              # Sample documentation
     └── test-cases/        # Sample test case suites with _index.json
 ```
@@ -53,7 +58,7 @@ tests/
 
 ```bash
 dotnet build                                    # Entire solution
-dotnet build src/Spectra.MCP/Spectra.MCP.csproj # Specific project
+dotnet build src/Spectra.CLI/Spectra.CLI.csproj # Specific project
 dotnet build -c Release                         # Release mode
 ```
 
@@ -61,7 +66,7 @@ dotnet build -c Release                         # Release mode
 
 ```bash
 dotnet test                          # All tests
-dotnet test tests/Spectra.MCP.Tests/ # Specific project
+dotnet test tests/Spectra.CLI.Tests/ # Specific project
 dotnet test -v n                     # Verbose output
 ```
 
@@ -72,37 +77,22 @@ dotnet test -v n                     # Verbose output
 ```bash
 dotnet run --project src/Spectra.CLI -- validate --path tests/TestFixtures
 dotnet run --project src/Spectra.CLI -- dashboard --output ./site
-dotnet run --project src/Spectra.CLI -- ai generate checkout --count 5
+dotnet run --project src/Spectra.CLI -- run start checkout --priorities high
 ```
 
-### MCP Server (from source)
+There is no `dotnet run … -- ai generate …` anymore — generation is skill-driven from inside
+Claude Code, not a standalone CLI command. See
+[Generation (in-session via the `spectra-generate` skill)](cli-reference.md#generation-in-session-via-the-spectra-generate-skill).
+
+### Install as a Global Tool
 
 ```bash
-# Against TestFixtures
-dotnet run --project src/Spectra.MCP -- "tests/TestFixtures"
-
-# Against your project
-dotnet run --project src/Spectra.MCP -- /path/to/your/project
-```
-
-The MCP server uses stdio transport. It expects JSON-RPC messages on stdin and writes responses to stdout.
-
-### Install as Global Tools
-
-```bash
-# Pack and install
 dotnet pack src/Spectra.CLI/Spectra.CLI.csproj -c Release
-dotnet pack src/Spectra.MCP/Spectra.MCP.csproj -c Release
-
 dotnet tool uninstall -g Spectra.CLI 2>/dev/null
-dotnet tool uninstall -g Spectra.MCP 2>/dev/null
-
 dotnet tool install -g --add-source src/Spectra.CLI/nupkg Spectra.CLI
-dotnet tool install -g --add-source src/Spectra.MCP/nupkg Spectra.MCP
 
 # Run from anywhere
 spectra validate
-spectra-mcp /path/to/project
 ```
 
 ### Dashboard (from source)
@@ -117,70 +107,13 @@ cd site && python -m http.server 8080
 # or: dotnet serve -d site -p 8080
 ```
 
-### MCP Server Configuration
-
-**VS Code (project-level)** — `.vscode/mcp.json`:
-
-```json
-{
-  "servers": {
-    "spectra": {
-      "command": "spectra-mcp",
-      "args": ["."]
-    }
-  }
-}
-```
-
-**VS Code (from source)** — `.vscode/mcp.json`:
-
-```json
-{
-  "servers": {
-    "spectra": {
-      "command": "dotnet",
-      "args": [
-        "run", "--project",
-        "C:/SourceCode/Spectra/src/Spectra.MCP/Spectra.MCP.csproj",
-        "--", "${workspaceFolder}"
-      ]
-    }
-  }
-}
-```
-
-**Claude Desktop** — `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "spectra": {
-      "command": "spectra-mcp",
-      "args": ["C:/path/to/your/test/project"]
-    }
-  }
-}
-```
-
-**Claude Code** — `.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "spectra": {
-      "command": "spectra-mcp",
-      "args": ["."]
-    }
-  }
-}
-```
-
 ## Using TestFixtures
 
 The `tests/TestFixtures/` folder contains ready-to-use sample data:
 
 ```bash
-dotnet run --project src/Spectra.MCP -- tests/TestFixtures
+dotnet run --project src/Spectra.CLI -- validate --path tests/TestFixtures
+dotnet run --project src/Spectra.CLI -- run list-suites --path tests/TestFixtures
 ```
 
 Available suites in fixtures: auth (3 test cases), checkout (1 test case).
@@ -203,27 +136,15 @@ Ensure your test case folder has `test-cases/` with suite subdirectories contain
 spectra index --rebuild
 ```
 
-### MCP server exits immediately
-
-Check that:
-1. The base path argument is valid
-2. The `.execution/` directory can be created
-3. No other process is using the SQLite database
-
-### VS Code doesn't see the MCP server
-
-1. Verify `.vscode/mcp.json` exists
-2. Verify `spectra-mcp` is in PATH (`where spectra-mcp`)
-3. Test manually: `echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | spectra-mcp .`
-4. Reload VS Code window after changing MCP config
-
 ### "No spectra.config.json found"
 
 ```bash
 spectra init
 ```
 
-### AI provider not available
+### A generation/analysis/criteria/update turn doesn't seem to be running
 
-1. For GitHub Copilot: Ensure you're signed in to GitHub in VS Code
-2. For BYOK: Set the API key environment variable (`OPENAI_API_KEY` or `ANTHROPIC_API_KEY`)
+There's no AI provider to check — SPECTRA makes no model calls of its own. Make sure you're
+actually driving the flow from inside Claude Code (e.g. "generate test cases for the checkout
+suite"), not calling `spectra ai compile-prompt`/`ingest-tests` outside a session with nothing to
+answer the compiled prompt.

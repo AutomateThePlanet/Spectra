@@ -6,9 +6,10 @@ nav_order: 1
 
 # Architecture Overview
 
-How SPECTRA's two subsystems work together.
+How SPECTRA's two subsystems work together, as of the v2 (Claude Code) migration.
 
-Related: [Full Technical Specification](../../spec-kit/architecture.md)
+Related: [Claude Code v2 vs. the GitHub Copilot SDK v1](../claude-code-v2-migration.md) |
+[How Test Case Generation Works](analysis/cli-vs-chat-generation.md)
 
 ---
 
@@ -16,52 +17,69 @@ Related: [Full Technical Specification](../../spec-kit/architecture.md)
 
 | Subsystem | Purpose | Can be used independently |
 |-----------|---------|--------------------------|
-| **AI CLI** | Generate, update, and analyze test cases from documentation | Yes — test cases are useful even without the execution engine |
-| **MCP Engine** | Execute test cases through deterministic AI-orchestrated protocol | Yes — works with any Markdown test cases, not just AI-generated ones |
+| **Authoring (generate/update/analyze)** | Generate, update, and analyze test cases from documentation, driven by Claude Code skills over a deterministic CLI seam | Yes — test cases are useful even without the execution engine |
+| **Execution (`spectra run`)** | Execute test cases through a deterministic state machine over SQLite | Yes — works with any Markdown test cases, not just AI-generated ones |
+
+Neither subsystem runs its own AI session anymore. There is **no MCP server** (removed in Spec
+070) and **no in-process model runtime** (the GitHub Copilot SDK was deleted in Spec 069) —
+every model call, on either side, is a turn (or subagent call) inside your interactive Claude Code
+session.
 
 ## System Flow
 
 ```
-docs/                        <- Source documentation
+docs/                              <- Source documentation
   |
-docs/_index.md               <- Pre-built document index (incremental)
+docs/_index/                       <- Per-suite manifest + checksums (Spec 040 v2 layout)
   |
-AI Test Generation CLI       <- GitHub Copilot SDK (sole AI runtime)
-  |                            Supports: github-models, azure-openai,
-test-cases/                  <-          azure-anthropic, openai, anthropic
+spectra ai compile-prompt          <- Deterministic prompt, no model call
   |
-MCP Execution Engine         <- Deterministic state machine
+(a turn in YOUR Claude Code        <- Generation/analysis/criteria/update all run here
+ session, driven by a skill)
   |
-LLM Orchestrator             <- Copilot Chat, Claude, any MCP client
-  | (as needed)
-Azure DevOps / Jira / Teams  <- Bug logging, notifications via their MCPs
+spectra ai ingest-tests            <- Fail-loud validate + persist
+  |
+spectra-critic subagent            <- context: fork verification, per test
+  |
+test-cases/                        <- Markdown + YAML frontmatter test cases
+  |
+spectra run                        <- Deterministic execution state machine (SQLite)
+  |
+spectra run console (optional)     <- Local browser UI for manual verdict recording
+  |
+Azure DevOps / Jira / Teams        <- Bug logging via their own separate MCPs
 ```
 
 ## Tech Stack
 
 - **Language:** C# 12, .NET 8+
-- **AI Runtime:** GitHub Copilot SDK (sole runtime for all AI operations)
+- **AI Runtime:** Claude Code (the user's interactive session) — SPECTRA makes no model calls of
+  its own; authoring orchestration ships as `.claude/skills/` + `.claude/agents/`
 - **CLI Framework:** System.CommandLine + Spectre.Console
 - **Serialization:** System.Text.Json (data), YamlDotNet (frontmatter)
-- **MCP Server:** ASP.NET Core (stdio transport, JSON-RPC 2.0)
-- **Storage:** Microsoft.Data.Sqlite (execution state), file system (test cases, reports)
+- **Execution store:** Microsoft.Data.Sqlite, WAL mode (`.execution/spectra.db`) — CLI-only, no
+  server process
+- **Storage:** file system (test cases, docs, reports)
 
 ## Project Structure
 
 ```
 src/
-├── Spectra.CLI/       # AI test generation CLI
-├── Spectra.Core/      # Shared library (parsing, validation, models, coverage)
-├── Spectra.MCP/       # MCP execution server
-└── Spectra.GitHub/    # GitHub integration (future)
+├── Spectra.CLI/        # CLI: authoring commands (compile-*/ingest-* seam) + spectra run
+├── Spectra.Core/       # Shared library (parsing, validation, models, coverage)
+├── Spectra.Execution/  # Transport-neutral execution engine, driven solely by spectra run
+└── Spectra.GitHub/     # GitHub integration (future)
 ```
 
 ## Key Design Decisions
 
-- **Single AI runtime**: All AI operations go through the GitHub Copilot SDK. No separate agent implementations per provider.
+- **No in-process AI runtime**: every model-touching flow (generation, analysis, criteria
+  extraction, updates, grounding verification) is a deterministic `compile-*` → in-session turn →
+  `ingest-*` seam. SPECTRA never opens a model session itself.
 - **File-based test case storage**: Test cases are Markdown files with YAML frontmatter. No database for test case definitions.
-- **Deterministic execution**: The MCP engine is a state machine. The AI orchestrator doesn't hold execution state.
+- **Deterministic execution**: `spectra run` drives a state machine over SQLite; the AI orchestrator (or the browser console) doesn't hold execution state itself.
 - **Three coverage dimensions**: Documentation, Acceptance Criteria, and Automation coverage are analyzed independently and reported together.
-- **Dual-model verification**: Generator and critic are separate models to catch hallucination.
+- **Isolated critic verification**: the `spectra-critic` subagent runs in a fresh, forked context per test — it sees only the artifact and its source docs, never the generator's reasoning.
 
-For the full technical specification, see [spec-kit/architecture.md](../../spec-kit/architecture.md).
+For the full history of how this replaced the pre-v2 architecture, see
+[Claude Code v2 vs. the GitHub Copilot SDK v1](../claude-code-v2-migration.md).

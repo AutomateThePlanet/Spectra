@@ -15,12 +15,11 @@ Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md)
 > adopt the new templates by running `spectra prompts reset --all` — your
 > customized templates are preserved.
 
-> **New in spec 038 (optional)**: SPECTRA can integrate with
-> [Testimize.MCP.Server](testimize-integration.md) for *algorithmic* test
-> data optimization (BVA, EP, pairwise, ABC). Disabled by default. Install
-> with `dotnet tool install --global Testimize.MCP.Server`, set
-> `testimize.enabled` to `true` in `spectra.config.json`, then verify with
-> `spectra testimize check`. SPECTRA works fine without Testimize.
+> **Optional**: SPECTRA can integrate with [Testimize](testimize-integration.md) for *algorithmic*
+> test data optimization (BVA, EP, pairwise, ABC). Disabled by default, and runs **in-process**
+> as a NuGet dependency — no separate install or MCP server (v1.48.3 moved it off the old
+> `Testimize.MCP.Server` child-process model). Set `testimize.enabled` to `true` in
+> `spectra.config.json`, then verify with `spectra testimize check`. SPECTRA works fine without it.
 
 ---
 
@@ -28,12 +27,13 @@ Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md)
 
 - .NET 8.0+ SDK
 - Git
-- VS Code with GitHub Copilot (for MCP execution)
-- GitHub Copilot Chat extension (for MCP support)
-- One of the following authentication options (for AI test generation):
-  - GitHub CLI authenticated (`gh auth login`)
-  - `GITHUB_TOKEN` environment variable
-  - `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` for alternative providers
+- [Claude Code](https://claude.com/claude-code), installed and signed in to your account
+
+That's the whole list. SPECTRA (v2) makes no model calls of its own — generation, analysis, and
+verification all run as turns/subagent calls inside your own Claude Code session, so there's no
+separate AI provider, API key, or authentication step to configure. See
+[Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) if you're upgrading
+from a pre-v2 install that used to require `gh auth login` / `spectra auth`.
 
 ## Install
 
@@ -79,7 +79,9 @@ my-project/
 └── templates/bug-report.md                      # Bug report template
 ```
 
-`spectra init` also writes a `.claude/settings.json` with the tool allowlist Claude Code needs to drive SPECTRA. The allowlist content (including the MCP execution tools) is covered in the execution setup — see [Skills Integration](skills-integration.md) and the execution setup next step.
+`spectra init` also merges `.claude/settings.json` with the permissions Claude Code needs to drive
+SPECTRA: `Bash(spectra *)` plus write/edit access to the `.spectra/` scratch directory. There is no
+MCP allowlist — execution is CLI-only (Spec 070). See [Skills Integration](skills-integration.md).
 
 > **Manual test runs:** ask the agent to run a suite and it starts the run, launches the local web
 > console (`spectra run console`), and hands you a `http://127.0.0.1:<port>/` URL. You record verdicts —
@@ -121,102 +123,17 @@ Edit `spectra.config.json` to point to your docs. See [Configuration Reference](
     "dir": "test-cases/"
   },
   "ai": {
-    "providers": [
-      { "name": "github-models", "model": "gpt-4.1", "enabled": true }
-    ],
-    "critic": {
-      "enabled": true,
-      "model": "claude-sonnet-4-6"
-    }
+    "generation_batch_size": 30,
+    "generation_timeout_minutes": 5,
+    "analysis_timeout_minutes": 2
   }
 }
 ```
 
-> **Spec 058:** the critic runs as the spectra-critic subagent; `ai.critic.model` (default `claude-sonnet-4-6`) is the only critic selector — the retired `provider`/`api_key_env`/`base_url` keys are ignored. The in-process *generator* still uses `ai.providers`. `spectra init -i` offers an **AI Model Preset** menu for the generator/critic models.
-
-## Authentication
-
-SPECTRA requires authentication to access AI providers. Check your status:
-
-```bash
-spectra auth
-```
-
-Output:
-
-```
-SPECTRA Authentication Status
-========================================
-
-github-models        [OK] via gh-cli
-openai               [NOT CONFIGURED]
-                       Set the OPENAI_API_KEY environment variable
-anthropic            [NOT CONFIGURED]
-                       Set the ANTHROPIC_API_KEY environment variable
-```
-
-### GitHub Models (Recommended)
-
-**Option 1: GitHub CLI (Recommended)**
-
-```bash
-gh auth login
-spectra auth -p github-models
-```
-
-SPECTRA automatically detects `gh auth token` and uses it.
-
-**Option 2: Environment Variable**
-
-```bash
-# Create a GitHub token at https://github.com/settings/tokens (scope: read:user)
-export GITHUB_TOKEN="ghp_your_token_here"
-
-# Windows PowerShell
-$env:GITHUB_TOKEN = "ghp_your_token_here"
-```
-
-### OpenAI
-
-```bash
-export OPENAI_API_KEY="sk-your_key_here"
-spectra auth -p openai
-```
-
-### Anthropic
-
-```bash
-export ANTHROPIC_API_KEY="sk-ant-your_key_here"
-spectra auth -p anthropic
-```
-
-### Custom Environment Variables
-
-Override the default environment variable name in config:
-
-```json
-{
-  "ai": {
-    "providers": [
-      {
-        "name": "openai",
-        "model": "gpt-4.1",
-        "api_key_env": "MY_CUSTOM_OPENAI_KEY",
-        "enabled": true
-      }
-    ]
-  }
-}
-```
-
-### Troubleshooting Authentication
-
-| Problem | Solution |
-|---------|----------|
-| "GitHub CLI is installed but not authenticated" | Run `gh auth login` |
-| "GitHub CLI is not installed" | Install from https://cli.github.com/ or use `GITHUB_TOKEN` |
-| "API key not found" | Verify with `echo $OPENAI_API_KEY` (or `$env:OPENAI_API_KEY` on Windows) |
-| Wrong provider being used | Check provider order in `spectra.config.json` — first enabled wins |
+> There's no generator/critic model to pick here anymore. The `ai` block only paces the
+> deterministic CLI side of generation (batch size, timeouts) — the model doing the actual work is
+> whatever your Claude Code session is running. The `spectra-critic` subagent's model is set in
+> `.claude/agents/spectra-critic.agent.md`. See [Configuration Reference](configuration.md#ai--generation-pacing-no-providermodel-routing-anymore).
 
 ## First Run
 

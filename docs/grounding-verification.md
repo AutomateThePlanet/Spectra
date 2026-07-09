@@ -156,7 +156,10 @@ Configure the critic in `spectra.config.json`:
 > subagent invoked by the generation skill after generation — not an in-process model call.
 > `ai.critic.model` is the only critic selector. The retired `provider`, `api_key_env`, and
 > `base_url` keys are ignored (`spectra validate` emits a non-blocking notice if they are still
-> present). The generator still runs in-process via `ai.providers`.
+> present). **Spec 069:** the generator no longer runs in-process either — `ai.providers` was
+> removed along with the GitHub Copilot SDK. Generation now runs as an ordinary turn in your
+> Claude Code session, driven by the `spectra-generate` skill over the compile→ingest seam. See
+> [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md).
 
 > **Spec 043 — parallel verification:** `max_concurrent` (default `1`) controls how many critic verification calls run concurrently. Setting it to `5` typically cuts the critic phase to ~1/5 of sequential time on a large suite without changing any output (results are written in original input order). Clamped to `[1, 20]`. Values >10 emit a rate-limit-risk warning at run start. If you start hitting rate limits, the Run Summary panel surfaces a `Rate limits` count with a hint pointing back at this knob.
 
