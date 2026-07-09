@@ -1,22 +1,22 @@
 ---
-title: Usage (Copilot Chat)
+title: Usage Guide
 parent: User Guide
 nav_order: 9
 ---
 
-# SPECTRA Usage Guide — VS Code Copilot Chat
+# SPECTRA Usage Guide
 
-This guide shows how to use SPECTRA through VS Code Copilot Chat. Every workflow below shows what to say and what to expect. For configuration and customization details, see `CUSTOMIZATION.md`.
+This guide shows how to use SPECTRA through Claude Code. Every workflow below shows what to say and what to expect. For configuration and customization details, see [Customization](customization.md).
 
 ## Prerequisites
 
-1. VS Code with the GitHub Copilot extension installed.
-2. `spectra init` completed in your project (creates SKILL files in `.github/skills/` and the bundled agent prompts in `.github/agents/`).
+1. [Claude Code](https://claude.com/claude-code), installed and signed in.
+2. `spectra init` completed in your project (creates SKILL files in `.claude/skills/` and the critic subagent in `.claude/agents/`).
 3. Documentation files present in `docs/` (the source material for test generation and acceptance criteria).
 
 ## Getting Started
 
-Open Copilot Chat in VS Code (Ctrl+Shift+I) and select the **SPECTRA Generation** agent for any of the workflows below. For test execution use the **SPECTRA Execution** agent. If you don't know which workflow you want, just ask the assistant "help me get started" — the bundled `spectra-quickstart` SKILL will walk you through the options.
+Open Claude Code in your project and just ask — the bundled skills match natural-language requests to the right workflow automatically; there's no menu to pick from. If you don't know where to start, ask "help me get started" and the bundled `spectra-quickstart` skill will walk you through the options.
 
 ---
 
@@ -38,12 +38,11 @@ The most common workflow. Three levels of specificity:
 
 ### What to expect
 
-1. A live progress page opens in a tab showing analysis status.
-2. Analysis phase: testable behaviors identified, existing coverage shown.
-3. You approve the count → generation begins.
-4. Test cases are verified by the critic model and written in batches.
-5. Results show: test cases created, verification verdicts, file paths.
-6. Optional: suggestions for additional coverage areas.
+1. Analysis phase: testable behaviors identified, existing coverage shown.
+2. You approve the count → generation begins as a turn in the same session.
+3. Each generated test is verified by the `spectra-critic` subagent before it's accepted.
+4. Results show: test cases created, verification verdicts, file paths.
+5. Optional: suggestions for additional coverage areas.
 
 ### Follow-up prompts
 
@@ -62,17 +61,16 @@ After generating, you can continue:
 
 ### What to expect
 
-1. Each document is processed individually (no truncation).
-2. SHA-256 hashing skips documents that haven't changed since the last extraction.
-3. Results are reported per document with criteria counts grouped by RFC 2119 level (MUST/SHOULD/MAY).
-4. Files created: `docs/criteria/{docname}.criteria.yaml` and a master `docs/criteria/_criteria_index.yaml`.
-5. **Inconclusive extractions are retried, not cached** (Spec 047). If the AI returns an unparseable or empty response, the extractor retries up to one more time with a short backoff. Documents that remain inconclusive after retries are reported under `failed_documents` and re-attempted on the next run instead of being silently skipped. A genuine "no criteria found" result (the AI returns a valid empty list) is cached normally.
-6. `--force` remains the full re-extraction escape hatch — it ignores the hash cache and re-extracts every document.
-7. **Coverage guards (Spec 048)**: `spectra docs index` emits a prominent non-blocking warning when it indexed documents but produced 0 criteria across the corpus, naming the recovery command (`spectra ai analyze --extract-criteria`). Similarly, `spectra ai generate` attaches a non-blocking note to the result when the target suite has no matching acceptance criteria, so you know generated tests will not contribute to acceptance-criteria coverage. Neither guard blocks; both surface in the JSON result.
+1. Each document is processed individually (no truncation), and only documents that changed since the last extraction are re-processed (SHA-256 content hashing).
+2. Results are reported per document with criteria counts grouped by RFC 2119 level (MUST/SHOULD/MAY).
+3. Files created: `docs/criteria/{docname}.criteria.yaml` and a master `docs/criteria/_criteria_index.yaml`.
+4. **Inconclusive extractions are retried, not cached.** If a document's extraction comes back unparseable or empty, it's retried once more with a short backoff. Documents that remain inconclusive after retries are reported under `failed_documents` and re-attempted on the next run instead of being silently skipped. A genuine "no criteria found" result (a real, valid empty list) is cached normally.
+5. `--force` remains the full re-extraction escape hatch — it ignores the hash cache and re-extracts every document.
+6. **Coverage guards**: `spectra docs index` emits a prominent non-blocking warning when it indexed documents but produced 0 criteria across the corpus, naming the recovery command (`spectra ai analyze --extract-criteria`). Similarly, `spectra ai generate` attaches a non-blocking note to the result when the target suite has no matching acceptance criteria, so you know generated tests will not contribute to acceptance-criteria coverage. Neither guard blocks; both surface in the JSON result.
 
 ### Troubleshooting
 
-**"Indexed but 0 criteria"** — `spectra docs index` finished but the corpus produced no acceptance criteria. This usually means every per-document extraction came back inconclusive (transient model glitches, rate limits, or output truncation). Run `spectra ai analyze --extract-criteria` to retry just the extraction phase on the documents that need it. The exit code on `docs index` is still success — the warning is informational, not a failure.
+**"Indexed but 0 criteria"** — `spectra docs index` finished but the corpus produced no acceptance criteria. This usually means every per-document extraction came back inconclusive (transient glitches or output truncation). Run `spectra ai analyze --extract-criteria` to retry just the extraction phase on the documents that need it. The exit code on `docs index` is still success — the warning is informational, not a failure.
 
 **"No acceptance criteria matched suite 'X'"** — `spectra ai generate` completed but no criteria matched the suite by component, source-doc, or file-name. Generated tests have no criteria linkage; acceptance-criteria coverage will not include them. If criteria are expected for this suite, run `spectra ai analyze --extract-criteria`. If criteria intentionally don't apply (e.g., a quick `--from-description` test), the note is just informational.
 
@@ -88,7 +86,7 @@ After generating, you can continue:
 > "Import acceptance criteria from jira-export.csv"
 > "Import criteria from sprint-42.yaml and replace existing"
 
-Supported formats: CSV (with auto-detection of Jira/ADO column layouts), YAML, and JSON. Compound criteria are automatically split by AI into individual entries. Imports merge by default; pass replace mode if you want to overwrite the target file.
+Supported formats: CSV (with auto-detection of Jira/ADO column layouts), YAML, and JSON. Imports merge by default; pass replace mode if you want to overwrite the target file.
 
 ---
 
@@ -129,13 +127,13 @@ Checks: required frontmatter fields, unique test IDs, valid priority enum values
 
 > "Update test cases for checkout — the payment docs changed"
 
-Classifies every test case in the suite as **UP_TO_DATE**, **OUTDATED**, **ORPHANED**, or **REDUNDANT** (deterministic, no model). For each **OUTDATED** test, the assistant then **edits the affected parts in-session** through a deterministic seam — `compile-update-prompt` builds an edit prompt from the existing test plus the changed docs/criteria, the assistant edits it, and `ingest-update` validates and persists it. The edit **preserves the test's id and any manual verdict/notes**, and **fails loud** if it would change a field the doc change didn't implicate (priority, component, tags) — so untouched fields can't silently drift. UP_TO_DATE tests are left alone; ORPHANED/REDUNDANT tests are flagged for your review, not edited.
+Classifies every test case in the suite as **UP_TO_DATE**, **OUTDATED**, **ORPHANED**, or **REDUNDANT** (deterministic, no model call). For each **OUTDATED** test, the assistant then **edits the affected parts in-session** through a deterministic seam — `compile-update-prompt` builds an edit prompt from the existing test plus the changed docs/criteria, the assistant edits it, and `ingest-update` validates and persists it. The edit **preserves the test's id and any manual verdict/notes**, and **fails loud** if it would change a field the doc change didn't implicate (priority, component, tags) — so untouched fields can't silently drift. UP_TO_DATE tests are left alone; ORPHANED/REDUNDANT tests are flagged for your review, not edited.
 
 ---
 
-## Verdict Disposition (Spec 071)
+## Verdict Disposition
 
-The critic assigns every generated test a verdict — **grounded**, **partial**, or **hallucinated** — and the `spectra-generate` skill now makes those verdicts durable and visible.
+The critic assigns every generated test a verdict — **grounded**, **partial**, or **hallucinated** — and those verdicts are made durable and visible, not just used to accept/reject in the moment.
 
 ### What happens automatically (in-batch)
 
@@ -155,7 +153,7 @@ After a batch run, review tests still marked `flagged_for_review: true`:
 
 The `spectra-review-flagged` skill lists each flagged test with its condensed verdict and lets you choose per test:
 - **Accept as-is** — clears `flagged_for_review`, keeps the partial block as acknowledged.
-- **Retry repair** — one more bounded `compile-repair-prompt` cycle.
+- **Retry repair** — one more bounded repair cycle.
 - **Delete** — writes a `user_decided` trail entry then performs the clean three-phase delete.
 
 To list flagged tests without an interactive session:
@@ -175,73 +173,34 @@ spectra ai review-flagged --suite checkout --no-interaction --output-format json
 
 `.spectra/verdicts/` and `.spectra/dropped-tests.json` are gitignored scratch — they survive the run but are not committed.
 
-### Repair Batch & Resume (Spec 072 + 073 + 077)
+### Repair Batch & Resume
 
-When a batch has many partials, the `spectra-generate` skill's Step 8 runs a **manifest-driven** repair loop that completes reliably across sessions:
+When a batch has many partials, the `spectra-generate` skill runs a **manifest-driven** repair loop that completes reliably across sessions, batching the mechanical steps instead of looping per test:
 
-**NON-STOP CONTRACT (general — Steps 7–9):** Every step must be a single `Bash(spectra *)` call or a `Write` to a spectra-authored path. If no single `spectra` call covers a step, STOP and report a missing affordance. Shell loops over per-test verbs, piping spectra output to any interpreter (`python`, `jq`, etc.), manual `.md` editing, and verdict field rewrites by hand are prohibited. Never accept a "scripting for all projects" allowlist option.
+1. `spectra ai compile-repair-batch --suite <s>` reads all partial verdict JSONs, filters to those still missing a grounding block, and compiles every repair prompt into one JSON manifest — deterministic, no model call.
+2. For each manifest entry, the assistant patches the test in-session and writes the corrected test JSON to `.spectra/updates/<suite>/updated-<id>.json`.
+3. Once all repairs are staged, they're ingested in **one batch call**: `spectra ai ingest-update <suite> --all`.
+4. Each repaired test is re-verified by the `spectra-critic` subagent, then all resulting verdicts are classified in **one batch call**: `spectra ai ingest-verdict --suite <s> --all`.
+5. All resulting grounding blocks are written in **one batch call**: `spectra ai ingest-grounding --suite <s> --all --repaired`.
+6. If interrupted or the session runs out, re-running from step 1 picks up exactly where it left off — the grounding block already written into a test's `.md` frontmatter is the resume checkpoint, so nothing is double-processed or restarted from scratch.
 
-**8a — Per-test critic loop + batch verdict-ingest + batch grounding-ingest (Spec 073 + 075 + 077):**
-```bash
-# After the 8a critic loop completes:
-# 1. Classify all verdict files in one call (Spec 077):
-spectra ai ingest-verdict --suite <s> --all --output-format json
-# 2. Write all grounded tests in one call (Spec 073):
-spectra ai ingest-grounding --suite <s> --all --output-format json
-# (partial tests are skipped by the pre-repair filter — their blocks are written after 8b)
-```
-
-**After the grounding batch call, check `written` against kept-grounded count (Spec 075 — mandatory):**
-- `written == kept-grounded` → proceed to 8b normally.
-- `written == 0` AND `kept-grounded > 0` → **STOP and report** the anomaly. Likely cause: `_index.json` paths are suite-prefixed (path-doubling bug). Run `spectra ai audit-grounding --suite <s>` to diagnose, then report to the user. Do NOT proceed to 8b. Do NOT edit `.md` files by hand.
-- `written < kept-grounded` (partial write) → surface a warning, then continue to 8b. Run `audit-grounding` to identify missing blocks.
-
-**8b — Manifest-driven repair loop + batch ingest-update + batch verdict-ingest + batch grounding-ingest (Spec 073 + 077):**
-1. `spectra ai compile-repair-batch --suite <s>` → reads all partial verdict JSONs, filters to those without a grounding block, compiles every repair prompt in one pass, emits a JSON manifest. Model-free, deterministic.
-2. **Manifest consumption:** If output exceeded inline capacity and was saved to a tool-results file, use the **Read tool** to read it. Iterate over JSON entries **in-context** — do NOT pipe to `python -c`, `jq`, or any interpreter.
-3. For each manifest entry (repair phase — Write tool only, no CLI calls per entry):
-   - Agent reads the `prompt` field, patches the test in-session.
-   - Writes corrected test JSON to `.spectra/updates/<suite>/updated-<id>.json` (Write tool).
-4. After all repairs staged — **batch ingest** (one call, no loop, Spec 077):
-   ```bash
-   spectra ai ingest-update <suite> --all --output-format json
-   ```
-5. Re-critic phase: for each repaired test, invoke `spectra-critic` subagent (irreducibly per-test); read verdict file after subagent returns.
-6. After re-critic phase — **batch verdict-ingest** (one call, Spec 077):
-   ```bash
-   spectra ai ingest-verdict --suite <s> --all --output-format json
-   ```
-7. After batch verdict-ingest — **batch grounding-ingest** (one call, Spec 073):
-   ```bash
-   spectra ai ingest-grounding --suite <s> --all --repaired --repair-attempts 1 --output-format json
-   ```
-8. On interruption or session exhaustion: re-run from step 1 — the filter skips already-grounded tests. Never restarts from scratch; never double-processes.
-
-**Resume oracle:** `spectra ai audit-grounding --suite <s>` reports per-test grounding state (id, verdict, score, grounding_written, flagged, action_needed) and summary counts. `grounding_written` reflects the **actual `.md` frontmatter on disk** (Spec 073 oracle fix — `test-cases/{suite}/{id}.md`, `grounding:` field).
+To check resume state or inspect grounding status directly:
 
 ```bash
 spectra ai audit-grounding --suite smoke --output-format json   # resume checkpoint: grounding_written==false → still needs repair
 spectra ai compile-repair-batch --suite smoke                   # re-run: emits only the remaining ungrounded partials
 ```
 
-The grounding block in `.md` frontmatter is the done-marker — a test is skipped once its block is written. Every repair step is either a `Write` to a spectra path or a `Bash(spectra *)` call — no shell improvisation, no allowlist prompts mid-run. The `--all` batch forms eliminate per-test shell loops for verdict, update, and grounding-ingest entirely.
-
 ---
 
-## Executing Tests via MCP
+## Executing Tests
 
 > "Run the smoke test selection"
 > "Execute the checkout suite"
 
-Switch to the **SPECTRA Execution** agent for this workflow. The agent orchestrates: it starts the run,
-launches the local web console, and hands you the URL — you record each PASS/FAIL/SKIP/BLOCKED verdict in
-the browser console (see [Driving a Run from the Web Console](#driving-a-run-from-the-web-console) below),
-and finalize generates an HTML report. Saved selections (like `smoke`) live in `spectra.config.json` and
-let you run a curated subset without naming individual test IDs.
+The execution skill orchestrates: it starts the run, launches the local web console, and hands you the URL — you record each PASS/FAIL/SKIP/BLOCKED verdict in the browser console (see [Driving a Run from the Web Console](#driving-a-run-from-the-web-console) below), and finalize generates an HTML report. Saved selections (like `smoke`) live in `spectra.config.json` and let you run a curated subset without naming individual test IDs.
 
-### Prerequisite
-
-The MCP server must be running. Check `.vscode/mcp.json` for the connection configuration — `spectra init` writes a working default.
+Execution is CLI-only (`spectra run`, driving `.execution/spectra.db`) — there is no server to run or configure.
 
 ---
 
@@ -260,9 +219,9 @@ spectra run console                 # prints a http://127.0.0.1:<port>/ URL — 
 spectra run console --stop          # stop the detached server
 ```
 
-No MCP server, no tokens, no network beyond localhost. The console runs detached (survives closing the
-launching terminal) and the page is ephemeral/gitignored. See `cli-reference.md` for the full command and
-`deployment.md` for how it differs from the static dashboard.
+No server config, no tokens, no network beyond localhost. The console runs detached (survives closing the
+launching terminal) and the page is ephemeral/gitignored. See [CLI Reference](cli-reference.md) for the full command and
+[Deployment](deployment.md) for how it differs from the static dashboard.
 
 ---
 
@@ -271,7 +230,7 @@ launching terminal) and the page is ephemeral/gitignored. See `cli-reference.md`
 > "Create a test generation profile for our API team"
 > "Set up a custom test format with request/response fields"
 
-Generation profiles control test output format — frontmatter fields, step structure, custom keys. The bundled init flow seeds `profiles/_default.yaml`; you can copy it to a named profile and customize it. Set the active profile in `spectra.config.json` under `ai.profile`. See `CUSTOMIZATION.md` for the full reference.
+Generation profiles control test output format — frontmatter fields, step structure, custom keys. The bundled init flow seeds `profiles/_default.yaml`; you can copy it to a named profile and customize it. Set the active profile in `spectra.config.json` under `ai.profile`. See [Customization](customization.md) for the full reference.
 
 ---
 
@@ -296,7 +255,7 @@ There are four customization surfaces:
 3. **Behavior categories** in `spectra.config.json` — control what kinds of behaviors the analyzer considers.
 4. **Focus filtering** — runtime focus passed via natural language ("focusing on security and error handling").
 
-For the complete customization reference, see `CUSTOMIZATION.md`.
+For the complete customization reference, see [Customization](customization.md).
 
 ---
 
@@ -304,11 +263,11 @@ For the complete customization reference, see `CUSTOMIZATION.md`.
 
 ### A command appears stuck or waiting for input
 
-All bundled SKILLs pass non-interactive flags. If you see a hang, your installed SKILL files may be out of date — refresh them with the spectra CLI's update-skills command. Customizations you've made to SKILL files are preserved by hash tracking.
+All bundled SKILLs pass non-interactive flags. If you see a hang, your installed SKILL files may be out of date — refresh them with `spectra update-skills`. Customizations you've made to SKILL files are preserved by hash tracking.
 
 ### Stale terminology in your installed SKILLs
 
-Same fix — refresh installed SKILL files with the update-skills command.
+Same fix — refresh installed SKILL files with `spectra update-skills`.
 
 ### Dashboard coverage section empty
 
@@ -324,15 +283,15 @@ Re-generate after extracting criteria. Generation auto-loads related criteria as
 
 ### Filter ignored / the whole suite ran
 
-If you asked to run only high-priority (or tagged/component) tests but the whole suite started, you were almost certainly sending the filter in the wrong shape. Use the **canonical top-level arrays** — the same shape on both `start_execution_run` and `find_test_cases`:
+If you asked to run only high-priority (or tagged/component) tests but the whole suite started, you were almost certainly sending the filter in the wrong shape. Use the **canonical top-level arrays** shape:
 
 ```json
 { "suite": "checkout", "priorities": ["high"], "tags": ["smoke"], "components": ["payments"] }
 ```
 
-Values within one array are OR'd; different arrays are AND'd. As of Spec 051 a misplaced field (top-level singular `priority`, or a nested `filters: { ... }` wrapper) no longer slips through silently — it returns an `INVALID_PARAMS` error that names the field and suggests the correct one, so the next attempt lands on the right shape. The legacy nested `filters` object is still accepted but deprecated.
+Values within one array are OR'd; different arrays are AND'd. A misplaced field (top-level singular `priority`, or a nested `filters: { ... }` wrapper) no longer slips through silently — it returns an error that names the field and suggests the correct one, so the next attempt lands on the right shape. The legacy nested `filters` object is still accepted but deprecated.
 
-> Note: run-mode tag matching is now **OR-within-array** (any listed tag), matching `find_test_cases`. Previously a multi-tag run-filter required *all* tags; if you relied on that AND behavior via the legacy nested shape, split it into separate runs or filter the results.
+> Note: run-mode tag matching is **OR-within-array** (any listed tag). If you need "match all of these tags," split it into separate runs or filter the results afterward.
 
 ---
 
