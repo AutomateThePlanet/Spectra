@@ -169,16 +169,14 @@ public sealed class TestClassifier
 
         foreach (var test in tests)
         {
-            // Find source content for this test
-            string? sourceContent = null;
-            foreach (var sourceRef in test.SourceRefs)
-            {
-                if (sourceContents.TryGetValue(sourceRef, out var content))
-                {
-                    sourceContent = content;
-                    break;
-                }
-            }
+            // Classify against every referenced document that was found, not just the first:
+            // join the distinct contents (refs to sections of one file share its content).
+            var found = test.SourceRefs
+                .Select(sourceRef => sourceContents.TryGetValue(sourceRef, out var content) ? content : null)
+                .Where(content => content is not null)
+                .Distinct()
+                .ToList();
+            var sourceContent = found.Count > 0 ? string.Join("\n\n", found) : null;
 
             var otherTests = tests.Where(t => t.Id != test.Id).ToList();
             results.Add(Classify(test, sourceContent, otherTests, criteria));

@@ -96,39 +96,10 @@ public sealed class GroundingWriteBackService
             CondensedFindings = nonGrounded
         };
 
-        var updated = CopyWithGrounding(original, grounding);
+        // `with` keeps every other field (and the source layout), so only the grounding block changes.
+        var updated = original with { Grounding = grounding };
         await _writer.WriteAsync(testFilePath, updated, ct);
 
         return new WriteBackResult { Outcome = WriteBackOutcome.Success, Grounding = grounding };
     }
-
-    private static TestCase CopyWithGrounding(TestCase original, GroundingMetadata grounding) => new()
-    {
-        Id = original.Id,
-        FilePath = original.FilePath,
-        Priority = original.Priority,
-        Tags = original.Tags,
-        Component = original.Component,
-        Description = original.Description,
-        Preconditions = original.Preconditions,
-        Environment = original.Environment,
-        EstimatedDuration = original.EstimatedDuration,
-        DependsOn = original.DependsOn,
-        SourceRefs = original.SourceRefs,
-        ScenarioFromDoc = original.ScenarioFromDoc,
-        RelatedWorkItems = original.RelatedWorkItems,
-        Custom = original.Custom,
-        AutomatedBy = original.AutomatedBy,
-        Requirements = original.Requirements,
-        Criteria = original.Criteria,
-        Bugs = original.Bugs,
-        Status = original.Status,
-        OrphanedReason = original.OrphanedReason,
-        OrphanedDate = original.OrphanedDate,
-        Title = original.Title,
-        Steps = original.Steps,
-        ExpectedResult = original.ExpectedResult,
-        TestData = original.TestData,
-        Grounding = grounding
-    };
 }

@@ -25,7 +25,7 @@ public sealed class UpdateCommand : Command
 
         var diffOption = new Option<bool>(
             ["--diff", "-d"],
-            "Show diff of proposed changes without applying");
+            "Show diff of proposed changes");
 
         var deleteOrphanedOption = new Option<bool>(
             "--delete-orphaned",

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Spectra.Core.Models;
 
@@ -27,6 +28,12 @@ public sealed partial class TestCaseParser
 
     [GeneratedRegex(@"^\d+\.\s+(.+)$", RegexOptions.Multiline)]
     private static partial Regex NumberedListRegex();
+
+    [GeneratedRegex(@"^#\s+.+$")]
+    private static partial Regex TitleLineRegex();
+
+    [GeneratedRegex(@"^##\s+")]
+    private static partial Regex SectionHeaderRegex();
 
     /// <summary>
     /// Parses a test case from Markdown content.
@@ -107,10 +114,192 @@ public sealed partial class TestCaseParser
             Title = title,
             Steps = steps,
             ExpectedResult = expectedResult ?? "",
-            TestData = testData
+            TestData = testData,
+            Status = frontmatter.Status,
+            OrphanedReason = frontmatter.OrphanedReason,
+            OrphanedDate = ParseOrphanedDate(frontmatter.OrphanedDate)
         };
 
-        return ParseResult<TestCase>.Success(testCase);
+        return ParseResult<TestCase>.Success(AttachLayout(testCase, markdown));
+    }
+
+    /// <summary>
+    /// Frontmatter keys the typed model reads. Everything else is preserved verbatim as an unknown key.
+    /// </summary>
+    public static readonly IReadOnlySet<string> KnownFrontmatterKeys = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "id", "priority", "tags", "component", "description", "preconditions", "environment",
+        "depends_on", "source_refs", "scenario_from_doc", "estimated_duration", "criteria",
+        "requirements", "related_work_items", "bugs", "automated_by", "custom", "status",
+        "orphaned_reason", "orphaned_date", "grounding"
+    };
+
+    private TestCase AttachLayout(TestCase baseline, string markdown)
+    {
+        if (!_frontmatterParser.TrySplitRaw(markdown, out var frontmatterText, out var rawBody))
+        {
+            return baseline;
+        }
+
+        IReadOnlyList<FrontmatterEntry> entries;
+        try
+        {
+            entries = CaptureFrontmatterEntries(frontmatterText);
+        }
+        catch (YamlDotNet.Core.YamlException)
+        {
+            // The typed parse already succeeded, so this should not happen; without a reliable layout
+            // the writer falls back to canonical output.
+            return baseline;
+        }
+
+        var layout = new TestCaseLayout(
+            baseline,
+            entries,
+            CaptureBodySegments(rawBody),
+            DetectNewline(markdown));
+
+        return baseline with { Layout = layout };
+    }
+
+    private static IReadOnlyList<FrontmatterEntry> CaptureFrontmatterEntries(string yaml)
+    {
+        var keyStarts = new List<(string Key, int Index)>();
+        var parser = new YamlDotNet.Core.Parser(new StringReader(yaml));
+        var depth = 0;
+        var expectKey = true;
+
+        while (parser.MoveNext())
+        {
+            switch (parser.Current)
+            {
+                case YamlDotNet.Core.Events.MappingStart:
+                case YamlDotNet.Core.Events.SequenceStart:
+                    depth++;
+                    break;
+                case YamlDotNet.Core.Events.MappingEnd:
+                case YamlDotNet.Core.Events.SequenceEnd:
+                    depth--;
+                    if (depth == 1) expectKey = true; // a collection value finished
+                    break;
+                case YamlDotNet.Core.Events.Scalar scalar when depth == 1:
+                    if (expectKey) keyStarts.Add((scalar.Value, (int)scalar.Start.Index));
+                    expectKey = !expectKey;
+                    break;
+                case YamlDotNet.Core.Events.AnchorAlias when depth == 1:
+                    expectKey = !expectKey;
+                    break;
+            }
+        }
+
+        var entries = new List<FrontmatterEntry>(keyStarts.Count);
+        for (var i = 0; i < keyStarts.Count; i++)
+        {
+            // The first entry also carries any leading comment lines.
+            var start = i == 0 ? 0 : keyStarts[i].Index;
+            var end = i + 1 < keyStarts.Count ? keyStarts[i + 1].Index : yaml.Length;
+            var key = keyStarts[i].Key;
+            entries.Add(new FrontmatterEntry(key, yaml[start..end], KnownFrontmatterKeys.Contains(key)));
+        }
+
+        return entries;
+    }
+
+    private static IReadOnlyList<BodySegment> CaptureBodySegments(string body)
+    {
+        var boundaries = new List<(int Index, BodySegmentKind Kind)>();
+        var seenKinds = new HashSet<BodySegmentKind>();
+        var titleSeen = false;
+        var titleLineEnd = -1;
+
+        var pos = 0;
+        while (pos < body.Length)
+        {
+            var lineBreak = body.IndexOf('\n', pos);
+            var nextPos = lineBreak < 0 ? body.Length : lineBreak + 1;
+            var line = body[pos..(lineBreak < 0 ? body.Length : lineBreak)].TrimEnd('\r');
+
+            if (!titleSeen && TitleLineRegex().IsMatch(line))
+            {
+                boundaries.Add((pos, BodySegmentKind.Title));
+                titleSeen = true;
+                titleLineEnd = nextPos;
+            }
+            else if (SectionHeaderRegex().IsMatch(line))
+            {
+                var kind = ClassifySectionHeader(line);
+                if (kind != BodySegmentKind.Unknown && !seenKinds.Add(kind))
+                {
+                    kind = BodySegmentKind.Unknown;
+                }
+
+                boundaries.Add((pos, kind));
+            }
+
+            pos = nextPos;
+        }
+
+        var segments = new List<BodySegment>();
+        var firstBoundary = boundaries.Count > 0 ? boundaries[0].Index : body.Length;
+        if (firstBoundary > 0)
+        {
+            segments.Add(new BodySegment(BodySegmentKind.Leading, body[..firstBoundary]));
+        }
+
+        for (var i = 0; i < boundaries.Count; i++)
+        {
+            var (start, kind) = boundaries[i];
+            var end = i + 1 < boundaries.Count ? boundaries[i + 1].Index : body.Length;
+
+            if (kind == BodySegmentKind.Title)
+            {
+                segments.Add(new BodySegment(BodySegmentKind.Title, body[start..titleLineEnd]));
+                if (end > titleLineEnd)
+                {
+                    segments.Add(new BodySegment(BodySegmentKind.Intro, body[titleLineEnd..end]));
+                }
+            }
+            else
+            {
+                segments.Add(new BodySegment(kind, body[start..end]));
+            }
+        }
+
+        return segments;
+    }
+
+    private static BodySegmentKind ClassifySectionHeader(string line)
+    {
+        if (PreconditionsHeaderRegex().IsMatch(line)) return BodySegmentKind.Preconditions;
+        if (StepsHeaderRegex().IsMatch(line)) return BodySegmentKind.Steps;
+        if (ExpectedResultHeaderRegex().IsMatch(line)) return BodySegmentKind.ExpectedResult;
+        if (TestDataHeaderRegex().IsMatch(line)) return BodySegmentKind.TestData;
+        return BodySegmentKind.Unknown;
+    }
+
+    private static string DetectNewline(string markdown)
+    {
+        var lineBreak = markdown.IndexOf('\n');
+        return lineBreak > 0 && markdown[lineBreak - 1] == '\r' ? "\r\n" : "\n";
+    }
+
+    private static DateTimeOffset? ParseOrphanedDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (DateTime.TryParseExact(value.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var date))
+        {
+            return new DateTimeOffset(date, TimeSpan.Zero);
+        }
+
+        return DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal,
+            out var parsed)
+            ? parsed
+            : null;
     }
 
     /// <summary>

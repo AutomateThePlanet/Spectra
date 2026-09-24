@@ -1,11 +1,14 @@
+using System.Text.Json.Serialization;
 using Spectra.Core.Models.Grounding;
+using YamlDotNet.Serialization;
 
 namespace Spectra.Core.Models;
 
 /// <summary>
 /// Represents a parsed test case from a Markdown file.
+/// A record so writer paths can copy a parsed test with <c>with</c> and change only the fields they own.
 /// </summary>
-public sealed class TestCase
+public sealed record TestCase
 {
     // Identity
     /// <summary>
@@ -140,4 +143,13 @@ public sealed class TestCase
     /// Grounding verification metadata (if verified).
     /// </summary>
     public GroundingMetadata? Grounding { get; init; }
+
+    /// <summary>
+    /// Source layout captured when the test was parsed from a file (raw frontmatter entries, raw body
+    /// segments, baseline values). Lets the writer reproduce unchanged content verbatim. Null for tests
+    /// built in memory.
+    /// </summary>
+    [JsonIgnore]
+    [YamlIgnore]
+    public TestCaseLayout? Layout { get; init; }
 }

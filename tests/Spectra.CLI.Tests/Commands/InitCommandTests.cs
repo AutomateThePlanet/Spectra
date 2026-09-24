@@ -136,6 +136,21 @@ public class InitCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task HandleAsync_GitIgnoresRunStatusFiles_WithoutDuplicates()
+    {
+        // Spec 078: classify-only runs still write these; they must not dirty `git status`.
+        var gitIgnorePath = Path.Combine(_testDir, ".gitignore");
+        await File.WriteAllTextAsync(gitIgnorePath, "node_modules/\n");
+
+        Assert.Equal(ExitCodes.Success, await new InitHandler(_logger, _testDir).HandleAsync(force: false));
+        Assert.Equal(ExitCodes.Success, await new InitHandler(_logger, _testDir).HandleAsync(force: true));
+
+        var content = await File.ReadAllTextAsync(gitIgnorePath);
+        Assert.Equal(1, content.Split(".spectra-result.json").Length - 1);
+        Assert.Equal(1, content.Split(".spectra-progress.html").Length - 1);
+    }
+
+    [Fact]
     public async Task HandleAsync_ConfigContainsValidJson()
     {
         // Arrange

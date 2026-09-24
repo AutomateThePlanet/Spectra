@@ -67,24 +67,13 @@ public sealed class TestEditor
         Console.WriteLine();
         Console.WriteLine("Changes saved.");
 
-        return new TestCase
+        // `with` keeps every field the editor does not touch (criteria, grounding, links, ...).
+        return test with
         {
-            Id = test.Id,
             Title = title,
             Priority = priority,
-            Tags = test.Tags,
-            Component = test.Component,
-            Preconditions = test.Preconditions,
-            Environment = test.Environment,
-            EstimatedDuration = test.EstimatedDuration,
-            DependsOn = test.DependsOn,
-            SourceRefs = test.SourceRefs,
-            RelatedWorkItems = test.RelatedWorkItems,
-            Custom = test.Custom,
             Steps = steps,
-            ExpectedResult = expectedResult,
-            TestData = test.TestData,
-            FilePath = test.FilePath
+            ExpectedResult = expectedResult
         };
     }
 

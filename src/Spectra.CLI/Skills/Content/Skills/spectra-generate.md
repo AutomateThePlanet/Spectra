@@ -408,7 +408,7 @@ Read the named SKILL first, then follow its steps exactly. Do NOT invent CLI com
 
 | Task | SKILL | CLI command |
 |------|-------|-------------|
-| Update test cases | `spectra-update` | `spectra ai update --suite {suite} --no-interaction --output-format json --verbosity quiet` |
+| Update test cases | `spectra-update` | `spectra ai update --suite {suite} --dry-run --no-interaction --output-format json --verbosity quiet` |
 | Coverage analysis | `spectra-coverage` | `spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet` |
 | Dashboard | `spectra-dashboard` | `spectra ai analyze --coverage --auto-link ... && spectra dashboard --output ./site ...` |
 | Extract criteria | `spectra-criteria` | `spectra ai analyze --extract-criteria --no-interaction --output-format json --verbosity quiet` |

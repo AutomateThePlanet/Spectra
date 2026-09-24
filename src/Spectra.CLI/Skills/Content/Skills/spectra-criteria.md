@@ -8,7 +8,7 @@ tools: [{{GENERATE_TOOLS}}]
 
 You manage acceptance criteria in SPECTRA. Extraction runs **in this session** through a deterministic
 CLI seam — the CLI never calls a model. It **compiles a grounded prompt** per document, *you* perform the
-extraction turn in your own context (reading the document with your file tools), and the CLI **ingests**
+extraction turn in your own context (the compiled prompt already carries the document text), and the CLI **ingests**
 and validates what you produced. The seam, per document:
 
 ```
@@ -66,9 +66,9 @@ spectra ai compile-extraction-prompt --doc {path} --component {component} --outp
   empty; nothing to extract. Skip it (no model turn, no ingest needed).
 - Exit 4 (refused) → show the `message` and skip that doc.
 
-**2b. Extract IN-SESSION**: Read the compiled prompt. Use your file tools to read `{path}` and identify
-every testable acceptance criterion exactly as the prompt specifies. Produce ONLY the JSON array the
-prompt describes. **Write it to `.spectra/criteria.json`** with the Write tool.
+**2b. Extract IN-SESSION**: Read the compiled prompt — it already contains the full document text; do not
+read `{path}` separately — and identify every testable acceptance criterion exactly as the prompt
+specifies. Produce ONLY the JSON array the prompt describes. **Write it to `.spectra/criteria.json`** with the Write tool.
 
 **2c. Ingest (fail-loud)**:
 ```

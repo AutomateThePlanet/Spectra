@@ -3,6 +3,7 @@ using System.Text.Json;
 using Spectra.CLI.Generation;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
+using Spectra.CLI.Source;
 using Spectra.CLI.Verification;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
@@ -212,7 +213,7 @@ public sealed class CompileCriticPromptCommand : Command
             {
                 try
                 {
-                    docs = await LoadDocumentsFromRefsAsync(test.SourceRefs, currentDir, ct);
+                    docs = await SourceRefDocumentLoader.LoadAsync(test.SourceRefs, currentDir, failOnMissing: true, ct);
                 }
                 catch (FileNotFoundException ex)
                 {
@@ -332,37 +333,6 @@ public sealed class CompileCriticPromptCommand : Command
                 if (item.GetString() is string s) values.Add(s);
         }
         return values;
-    }
-
-    /// <summary>
-    /// Resolves each source_ref to its file on disk (stripping any fragment) and loads its content.
-    /// Deduplicates by resolved path. Throws <see cref="FileNotFoundException"/> when a ref cannot
-    /// be found — callers should surface this as a distinct error (not a silent empty list).
-    /// </summary>
-    private static async Task<IReadOnlyList<SourceDocument>> LoadDocumentsFromRefsAsync(
-        IReadOnlyList<string> sourceRefs, string currentDir, CancellationToken ct)
-    {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var docs = new List<SourceDocument>();
-        foreach (var r in sourceRefs)
-        {
-            var file = r.Split('#')[0].Trim();
-            if (string.IsNullOrWhiteSpace(file))
-                continue;
-            var full = Path.IsPathRooted(file) ? file : Path.Combine(currentDir, file);
-            if (!seen.Add(Path.GetFullPath(full)))
-                continue;
-            if (!File.Exists(full))
-                throw new FileNotFoundException($"Source ref not found: {r}", full);
-            var content = await File.ReadAllTextAsync(full, ct);
-            docs.Add(new SourceDocument
-            {
-                Path = Path.GetRelativePath(currentDir, full).Replace('\\', '/'),
-                Title = Path.GetFileNameWithoutExtension(full),
-                Content = content
-            });
-        }
-        return docs;
     }
 
     private static async Task<IReadOnlyList<SourceDocument>> LoadDocumentsAsync(

@@ -395,6 +395,9 @@ public sealed class InitHandler
             ".spectra/critic-verdict.json",
             ".spectra/seam-progress.html",
             ".spectra/skills-manifest.json",
+            // Spec 078: run-status files every long-running command writes (incl. dry runs).
+            ".spectra-result.json",
+            ".spectra-progress.html",
         };
         var newEntries = new List<string>();
 

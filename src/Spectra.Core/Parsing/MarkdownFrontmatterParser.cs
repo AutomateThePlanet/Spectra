@@ -126,18 +126,50 @@ public sealed class MarkdownFrontmatterParser
         return ParseResult<(T, string)>.Success((frontmatterResult.Value, body));
     }
 
+    /// <summary>
+    /// Splits a Markdown string into its raw frontmatter text (between the opening and closing
+    /// <c>---</c> lines, including the last content line's line break) and its raw body (everything
+    /// after the closing delimiter line's line break, untrimmed). Returns false when there is no
+    /// frontmatter block.
+    /// </summary>
+    public bool TrySplitRaw(string markdown, out string frontmatter, out string body)
+    {
+        frontmatter = string.Empty;
+        body = markdown;
+
+        var document = Markdown.Parse(markdown, Pipeline);
+        var yamlBlock = document.Descendants<YamlFrontMatterBlock>().FirstOrDefault();
+        if (yamlBlock is null)
+        {
+            return false;
+        }
+
+        frontmatter = ExtractYamlContent(markdown, yamlBlock);
+
+        var afterBlock = yamlBlock.Span.End + 1;
+        if (afterBlock < markdown.Length && markdown[afterBlock] == '\r') afterBlock++;
+        if (afterBlock < markdown.Length && markdown[afterBlock] == '\n') afterBlock++;
+        body = afterBlock <= markdown.Length ? markdown[afterBlock..] : string.Empty;
+        return true;
+    }
+
     private static string ExtractYamlContent(string markdown, YamlFrontMatterBlock yamlBlock)
     {
-        // Extract the raw text of the YAML block
-        var span = yamlBlock.Span;
-        var rawText = markdown.Substring(span.Start, span.Length);
+        // The block spans "---<nl>...<nl>---". Keep the exact text between the delimiter lines.
+        var rawText = markdown.Substring(yamlBlock.Span.Start, yamlBlock.Span.Length);
 
-        // Split into lines and remove --- delimiters
-        var lines = rawText.Split('\n')
-            .Select(l => l.TrimEnd('\r'))
-            .Where(l => l.Trim() != "---")
-            .ToList();
+        var firstBreak = rawText.IndexOf('\n');
+        if (firstBreak < 0)
+        {
+            return string.Empty;
+        }
 
-        return string.Join('\n', lines);
+        var lastLineStart = rawText.LastIndexOf('\n') + 1;
+        if (lastLineStart <= firstBreak + 1)
+        {
+            return string.Empty;
+        }
+
+        return rawText[(firstBreak + 1)..lastLineStart];
     }
 }
