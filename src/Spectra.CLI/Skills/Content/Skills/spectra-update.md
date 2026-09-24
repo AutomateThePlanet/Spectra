@@ -43,8 +43,9 @@ Write `.spectra/progress.json` with the Write tool:
 
 Run with the Bash tool:
 ```
-spectra ai update --suite <suite> --diff --no-interaction --output-format json --verbosity quiet
+spectra ai update --suite <suite> --diff --dry-run --no-interaction --output-format json --verbosity quiet
 ```
+This step only classifies: with `--dry-run` it never writes a test file or `_index.json`.
 Replace `<suite>` with the suite the user mentions (e.g., "checkout", "login", "payments").
 The progress page auto-refreshes — the user can watch live. While it runs, do NOTHING —
 don't poll the terminal, list directories, or read files; just wait for it to complete. Once it finishes, open `.spectra-progress.html` using the VS Code preview (IDE preview tool) to see the run summary. If an IDE preview is not available, run `spectra open .spectra-progress.html`.

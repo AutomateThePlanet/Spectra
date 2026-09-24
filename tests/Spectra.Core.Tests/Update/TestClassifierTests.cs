@@ -201,4 +201,68 @@ Use the modern approach for better results.
         Assert.NotNull(result.Reason);
         Assert.NotEmpty(result.Reason);
     }
+
+    // ---- Spec 078: classification uses every resolved source document ----
+
+    private static TestCase MultiRefTest(params string[] refs) => CreateTestCase(
+        "TC-078",
+        "alpha bravo",
+        ["charlie delta"],
+        "echo foxtrot",
+        refs);
+
+    [Fact]
+    public void ClassifyBatch_OneRefMissingOnePresent_IsNotOrphaned()
+    {
+        var classifier = new TestClassifier();
+        var contents = new Dictionary<string, string>
+        {
+            ["docs/a.md#One"] = "alpha bravo charlie delta echo foxtrot"
+        };
+
+        var result = Assert.Single(classifier.ClassifyBatch([MultiRefTest("docs/gone.md", "docs/a.md#One")], contents));
+
+        Assert.NotEqual(UpdateClassification.Orphaned, result.Classification);
+    }
+
+    [Fact]
+    public void ClassifyBatch_UsesTextOfAllResolvedRefs()
+    {
+        var classifier = new TestClassifier();
+        var contents = new Dictionary<string, string>
+        {
+            ["docs/a.md"] = "alpha bravo charlie",
+            ["docs/b.md"] = "delta echo foxtrot"
+        };
+
+        var firstOnly = Assert.Single(classifier.ClassifyBatch([MultiRefTest("docs/a.md")], contents));
+        var both = Assert.Single(classifier.ClassifyBatch([MultiRefTest("docs/a.md", "docs/b.md")], contents));
+
+        Assert.Equal(UpdateClassification.Outdated, firstOnly.Classification);
+        Assert.Equal(UpdateClassification.UpToDate, both.Classification);
+    }
+
+    [Fact]
+    public void ClassifyBatch_NoRefResolved_IsOrphanedNotFound()
+    {
+        var classifier = new TestClassifier();
+
+        var result = Assert.Single(classifier.ClassifyBatch(
+            [MultiRefTest("docs/gone.md", "docs/also-gone.md#S")],
+            new Dictionary<string, string>()));
+
+        Assert.Equal(UpdateClassification.Orphaned, result.Classification);
+        Assert.Equal("Source document not found or empty", result.Reason);
+    }
+
+    [Fact]
+    public void ClassifyBatch_AllResolvedDocsEmpty_StaysOrphaned()
+    {
+        var classifier = new TestClassifier();
+        var contents = new Dictionary<string, string> { ["docs/empty.md"] = "" };
+
+        var result = Assert.Single(classifier.ClassifyBatch([MultiRefTest("docs/empty.md")], contents));
+
+        Assert.Equal(UpdateClassification.Orphaned, result.Classification);
+    }
 }

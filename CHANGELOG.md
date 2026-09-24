@@ -5,6 +5,73 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-09-24 — Lossless test writes and doc-reference resolution
+
+### Changed — Breaking (Spec 078)
+
+- **`spectra ai update --no-interaction` no longer applies changes.** On its own it now classifies
+  and reports only: it prints the classification tables, writes `.spectra-result.json`, and leaves
+  every test file and `_index.json` untouched. Applying without interactive review needs the global
+  `--no-review` flag. **CI that relied on `--no-interaction` to mark or delete orphans must add
+  `--no-review`**, e.g. `spectra ai update checkout --no-interaction --no-review`.
+- **`--dry-run` now produces the full result.** With `--diff` it used to exit before writing
+  `.spectra-result.json`; without `--diff` it still reached the interactive reviewer. A dry run now
+  classifies, prints the tables, writes the result and never prompts.
+- **`.spectra-result.json` gains `applied`** — `false` for dry runs and classify-only runs, `true`
+  when the apply step ran — so a run that changed nothing can be told apart from one that was not
+  allowed to.
+- **The critic and repair prompt compilers resolve `source_refs` with the same rules as
+  `ai update`.** Legacy bare refs (`file.md`) now resolve through `source.local_dir`; refs that point
+  outside the repository now fail loud in `compile-critic-prompt` and `compile-repair-prompt`
+  (`compile-repair-batch` still skips them).
+- **`spectra init` gitignores `.spectra-result.json` and `.spectra-progress.html`.** Every
+  long-running command writes them, including classify-only runs. Existing workspaces can add the
+  two lines to `.gitignore` by hand.
+
+### Fixed (Spec 078)
+
+- **Rewriting a test no longer loses data.** Every writer — `ingest-tests`, `ingest-update`,
+  `ingest-grounding`, `review-flagged` accept, orphan marking, batch write and interactive review
+  edits — now keeps every field the parser reads. Previously `description`, `environment`,
+  `related_work_items`, `custom`, `automated_by`, `requirements` and `bugs` were silently dropped
+  (losing `automated_by` also broke automation coverage), and `ingest-update` lost
+  `estimated_duration`.
+- **Unchanged content is reproduced verbatim.** Frontmatter keys SPECTRA does not know and body
+  sections it does not read (e.g. a hand-written `## Notes`, step sub-bullets) are kept exactly as
+  written. Known keys are emitted in one fixed order, so writing a test twice gives identical bytes,
+  and changing one field changes only that field's lines.
+- **Orphan marking changes only `status`, `orphaned_reason` and `orphaned_date`**, and a test that
+  was already orphaned keeps its original `orphaned_date`. Previously it rebuilt the test and dropped
+  criteria, grounding, links and more.
+- **`status` / `orphaned_reason` / `orphaned_date` are now read back**, so a later rewrite no longer
+  silently un-orphans a test.
+- **Grounding round-trips.** `source`, `created_by` and `note` are kept; a manual verdict's
+  `verified_at` comes from the file instead of the current time; `score` and `verified_at` are
+  written culture-invariant and in UTC.
+- **YAML escaping.** Changed values containing `: `, ` #`, backslashes, quotes, leading indicator
+  characters or line breaks are now quoted correctly instead of producing invalid or different YAML.
+  Durations keep their seconds (`1m30s` instead of `1m`).
+- **`spectra ai update` finds the documents tests reference.** Refs in the default profile's format
+  (`docs/file.md#Section`) were joined onto the source directory and looked up with the fragment,
+  so such tests were classified ORPHANED ("Source document not found or empty"). One shared
+  resolver now strips the fragment, normalises separators, resolves against the repository root and
+  falls back to `source.local_dir` for bare legacy refs. A test is orphaned for a missing source only
+  when none of its referenced files exist, and it is classified against the text of **all** its
+  referenced documents.
+- **The `spectra-update` skill's classification step no longer writes files.** It and the update
+  delegation rows in `spectra-generate` / `spectra-execute` now pass `--dry-run`.
+- **The `spectra-criteria` skill reads each document once.** The compiled extraction prompt already
+  embeds the document text; the skill no longer tells the session to read the file as well.
+
+### Notes
+
+- **Data already lost is not recovered.** Fields dropped by earlier versions are gone from the
+  working tree; restore them from Git history (e.g. `git log -p -- test-cases/`).
+- **Known issues, not changed here:** `spectra delete` / `spectra suite delete` strip every
+  `- TC-n` list line from other test files, not only `depends_on` entries; `spectra doctor ids --fix`
+  replaces the id anywhere in the file; coverage analysis compares `source_refs` inconsistently
+  (fragments, bare refs); a test with no `source_refs` is still classified ORPHANED.
+
 ## [2.4.0] - 2026-07-09 — Claude Code migration (v2)
 
 ### Added (Spec 077 — non-stop seam coverage: batch verbs, manifest consumption, general contract preamble)

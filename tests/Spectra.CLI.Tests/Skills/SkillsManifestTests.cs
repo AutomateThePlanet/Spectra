@@ -371,4 +371,34 @@ public class SkillsManifestTests : IDisposable
             }
         }
     }
+
+    // ---- Spec 078: classification call sites never write ----
+
+    [Theory]
+    [InlineData("spectra-update")]
+    [InlineData("spectra-generate")]
+    [InlineData("spectra-execute")]
+    public void AiUpdateCallSites_PassDryRun(string skill)
+    {
+        var lines = SkillContent.All[skill]
+            .Split('\n')
+            .Where(l => l.Contains("spectra ai update"))
+            .ToList();
+
+        Assert.NotEmpty(lines);
+        Assert.All(lines, l => Assert.Contains("--dry-run", l));
+    }
+
+    // ---- Spec 078: criteria extraction reads each document once ----
+
+    [Fact]
+    public void CriteriaSkill_UsesCompiledPromptAsTheOnlyDocumentSource()
+    {
+        var content = SkillContent.All["spectra-criteria"];
+
+        Assert.DoesNotContain("file tools to read", content);
+        Assert.DoesNotContain("reading the document with your file tools", content);
+        Assert.Contains("it already contains the full document text", content);
+        Assert.Contains("do not\nread `{path}` separately", content.Replace("\r\n", "\n"));
+    }
 }

@@ -60,6 +60,21 @@ public sealed record GroundingMetadata
     public IReadOnlyList<CondensedFinding> CondensedFindings { get; init; } = [];
 
     /// <summary>
+    /// Where the verdict came from (e.g. a manual review source). Round-tripped from frontmatter.
+    /// </summary>
+    public string? Source { get; init; }
+
+    /// <summary>
+    /// Who recorded the verdict. Round-tripped from frontmatter.
+    /// </summary>
+    public string? CreatedBy { get; init; }
+
+    /// <summary>
+    /// Free-text note attached to the verdict. Round-tripped from frontmatter.
+    /// </summary>
+    public string? Note { get; init; }
+
+    /// <summary>
     /// Validates the metadata has valid values.
     /// </summary>
     public bool IsValid()

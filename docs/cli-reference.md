@@ -459,20 +459,47 @@ continue to apply to the verification path.
 Update existing test cases when documentation changes. Classifies test cases as UP_TO_DATE, OUTDATED, ORPHANED, or REDUNDANT.
 
 ```bash
-spectra ai update                             # Interactive mode
-spectra ai update checkout                    # Direct mode
-spectra ai update checkout --diff             # Show proposed changes
-spectra ai update checkout --delete-orphaned  # Auto-delete orphaned test cases
-spectra ai update checkout --no-interaction   # CI mode
+spectra ai update                                              # Interactive mode
+spectra ai update checkout                                     # Direct mode: classify, review, apply
+spectra ai update checkout --diff --dry-run                    # Classify and show proposed changes; write nothing
+spectra ai update checkout --no-interaction                    # CI: classify and report only
+spectra ai update checkout --no-interaction --no-review        # CI: classify and apply (mark orphans)
+spectra ai update checkout --no-review --delete-orphaned       # Apply and delete orphaned test cases
 ```
 
 | Option | Short | Description |
 |--------|-------|-------------|
 | `--diff` | `-d` | Show diff of proposed changes |
-| `--delete-orphaned` | | Automatically delete orphaned test cases |
-| `--no-interaction` | | Disable interactive prompts |
-| `--no-review` | | Skip interactive review |
-| `--dry-run` | | Preview without applying changes |
+| `--delete-orphaned` | | Delete orphaned test cases when applying (instead of marking them `status: orphaned`) |
+| `--no-interaction` | | Disable interactive prompts. On its own, classifies and reports only |
+| `--no-review` | | Apply without interactive review |
+| `--dry-run` | | Classify and report only; never writes, even with `--no-review` |
+
+**What gets written**
+
+| Flags | Behaviour | Writes test files / `_index.json` |
+|---|---|---|
+| `--dry-run` (with anything) | Classify, print tables, write result | No |
+| `--no-interaction` without `--no-review` | Classify, print tables, write result | No |
+| `--no-interaction --no-review` | Classify, then mark orphans (or delete with `--delete-orphaned`) and regenerate the index | Yes |
+| `--no-review` | Same as above | Yes |
+| neither | Interactive review, then apply what you approve | Yes, if approved |
+
+Every run prints the classification tables and writes `.spectra-result.json`, including dry runs.
+The result's `applied` field is `false` when nothing was allowed to change and `true` when the apply
+step ran. The exit code is the same either way (0 on success). Marking a test orphaned changes only its
+`status`, `orphaned_reason` and `orphaned_date`; everything else in the file is kept.
+
+> **Changed in 2.5.0:** `--no-interaction` used to apply changes. CI that relied on that must add
+> `--no-review`.
+
+**How `source_refs` are resolved.** A ref such as `docs/checkout.md#Payment` is resolved by dropping the
+`#fragment`, normalising `\` to `/`, and looking for the file relative to the repository root; bare
+legacy refs such as `checkout.md` fall back to the configured `source.local_dir`. Refs that point outside
+the repository never resolve. A test is classified ORPHANED for a missing source only when none of its
+referenced files exist, and it is compared with the text of all of its referenced documents.
+`compile-critic-prompt` and `compile-repair-prompt` resolve refs the same way and fail when one is
+missing.
 
 `spectra ai update` is the **selector**: it classifies tests but does not rewrite them. The doc-aware targeted edit of an OUTDATED test runs in the interactive session via the `spectra-update` skill, over the deterministic update seam below.
 

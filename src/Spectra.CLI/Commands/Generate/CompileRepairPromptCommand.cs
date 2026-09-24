@@ -2,6 +2,7 @@ using System.CommandLine;
 using System.Text.Json;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
+using Spectra.CLI.Source;
 using Spectra.CLI.Verification;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
@@ -123,7 +124,7 @@ public sealed class CompileRepairPromptCommand : Command
         IReadOnlyList<SourceDocument> sourceDocs;
         try
         {
-            sourceDocs = await LoadDocumentsFromRefsAsync(test.SourceRefs, currentDir, ct);
+            sourceDocs = await SourceRefDocumentLoader.LoadAsync(test.SourceRefs, currentDir, failOnMissing: true, ct);
         }
         catch (FileNotFoundException ex)
         {
@@ -141,30 +142,6 @@ public sealed class CompileRepairPromptCommand : Command
         Console.Out.Write(prompt);
         if (!prompt.EndsWith('\n')) Console.Out.WriteLine();
         return ExitSuccess;
-    }
-
-    private static async Task<IReadOnlyList<SourceDocument>> LoadDocumentsFromRefsAsync(
-        IReadOnlyList<string> sourceRefs, string currentDir, CancellationToken ct)
-    {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var docs = new List<SourceDocument>();
-        foreach (var r in sourceRefs)
-        {
-            var file = r.Split('#')[0].Trim();
-            if (string.IsNullOrWhiteSpace(file)) continue;
-            var full = Path.IsPathRooted(file) ? file : Path.Combine(currentDir, file);
-            if (!seen.Add(Path.GetFullPath(full))) continue;
-            if (!File.Exists(full))
-                throw new FileNotFoundException($"Source ref not found: {r}", full);
-            var content = await File.ReadAllTextAsync(full, ct);
-            docs.Add(new SourceDocument
-            {
-                Path = Path.GetRelativePath(currentDir, full).Replace('\\', '/'),
-                Title = Path.GetFileNameWithoutExtension(full),
-                Content = content
-            });
-        }
-        return docs;
     }
 
     private static async Task<string> ResolveTestsDirAsync(string currentDir, CancellationToken ct)

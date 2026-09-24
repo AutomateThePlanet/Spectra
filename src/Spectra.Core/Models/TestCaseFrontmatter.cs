@@ -62,4 +62,13 @@ public sealed class TestCaseFrontmatter
 
     [YamlMember(Alias = "bugs")]
     public List<string> Bugs { get; set; } = [];
+
+    [YamlMember(Alias = "status")]
+    public string? Status { get; set; }
+
+    [YamlMember(Alias = "orphaned_reason")]
+    public string? OrphanedReason { get; set; }
+
+    [YamlMember(Alias = "orphaned_date")]
+    public string? OrphanedDate { get; set; }
 }

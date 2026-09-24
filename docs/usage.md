@@ -129,6 +129,12 @@ Checks: required frontmatter fields, unique test IDs, valid priority enum values
 
 Classifies every test case in the suite as **UP_TO_DATE**, **OUTDATED**, **ORPHANED**, or **REDUNDANT** (deterministic, no model call). For each **OUTDATED** test, the assistant then **edits the affected parts in-session** through a deterministic seam: `compile-update-prompt` builds an edit prompt from the existing test plus the changed docs/criteria, the assistant edits it, and `ingest-update` validates and persists it. The edit **preserves the test's id and any manual verdict/notes**, and **fails loud** if it would change a field the doc change didn't implicate (priority, component, tags), so untouched fields can't silently drift. UP_TO_DATE tests are left alone; ORPHANED/REDUNDANT tests are flagged for your review, not edited.
 
+Classification never changes files: the assistant runs it with `--dry-run`, and in CI
+`spectra ai update <suite> --no-interaction` also only classifies and reports. To mark orphaned tests
+from a script, add `--no-review`; marking changes only a test's `status`, `orphaned_reason` and
+`orphaned_date`. Tests are matched to their documents through `source_refs` such as
+`docs/checkout.md#Payment` — the `#section` part is ignored when finding the file.
+
 ---
 
 ## Verdict Disposition

@@ -1,3 +1,4 @@
+using System.Globalization;
 using YamlDotNet.Serialization;
 
 namespace Spectra.Core.Models.Grounding;
@@ -63,7 +64,8 @@ public sealed class GroundingFrontmatter
             return null;
         }
 
-        // Manual verdict uses placeholder values — no critic verification was performed
+        // Manual verdict uses placeholder values — no critic verification was performed.
+        // verified_at comes from the file (MinValue when absent) so parsing is deterministic.
         if (verdict == VerificationVerdict.Manual)
         {
             return new GroundingMetadata
@@ -72,8 +74,15 @@ public sealed class GroundingFrontmatter
                 Score = 1.0,
                 Generator = "user",
                 Critic = "none",
-                VerifiedAt = DateTimeOffset.UtcNow,
-                UnverifiedClaims = []
+                VerifiedAt = ParseVerifiedAt(VerifiedAt),
+                UnverifiedClaims = UnverifiedClaims,
+                FlaggedForReview = FlaggedForReview,
+                RepairAttempts = RepairAttempts,
+                Repaired = Repaired,
+                CondensedFindings = MapFindings(),
+                Source = Source,
+                CreatedBy = CreatedBy,
+                Note = Note
             };
         }
 
@@ -83,28 +92,33 @@ public sealed class GroundingFrontmatter
             return null;
         }
 
-        if (!DateTimeOffset.TryParse(VerifiedAt, out var verifiedAt))
-        {
-            verifiedAt = DateTimeOffset.MinValue;
-        }
-
         return new GroundingMetadata
         {
             Verdict = verdict,
             Score = Math.Clamp(Score, 0.0, 1.0),
             Generator = Generator,
             Critic = Critic,
-            VerifiedAt = verifiedAt,
+            VerifiedAt = ParseVerifiedAt(VerifiedAt),
             UnverifiedClaims = UnverifiedClaims,
             FlaggedForReview = FlaggedForReview,
             RepairAttempts = RepairAttempts,
             Repaired = Repaired,
-            CondensedFindings = CondensedFindings
-                .Where(f => !string.IsNullOrWhiteSpace(f.Element))
-                .Select(f => new CondensedFinding { Element = f.Element!, Reason = f.Reason ?? "" })
-                .ToList()
+            CondensedFindings = MapFindings(),
+            Source = Source,
+            CreatedBy = CreatedBy,
+            Note = Note
         };
     }
+
+    private List<CondensedFinding> MapFindings() => CondensedFindings
+        .Where(f => !string.IsNullOrWhiteSpace(f.Element))
+        .Select(f => new CondensedFinding { Element = f.Element!, Reason = f.Reason ?? "" })
+        .ToList();
+
+    private static DateTimeOffset ParseVerifiedAt(string? value) =>
+        DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed)
+            ? parsed
+            : DateTimeOffset.MinValue;
 
     private static bool TryParseVerdict(string value, out VerificationVerdict verdict)
     {

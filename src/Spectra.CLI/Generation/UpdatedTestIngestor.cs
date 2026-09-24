@@ -16,8 +16,9 @@ namespace Spectra.CLI.Generation;
 /// <item><b>Id from original</b> — the persisted id (and file path) is the original's; the model's
 /// id is ignored. This is an edit, not a create: no new id is allocated.</item>
 /// <item><b>Manual/grounding re-assertion</b> — the original's grounding (including a
-/// <see cref="VerificationVerdict.Manual"/> verdict and its note) is re-asserted onto the edited
-/// test, so an edit can never silently strip human-curated content.</item>
+/// <see cref="VerificationVerdict.Manual"/> verdict with its source, author and note) and every
+/// non-edited field are kept from the original, so an edit can never silently strip human-curated
+/// content.</item>
 /// <item><b>Drift guard</b> — a change to a protected field not implicated by the doc change
 /// (priority, component, tags) is surfaced fail-loud (<see cref="DriftDetected"/>) rather than
 /// persisted.</item>
@@ -113,38 +114,18 @@ public sealed class UpdatedTestIngestor
     }
 
     /// <summary>
-    /// Produces the test to persist: a copy of <paramref name="original"/> with only the editable
-    /// content fields replaced from <paramref name="candidate"/>. Id, file path, grounding, and
-    /// every protected / non-round-tripped field are preserved from the original.
+    /// Produces the test to persist: <paramref name="original"/> with only the editable content fields
+    /// replaced from <paramref name="candidate"/>. Everything else — id, file path, priority, component,
+    /// tags, grounding (incl. a Manual verdict), estimated duration, links, custom metadata, lifecycle
+    /// fields and the source layout (unknown frontmatter keys and body sections) — stays the original's.
     /// </summary>
     public static TestCase ApplyEdit(TestCase original, TestCase candidate)
     {
         ArgumentNullException.ThrowIfNull(original);
         ArgumentNullException.ThrowIfNull(candidate);
 
-        return new TestCase
+        return original with
         {
-            // Invariants — always from the original.
-            Id = original.Id,
-            FilePath = original.FilePath,
-            Priority = original.Priority,
-            Component = original.Component,
-            Tags = original.Tags,
-            // Manual / grounding re-asserted from the original (incl. Manual verdict + note).
-            Grounding = original.Grounding,
-            // Non-round-tripped fields preserved from the original.
-            Description = original.Description,
-            Environment = original.Environment,
-            DependsOn = original.DependsOn,
-            RelatedWorkItems = original.RelatedWorkItems,
-            Custom = original.Custom,
-            AutomatedBy = original.AutomatedBy,
-            Requirements = original.Requirements,
-            Bugs = original.Bugs,
-            Status = original.Status,
-            OrphanedReason = original.OrphanedReason,
-            OrphanedDate = original.OrphanedDate,
-            // Editable content — taken from the model's edit.
             Title = candidate.Title,
             Preconditions = candidate.Preconditions,
             Steps = candidate.Steps,
