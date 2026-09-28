@@ -125,6 +125,47 @@ Run `spectra ai review-flagged --no-interaction --output-format json` to confirm
 ## Guardrails
 
 - **NEVER auto-advance** without reading the critic verdict first.
-- **NEVER change verdict or score** via accept — the partial block stays as-is; only `flagged_for_review` is cleared.
+- **Accept and feedback MUST NOT modify `grounding.verdict` or `grounding.score`** — those remain the
+  critic's own assessment. **Retry-repair is the only action that changes them**, and only as a side
+  effect of the fresh critic pass it runs.
+- **Every action a human takes on a reviewable test — accept, retry-repair, feedback — MUST write
+  `grounding.reviewed_by`, `grounding.reviewed_at`, and (when the reviewer gave one)
+  `grounding.note`.** This is the durable human-review record. It is written **in addition to, never
+  instead of**, the action's existing effect. The CLI does this for you; do not hand-edit `.md` files
+  to add it.
+- The review record **survives any unrelated grounding write-back** — a re-critique preserves it
+  rather than erasing it. It is not this action's job to defend that, but reviewers can rely on the
+  record being durable across re-verification, not just across this one action.
 - **NEVER delete without writing the trail first** (`record-drop` before `spectra delete`). If `record-drop` fails, do NOT delete.
 - **NEVER run more than 1 automatic retry** per test in this session without explicit user confirmation for more.
+- **NEVER hand-edit `reraise_suppressed_at`.** It is machine-written and means *currently* suppressed;
+  the CLI clears it whenever a test is re-raised or re-reviewed.
+
+## Plain-language triggers
+
+Expose all four actions conversationally — the reviewer should never need to type a command:
+
+| What the reviewer says | Action |
+|---|---|
+| "looks fine, accept it" | `--action accept` |
+| "accept it — I checked the runbook and the interval is right" | `--action accept --note "…"` |
+| "regenerate this one" | retry-repair (Action 1 above) |
+| "this one's redundant, remove it" | `--action delete` |
+| "the step about X is wrong" / "leave a note that…" | `--action feedback --note "…"` |
+| "the step about X is wrong, fix it" | `--action feedback --note "…" --fix` |
+
+All four are invocable non-interactively:
+
+```
+spectra ai review-flagged --suite {suite} --action accept   --test {id} [--note "..."] [--reviewer "..."]
+spectra ai review-flagged --suite {suite} --action feedback --test {id}  --note "..."  [--fix]
+spectra ai review-flagged --suite {suite} --action delete   --test {id}
+spectra ai review-flagged --suite {suite} --action accept   --all
+```
+
+`feedback` is the only action valid on a test that is **not** currently flagged — that is how a
+confidently-`grounded` test the critic got wrong gets raised at all. `accept`, retry-repair, and
+`delete` refuse an unflagged test with `NOT_FLAGGED`.
+
+`--fix` does **not** run the repair. It records the review and returns a `next_step.chain` in its JSON
+result. Read that chain and drive it — do not reconstruct it from memory.

@@ -31,21 +31,28 @@ public sealed class CompileRepairPromptCommand : Command
         var suiteOption = new Option<string>(["--suite", "-s"], "Suite name to resolve the test from") { IsRequired = true };
         var testOption = new Option<string>(["--test", "-t"], "Test ID to compile repair prompt for") { IsRequired = true };
         var fromOption = new Option<string?>("--from", "Verdict JSON file path (default: .spectra/verdicts/critic-verdict-{id}.json)");
+        // Spec 078 FR-015: the reviewer objection reaches the rewrite alongside the critic findings.
+        var feedbackOption = new Option<string?>("--feedback", "Reviewer feedback text to include in the repair prompt (Spec 078)");
+        var feedbackFromReviewFlag = new Option<bool>("--feedback-from-review", "Use the note already recorded on the test grounding block as the reviewer feedback (Spec 078)");
 
         AddOption(suiteOption);
         AddOption(testOption);
         AddOption(fromOption);
+        AddOption(feedbackOption);
+        AddOption(feedbackFromReviewFlag);
 
         this.SetHandler(async (context) =>
         {
             var suite = context.ParseResult.GetValueForOption(suiteOption)!;
             var testId = context.ParseResult.GetValueForOption(testOption)!;
             var from = context.ParseResult.GetValueForOption(fromOption);
-            context.ExitCode = await RunAsync(suite, testId, from, context.GetCancellationToken());
+            var feedback = context.ParseResult.GetValueForOption(feedbackOption);
+            var feedbackFromReview = context.ParseResult.GetValueForOption(feedbackFromReviewFlag);
+            context.ExitCode = await RunAsync(suite, testId, from, feedback, feedbackFromReview, context.GetCancellationToken());
         });
     }
 
-    private static async Task<int> RunAsync(string suite, string testId, string? from, CancellationToken ct)
+    private static async Task<int> RunAsync(string suite, string testId, string? from, string? feedback, bool feedbackFromReview, CancellationToken ct)
     {
         var currentDir = Directory.GetCurrentDirectory();
         var testsDir = await ResolveTestsDirAsync(currentDir, ct);
@@ -131,7 +138,13 @@ public sealed class CompileRepairPromptCommand : Command
             return ExitError;
         }
 
-        var (prompt, refusalReason) = RepairPromptCompiler.Compile(test, nonGrounded, sourceDocs);
+        // Spec 078 FR-015: --feedback-from-review reads the note the reviewer just recorded, so the
+        // skill does not have to carry the text through the chain by hand.
+        var reviewerFeedback = !string.IsNullOrWhiteSpace(feedback)
+            ? feedback
+            : feedbackFromReview ? test.Grounding?.Note : null;
+
+        var (prompt, refusalReason) = RepairPromptCompiler.Compile(test, nonGrounded, sourceDocs, reviewerFeedback);
         if (prompt is null)
         {
             Console.Error.WriteLine($"Refused to compile repair prompt: {refusalReason}");

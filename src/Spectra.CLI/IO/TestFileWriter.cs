@@ -144,6 +144,26 @@ public sealed class TestFileWriter
                     sb.AppendLine($"      reason: \"{EscapeYamlString(finding.Reason)}\"");
                 }
             }
+
+            // Spec 078: provenance + human review record. Every field is conditional, so a test
+            // without them is emitted byte-identically to before (SC-007).
+            if (!string.IsNullOrWhiteSpace(testCase.Grounding.Source))
+                sb.AppendLine($"  source: \"{EscapeYamlString(testCase.Grounding.Source)}\"");
+
+            if (!string.IsNullOrWhiteSpace(testCase.Grounding.CreatedBy))
+                sb.AppendLine($"  created_by: \"{EscapeYamlString(testCase.Grounding.CreatedBy)}\"");
+
+            if (!string.IsNullOrWhiteSpace(testCase.Grounding.Note))
+                sb.AppendLine($"  note: \"{EscapeYamlString(testCase.Grounding.Note)}\"");
+
+            if (!string.IsNullOrWhiteSpace(testCase.Grounding.ReviewedBy))
+                sb.AppendLine($"  reviewed_by: \"{EscapeYamlString(testCase.Grounding.ReviewedBy)}\"");
+
+            if (testCase.Grounding.ReviewedAt.HasValue)
+                sb.AppendLine($"  reviewed_at: {testCase.Grounding.ReviewedAt.Value.UtcDateTime:yyyy-MM-ddTHH:mm:ssZ}");
+
+            if (testCase.Grounding.ReraiseSuppressedAt.HasValue)
+                sb.AppendLine($"  reraise_suppressed_at: {testCase.Grounding.ReraiseSuppressedAt.Value.UtcDateTime:yyyy-MM-ddTHH:mm:ssZ}");
         }
 
         sb.AppendLine("---");
@@ -209,8 +229,49 @@ public sealed class TestFileWriter
         return $"{(int)duration.TotalSeconds}s";
     }
 
+    /// <summary>
+    /// Escapes a string for emission inside a YAML double-quoted scalar.
+    /// </summary>
+    /// <remarks>
+    /// Spec 078 FR-006. Backslash MUST be escaped first: it is itself the escape character in a
+    /// double-quoted scalar, so escaping it after the quote step would double-escape the backslashes
+    /// that step introduced. Before this fix, backslash was not escaped at all — a note containing
+    /// <c>C:\temp</c> round-tripped as <c>C:&lt;TAB&gt;emp</c> (silent corruption) and a trailing
+    /// backslash produced an unterminated scalar that broke frontmatter parsing outright.
+    /// </remarks>
     private static string EscapeYamlString(string value)
     {
-        return value.Replace("\"", "\\\"").Replace("\n", "\\n");
+        return value
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"")
+            .Replace("\n", "\\n")
+            .Replace("\r", "\\r");
+    }
+
+    /// <summary>
+    /// Returns an error message when <paramref name="value"/> cannot be represented faithfully in a
+    /// YAML double-quoted scalar, or null when it can.
+    /// </summary>
+    /// <remarks>
+    /// Spec 078 FR-006 requires refusal before any write rather than silent truncation or
+    /// alteration. With <see cref="EscapeYamlString"/> handling backslash, quote, LF and CR, the
+    /// only remaining unrepresentable input is a control character with no escape form.
+    /// </remarks>
+    public static string? ValidateAnnotation(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return null;
+        }
+
+        foreach (var ch in value)
+        {
+            if (char.IsControl(ch) && ch != '\n' && ch != '\r' && ch != '\t')
+            {
+                return $"contains a control character (U+{(int)ch:X4}) that cannot be represented in frontmatter";
+            }
+        }
+
+        return null;
     }
 }

@@ -42,3 +42,7 @@ coverage/
 node_modules/
 dist/
 .next/
+
+# Visual Studio / editor scratch (spec 078 setup verification)
+.vs/
+*.tmp

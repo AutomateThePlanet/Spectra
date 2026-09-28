@@ -59,6 +59,51 @@ public sealed record GroundingMetadata
     /// </summary>
     public IReadOnlyList<CondensedFinding> CondensedFindings { get; init; } = [];
 
+    // --- Provenance (Spec 078 FR-002: round-trip was previously broken — parsed then dropped) ---
+
+    /// <summary>
+    /// How the test came to exist, e.g. "user-described". Set by the generation prompt on the
+    /// user-described path; preserved by every later write-back.
+    /// </summary>
+    public string? Source { get; init; }
+
+    /// <summary>
+    /// Identity that authored a hand-created test. Preserved by every later write-back.
+    /// </summary>
+    public string? CreatedBy { get; init; }
+
+    /// <summary>
+    /// Free-text annotation on the grounding block. For <see cref="VerificationVerdict.Manual"/>
+    /// tests this is generator provenance; for grounded/partial tests it is the human reviewer's
+    /// note (Spec 078 Decision 5). The two meanings never coexist, because a manual test is
+    /// ineligible for review.
+    /// </summary>
+    public string? Note { get; init; }
+
+    // --- Human review record (Spec 078 FR-001) ---
+
+    /// <summary>
+    /// Identity of the human who last reviewed this test's critic verdict. A non-null value is the
+    /// single signal that the test has been human-reviewed — there is deliberately no companion
+    /// boolean (Spec 078 Decision 4).
+    /// </summary>
+    public string? ReviewedBy { get; init; }
+
+    /// <summary>
+    /// When that review happened. Always written together with <see cref="ReviewedBy"/>.
+    /// Compared against <see cref="VerifiedAt"/> to decide re-raise suppression (FR-010).
+    /// </summary>
+    public DateTimeOffset? ReviewedAt { get; init; }
+
+    /// <summary>
+    /// When the re-raise <b>currently being withheld</b> was suppressed, because a newer review
+    /// stands (FR-011). This means <i>currently</i> suppressed: it is cleared the moment the test is
+    /// re-raised, re-reviewed, or comes back with a non-partial verdict, so it is never a historical
+    /// record of a lapsed suppression. Mutually exclusive with <see cref="FlaggedForReview"/>.
+    /// Written by the verification pass, never by a reviewer.
+    /// </summary>
+    public DateTimeOffset? ReraiseSuppressedAt { get; init; }
+
     /// <summary>
     /// Validates the metadata has valid values.
     /// </summary>
@@ -73,13 +118,36 @@ public sealed record GroundingMetadata
         if (Verdict == VerificationVerdict.Partial && UnverifiedClaims.Count == 0)
             return false;
 
-        if (FlaggedForReview && Verdict != VerificationVerdict.Partial)
+        // Spec 078 FR-008: a confidently-verified test can be flagged by a human, so the marker is
+        // no longer partial-only. Hallucinated and Manual remain ineligible (FR-007).
+        if (FlaggedForReview
+            && Verdict != VerificationVerdict.Partial
+            && Verdict != VerificationVerdict.Grounded)
             return false;
 
         if (Repaired && Verdict != VerificationVerdict.Grounded)
             return false;
 
         if (RepairAttempts < 0)
+            return false;
+
+        // Spec 078: the review record is written as a unit — one half without the other is malformed.
+        if ((ReviewedBy is null) != (ReviewedAt is null))
+            return false;
+
+        // Spec 078 FR-007: neither verdict enters the review workflow, so a review record on one
+        // indicates a hand-edited or corrupt file.
+        if (ReviewedBy is not null
+            && (Verdict == VerificationVerdict.Hallucinated || Verdict == VerificationVerdict.Manual))
+            return false;
+
+        // Spec 078 FR-011: only a review can suppress a re-raise.
+        if (ReraiseSuppressedAt is not null && ReviewedBy is null)
+            return false;
+
+        // Spec 078 (option (a)): the marker means *currently* suppressed. A flagged test withholds
+        // nothing, so the two are mutually exclusive.
+        if (ReraiseSuppressedAt is not null && FlaggedForReview)
             return false;
 
         return true;

@@ -47,6 +47,15 @@ public sealed class GroundingFrontmatter
     [YamlMember(Alias = "note")]
     public string? Note { get; set; }
 
+    [YamlMember(Alias = "reviewed_by")]
+    public string? ReviewedBy { get; set; }
+
+    [YamlMember(Alias = "reviewed_at")]
+    public string? ReviewedAt { get; set; }
+
+    [YamlMember(Alias = "reraise_suppressed_at")]
+    public string? ReraiseSuppressedAt { get; set; }
+
     /// <summary>
     /// Converts the frontmatter DTO to a GroundingMetadata record.
     /// Returns null if required fields are missing.
@@ -63,7 +72,9 @@ public sealed class GroundingFrontmatter
             return null;
         }
 
-        // Manual verdict uses placeholder values — no critic verification was performed
+        // Manual verdict uses placeholder values — no critic verification was performed.
+        // Spec 078 FR-002: source/created_by/note are the fields the user-described generation path
+        // is instructed to populate, so this is precisely the path that must not drop them.
         if (verdict == VerificationVerdict.Manual)
         {
             return new GroundingMetadata
@@ -73,7 +84,10 @@ public sealed class GroundingFrontmatter
                 Generator = "user",
                 Critic = "none",
                 VerifiedAt = DateTimeOffset.UtcNow,
-                UnverifiedClaims = []
+                UnverifiedClaims = [],
+                Source = Source,
+                CreatedBy = CreatedBy,
+                Note = Note
             };
         }
 
@@ -102,9 +116,27 @@ public sealed class GroundingFrontmatter
             CondensedFindings = CondensedFindings
                 .Where(f => !string.IsNullOrWhiteSpace(f.Element))
                 .Select(f => new CondensedFinding { Element = f.Element!, Reason = f.Reason ?? "" })
-                .ToList()
+                .ToList(),
+            // Spec 078 FR-002: these three were declared but never mapped — parsed off disk and
+            // silently discarded on the next write. Mapping them closes the round-trip.
+            Source = Source,
+            CreatedBy = CreatedBy,
+            Note = Note,
+            ReviewedBy = ReviewedBy,
+            ReviewedAt = ParseTimestamp(ReviewedAt),
+            ReraiseSuppressedAt = ParseTimestamp(ReraiseSuppressedAt)
         };
     }
+
+    /// <summary>
+    /// Parses an optional ISO-8601 timestamp. Returns null when absent or unparseable — a malformed
+    /// timestamp is treated as absent rather than throwing, matching how <c>verified_at</c> already
+    /// degrades.
+    /// </summary>
+    private static DateTimeOffset? ParseTimestamp(string? value) =>
+        !string.IsNullOrWhiteSpace(value) && DateTimeOffset.TryParse(value, out var parsed)
+            ? parsed
+            : null;
 
     private static bool TryParseVerdict(string value, out VerificationVerdict verdict)
     {

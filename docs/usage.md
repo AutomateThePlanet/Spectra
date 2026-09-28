@@ -191,6 +191,106 @@ spectra ai audit-grounding --suite smoke --output-format json   # resume checkpo
 spectra ai compile-repair-batch --suite smoke                   # re-run: emits only the remaining ungrounded partials
 ```
 
+### The human review record
+
+Accepting a flagged test used to clear the flag and write nothing else, leaving a file
+indistinguishable from one that was never flagged. Every reviewer action now records **who** looked at
+the test and **when**, in the test's own `grounding:` block — so it is committed to git and visible to
+anyone who opens the file.
+
+```bash
+# Approve, with the reasoning attached
+spectra ai review-flagged --suite smoke --action accept --test TC-142 \
+  --note "Confirmed the refund interval against the support runbook."
+
+# Raise a concern on a test the critic was confident about
+spectra ai review-flagged --suite smoke --action feedback --test TC-151 \
+  --note "Step 2 references a loyalty tier field that does not exist in the checkout UI."
+
+# ...and ask for it to be fixed in the same breath
+spectra ai review-flagged --suite smoke --action feedback --test TC-151 --note "..." --fix
+```
+
+```yaml
+grounding:
+  verdict: partial            # unchanged — the critic's assessment stays the critic's
+  score: 0.72                 # unchanged
+  flagged_for_review: false
+  reviewed_by: Oleg Kuzmanov
+  reviewed_at: 2026-08-28T10:15:00Z
+  note: "Confirmed the refund interval against the support runbook."
+```
+
+`reviewed_by` is a **name** (git `user.name`, falling back to the OS user name), not an email address.
+Override it with `--reviewer`. Resolution never fails and never prompts.
+
+**`feedback` is the only action valid on an unflagged test** — that is how a confidently-`grounded`
+test the critic got wrong gets raised at all. `accept`, retry-repair, and `delete` refuse an unflagged
+test with `NOT_FLAGGED`.
+
+### Re-verification: the record survives, and a newer review defers a re-raise
+
+A record that routine batch verification deletes is not a record, so the write-back preserves
+`reviewed_by`, `reviewed_at`, `note`, `source`, and `created_by` on every pass while the critic's own
+fields update as normal.
+
+```bash
+spectra ai ingest-grounding --suite smoke --all --re-verify --output-format json
+```
+
+`--re-verify` is required for re-verification. Without it, the batch call skips every already-grounded
+test — which keeps the generate flow's post-loop call repeat-safe, but means a second pass writes
+nothing, so neither preservation nor suppression is exercised.
+
+If a test's review is newer than the `verified_at` recorded on it, an automatic re-raise is
+**suppressed**: the human's decision stands and `reraise_suppressed_at` records that a concern is
+being withheld. Equal timestamps re-raise. A flag a human raised through `feedback` is never
+suppressed.
+
+Suppression lasts exactly one pass per review event — the same pass advances `verified_at` past
+`reviewed_at`, so the next pass re-raises. Deferring again requires reviewing again.
+
+### ...and a raise you made yourself won't quietly vanish
+
+The mirror image, on the same principle: suppression protects a human **clearance**, and the same rule
+protects a human **raise**. If you flagged a test with `feedback` — including a confidently-`grounded`
+one the critic was happy with — that flag **survives any number of `--re-verify` passes that agree
+with the critic's prior verdict.** Unlike suppression it does not decay after one pass: a raise is a
+standing objection, and it stays until someone resolves it.
+
+```bash
+# You flag a grounded test the critic got wrong
+spectra ai review-flagged --suite smoke --action feedback --test TC-151 \
+  --note "Step 2 references a loyalty tier field that does not exist."
+
+# Three re-verification passes later, still grounded, still flagged:
+spectra ai ingest-grounding --suite smoke --all --re-verify
+spectra ai review-flagged --suite smoke --no-interaction --output-format json
+#   → TC-151 is still in `tests`, flagged, with your note attached
+```
+
+Only two things clear it, both deliberate:
+
+- **`--action accept`** — you resolving your own objection.
+- **A verdict that genuinely changes** — the pass has new information. A repair that upgrades a test
+  from `partial` to `grounded` clears the flag, otherwise every repaired test would stay flagged
+  forever.
+
+A pass whose verdict matches what is already on the test has learned nothing new and does not overrule
+you. This also means a `--repaired` pass whose re-verdict is still `partial` keeps the flag, which is
+what the review skill has always documented ("re-verdict `partial` → test still flagged").
+
+```bash
+spectra ai review-flagged --suite smoke --no-interaction --output-format json  # flagged + suppressed arrays
+spectra ai audit-grounding --suite smoke                                       # reviewed / suppressed / stale counts
+```
+
+Suppressed tests are unflagged, so they appear in the listing's separate `suppressed` array rather
+than in `tests` — a withheld concern is never invisible. `audit-grounding` reports `reviewed` as a
+fourth `action_needed` value (distinct from `none`, which now means "never needed a human"), plus
+`reraises_suppressed` and `reviews_stale` counts. A rising `reviews_stale` is the signal that
+timestamp-based suppression is not holding up.
+
 ---
 
 ## Executing Tests

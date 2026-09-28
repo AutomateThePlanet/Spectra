@@ -323,4 +323,114 @@ public class GroundingModelsTests
         var metadata = frontmatter.ToMetadata();
         Assert.Null(metadata);
     }
+
+    // --- Spec 078: revised and new IsValid() rules (FR-007, FR-008, FR-011) ---
+
+    private static GroundingMetadata Base(VerificationVerdict verdict) => new()
+    {
+        Verdict = verdict,
+        Score = 0.9,
+        Generator = "claude-code-session",
+        Critic = "claude-opus-5",
+        VerifiedAt = DateTimeOffset.Parse("2026-08-20T09:14:00Z"),
+        UnverifiedClaims = verdict == VerificationVerdict.Partial ? ["Step 3: absent"] : []
+    };
+
+    [Fact]
+    public void IsValid_FlaggedForReview_OnGroundedVerdict_IsNowAllowed()
+    {
+        // FR-008: a confidently-verified test must be markable by a human.
+        var grounding = Base(VerificationVerdict.Grounded) with { FlaggedForReview = true };
+        Assert.True(grounding.IsValid());
+    }
+
+    [Fact]
+    public void IsValid_FlaggedForReview_OnPartialVerdict_StillAllowed()
+    {
+        var grounding = Base(VerificationVerdict.Partial) with { FlaggedForReview = true };
+        Assert.True(grounding.IsValid());
+    }
+
+    [Fact]
+    public void IsValid_FlaggedForReview_OnManualVerdict_IsRejected()
+    {
+        var grounding = Base(VerificationVerdict.Manual) with { FlaggedForReview = true };
+        Assert.False(grounding.IsValid());
+    }
+
+    [Fact]
+    public void IsValid_ReviewedByWithoutReviewedAt_IsRejected()
+    {
+        var grounding = Base(VerificationVerdict.Grounded) with { ReviewedBy = "Oleg Kuzmanov" };
+        Assert.False(grounding.IsValid());
+    }
+
+    [Fact]
+    public void IsValid_ReviewedAtWithoutReviewedBy_IsRejected()
+    {
+        var grounding = Base(VerificationVerdict.Grounded) with { ReviewedAt = DateTimeOffset.UtcNow };
+        Assert.False(grounding.IsValid());
+    }
+
+    [Fact]
+    public void IsValid_ReviewRecordAsAPair_IsAccepted()
+    {
+        var grounding = Base(VerificationVerdict.Grounded) with
+        {
+            ReviewedBy = "Oleg Kuzmanov",
+            ReviewedAt = DateTimeOffset.UtcNow
+        };
+        Assert.True(grounding.IsValid());
+    }
+
+    [Theory]
+    [InlineData(VerificationVerdict.Hallucinated)]
+    [InlineData(VerificationVerdict.Manual)]
+    public void IsValid_ReviewRecordOnIneligibleVerdict_IsRejected(VerificationVerdict verdict)
+    {
+        // FR-007: neither verdict enters the review workflow.
+        var grounding = Base(verdict) with
+        {
+            ReviewedBy = "Oleg Kuzmanov",
+            ReviewedAt = DateTimeOffset.UtcNow
+        };
+        Assert.False(grounding.IsValid());
+    }
+
+    [Fact]
+    public void IsValid_SuppressionMarkerWithoutReviewer_IsRejected()
+    {
+        var grounding = Base(VerificationVerdict.Partial) with
+        {
+            ReraiseSuppressedAt = DateTimeOffset.UtcNow
+        };
+        Assert.False(grounding.IsValid());
+    }
+
+    [Fact]
+    public void IsValid_SuppressionMarkerWithFlaggedForReview_IsRejected()
+    {
+        // Option (a): the marker means *currently* suppressed, so a flagged test cannot carry it.
+        var grounding = Base(VerificationVerdict.Partial) with
+        {
+            ReviewedBy = "Oleg Kuzmanov",
+            ReviewedAt = DateTimeOffset.UtcNow,
+            ReraiseSuppressedAt = DateTimeOffset.UtcNow,
+            FlaggedForReview = true
+        };
+        Assert.False(grounding.IsValid());
+    }
+
+    [Fact]
+    public void IsValid_SuppressionMarkerOnUnflaggedReviewedTest_IsAccepted()
+    {
+        var grounding = Base(VerificationVerdict.Partial) with
+        {
+            ReviewedBy = "Oleg Kuzmanov",
+            ReviewedAt = DateTimeOffset.Parse("2026-08-28T10:15:00Z"),
+            ReraiseSuppressedAt = DateTimeOffset.Parse("2026-08-31T08:00:00Z"),
+            FlaggedForReview = false
+        };
+        Assert.True(grounding.IsValid());
+    }
 }

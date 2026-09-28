@@ -18,10 +18,17 @@ public static class RepairPromptCompiler
     /// Compiles a plain-text repair prompt for a partial test.
     /// Refuses (returns null + reason) if the test has no id/title, or if findings are empty.
     /// </summary>
+    /// <param name="reviewerFeedback">
+    /// Spec 078 FR-015: the reviewer's own objection, when the repair was requested through
+    /// <c>feedback --fix</c>. Emitted as its own labelled section so the rewrite addresses what the
+    /// human actually flagged, not only what the critic originally found. Null on the automatic
+    /// repair path, where the output is byte-identical to before.
+    /// </param>
     public static (string? Prompt, string? RefusalReason) Compile(
         TestCase test,
         IReadOnlyList<CriticFinding> nonGroundedFindings,
-        IReadOnlyList<SourceDocument> sourceDocs)
+        IReadOnlyList<SourceDocument> sourceDocs,
+        string? reviewerFeedback = null)
     {
         if (string.IsNullOrWhiteSpace(test.Id) || string.IsNullOrWhiteSpace(test.Title))
             return (null, "Test artifact is missing id or title.");
@@ -37,6 +44,17 @@ public static class RepairPromptCompiler
         sb.AppendLine($"Preserve the test id ({test.Id}), priority, component, tags, and any elements the critic found grounded.");
         sb.AppendLine("Return a JSON array containing the ONE corrected test, using the same schema as the generation output.");
         sb.AppendLine();
+
+        if (!string.IsNullOrWhiteSpace(reviewerFeedback))
+        {
+            sb.AppendLine("## Reviewer feedback (address this as well as the critic findings)");
+            sb.AppendLine();
+            sb.AppendLine("A human reviewer requested this repair and described the problem as follows.");
+            sb.AppendLine("Treat it as authoritative: it may identify something the critic missed entirely.");
+            sb.AppendLine();
+            sb.AppendLine("> " + reviewerFeedback.Trim().Replace("\n", "\n> "));
+            sb.AppendLine();
+        }
 
         // Test artifact
         sb.AppendLine($"## Test to repair: {test.Id}");

@@ -21,7 +21,11 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '8.0.x'
+          # 10.0.x satisfies the SDK pin in global.json; 8.0.x supplies the net8.0
+          # runtime. The published tool still targets net8.0 — unchanged.
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Extract version from tag
         id: version

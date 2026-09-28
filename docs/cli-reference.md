@@ -306,7 +306,60 @@ spectra ai ingest-grounding --suite reporting --all --repaired --repair-attempts
 
 `--all` scans `.spectra/verdicts/critic-verdict-*.json`, filters to the named suite via `_index.json`, and writes each eligible block in one pass. It is idempotent, since tests whose `.md` already has a `grounding:` block are skipped (`skipped_already_written`). Without `--repaired`, partial verdicts are skipped (`skipped_partial_pre_repair`) because they need one repair attempt first. With `--repaired`, all ungrounded tests (both `grounded` and `partial` re-verdicts) are written.
 
-Batch output (JSON): `{ command, mode:"batch", suite, written, skipped_already_written, skipped_partial_pre_repair, errors }`.
+Batch output (JSON): `{ command, mode:"batch", suite, re_verify, written, skipped_already_written, skipped_partial_pre_repair, reraises_suppressed, review_records_preserved, errors }`.
+
+**Re-verification mode (`--re-verify`):**
+
+```bash
+spectra ai ingest-grounding --suite reporting --all --re-verify --output-format json
+```
+
+The idempotency skip above makes the batch call safe to repeat, but it also means a **second**
+verification pass over an already-grounded suite writes nothing at all. `--re-verify` bypasses the
+skip so each test is rewritten: the human review record is carried forward unchanged, the critic's
+fields update, and the re-raise suppression comparison is applied. Without it, neither preservation
+nor suppression is reachable in the real flow.
+
+The default (no `--re-verify`) is unchanged and remains repeat-safe.
+
+**Suppression.** When a test carries a review record whose `reviewed_at` is newer than the
+`verified_at` **already on the test** — the value present before this pass writes its own — and the
+new verdict is `partial`, the automatic re-raise is withheld: `flagged_for_review` stays as the human
+left it and `reraise_suppressed_at` is set. Equal timestamps re-raise. A flag a human *raised* through
+`feedback` is never suppressed.
+
+Suppression lasts exactly one pass per review event: the same pass advances `verified_at` past
+`reviewed_at`, so the next pass re-raises and clears the marker. A second deferral requires a second
+review.
+
+**Raise survival (the mirror image).** Suppression protects a human *clearance*; the same principle
+protects a human *raise*. If you flag a test yourself with `--action feedback` — including a
+confidently-`grounded` one — that flag **survives any number of automated passes that merely agree
+with the critic's prior verdict.** It does not quietly vanish on the next `--re-verify`, and unlike
+suppression it does not decay after one pass: a raise is a standing objection.
+
+Two things clear it, both deliberate:
+
+| What clears a human raise | Why |
+|---|---|
+| `--action accept` | An explicit reviewer decision — the reviewer resolving their own objection. |
+| A verdict that genuinely **changes** | The pass has new information. A repair upgrading `partial` → `grounded` clears the flag, otherwise every repaired test would stay flagged forever. |
+
+A pass whose verdict equals the one already on the test has no new information and does not overrule
+the reviewer. Concretely, the marker is derived as:
+
+```
+flagged_for_review  =  (pre-write flag  ∧  new verdict == pre-write verdict)
+                    ∨  (new verdict == partial  ∧  ¬repaired)
+```
+
+Note this means a `--repaired` pass whose re-verdict is still `partial` now **preserves** an existing
+flag, matching the `spectra-review-flagged` skill's documented "re-verdict `partial` → test still
+flagged" behaviour.
+
+Per-test output gains `reraise_suppressed`, `suppressed_by_review_at`, and `review_record_preserved`.
+Watch `reraises_suppressed` in batch output — `0` on a suite with known review records is the
+signature of a mis-wired comparison baseline.
 
 - **grounded** → condensed "verified clean" block (`verdict: grounded`, `score`, `verified_at`).
 - **partial** → block with condensed findings + `flagged_for_review: true` (unless `--repaired`; the `spectra-review-flagged` skill then dispositions flagged tests).
@@ -357,6 +410,50 @@ spectra ai review-flagged --suite reporting --no-interaction --output-format jso
 - In interactive mode, the prompts are `[A]ccept`, `[D]elete`, `[S]kip`, `[Q]uit` per flagged test.
 - In non-interactive mode (or with `--output-format json`), the command exits `2` if undisposed flagged tests remain.
 - Exit code is `0` when all tests are dispositioned, `2` when undisposed flagged tests remain (non-interactive), and `1` on error.
+
+#### Non-interactive actions and the human review record
+
+Every action is invocable without an interactive session, and each one records **who** reviewed the
+test and **when** in the `grounding:` block:
+
+```bash
+spectra ai review-flagged --suite reporting --action accept   --test TC-142 --note "Checked the runbook."
+spectra ai review-flagged --suite reporting --action feedback --test TC-151 --note "Step 2 field does not exist."
+spectra ai review-flagged --suite reporting --action feedback --test TC-151 --note "..." --fix
+spectra ai review-flagged --suite reporting --action delete   --test TC-160
+spectra ai review-flagged --suite reporting --action accept   --all
+```
+
+| Option | Purpose |
+|---|---|
+| `--action accept\|delete\|feedback` | The action to perform. Omit for the listing / interactive loop. |
+| `--test <id>` | Target test. Required with `--action` unless `--all`. |
+| `--all` | Apply to every eligible test in scope. Refused for `delete`. |
+| `--note "<text>"` | Reviewer's note. Optional on `accept`, **required** on `feedback`. |
+| `--reviewer "<name>"` | Explicit identity. Defaults to git `user.name`, then the OS user name. A **name**, not an email address. |
+| `--fix` | `feedback` only. Records the review and returns the repair chain as `next_step` — it does not run the repair. |
+
+**`feedback` is the only action valid on a test that is not currently flagged.** That is how a
+confidently-`grounded` test the critic got wrong is raised at all; `accept`, retry-repair, and
+`delete` refuse an unflagged test with `NOT_FLAGGED`.
+
+Review record fields written to `grounding:`:
+
+| Field | Meaning |
+|---|---|
+| `reviewed_by` | Who last reviewed the verdict. Non-null is the sole "has been reviewed" signal. |
+| `reviewed_at` | When. UTC ISO-8601. |
+| `note` | The reviewer's note (or generator provenance for `verdict: manual` tests). |
+| `reraise_suppressed_at` | Machine-written. Non-null means an automatic re-raise is being withheld **right now** by a newer review. Mutually exclusive with `flagged_for_review: true`. |
+
+Alongside these, `source` and `created_by` now round-trip correctly; before this they were parsed off
+disk and silently discarded on the next write.
+
+Exit codes: `0` success · `2` invalid option combination or an unrepresentable note (`TARGET_REQUIRED`,
+`TARGET_AMBIGUOUS`, `NOTE_REQUIRED`, `FIX_NOT_APPLICABLE`, `BULK_DELETE_REFUSED`,
+`NOTE_UNREPRESENTABLE`) · `4` target not found or ineligible (`TEST_NOT_FOUND`, `SUITE_NOT_FOUND`,
+`NOT_FLAGGED`, `NOT_VERIFIED`, `VERDICT_INELIGIBLE_MANUAL`, `VERDICT_INELIGIBLE_HALLUCINATED`) · `1`
+I/O error. Every refusal happens before any file is modified.
 
 ### `spectra ai audit-grounding` (resume oracle + inspection)
 

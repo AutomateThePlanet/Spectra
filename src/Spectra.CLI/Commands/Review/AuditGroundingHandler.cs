@@ -85,6 +85,11 @@ public sealed class AuditGroundingHandler
             string? filePath = null;
             bool groundingWritten = false;
             bool flaggedForReview = false;
+            string? reviewedBy = null;
+            DateTimeOffset? reviewedAt = null;
+            string? note = null;
+            DateTimeOffset? suppressedAt = null;
+            DateTimeOffset? verifiedAt = null;
 
             if (indexLookup.TryGetValue(id, out var testEntry))
             {
@@ -102,15 +107,40 @@ public sealed class AuditGroundingHandler
                         {
                             groundingWritten = tc.Grounding is not null;
                             flaggedForReview = tc.Grounding is { FlaggedForReview: true };
+                            reviewedBy = tc.Grounding?.ReviewedBy;
+                            reviewedAt = tc.Grounding?.ReviewedAt;
+                            note = tc.Grounding?.Note;
+                            suppressedAt = tc.Grounding?.ReraiseSuppressedAt;
+                            verifiedAt = tc.Grounding?.VerifiedAt;
                         }
                     }
                     catch { /* skip grounding check on parse error */ }
                 }
             }
 
+            // Spec 078: `none` was ambiguous — it meant both "never needed a human" and "a human
+            // cleared it". `reviewed` separates them, and takes precedence over `none`.
             var actionNeeded = groundingWritten
-                ? (flaggedForReview ? "review" : "none")
+                ? flaggedForReview ? "review"
+                    : reviewedBy is not null ? "reviewed"
+                    : "none"
                 : "repair";
+
+            // Spec 078: the marker means *currently* suppressed, so it cannot coexist with the flag.
+            // Report the contradiction rather than silently believing one side of it.
+            var inconsistent = suppressedAt is not null && flaggedForReview
+                ? $"flagged for review, but reraise_suppressed_at is set ({suppressedAt:yyyy-MM-dd}) — these are mutually exclusive; the file may have been edited by hand"
+                : null;
+
+            // Disjoint from suppression by the null-marker clause: without it, every suppressed test
+            // would also count as stale, because a suppressing pass advances verified_at past the
+            // review it just honoured.
+            var reviewStale = reviewedBy is not null
+                && !flaggedForReview
+                && suppressedAt is null
+                && reviewedAt.HasValue
+                && verifiedAt.HasValue
+                && verifiedAt.Value > reviewedAt.Value;
 
             entries.Add(new AuditGroundingEntry
             {
@@ -120,7 +150,13 @@ public sealed class AuditGroundingHandler
                 GroundingWritten = groundingWritten,
                 FlaggedForReview = flaggedForReview,
                 ActionNeeded = actionNeeded,
-                File = filePath
+                File = filePath,
+                ReviewedBy = reviewedBy,
+                ReviewedAt = reviewedAt?.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                Note = note,
+                ReraiseSuppressedAt = suppressedAt?.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                Inconsistent = inconsistent,
+                ReviewStale = reviewStale
             });
         }
 
@@ -129,7 +165,12 @@ public sealed class AuditGroundingHandler
             Total = entries.Count,
             GroundingWritten = entries.Count(e => e.GroundingWritten),
             PartialPendingRepair = entries.Count(e => e.ActionNeeded == "repair"),
-            FlaggedForReview = entries.Count(e => e.FlaggedForReview)
+            FlaggedForReview = entries.Count(e => e.FlaggedForReview),
+            // Spec 078: additive. The four above keep their existing names and meanings — Spec 072's
+            // repair-batch resume logic reads them.
+            Reviewed = entries.Count(e => e.ActionNeeded == "reviewed"),
+            ReraisesSuppressed = entries.Count(e => e.ReraiseSuppressedAt is not null),
+            ReviewsStale = entries.Count(e => e.ReviewStale)
         };
 
         if (json)
@@ -194,13 +235,30 @@ public sealed class AuditGroundingHandler
             {
                 Console.WriteLine(
                     $"  {e.Id,-12} {e.Verdict,-10} {e.Score,5:F2}  {(e.GroundingWritten ? "yes" : "no"),-8}  {(e.FlaggedForReview ? "yes" : "no"),-7}  {e.ActionNeeded}");
+
+                // Spec 078: a count alone does not tell a reviewer WHICH concerns were withheld or
+                // which sign-off has been overtaken — and either is the thing they need to act on.
+                if (e.ReviewedBy is not null)
+                    Console.WriteLine($"          reviewed by {e.ReviewedBy} on {e.ReviewedAt?[..10]}");
+
+                if (e.ReraiseSuppressedAt is not null)
+                    Console.WriteLine(
+                        $"          re-raise suppressed {e.ReraiseSuppressedAt[..10]} — review is newer than the prior verification");
+
+                if (e.ReviewStale)
+                    Console.WriteLine(
+                        "          verification is newer than the review; nothing withheld — the next partial verdict will re-raise");
+
+                if (e.Inconsistent is not null)
+                    Console.WriteLine($"          ⚠ inconsistent: {e.Inconsistent}");
             }
         }
 
         Console.WriteLine();
         Console.WriteLine(
             $"Summary: {summary.Total} total | {summary.GroundingWritten} grounded | " +
-            $"{summary.PartialPendingRepair} pending repair | {summary.FlaggedForReview} flagged");
+            $"{summary.PartialPendingRepair} pending repair | {summary.FlaggedForReview} flagged | " +
+            $"{summary.Reviewed} reviewed | {summary.ReraisesSuppressed} suppressed | {summary.ReviewsStale} stale");
     }
 
     public static async Task<string> ResolveTestsDirAsync(string currentDir, CancellationToken ct)

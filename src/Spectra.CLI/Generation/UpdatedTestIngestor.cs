@@ -131,7 +131,13 @@ public sealed class UpdatedTestIngestor
             Component = original.Component,
             Tags = original.Tags,
             // Manual / grounding re-asserted from the original (incl. Manual verdict + note).
-            Grounding = original.Grounding,
+            // Spec 078 Decision 7: the content has just been rewritten, so any suppression marker
+            // described content that no longer exists — clear it deliberately rather than carrying a
+            // stale timestamp forward. The review record itself is retained here and is replaced by
+            // the requester's when the repair chain records its own review.
+            Grounding = original.Grounding is null
+                ? null
+                : original.Grounding with { ReraiseSuppressedAt = null },
             // Non-round-tripped fields preserved from the original.
             Description = original.Description,
             Environment = original.Environment,

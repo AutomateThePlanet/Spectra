@@ -18,7 +18,12 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '8.0.x'
+          # 10.0.x satisfies the SDK pin in global.json; 8.0.x supplies the runtime
+          # the net8.0 test assemblies execute on. Both are required — the .NET 10
+          # SDK alone cannot run a net8.0 target.
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Restore dependencies
         run: dotnet restore

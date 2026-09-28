@@ -34,6 +34,12 @@ public sealed class IngestGroundingCommand : Command
         var fromOption = new Option<string?>("--from", "Verdict JSON file path (default: .spectra/verdicts/critic-verdict-{id}.json)");
         var repairedFlag = new Option<bool>("--repaired", "Mark test as repaired (sets repaired: true in the grounding block)");
         var repairAttemptsOption = new Option<int>("--repair-attempts", () => 0, "Number of repair attempts performed");
+        // Spec 078 FR-003/FR-010 (research R2): without this, the batch path skips every
+        // already-grounded test, so a second verification pass writes nothing — preservation is
+        // never exercised and suppression never fires. The default skip stays: Specs 073/077 rely on
+        // the post-loop batch call being repeat-safe.
+        var reVerifyFlag = new Option<bool>("--re-verify",
+            "Batch mode: do not skip already-grounded tests. Rewrites each one, preserving its review record and applying the suppression comparison (Spec 078)");
 
         AddOption(suiteOption);
         AddOption(testOption);
@@ -41,6 +47,7 @@ public sealed class IngestGroundingCommand : Command
         AddOption(fromOption);
         AddOption(repairedFlag);
         AddOption(repairAttemptsOption);
+        AddOption(reVerifyFlag);
 
         this.SetHandler(async (context) =>
         {
@@ -50,12 +57,13 @@ public sealed class IngestGroundingCommand : Command
             var from = context.ParseResult.GetValueForOption(fromOption);
             var repaired = context.ParseResult.GetValueForOption(repairedFlag);
             var repairAttempts = context.ParseResult.GetValueForOption(repairAttemptsOption);
+            var reVerify = context.ParseResult.GetValueForOption(reVerifyFlag);
             var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
             var json = outputFormat == OutputFormat.Json;
 
             if (all)
             {
-                context.ExitCode = await RunBatchAsync(suite, repaired, repairAttempts, json, context.GetCancellationToken());
+                context.ExitCode = await RunBatchAsync(suite, repaired, repairAttempts, reVerify, json, context.GetCancellationToken());
             }
             else if (!string.IsNullOrEmpty(testId))
             {
@@ -70,7 +78,7 @@ public sealed class IngestGroundingCommand : Command
     }
 
     private static async Task<int> RunBatchAsync(
-        string suite, bool repaired, int repairAttempts, bool json, CancellationToken ct)
+        string suite, bool repaired, int repairAttempts, bool reVerify, bool json, CancellationToken ct)
     {
         var currentDir = Directory.GetCurrentDirectory();
         var testsDir = await ResolveTestsDirAsync(currentDir, ct);
@@ -97,6 +105,10 @@ public sealed class IngestGroundingCommand : Command
         var parser = new TestCaseParser();
         var service = new GroundingWriteBackService(new TestFileWriter());
         int written = 0, skippedAlreadyWritten = 0, skippedPartialPreRepair = 0, errors = 0;
+        // Spec 078 FR-011: `reraises_suppressed: 0` on a suite with known review records is the
+        // signature of the baseline bug — it is the number that proves suppression is actually wired.
+        int reraisesSuppressed = 0, reviewRecordsPreserved = 0;
+        var suppressedIds = new List<string>();
 
         var verdictFiles = Directory.GetFiles(verdictDir, "critic-verdict-*.json").OrderBy(f => f);
         foreach (var vf in verdictFiles)
@@ -115,19 +127,27 @@ public sealed class IngestGroundingCommand : Command
             var testFilePath = Path.Combine(suitePath, testEntry.File);
             if (!File.Exists(testFilePath)) continue; // hallucinated — file gone, skip silently
 
-            // Idempotent: skip tests whose .md already has a grounding block
-            try
+            // Idempotent: skip tests whose .md already has a grounding block.
+            // Spec 078 (research R2): --re-verify bypasses this. Without the bypass, a second
+            // verification pass over an already-grounded suite writes nothing at all — WriteAsync is
+            // never reached, so FR-003's preservation is never exercised and FR-010's suppression
+            // never fires. The skip itself must stay for the default path: Specs 073/077 built their
+            // non-stop batch flows on this call being repeat-safe.
+            if (!reVerify)
             {
-                var existingContent = await File.ReadAllTextAsync(testFilePath, ct);
-                var rel = Path.GetRelativePath(suitePath, testFilePath);
-                var parsedExisting = parser.Parse(existingContent, rel);
-                if (parsedExisting.IsSuccess && parsedExisting.Value is { } existing && existing.Grounding is not null)
+                try
                 {
-                    skippedAlreadyWritten++;
-                    continue;
+                    var existingContent = await File.ReadAllTextAsync(testFilePath, ct);
+                    var rel = Path.GetRelativePath(suitePath, testFilePath);
+                    var parsedExisting = parser.Parse(existingContent, rel);
+                    if (parsedExisting.IsSuccess && parsedExisting.Value is { } existing && existing.Grounding is not null)
+                    {
+                        skippedAlreadyWritten++;
+                        continue;
+                    }
                 }
+                catch { /* on parse error, attempt write */ }
             }
-            catch { /* on parse error, attempt write */ }
 
             string verdictJson;
             try { verdictJson = await File.ReadAllTextAsync(vf, ct); }
@@ -154,16 +174,29 @@ public sealed class IngestGroundingCommand : Command
 
             // Write grounding block — reuses same service as per-test mode (no code duplication)
             var result = await service.WriteAsync(testFilePath, verdictJson, repairAttempts, repaired, ct);
-            if (result.IsSuccess) written++;
+            if (result.IsSuccess)
+            {
+                written++;
+                // Spec 078 FR-011: a withheld concern must never be invisible.
+                if (result.ReraiseSuppressed)
+                {
+                    reraisesSuppressed++;
+                    suppressedIds.Add(testId);
+                }
+                if (result.ReviewRecordPreserved) reviewRecordsPreserved++;
+            }
             else errors++;
         }
 
-        EmitBatchResult(json, suite, written, skippedAlreadyWritten, skippedPartialPreRepair, errors);
+        EmitBatchResult(json, suite, written, skippedAlreadyWritten, skippedPartialPreRepair, errors,
+            reVerify, reraisesSuppressed, reviewRecordsPreserved, suppressedIds);
         return ExitSuccess;
     }
 
     private static void EmitBatchResult(bool json, string suite, int written,
-        int skippedAlreadyWritten, int skippedPartialPreRepair, int errors)
+        int skippedAlreadyWritten, int skippedPartialPreRepair, int errors,
+        bool reVerify = false, int reraisesSuppressed = 0, int reviewRecordsPreserved = 0,
+        List<string>? suppressedIds = null)
     {
         if (json)
         {
@@ -172,9 +205,12 @@ public sealed class IngestGroundingCommand : Command
                 command = "ingest-grounding",
                 mode = "batch",
                 suite,
+                re_verify = reVerify,
                 written,
                 skipped_already_written = skippedAlreadyWritten,
                 skipped_partial_pre_repair = skippedPartialPreRepair,
+                reraises_suppressed = reraisesSuppressed,
+                review_records_preserved = reviewRecordsPreserved,
                 errors
             }));
         }
@@ -184,6 +220,17 @@ public sealed class IngestGroundingCommand : Command
                 $"Batch grounding-ingest for suite '{suite}': written={written} " +
                 $"skipped_already_written={skippedAlreadyWritten} " +
                 $"skipped_partial_pre_repair={skippedPartialPreRepair} errors={errors}");
+
+            if (reviewRecordsPreserved > 0)
+                Console.Out.WriteLine($"  Review records preserved: {reviewRecordsPreserved}");
+
+            if (reraisesSuppressed > 0)
+            {
+                // Naming the ids matters: a count alone does not tell a reviewer which concerns were
+                // withheld, and that is exactly what they need to act on.
+                var ids = suppressedIds is { Count: > 0 } ? $"   ({string.Join(", ", suppressedIds)})" : "";
+                Console.Out.WriteLine($"  Re-raises suppressed:     {reraisesSuppressed}{ids}");
+            }
         }
     }
 
@@ -248,7 +295,11 @@ public sealed class IngestGroundingCommand : Command
                     score = g.Score,
                     flagged_for_review = g.FlaggedForReview,
                     repair_attempts = g.RepairAttempts,
-                    repaired = g.Repaired
+                    repaired = g.Repaired,
+                    // Spec 078 FR-011
+                    reraise_suppressed = result.ReraiseSuppressed,
+                    suppressed_by_review_at = result.SuppressedByReviewAt?.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                    review_record_preserved = result.ReviewRecordPreserved
                 }));
             }
             else
@@ -258,6 +309,12 @@ public sealed class IngestGroundingCommand : Command
                     Console.Out.WriteLine($"  Flagged for review ({g.CondensedFindings.Count} condensed finding(s)).");
                 if (g.Repaired)
                     Console.Out.WriteLine($"  Repaired after {g.RepairAttempts} attempt(s).");
+                if (result.ReraiseSuppressed)
+                    Console.Out.WriteLine(
+                        $"  Re-raise suppressed — review by {g.ReviewedBy} on " +
+                        $"{result.SuppressedByReviewAt?.UtcDateTime:yyyy-MM-dd} is newer than the prior verification.");
+                if (result.ReviewRecordPreserved)
+                    Console.Out.WriteLine("  Review record preserved.");
             }
             return ExitSuccess;
         }
