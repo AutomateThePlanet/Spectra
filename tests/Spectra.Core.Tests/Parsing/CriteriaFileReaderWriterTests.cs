@@ -194,4 +194,51 @@ public class CriteriaFileReaderWriterTests : IDisposable
         Assert.Contains("Doc hash: hash123", content);
         Assert.Contains("Generated at:", content);
     }
+
+    // ---- Spec 079: strict reads for write paths ----
+
+    [Fact]
+    public async Task ReadStrictAsync_MissingFile_IsEmpty()
+    {
+        Assert.Empty(await _reader.ReadStrictAsync(Path.Combine(_tempDir, "missing.criteria.yaml")));
+    }
+
+    [Fact]
+    public async Task ReadStrictAsync_CorruptFile_Throws()
+    {
+        var path = Path.Combine(_tempDir, "corrupt.criteria.yaml");
+        await File.WriteAllTextAsync(path, "criteria:\n  - id: [unclosed\n    text: : :\n");
+
+        var ex = await Assert.ThrowsAsync<CriteriaFileUnreadableException>(() => _reader.ReadStrictAsync(path));
+        Assert.Equal(path, ex.FilePath);
+        Assert.Empty(await _reader.ReadAsync(path)); // the lenient reader is unchanged
+    }
+
+    [Fact]
+    public async Task IndexReadStrictAsync_CorruptIndex_Throws()
+    {
+        var path = Path.Combine(_tempDir, "_criteria_index.yaml");
+        await File.WriteAllTextAsync(path, "sources: [ {file: a, : }\n");
+
+        await Assert.ThrowsAsync<CriteriaFileUnreadableException>(() => new CriteriaIndexReader().ReadStrictAsync(path));
+    }
+
+    [Fact]
+    public async Task IndexWriter_WritesHighWaterMarksSorted_AndOmitsThemWhenEmpty()
+    {
+        var path = Path.Combine(_tempDir, "_criteria_index.yaml");
+        var writer = new CriteriaIndexWriter();
+
+        await writer.WriteAsync(path, new CriteriaIndex());
+        Assert.DoesNotContain("id_high_water_marks", await File.ReadAllTextAsync(path));
+
+        await writer.WriteAsync(path, new CriteriaIndex
+        {
+            IdHighWaterMarks = new() { ["AC-Z"] = 2, ["AC-A"] = 7 }
+        });
+        var content = await File.ReadAllTextAsync(path);
+        Assert.True(content.IndexOf("AC-A: 7", StringComparison.Ordinal) < content.IndexOf("AC-Z: 2", StringComparison.Ordinal));
+        Assert.Equal(7, (await new CriteriaIndexReader().ReadStrictAsync(path)).IdHighWaterMarks!["AC-A"]);
+        Assert.Empty(Directory.GetFiles(_tempDir, "*.tmp"));
+    }
 }

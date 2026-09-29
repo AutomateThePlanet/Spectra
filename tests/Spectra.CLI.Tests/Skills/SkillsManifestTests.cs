@@ -401,4 +401,30 @@ public class SkillsManifestTests : IDisposable
         Assert.Contains("it already contains the full document text", content);
         Assert.Contains("do not\nread `{path}` separately", content.Replace("\r\n", "\n"));
     }
+
+    // ---- Spec 079: moved / deleted docs and the changeset summary ----
+
+    [Fact]
+    public void CriteriaSkill_AppliesMoves_AndRetiresDeletedDocsOnlyAfterConfirmation()
+    {
+        var content = SkillContent.All["spectra-criteria"].Replace("\r\n", "\n");
+
+        Assert.Contains("spectra docs apply-move --from {from} --to {path} --output-format json", content);
+        Assert.Contains("spectra docs retire --doc {path} --dry-run --output-format json", content);
+        Assert.Contains("Never retire anything on your own", content);
+        Assert.Contains("Only on an explicit yes, run:\n```\nspectra docs retire --doc {path} --output-format json", content);
+        Assert.Contains("referencing_tests", content);
+    }
+
+    [Fact]
+    public void CriteriaSkill_SummarisesChangesets_AndHandlesInvalidIds()
+    {
+        var content = SkillContent.All["spectra-criteria"];
+
+        Assert.Contains("criteria added / modified / removed", content);
+        Assert.Contains("removed** criterion id that tests still reference", content);
+        Assert.Contains("Exit 7 (`INVALID_CRITERION_ID`)", content);
+        // Spec 078 wording is kept.
+        Assert.Contains("it already contains the full document text", content);
+    }
 }

@@ -158,6 +158,21 @@ criteria:
 
 The path to this file is configured via `coverage.criteria_file` in [spectra.config.json](configuration.md).
 
+### Criterion identity
+
+Tests link to criteria by ID (`criteria:` in the frontmatter), so IDs are kept stable:
+
+- **Rewording keeps the ID.** Re-extraction offers the document's existing criteria to the model, which returns an
+  existing ID for the same requirement; a criterion whose text only changed in markup or whitespace keeps its ID too.
+- **IDs are never reused.** New IDs come from a per-prefix high-water mark committed in `_criteria_index.yaml`
+  (`id_high_water_marks`), so removing a criterion never frees its number, and extraction and import never collide.
+- **One file per document.** Each document's criteria live in a file mirroring its path, so two documents with the
+  same file name no longer overwrite each other. `spectra docs migrate-criteria` moves an older workspace.
+- **Deleted documents are retired explicitly.** `spectra docs changed` reports them as `deleted`; `spectra docs retire`
+  removes their criteria (they then drop out of coverage totals) and reports the tests that still reference them.
+- **Duplicates are reported.** Criterion IDs defined more than once (from older versions) are listed by
+  `docs changed` and `ingest-criteria`, never renumbered.
+
 ### Resilience
 
 `ai analyze --extract-criteria` runs per-document with bounded retries on inconclusive AI responses:

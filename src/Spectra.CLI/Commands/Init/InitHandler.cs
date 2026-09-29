@@ -398,6 +398,8 @@ public sealed class InitHandler
             // Spec 078: run-status files every long-running command writes (incl. dry runs).
             ".spectra-result.json",
             ".spectra-progress.html",
+            // Spec 079: cross-process lock for criteria index/file writes.
+            ".spectra/criteria.lock",
         };
         var newEntries = new List<string>();
 

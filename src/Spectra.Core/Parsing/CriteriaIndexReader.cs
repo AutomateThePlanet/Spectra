@@ -45,6 +45,33 @@ public sealed class CriteriaIndexReader
     /// If _criteria_index.yaml doesn't exist but _requirements.yaml does in the same directory,
     /// rename the legacy file to .bak so fresh extraction can create the new format.
     /// </summary>
+    /// <summary>
+    /// Spec 079: strict read for write paths. A missing index is an empty index, but an index that exists and
+    /// cannot be parsed throws <see cref="CriteriaFileUnreadableException"/> instead of reading as empty (which
+    /// would make the next write drop every other source).
+    /// </summary>
+    public async Task<CriteriaIndex> ReadStrictAsync(string filePath, CancellationToken ct = default)
+    {
+        if (!File.Exists(filePath))
+        {
+            TryRenameLegacyRequirementsFile(filePath);
+            return new CriteriaIndex();
+        }
+
+        try
+        {
+            var content = await File.ReadAllTextAsync(filePath, ct);
+            if (string.IsNullOrWhiteSpace(content))
+                return new CriteriaIndex();
+
+            return Deserializer.Deserialize<CriteriaIndex>(content) ?? new CriteriaIndex();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new CriteriaFileUnreadableException(filePath, ex);
+        }
+    }
+
     private static void TryRenameLegacyRequirementsFile(string criteriaFilePath)
     {
         try

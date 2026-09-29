@@ -63,10 +63,13 @@ After generating, you can continue:
 
 1. Each document is processed individually (no truncation), and only documents that changed since the last extraction are re-processed (SHA-256 content hashing).
 2. Results are reported per document with criteria counts grouped by RFC 2119 level (MUST/SHOULD/MAY).
-3. Files created: `docs/criteria/{docname}.criteria.yaml` and a master `docs/criteria/_criteria_index.yaml`.
-4. **Inconclusive extractions are retried, not cached.** If a document's extraction comes back unparseable or empty, it's retried once more with a short backoff. Documents that remain inconclusive after retries are reported under `failed_documents` and re-attempted on the next run instead of being silently skipped. A genuine "no criteria found" result (a real, valid empty list) is cached normally.
-5. `--force` remains the full re-extraction escape hatch, ignoring the hash cache and re-extracting every document.
-6. Two coverage guards help here: `spectra docs index` emits a prominent non-blocking warning when it indexed documents but produced 0 criteria across the corpus, naming the recovery command (`spectra ai analyze --extract-criteria`), and `spectra ai generate` attaches a non-blocking note to the result when the target suite has no matching acceptance criteria, so you know generated tests will not contribute to acceptance-criteria coverage. Neither guard blocks; both surface in the JSON result.
+3. Files created: one criteria file per document, mirroring its path (`docs/a/login.md` → `docs/criteria/docs/a/login.criteria.yaml`), and a master `docs/criteria/_criteria_index.yaml`.
+4. **IDs stay stable.** When a document changes, the assistant sees its existing criteria and keeps each criterion's ID when it still expresses the same requirement, even if reworded. A removed criterion's ID is never reused for something else.
+5. **You see what changed.** Each document's refresh reports criteria added, modified (old → new text) and removed, and for each removed criterion the tests that still reference it.
+6. **Deleted and moved documents.** A document moved without changes keeps its criteria and IDs. A deleted document is shown with the criteria that would be removed; its criteria are only retired after you confirm.
+7. **Inconclusive extractions are retried, not cached.** If a document's extraction comes back unparseable or empty, it's retried once more with a short backoff. Documents that remain inconclusive after retries are reported under `failed_documents` and re-attempted on the next run instead of being silently skipped. A genuine "no criteria found" result (a real, valid empty list) is cached normally.
+8. `--force` remains the full re-extraction escape hatch, ignoring the hash cache and re-extracting every document.
+9. Two coverage guards help here: `spectra docs index` emits a prominent non-blocking warning when it indexed documents but produced 0 criteria across the corpus, naming the recovery command (`spectra ai analyze --extract-criteria`), and `spectra ai generate` attaches a non-blocking note to the result when the target suite has no matching acceptance criteria, so you know generated tests will not contribute to acceptance-criteria coverage. Neither guard blocks; both surface in the JSON result.
 
 ### Troubleshooting
 

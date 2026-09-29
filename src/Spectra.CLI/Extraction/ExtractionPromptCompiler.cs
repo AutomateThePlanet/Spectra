@@ -1,4 +1,8 @@
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Spectra.CLI.Prompts;
+using Spectra.Core.Models.Coverage;
 
 namespace Spectra.CLI.Extraction;
 
@@ -40,7 +44,8 @@ public static class ExtractionPromptCompiler
         string? documentPath,
         string? documentContent,
         string? component = null,
-        PromptTemplateLoader? templateLoader = null)
+        PromptTemplateLoader? templateLoader = null,
+        IReadOnlyList<AcceptanceCriterion>? existingCriteria = null)
     {
         if (string.IsNullOrWhiteSpace(documentPath))
         {
@@ -58,7 +63,7 @@ public static class ExtractionPromptCompiler
                 + "prompt with no document body.");
         }
 
-        var prompt = Assemble(documentPath, documentContent, component, templateLoader);
+        var prompt = Assemble(documentPath, documentContent, component, templateLoader, existingCriteria);
         return ExtractionPromptCompileResult.Success(prompt);
     }
 
@@ -71,8 +76,11 @@ public static class ExtractionPromptCompiler
         string docPath,
         string content,
         string? component = null,
-        PromptTemplateLoader? templateLoader = null)
+        PromptTemplateLoader? templateLoader = null,
+        IReadOnlyList<AcceptanceCriterion>? existingCriteria = null)
     {
+        var existing = RenderExistingCriteria(existingCriteria);
+
         if (templateLoader is not null)
         {
             var template = templateLoader.LoadTemplate("criteria-extraction");
@@ -80,7 +88,7 @@ public static class ExtractionPromptCompiler
             {
                 ["document_text"] = content,
                 ["document_title"] = docPath,
-                ["existing_criteria"] = "",
+                ["existing_criteria"] = existing,
                 ["component"] = component ?? ""
             };
             return PromptTemplateLoader.Resolve(template, values);
@@ -88,6 +96,12 @@ public static class ExtractionPromptCompiler
 
         var componentHint = component is not null
             ? $"\nThe document belongs to the \"{component}\" component."
+            : "";
+        var existingHint = existing.Length > 0
+            ? "\nThis document already has acceptance criteria. For every criterion you extract that expresses the SAME "
+              + "requirement as one of these (even if you word it differently), return that criterion's \"id\" unchanged. "
+              + "Omit \"id\" for new requirements. Never invent an id, and never use the same id twice.\n\nExisting criteria:\n"
+              + existing
             : "";
 
         return $$"""
@@ -100,7 +114,7 @@ public static class ExtractionPromptCompiler
             - priority: "high" for MUST/SHALL/REQUIRED, "medium" for SHOULD/RECOMMENDED, "low" for MAY/OPTIONAL
             - tags: 1-3 relevant categorization tags
             - technique_hint (optional): "BVA" if the criterion mentions a numeric range, "DT" if multiple conditions with outcomes, "ST" if a workflow/state change, "EP" if valid/invalid input categories. Omit if no technique clearly applies.
-            {{componentHint}}
+            {{componentHint}}{{existingHint}}
 
             Respond ONLY with a JSON array. No markdown, no explanation, no code fences. Example:
             [
@@ -114,4 +128,34 @@ public static class ExtractionPromptCompiler
             {{content}}
             """;
     }
+
+    private static readonly JsonSerializerOptions ExistingCriteriaJson = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        WriteIndented = false
+    };
+
+    /// <summary>
+    /// Spec 079 FR-001/FR-003: the doc's existing criteria as a compact JSON array (id, text, source_section), in
+    /// file order. Deterministic: identical criteria give identical bytes. Empty when there are none.
+    /// </summary>
+    public static string RenderExistingCriteria(IReadOnlyList<AcceptanceCriterion>? existing)
+    {
+        if (existing is null || existing.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var items = existing
+            .Where(c => !string.IsNullOrWhiteSpace(c.Id))
+            .Select(c => new ExistingCriterionView(c.Id, c.Text, string.IsNullOrWhiteSpace(c.SourceSection) ? null : c.SourceSection))
+            .ToList();
+        return items.Count == 0 ? string.Empty : JsonSerializer.Serialize(items, ExistingCriteriaJson);
+    }
+
+    private sealed record ExistingCriterionView(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("text")] string Text,
+        [property: JsonPropertyName("source_section")] string? SourceSection);
 }

@@ -297,6 +297,17 @@ public sealed class UpdateHandler
             // Criteria loading is best-effort; continue without criteria
         }
 
+        // Spec 079 FR-011: duplicate criterion IDs (from older workspaces) are reported, never fatal.
+        foreach (var duplicate in (suiteCriteria ?? [])
+                     .Where(c => !string.IsNullOrWhiteSpace(c.Id))
+                     .GroupBy(c => c.Id, StringComparer.OrdinalIgnoreCase)
+                     .Where(g => g.Count() > 1)
+                     .Select(g => g.Key)
+                     .OrderBy(id => id, StringComparer.Ordinal))
+        {
+            _progress.Warning($"Criterion id {duplicate} is defined more than once; using the first definition.");
+        }
+
         // Classify tests using the classifier directly for better presentation
         var classifier = new TestClassifier();
         var classificationResults = await _progress.StatusAsync(

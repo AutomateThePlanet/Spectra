@@ -159,6 +159,86 @@ Errors with exit code 1 + the available-suites list if `<suite-id>` is unknown.
 
 ---
 
+### `spectra docs changed`
+
+Lists the documents whose acceptance criteria need attention, by comparing each document's SHA-256 with the
+`doc_hash` recorded in `_criteria_index.yaml`. Read-only; calls no model.
+
+```bash
+spectra docs changed --output-format json
+spectra docs changed --include-unchanged      # also list up-to-date documents
+```
+
+Each entry in `changed` has a `status`:
+
+| Status | Meaning | What to do |
+|---|---|---|
+| `new` | No criteria extracted yet | Extract (`compile-extraction-prompt` → `ingest-criteria`) |
+| `changed` | Content changed since the last extraction | Re-extract; existing criterion IDs are offered for reuse |
+| `moved` | A new path whose content equals a deleted document's (`from`) | `spectra docs apply-move --from <from> --to <path>` |
+| `deleted` | An indexed document that no longer exists (`criteria_count`) | Review, then `spectra docs retire --doc <path>` |
+
+A move is reported only when exactly one new document and exactly one deleted document share the hash;
+otherwise they are listed as `new` and `deleted`. Imported criteria are never reported as deleted. Paths are
+compared normalised (repository-relative, `/`), so an index entry written as `docs\x.md` still matches.
+
+The result also carries `duplicate_ids` (criterion IDs defined more than once, with their files; reported,
+never renumbered), `migration_needed` (the criteria files still use the pre-2.6 layout) and `warnings`. The
+exit code is always 0.
+
+---
+
+### `spectra docs apply-move`
+
+Applies a move reported by `docs changed`. The criteria and their IDs are kept; only `source_doc` and the
+criteria file location follow the new path. No extraction runs.
+
+```bash
+spectra docs apply-move --from docs/refunds.md --to docs/billing/refunds.md [--dry-run]
+```
+
+Refuses (exit 4) unless `--from` is an indexed document that no longer exists (`NOT_INDEXED`,
+`DOC_STILL_EXISTS`), `--to` exists (`TARGET_MISSING`) and has no criteria yet (`TARGET_INDEXED`), and its
+content equals what was recorded for `--from` (`CONTENT_CHANGED`: extract it instead). Exit 1 on other errors.
+
+---
+
+### `spectra docs retire`
+
+Retires a deleted document: removes its entry from `_criteria_index.yaml` and deletes its criteria file.
+Nothing is retired without this explicit call.
+
+```bash
+spectra docs retire --doc docs/old-feature.md --dry-run   # preview
+spectra docs retire --doc docs/old-feature.md
+```
+
+The result's `changeset` lists every criterion as removed, each with `referencing_tests` and `test_ids` (the
+tests whose `criteria:` still name it), so you can see which links break. In JSON mode the human summary goes to
+stderr. Refuses (exit 4) a document that still exists (`DOC_STILL_EXISTS`) or is not indexed (`NOT_INDEXED`).
+Criterion ID numbers are never freed for reuse.
+
+---
+
+### `spectra docs migrate-criteria`
+
+Moves criteria files from the pre-2.6 layout (`docs/criteria/{basename}.criteria.yaml`) to one file per
+document, mirroring the document's repository path (`docs/a/login.md` → `docs/criteria/docs/a/login.criteria.yaml`).
+
+```bash
+spectra docs migrate-criteria --dry-run
+spectra docs migrate-criteria
+```
+
+- Every criterion ID is preserved, `source_doc` is normalised, and the ID high-water marks are seeded.
+- It is idempotent: a second run reports `already_migrated: true` and changes nothing.
+- Index entries that already share one file (two docs with the same file name overwrote each other in the old
+  layout) are reported under `collisions` and left as they are; re-extract both documents to split them.
+- `ingest-criteria`, `retire`, `apply-move` and `ai analyze --import-criteria` run the migration automatically
+  before they write. `docs changed` and `compile-extraction-prompt` never move files; they only warn.
+
+---
+
 ## AI Generation Commands
 
 ### `spectra ai compile-prompt` (inverted handoff)
@@ -223,6 +303,11 @@ spectra ai compile-extraction-prompt --doc docs/payment.md --component payment
   "nothing to extract" (`Extracted, []`): it emits **no** prompt, performs no
   model turn, and exits **0**.
 - Writes nothing to disk.
+- The prompt lists the document's **existing criteria** (`id`, `text`, `source_section`, as compact JSON)
+  and asks the model to return an existing `id` when a criterion expresses the same requirement, so IDs stay
+  stable across rewordings. They are found through the document's `_criteria_index.yaml` entry, in either
+  storage layout. A customised `.spectra/prompts/criteria-extraction.md` without `{{existing_criteria}}` still
+  compiles, with a warning to run `spectra prompts reset criteria-extraction`.
 
 ### `spectra ai ingest-criteria` (fail-loud boundary)
 
@@ -239,10 +324,24 @@ cat ./criteria.json | spectra ai ingest-criteria --doc docs/payment.md
   content persists **nothing** and reports the typed `outcome`
   (`EmptyResponse` / `ParseFailure`). There is no cache poisoning, because the criteria index is
   left untouched so a later run re-attempts.
-- A genuine `Extracted` result persists via the unchanged `.criteria.yaml` writer
-  + criteria-index upsert (`outcome: extracted`).
-- `--dry-run` classifies and reports without writing.
-- Exit code is `0` when extracted/persisted, `5` for `EmptyResponse`, and `6` for `ParseFailure`.
+- A genuine `Extracted` result persists to the document's own `.criteria.yaml` file plus a criteria-index
+  upsert (`outcome: extracted`). `source_doc` is stored repository-relative with `/`, however `--doc` was typed.
+- **Stable IDs.** Each criterion may carry an optional `id`. It is kept only if it is one of this document's
+  existing criteria and appears once; otherwise the ingest fails with exit **7** (`INVALID_CRITERION_ID`) and
+  writes nothing. A criterion without an `id` keeps an existing ID when its normalised text (markup, whitespace
+  and case ignored) is unchanged; then its stored text is kept verbatim.
+- **Never-reused IDs.** New IDs come from `id_high_water_marks` in `_criteria_index.yaml` (committed, per prefix
+  such as `AC-CHECKOUT`), so a removed criterion's number is never issued again, and two documents with the same
+  component never collide. Import uses the same allocator.
+- **Changeset.** The JSON result has `changeset` (`added`, `modified` with old/new text, `removed` with
+  `referencing_tests`/`test_ids`, `metadata` changes by field), plus `written`, `duplicate_ids` and `migration`.
+  A human summary of the changeset is always printed: on stderr in JSON mode (stdout is exactly the JSON) and on
+  stdout otherwise. When nothing changed, nothing is written and the criteria file stays byte-identical.
+- Writers take `.spectra/criteria.lock`, so concurrent ingests never lose an update or share an ID.
+- `--dry-run` computes everything (IDs, changeset) without writing.
+- Exit code is `0` when extracted/persisted (or unchanged), `5` for `EmptyResponse`, `6` for `ParseFailure`,
+  `7` for `INVALID_CRITERION_ID`, and `1` for other errors (`CRITERIA_FILE_UNREADABLE`,
+  `CRITERIA_FILE_COLLISION`, `INVALID_DOC_PATH`, `LOCK_TIMEOUT`).
 
 > `spectra docs index` and `spectra ai analyze
 > --extract-criteria` still run their extraction in-process today; the

@@ -37,20 +37,50 @@ Write `.spectra/progress.json` with the Write tool:
 spectra docs changed --output-format json
 ```
 
-Read the `changed` array. Each entry is `{ path, component, status, current_hash, indexed_hash }` with
-`status` = `new` or `changed`. **If `changed` is empty, report "Acceptance criteria are up to date" and
-STOP** — do not extract anything. (Unchanged documents are skipped here, so they never reach a model turn.
-Use `--force`-style full re-extraction by passing `--include-unchanged` and processing every doc only when
-the user explicitly asks to re-extract everything.)
+Read the `changed` array. Each entry is `{ path, component, status, current_hash, indexed_hash }` where
+`status` is one of:
+- `new` / `changed` → extract it in Step 2;
+- `moved` (with `from`) → the same content now lives at `path`; handled in 1a, never extracted;
+- `deleted` (with `criteria_count`) → the document is gone; handled in 1b.
 
-Update `.spectra/progress.json` — N = number of changed docs:
+Also show the user every entry of `warnings` (e.g. duplicate criterion ids, or that criteria storage still
+uses the old layout — criteria writes migrate it automatically).
+
+**If `changed` is empty, report "Acceptance criteria are up to date" and STOP** — do not extract anything.
+(Unchanged documents are skipped here, so they never reach a model turn. Use `--force`-style full
+re-extraction by passing `--include-unchanged` and processing every doc only when the user explicitly asks
+to re-extract everything.)
+
+**1a. Moved documents** (`status: moved`). The content is unchanged, so its criteria and their IDs are kept
+and nothing is extracted. Apply the move:
+```
+spectra docs apply-move --from {from} --to {path} --output-format json
+```
+- Exit 0 → record "moved {from} → {path}, {criteria_count} criteria kept".
+- Exit 4 → show `errors[0]` to the user and continue.
+
+**1b. Deleted documents** (`status: deleted`). Never retire anything on your own. For each, preview:
+```
+spectra docs retire --doc {path} --dry-run --output-format json
+```
+Show the user the `changeset` from stdout: every criterion that would be removed and, for each, its
+`referencing_tests` / `test_ids` — the tests that still link to it. Ask the user whether to retire this
+document's criteria. Only on an explicit yes, run:
+```
+spectra docs retire --doc {path} --output-format json
+```
+Otherwise leave it; it stays reported as `deleted` and nothing is removed.
+
+The Step 2 work-list is the `new` and `changed` entries only.
+
+Update `.spectra/progress.json` — N = number of `new` + `changed` docs:
 ```json
 {"phases":["Step 1 — Find changed docs","Step 2 — Extract criteria","Step 3 — Summarize"],"active":1,"loop":{"current":0,"total":N,"label":"starting"}}
 ```
 
 ### Step 2 — Per changed document: compile → extract in-session → ingest
 
-For EACH entry in `changed` (i = 1..N), update progress.json first:
+For EACH `new` or `changed` entry (i = 1..N), update progress.json first:
 ```json
 {"phases":["Step 1 — Find changed docs","Step 2 — Extract criteria","Step 3 — Summarize"],"active":1,"loop":{"current":i,"total":N,"label":"doc i/N: <path>"}}
 ```
@@ -74,18 +104,30 @@ specifies. Produce ONLY the JSON array the prompt describes. **Write it to `.spe
 ```
 spectra ai ingest-criteria --doc {path} --component {component} --from .spectra/criteria.json --output-format json
 ```
-- Exit 0 → persisted; record `persisted` count + `ids`.
+- Exit 0 → persisted; record `persisted`, `ids` and the `changeset` from stdout (`added`, `modified`
+  with old/new text, `removed` with `referencing_tests` / `test_ids`, `metadata`). A human summary of the
+  same changeset is printed on stderr — you do not need to parse it.
 - Exit 5 (empty) or exit 6 (unparseable JSON array) → **fail loud, nothing persisted.** Re-read the
   compiled prompt, regenerate stricter JSON, rewrite `.spectra/criteria.json`, and re-ingest. **Bounded:
   at most 2 attempts** per document; then record that document as failed and continue with the rest.
+- Exit 7 (`INVALID_CRITERION_ID`) → you returned an `id` that is not one of this document's existing
+  criteria, or used one `id` twice. Nothing was persisted. Regenerate using only ids from the prompt's
+  "Existing criteria" list (or omit `id` for new requirements), rewrite `.spectra/criteria.json`, and
+  re-ingest — same 2-attempt bound.
 
 Update `.spectra/progress.json`: `{"active":2}` after the loop completes.
 
 ### Step 3 — Summarize
 
-Report: documents processed, criteria persisted (new/updated), documents skipped as unchanged (from
-Step 1), and any per-document failures. Suggest next steps: "Run coverage analysis?" or "Generate test
-cases for uncovered criteria?"
+Report one combined changeset summary:
+- per document: criteria added / modified / removed (from each ingest's `changeset`);
+- every **removed** criterion id that tests still reference, with those test ids — these links are now
+  broken and the tests need attention;
+- moves applied (1a), documents retired (1b), deleted documents the user chose to keep for now;
+- documents skipped as unchanged (from Step 1) and any per-document failures.
+
+Suggest next steps: "Update the tests that reference removed criteria?", "Run coverage analysis?" or
+"Generate test cases for uncovered criteria?"
 
 Write `.spectra/progress.json`: `{"active":3}` (terminal — seam-progress page renders Complete).
 

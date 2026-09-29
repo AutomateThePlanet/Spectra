@@ -1,4 +1,6 @@
+using Spectra.CLI.Criteria;
 using Spectra.CLI.Infrastructure;
+using Spectra.Core.Criteria;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Coverage;
 using Spectra.Core.Parsing;
@@ -19,6 +21,9 @@ namespace Spectra.CLI.Extraction;
 /// </summary>
 public sealed class CriteriaIngestor
 {
+    /// <summary>Spec 079: a returned criterion id is unknown, belongs to another doc, or repeats.</summary>
+    public const string ErrorInvalidCriterionId = "INVALID_CRITERION_ID";
+
     private readonly SpectraConfig _config;
 
     public CriteriaIngestor(SpectraConfig config)
@@ -48,16 +53,17 @@ public sealed class CriteriaIngestor
     }
 
     /// <summary>
-    /// Classifies <paramref name="agentContent"/> and, on <see cref="ExtractionOutcome.Extracted"/>,
-    /// persists the criteria into <c>{component}.criteria.yaml</c> and upserts the criteria index.
-    /// On any non-cacheable outcome nothing is written.
+    /// Classifies <paramref name="agentContent"/> and, on <see cref="ExtractionOutcome.Extracted"/>, matches the
+    /// criteria to the doc's previous ones (keeping IDs the model returned or whose normalised text is unchanged),
+    /// allocates never-reused IDs for the rest, computes the changeset, and persists — all under the criteria
+    /// lock (Spec 079). On any failure nothing is written.
     /// </summary>
     /// <param name="agentContent">The agent's extraction response (expected to contain a JSON array).</param>
     /// <param name="currentDir">Workspace root (where <c>spectra.config.json</c> lives).</param>
-    /// <param name="docPath">Source document path the criteria belong to (sets <c>SourceDoc</c>).</param>
+    /// <param name="docPath">Source document, as typed; normalised to a repo-relative, forward-slash path.</param>
     /// <param name="component">Component override; defaults to a slug derived from the doc filename.</param>
     /// <param name="docHash">Source-document content hash for the cache entry; null skips the hash.</param>
-    /// <param name="dryRun">When true, classify + report but persist nothing.</param>
+    /// <param name="dryRun">When true, compute everything (IDs, changeset) but persist nothing.</param>
     public async Task<CriteriaIngestResult> IngestAsync(
         string? agentContent,
         string currentDir,
@@ -70,97 +76,165 @@ public sealed class CriteriaIngestor
         ArgumentException.ThrowIfNullOrWhiteSpace(currentDir);
         ArgumentException.ThrowIfNullOrWhiteSpace(docPath);
 
-        var resolvedComponent = string.IsNullOrWhiteSpace(component)
-            ? DeriveComponent(docPath)
-            : component;
+        var normalized = CriteriaPaths.NormalizeSourceDoc(docPath, currentDir);
+        if (!normalized.IsSuccess)
+        {
+            return CriteriaIngestResult.Rejected(CriteriaPaths.ErrorInvalidDocPath,
+                $"The document path must be inside the repository: {docPath}");
+        }
 
-        var classified = Classify(agentContent, docPath, resolvedComponent);
+        var doc = normalized.Path!;
+        var resolvedComponent = string.IsNullOrWhiteSpace(component) ? DeriveComponent(doc) : component;
 
-        // FR-006 cache gate: only a genuine extraction is persisted. Anything else returns the
-        // fail-loud result with the index untouched.
+        var classified = Classify(agentContent, doc, resolvedComponent);
+
+        // FR-006 cache gate: only a genuine extraction is persisted.
         if (!classified.IsSuccess)
             return classified;
 
-        if (dryRun)
-            return classified; // classified Extracted, but persist nothing on a dry run
-
-        var criteria = classified.PersistedCriteria;
-
-        var criteriaDir = Path.Combine(currentDir, _config.Coverage.CriteriaDir);
-        var criteriaIndexPath = Path.Combine(currentDir, _config.Coverage.CriteriaFile);
-        Directory.CreateDirectory(criteriaDir);
-
-        var docBaseName = Path.GetFileNameWithoutExtension(docPath);
-        var criteriaFileName = $"{docBaseName}.criteria.yaml";
-        var criteriaFilePath = Path.Combine(criteriaDir, criteriaFileName);
-
-        // Assign/reuse IDs against the existing per-doc file (same scheme as AnalyzeHandler).
-        var reader = new CriteriaFileReader();
-        var existingCriteria = await reader.ReadAsync(criteriaFilePath, ct);
-        var existingIdMap = existingCriteria
-            .Where(c => !string.IsNullOrEmpty(c.Id))
-            .GroupBy(c => c.Text, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
-
-        var componentPrefix = $"AC-{resolvedComponent.ToUpperInvariant()}-";
-        var maxId = existingCriteria
-            .Where(c => c.Id.StartsWith(componentPrefix, StringComparison.OrdinalIgnoreCase))
-            .Select(c => int.TryParse(c.Id[componentPrefix.Length..], out var n) ? n : 0)
-            .DefaultIfEmpty(0)
-            .Max();
-        var nextId = maxId + 1;
-
-        foreach (var criterion in criteria)
+        try
         {
-            if (existingIdMap.TryGetValue(criterion.Text, out var existingId))
+            return await CriteriaStore.WithLockAsync(currentDir,
+                () => IngestLockedAsync(classified.PersistedCriteria, currentDir, doc, resolvedComponent, docHash, dryRun, ct),
+                ct);
+        }
+        catch (CriteriaStoreException ex)
+        {
+            return CriteriaIngestResult.Rejected(ex.ErrorCode, ex.Message);
+        }
+    }
+
+    private async Task<CriteriaIngestResult> IngestLockedAsync(
+        IReadOnlyList<AcceptanceCriterion> extracted, string currentDir, string doc, string component,
+        string? docHash, bool dryRun, CancellationToken ct)
+    {
+        var ws = await CriteriaStore.LoadAsync(_config, currentDir, ct);
+
+        // FR-016b: write paths migrate the old layout first (inside the same lock).
+        MigrationReport? migration = null;
+        if (!dryRun && CriteriaPaths.IsOldLayout(ws.Index))
+        {
+            var report = await CriteriaLayoutMigrator.MigrateAsync(ws, dryRun: false, ct);
+            if (!report.AlreadyMigrated)
             {
-                criterion.Id = existingId;
+                migration = report;
+                ws = await CriteriaStore.LoadAsync(_config, currentDir, ct);
             }
-            else
+        }
+
+        // Where the previous criteria live, and where this doc's criteria go.
+        var source = ws.FindDocumentSource(doc);
+        string? previousFile = null;
+        var sharedFile = false;
+        var target = CriteriaPaths.DerivedFile(doc);
+        if (source is not null && !string.IsNullOrWhiteSpace(source.File))
+        {
+            previousFile = CriteriaPaths.NormalizeLexical(source.File);
+            sharedFile = ws.Index.Sources.Count(s => CriteriaPaths.IsDocumentSource(s)
+                && string.Equals(CriteriaPaths.NormalizeLexical(s.File), previousFile, StringComparison.OrdinalIgnoreCase)) > 1;
+            if (!sharedFile)
             {
-                criterion.Id = $"{componentPrefix}{nextId:D3}";
-                nextId++;
+                target = previousFile;
             }
-            criterion.SourceDoc = docPath;
+        }
+
+        if (ws.FileOwnedByOther(target, source) is { } owner)
+        {
+            return CriteriaIngestResult.Rejected(CriteriaPaths.ErrorFileCollision,
+                $"Criteria file '{target}' already belongs to '{owner.SourceDoc ?? owner.File}'.");
+        }
+
+        var previous = previousFile is null ? [] : await ws.ReadStrictAsync(previousFile, ct);
+        if (sharedFile)
+        {
+            // A past base-name collision: only the criteria this doc wrote are its own (per-criterion provenance).
+            previous = previous
+                .Where(p => string.Equals(CriteriaPaths.NormalizeLexical(p.SourceDoc), doc, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        // FR-004/FR-005: validate returned IDs, then the one-to-one normalised-text fallback.
+        var incoming = extracted
+            .Select(c => new IncomingCriterion(c, string.IsNullOrWhiteSpace(c.Id) ? null : c.Id))
+            .ToList();
+        var match = CriteriaMatcher.Match(incoming, previous);
+        if (!match.IsValid)
+        {
+            return CriteriaIngestResult.Rejected(ErrorInvalidCriterionId,
+                "The response uses criterion id(s) that are not this document's existing criteria, or repeats them: "
+                + string.Join(", ", match.InvalidIds));
+        }
+
+        // FR-007: new IDs from the committed per-prefix high-water mark (never reused).
+        var unmatched = match.Items.Where(i => i.Previous is null).ToList();
+        var newIds = CriteriaIdAllocator.Allocate(
+            ws.Index, $"AC-{component.ToUpperInvariant()}", unmatched.Count, ws.AllIds);
+        for (var i = 0; i < unmatched.Count; i++)
+        {
+            unmatched[i].Criterion.Id = newIds[i];
+        }
+
+        var next = match.Items.Select(i => i.Criterion).ToList();
+        foreach (var criterion in next)
+        {
+            criterion.SourceDoc = doc;
             criterion.SourceType = "document";
-            criterion.Component = resolvedComponent;
+            criterion.Component = component;
         }
 
-        // Write the per-doc criteria file.
-        var fileWriter = new CriteriaFileWriter();
-        await fileWriter.WriteAsync(criteriaFilePath, criteria, docPath, docHash, ct);
+        var (testsById, warnings) = await CriteriaReferenceCounter.LoadAsync(currentDir, _config, ct);
+        var changeset = CriteriaChangeset.Build(doc, previous, next).WithReferences(testsById);
 
-        // Upsert the index source (Spec 048: only genuine extractions reach here ⇒ outcome=extracted).
-        var indexReader = new CriteriaIndexReader();
-        var index = await indexReader.ReadAsync(criteriaIndexPath, ct);
-        var existingSource = index.Sources
-            .FirstOrDefault(s => string.Equals(s.SourceDoc, docPath, StringComparison.OrdinalIgnoreCase));
-        if (existingSource is not null)
+        // FR-014 no-op rule: nothing changed and the index already records this exact state → write nothing.
+        var hashSame = source is not null && string.Equals(source.DocHash, docHash, StringComparison.OrdinalIgnoreCase);
+        var entryCurrent = source is not null
+            && string.Equals(source.SourceDoc, doc, StringComparison.Ordinal)
+            && string.Equals(CriteriaPaths.NormalizeLexical(source.File), target, StringComparison.Ordinal);
+        var needFileWrite = !changeset.IsEmpty || previousFile != target || !File.Exists(ws.FullPath(target));
+        var needIndexWrite = needFileWrite || !hashSame || !entryCurrent;
+
+        var written = false;
+        if (!dryRun && (needFileWrite || needIndexWrite))
         {
-            existingSource.DocHash = docHash;
-            existingSource.CriteriaCount = criteria.Count;
-            existingSource.LastExtracted = DateTime.UtcNow;
-            existingSource.File = criteriaFileName;
-            existingSource.Outcome = "extracted";
-        }
-        else
-        {
-            index.Sources.Add(new CriteriaSource
+            if (needFileWrite)
             {
-                File = criteriaFileName,
-                SourceDoc = docPath,
-                SourceType = "document",
-                DocHash = docHash,
-                CriteriaCount = criteria.Count,
-                LastExtracted = DateTime.UtcNow,
-                Outcome = "extracted"
-            });
+                await ws.WriteCriteriaAsync(target, next, doc, docHash, ct);
+            }
+
+            if (source is null)
+            {
+                source = new CriteriaSource { SourceType = "document" };
+                ws.Index.Sources.Add(source);
+            }
+
+            source.File = target;
+            source.SourceDoc = doc;
+            source.DocHash = docHash;
+            source.CriteriaCount = next.Count;
+            source.LastExtracted = DateTime.UtcNow;
+            source.Outcome = "extracted";
+            await ws.SaveIndexAsync(ct);
+
+            // A shared (collided) file that no source references any more would be double-counted by the
+            // recursive criteria scanners, so it goes once the last doc has moved off it.
+            if (sharedFile && previousFile is not null && previousFile != target
+                && !ws.Index.Sources.Any(s => string.Equals(CriteriaPaths.NormalizeLexical(s.File), previousFile, StringComparison.OrdinalIgnoreCase)))
+            {
+                File.Delete(ws.FullPath(previousFile));
+            }
+
+            written = true;
         }
 
-        var indexWriter = new CriteriaIndexWriter();
-        await indexWriter.WriteAsync(criteriaIndexPath, index, ct);
-
-        return classified;
+        return CriteriaIngestResult.Extracted(next) with
+        {
+            Doc = doc,
+            Changeset = changeset,
+            Written = written,
+            DuplicateIds = ws.Duplicates,
+            Migration = migration,
+            Warnings = warnings
+        };
     }
 
     /// <summary>Best-effort source-document hash for the cache entry; null when unreadable.</summary>
@@ -190,8 +264,29 @@ public sealed record CriteriaIngestResult
     /// <summary>The classified outcome from <see cref="CriteriaExtractor.ClassifyResponse"/>.</summary>
     public ExtractionOutcome Outcome { get; private init; }
 
-    /// <summary>True when the outcome is <see cref="ExtractionOutcome.Extracted"/>.</summary>
-    public bool IsSuccess => Outcome == ExtractionOutcome.Extracted;
+    /// <summary>True when the outcome is <see cref="ExtractionOutcome.Extracted"/> and nothing was rejected.</summary>
+    public bool IsSuccess => Outcome == ExtractionOutcome.Extracted && ErrorCode is null;
+
+    /// <summary>Spec 079: machine-readable reason for a rejected ingest (e.g. <c>INVALID_CRITERION_ID</c>).</summary>
+    public string? ErrorCode { get; private init; }
+
+    /// <summary>Spec 079: the normalised source doc.</summary>
+    public string? Doc { get; init; }
+
+    /// <summary>Spec 079: what changed in this doc's criteria (computed on dry runs too).</summary>
+    public CriteriaChangeset? Changeset { get; init; }
+
+    /// <summary>Spec 079: false on a dry run or when the no-op rule wrote nothing.</summary>
+    public bool Written { get; init; }
+
+    /// <summary>Spec 079: workspace-wide duplicate criterion IDs (reported, never renumbered).</summary>
+    public IReadOnlyList<DuplicateCriterionId> DuplicateIds { get; init; } = [];
+
+    /// <summary>Spec 079: the automatic layout migration this ingest ran first, if any.</summary>
+    public MigrationReport? Migration { get; init; }
+
+    /// <summary>Non-blocking warnings (e.g. an unreadable test index while counting references).</summary>
+    public IReadOnlyList<string> Warnings { get; init; } = [];
 
     /// <summary>Criteria persisted (or, on dry-run, that would be). Empty on failure.</summary>
     public IReadOnlyList<AcceptanceCriterion> PersistedCriteria { get; private init; } = [];
@@ -206,6 +301,14 @@ public sealed record CriteriaIngestResult
     {
         Outcome = ExtractionOutcome.Extracted,
         PersistedCriteria = criteria ?? []
+    };
+
+    /// <summary>Spec 079: a classified response that was rejected before persisting (nothing written).</summary>
+    public static CriteriaIngestResult Rejected(string errorCode, params string[] errors) => new()
+    {
+        Outcome = ExtractionOutcome.Extracted,
+        ErrorCode = errorCode,
+        Errors = errors ?? []
     };
 
     /// <summary>Creates a fail-loud (non-cacheable) result. Persists nothing.</summary>

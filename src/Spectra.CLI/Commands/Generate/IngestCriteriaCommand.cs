@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Text.Json;
+using Spectra.CLI.Criteria;
 using Spectra.CLI.Extraction;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
@@ -18,6 +19,7 @@ public sealed class IngestCriteriaCommand : Command
     private const int ExitError = 1;
     private const int ExitEmptyResponse = 5; // EmptyResponse
     private const int ExitParseFailure = 6;  // ParseFailure
+    private const int ExitInvalidCriterionId = 7; // Spec 079: unknown / foreign / repeated criterion id
 
     public IngestCriteriaCommand()
         : base("ingest-criteria", "Validate and persist agent-extracted acceptance criteria (fail-loud)")
@@ -105,41 +107,76 @@ public sealed class IngestCriteriaCommand : Command
 
         if (result.IsSuccess)
         {
+            // Spec 079: the success JSON is the whole of stdout in JSON mode; the human changeset summary goes to
+            // stderr there, and to stdout in human mode. It is never suppressed.
             if (json)
             {
                 Console.Out.WriteLine(JsonSerializer.Serialize(new
                 {
                     success = true,
                     outcome = result.Outcome.ToString(),
+                    doc = result.Doc,
                     persisted = result.PersistedCriteria.Count,
                     ids = result.PersistedCriteria.Select(c => c.Id).ToArray(),
-                    dry_run = dryRun
+                    dry_run = dryRun,
+                    written = result.Written,
+                    changeset = result.Changeset,
+                    duplicate_ids = result.DuplicateIds,
+                    migration = result.Migration,
+                    warnings = result.Warnings
                 }));
             }
-            else
+
+            var human = json ? Console.Error : Console.Out;
+            if (!json)
             {
-                var verb = dryRun ? "Would persist" : "Persisted";
-                Console.Out.WriteLine($"{verb} {result.PersistedCriteria.Count} criterion(s) for '{doc}': "
+                var verb = dryRun ? "Would persist" : result.Written ? "Persisted" : "Unchanged —";
+                human.WriteLine($"{verb} {result.PersistedCriteria.Count} criterion(s) for '{result.Doc}': "
                     + string.Join(", ", result.PersistedCriteria.Select(c => c.Id)));
             }
+
+            if (result.Migration is { } migration)
+            {
+                human.WriteLine($"Migrated criteria storage first: {migration.Moved.Count} file(s) moved, "
+                    + $"{migration.Collisions.Count} collision(s) reported.");
+            }
+
+            if (result.Changeset is not null)
+            {
+                CriteriaChangesetPresenter.Write(human, result.Changeset,
+                    dryRun ? $"Criteria changeset for {result.Doc} (dry run — nothing written)" : null);
+            }
+
+            CriteriaChangesetPresenter.WriteDuplicates(human, result.DuplicateIds);
+            foreach (var warning in result.Warnings)
+            {
+                human.WriteLine($"Warning: {warning}");
+            }
+
             return ExitSuccess;
         }
 
-        // Fail loud — nothing persisted (FR-003, FR-006).
+        // Fail loud — nothing persisted (FR-003, FR-006). Failure output stays machine-readable, no summary.
         if (json)
         {
             Console.Error.WriteLine(JsonSerializer.Serialize(new
             {
                 success = false,
                 outcome = result.Outcome.ToString(),
+                error_code = result.ErrorCode,
                 errors = result.Errors
             }));
         }
         else
         {
-            Console.Error.WriteLine($"Ingest failed [{result.Outcome}] — nothing persisted:");
+            Console.Error.WriteLine($"Ingest failed [{result.ErrorCode ?? result.Outcome.ToString()}] — nothing persisted:");
             foreach (var e in result.Errors)
                 Console.Error.WriteLine($"  - {e}");
+        }
+
+        if (result.ErrorCode is not null)
+        {
+            return result.ErrorCode == CriteriaIngestor.ErrorInvalidCriterionId ? ExitInvalidCriterionId : ExitError;
         }
 
         return result.Outcome == ExtractionOutcome.EmptyResponse ? ExitEmptyResponse : ExitParseFailure;

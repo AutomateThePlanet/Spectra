@@ -48,7 +48,10 @@ public sealed class TestClassifier
         // Check criteria-based classification first (if criteria data is available)
         if (criteria is not null && test.Criteria.Count > 0)
         {
-            var criteriaById = criteria.ToDictionary(c => c.Id, StringComparer.OrdinalIgnoreCase);
+            // Spec 079 FR-011: tolerate duplicate IDs from older workspaces — first definition wins (reported by the caller).
+            var criteriaById = criteria
+                .GroupBy(c => c.Id, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
             foreach (var criterionId in test.Criteria)
             {

@@ -90,6 +90,56 @@ public sealed class DocsChangedTests : IDisposable
         Assert.Equal("new", changed[0].GetProperty("status").GetString());
     }
 
+    // ---- Spec 079: normalised source_doc and the old-layout warning ----
+
+    [Theory]
+    [InlineData("docs\\\\stored.md")]
+    [InlineData("./docs/stored.md")]
+    public async Task IndexEntryWithUnnormalisedPath_StillMatches(string storedPath)
+    {
+        var content = "# Stored\nThe system MUST do S.\n";
+        File.WriteAllText(Path.Combine(_dir, "docs", "stored.md"), content);
+        File.WriteAllText(Path.Combine(_dir, "docs", "criteria", "_criteria_index.yaml"), $"""
+            version: 1
+            sources:
+              - file: docs/stored.criteria.yaml
+                source_doc: "{storedPath}"
+                source_type: document
+                doc_hash: {FileHasher.ComputeHash(content)}
+                criteria_count: 0
+            """);
+
+        using var doc = JsonDocument.Parse(await CaptureJsonAsync(includeUnchanged: true));
+
+        var entry = doc.RootElement.GetProperty("changed").EnumerateArray()
+            .Single(e => e.GetProperty("path").GetString() == "docs/stored.md");
+        Assert.Equal("unchanged", entry.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task OldLayout_WarnsMigrationNeeded_AndMovesNothing()
+    {
+        var content = "# Old\nThe system MUST do O.\n";
+        File.WriteAllText(Path.Combine(_dir, "docs", "old.md"), content);
+        File.WriteAllText(Path.Combine(_dir, "docs", "criteria", "old.criteria.yaml"), "criteria:\n- id: AC-OLD-001\n  text: o\n");
+        File.WriteAllText(Path.Combine(_dir, "docs", "criteria", "_criteria_index.yaml"), $"""
+            version: 1
+            sources:
+              - file: old.criteria.yaml
+                source_doc: docs/old.md
+                source_type: document
+                doc_hash: {FileHasher.ComputeHash(content)}
+                criteria_count: 1
+            """);
+        var before = Directory.GetFiles(_dir, "*", SearchOption.AllDirectories).OrderBy(f => f).ToList();
+
+        using var doc = JsonDocument.Parse(await CaptureJsonAsync(includeUnchanged: false));
+
+        Assert.True(doc.RootElement.GetProperty("migration_needed").GetBoolean());
+        Assert.Contains("migrate-criteria", doc.RootElement.GetProperty("warnings")[0].GetString());
+        Assert.Equal(before, Directory.GetFiles(_dir, "*", SearchOption.AllDirectories).OrderBy(f => f).ToList());
+    }
+
     private async Task<string> CaptureJsonAsync(bool includeUnchanged)
     {
         var handler = new DocsChangedHandler(OutputFormat.Json, includeUnchanged, includeArchived: false);

@@ -54,7 +54,8 @@ public sealed class CriteriaIngestorTests : IDisposable
         Assert.Single(result.PersistedCriteria);
         Assert.StartsWith("AC-PAYMENT-", result.PersistedCriteria[0].Id);
 
-        var criteriaFile = Path.Combine(_dir, "docs/criteria", "payment.criteria.yaml");
+        // Spec 079: per-doc file mirroring the doc's repo-relative path (was the base name payment.criteria.yaml).
+        var criteriaFile = Path.Combine(_dir, "docs/criteria", "docs", "payment.criteria.yaml");
         Assert.True(File.Exists(criteriaFile));
 
         var indexFile = Path.Combine(_dir, "docs/criteria/_criteria_index.yaml");
@@ -72,7 +73,7 @@ public sealed class CriteriaIngestorTests : IDisposable
             GoodJson, _dir, "docs/payment.md", "payment", "abc123", dryRun: true);
 
         Assert.True(result.IsSuccess); // classified Extracted...
-        Assert.False(File.Exists(Path.Combine(_dir, "docs/criteria", "payment.criteria.yaml"))); // ...but wrote nothing
+        Assert.False(File.Exists(Path.Combine(_dir, "docs/criteria", "docs", "payment.criteria.yaml"))); // ...but wrote nothing
     }
 
     // ---------- US3: fail-loud, no persistence, no cache poisoning ----------

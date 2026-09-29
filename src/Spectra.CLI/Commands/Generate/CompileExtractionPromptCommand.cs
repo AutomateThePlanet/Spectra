@@ -4,6 +4,10 @@ using Spectra.CLI.Extraction;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
 using Spectra.CLI.Prompts;
+using Spectra.Core.Criteria;
+using Spectra.Core.Models.Config;
+using Spectra.Core.Models.Coverage;
+using Spectra.Core.Parsing;
 
 namespace Spectra.CLI.Commands.Generate;
 
@@ -88,7 +92,23 @@ public sealed class CompileExtractionPromptCommand : Command
         }
 
         var templateLoader = new PromptTemplateLoader(currentDir);
-        var result = ExtractionPromptCompiler.Compile(doc, content, component, templateLoader);
+
+        // Spec 079 FR-001/FR-016c-d: read (never write) this doc's existing criteria through the index `file`
+        // entry, so the prompt carries their IDs in both the old and the per-doc layout.
+        var (existing, warnings) = await LoadExistingCriteriaAsync(currentDir, doc, ct);
+        if (existing.Count > 0
+            && !templateLoader.LoadTemplate("criteria-extraction").Body.Contains("existing_criteria", StringComparison.Ordinal))
+        {
+            warnings.Add("The criteria-extraction prompt template in .spectra/prompts/ does not use {{existing_criteria}}, "
+                + "so existing criterion IDs are not offered for reuse. Run 'spectra prompts reset criteria-extraction' to update it.");
+        }
+
+        foreach (var warning in warnings)
+        {
+            Console.Error.WriteLine($"Warning: {warning}");
+        }
+
+        var result = ExtractionPromptCompiler.Compile(doc, content, component, templateLoader, existing);
 
         if (!result.IsSuccess)
         {
@@ -100,6 +120,49 @@ public sealed class CompileExtractionPromptCommand : Command
         Console.Out.Write(result.Prompt);
         if (!result.Prompt!.EndsWith('\n')) Console.Out.WriteLine();
         return ExitSuccess;
+    }
+
+    /// <summary>
+    /// The doc's current criteria, located via its index entry's <c>file</c> (lenient: a missing or unreadable
+    /// config, index or file gives no criteria plus a warning). Never writes and never migrates.
+    /// </summary>
+    private static async Task<(IReadOnlyList<AcceptanceCriterion> Criteria, List<string> Warnings)> LoadExistingCriteriaAsync(
+        string currentDir, string doc, CancellationToken ct)
+    {
+        var warnings = new List<string>();
+        var config = SpectraConfig.Default;
+        var configPath = Path.Combine(currentDir, "spectra.config.json");
+        if (File.Exists(configPath))
+        {
+            try
+            {
+                config = JsonSerializer.Deserialize<SpectraConfig>(await File.ReadAllTextAsync(configPath, ct),
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? SpectraConfig.Default;
+            }
+            catch (JsonException)
+            {
+                warnings.Add("spectra.config.json could not be parsed; using default criteria paths.");
+            }
+        }
+
+        var index = await new CriteriaIndexReader().ReadAsync(Path.Combine(currentDir, config.Coverage.CriteriaFile), ct);
+        if (CriteriaPaths.IsOldLayout(index))
+        {
+            warnings.Add("Criteria files use the pre-2.6 layout; run 'spectra docs migrate-criteria' "
+                + "(criteria writes also migrate automatically).");
+        }
+
+        var normalized = CriteriaPaths.NormalizeSourceDoc(doc, currentDir).Path ?? CriteriaPaths.NormalizeLexical(doc);
+        var source = index.Sources.FirstOrDefault(s => CriteriaPaths.IsDocumentSource(s)
+            && string.Equals(CriteriaPaths.NormalizeLexical(s.SourceDoc), normalized, StringComparison.OrdinalIgnoreCase));
+        if (source is null || string.IsNullOrWhiteSpace(source.File))
+        {
+            return ([], warnings);
+        }
+
+        var filePath = Path.Combine(currentDir, config.Coverage.CriteriaDir, source.File);
+        var criteria = await new CriteriaFileReader().ReadAsync(filePath, ct);
+        return (criteria, warnings);
     }
 
     private static void EmitRefusal(bool json, string missingInput, string message)

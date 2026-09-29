@@ -1,4 +1,5 @@
 using Spectra.Core.Models;
+using Spectra.Core.Models.Coverage;
 using Spectra.Core.Update;
 
 namespace Spectra.Core.Tests.Update;
@@ -264,5 +265,27 @@ Use the modern approach for better results.
         var result = Assert.Single(classifier.ClassifyBatch([MultiRefTest("docs/empty.md")], contents));
 
         Assert.Equal(UpdateClassification.Orphaned, result.Classification);
+    }
+
+    // ---- Spec 079 FR-011: duplicate criterion IDs never crash classification ----
+
+    [Fact]
+    public void Classify_WithDuplicateCriterionIds_UsesTheFirstDefinition()
+    {
+        var classifier = new TestClassifier();
+        var test = CreateTestCase("TC-079", "Checkout payment flow", ["Open checkout"], "Payment accepted") with
+        {
+            Criteria = ["AC-CHECKOUT-001"],
+            ScenarioFromDoc = "System MUST accept the payment"
+        };
+        var criteria = new List<AcceptanceCriterion>
+        {
+            new() { Id = "AC-CHECKOUT-001", Text = "System MUST accept the payment" },
+            new() { Id = "ac-checkout-001", Text = "A different, duplicated definition" }
+        };
+
+        var result = classifier.Classify(test, "Checkout payment flow. Open checkout. Payment accepted.", [], criteria);
+
+        Assert.NotEqual(UpdateClassification.Orphaned, result.Classification);
     }
 }

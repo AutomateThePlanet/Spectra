@@ -57,4 +57,19 @@ public class CriteriaExtractionTemplateTests
         var body = Body();
         Assert.Contains("technique_hint", body);
     }
+
+    // ---- Spec 079: stable IDs ----
+
+    [Fact]
+    public void Template_OffersExistingCriteriaForIdReuse()
+    {
+        var body = Body();
+
+        Assert.Contains("{{#if existing_criteria}}", body);
+        Assert.Contains("{{existing_criteria}}", body);
+        Assert.Contains("return that criterion's \"id\" unchanged", body);
+        Assert.Contains("Omit \"id\" for new requirements", body);
+        Assert.Contains("id (optional)", body);
+        Assert.Contains("\"id\": \"AC-PAYMENTS-001\"", body);
+    }
 }
