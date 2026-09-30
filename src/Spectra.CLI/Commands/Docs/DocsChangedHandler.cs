@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Spectra.CLI.Commands.Analyze;
+using Spectra.CLI.Criteria;
 using Spectra.CLI.Index;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Output;
@@ -41,30 +42,15 @@ public sealed class DocsChangedHandler
     /// </summary>
     public async Task<int> ExecuteAsync(string currentDir, TextWriter output, CancellationToken ct = default)
     {
-        var configPath = Path.Combine(currentDir, "spectra.config.json");
-        if (!File.Exists(configPath))
+        // Spec 080 A5: a read command — built-in defaults when there is no config; exit 1 on a malformed or
+        // invalid one (never a silent fallback).
+        var loaded = await Spectra.Core.Config.ConfigLoader.LoadForReadAsync(currentDir, ct);
+        if (!loaded.IsSuccess)
         {
-            Console.Error.WriteLine("spectra.config.json not found. Run 'spectra init' first.");
+            Console.Error.WriteLine(loaded.Error);
             return ExitCodes.Error;
         }
-
-        SpectraConfig? config;
-        try
-        {
-            config = JsonSerializer.Deserialize<SpectraConfig>(
-                await File.ReadAllTextAsync(configPath, ct),
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        }
-        catch (JsonException ex)
-        {
-            Console.Error.WriteLine($"Error reading config: {ex.Message}");
-            return ExitCodes.Error;
-        }
-        if (config is null)
-        {
-            Console.Error.WriteLine("Could not parse spectra.config.json.");
-            return ExitCodes.Error;
-        }
+        var config = loaded.Config!;
 
         var criteriaIndexPath = Path.Combine(currentDir, config.Coverage.CriteriaFile);
 
@@ -144,7 +130,8 @@ public sealed class DocsChangedHandler
         entries.AddRange(deleted);
         entries.Sort((a, b) => string.CompareOrdinal(a.Path, b.Path)); // stable, deterministic order
 
-        var duplicates = await ScanDuplicatesAsync(Path.Combine(currentDir, config.Coverage.CriteriaDir), ct);
+        var duplicates = CriteriaDuplicateScanner.Scan(
+            await CriteriaStore.ScanFilesAsync(Path.GetFullPath(Path.Combine(currentDir, config.Coverage.CriteriaDir)), ct));
         var migrationNeeded = CriteriaPaths.IsOldLayout(criteriaIndex);
         var warnings = new List<string>();
         if (migrationNeeded)
@@ -223,24 +210,6 @@ public sealed class DocsChangedHandler
 
     private static string DeriveComponent(string path) =>
         Path.GetFileNameWithoutExtension(path).Replace(' ', '-').ToLowerInvariant();
-
-    private static async Task<IReadOnlyList<DuplicateCriterionId>> ScanDuplicatesAsync(string criteriaDir, CancellationToken ct)
-    {
-        if (!Directory.Exists(criteriaDir))
-        {
-            return [];
-        }
-
-        var reader = new CriteriaFileReader();
-        var files = new List<(string File, IReadOnlyList<AcceptanceCriterion> Criteria)>();
-        foreach (var path in Directory.GetFiles(criteriaDir, "*.criteria.yaml", SearchOption.AllDirectories)
-                     .OrderBy(p => p, StringComparer.Ordinal))
-        {
-            files.Add((Path.GetRelativePath(criteriaDir, path).Replace('\\', '/'), await reader.ReadAsync(path, ct)));
-        }
-
-        return CriteriaDuplicateScanner.Scan(files);
-    }
 
     private sealed record ChangedDocEntry(
         string Path, string Component, string Status, string? CurrentHash, string? IndexedHash,

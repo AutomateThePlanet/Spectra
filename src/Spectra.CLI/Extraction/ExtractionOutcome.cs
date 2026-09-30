@@ -31,6 +31,12 @@ public enum ExtractionOutcome
     /// deserialize returned null, or an exception was raised while parsing.
     /// </summary>
     ParseFailure,
+
+    /// <summary>
+    /// Spec 080 B6: the response was classified but the ingest refused it before persisting anything (for
+    /// example a foreign criterion ID, a collision or a lock timeout). The error code says why. Never cacheable.
+    /// </summary>
+    Rejected,
 }
 
 /// <summary>

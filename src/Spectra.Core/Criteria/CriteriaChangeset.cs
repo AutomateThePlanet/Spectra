@@ -49,7 +49,10 @@ public sealed record CriteriaChangeset(
             foreach (var field in MetadataFields)
             {
                 var (o, n) = (Field(old, field), Field(now, field));
-                if (!string.Equals(o, n, StringComparison.Ordinal))
+                var same = field == "tags"
+                    ? string.Equals(TagsKey(old.Tags), TagsKey(now.Tags), StringComparison.Ordinal)
+                    : string.Equals(o, n, StringComparison.Ordinal);
+                if (!same)
                 {
                     metadata.Add(new MetadataChange(id, field, o, n));
                 }
@@ -81,6 +84,17 @@ public sealed record CriteriaChangeset(
             .Where(c => !string.IsNullOrWhiteSpace(c.Id))
             .GroupBy(c => c.Id, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Spec 080 B4: tags compare as a case-insensitive set (order and duplicates ignored). The reported old/new
+    /// values keep the original text.
+    /// </summary>
+    private static string TagsKey(IEnumerable<string> tags) => string.Join(", ", tags
+        .Select(t => t.Trim())
+        .Where(t => t.Length > 0)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(t => t, StringComparer.OrdinalIgnoreCase)
+        .Select(t => t.ToLowerInvariant()));
 
     private static string? Field(AcceptanceCriterion c, string field) => field switch
     {

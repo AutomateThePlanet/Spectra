@@ -77,13 +77,11 @@ public sealed class DocsRetireCommand : Command
                 }
 
                 var file = CriteriaPaths.NormalizeLexical(source.File);
-                var shared = ws.Index.Sources.Count(s => !ReferenceEquals(s, source)
-                    && string.Equals(CriteriaPaths.NormalizeLexical(s.File), file, StringComparison.OrdinalIgnoreCase)) > 0;
+                var shared = CriteriaProvenance.IsShared(ws.Index, source);
                 var previous = string.IsNullOrWhiteSpace(file) ? [] : await ws.ReadStrictAsync(file, ct);
                 if (shared)
                 {
-                    previous = previous.Where(p => string.Equals(CriteriaPaths.NormalizeLexical(p.SourceDoc), doc,
-                        StringComparison.OrdinalIgnoreCase)).ToList();
+                    previous = CriteriaProvenance.OwnedBy(previous, doc);
                 }
 
                 var (testsById, _) = await CriteriaReferenceCounter.LoadAsync(root, config, ct);
@@ -95,6 +93,10 @@ public sealed class DocsRetireCommand : Command
                         File.Delete(ws.FullPath(file));
                     ws.Index.Sources.Remove(source);
                     await ws.SaveIndexAsync(ct);
+
+                    // Spec 080 B2: a retired doc's criteria leave the shared file, so they stop counting in coverage.
+                    if (shared)
+                        await ws.LeaveSharedFileAsync(file, doc, ct);
                 }
 
                 return RetireOutcome.Done(changeset, migration);

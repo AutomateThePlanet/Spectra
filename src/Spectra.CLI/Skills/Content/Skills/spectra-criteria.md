@@ -58,6 +58,10 @@ spectra docs apply-move --from {from} --to {path} --output-format json
 ```
 - Exit 0 → record "moved {from} → {path}, {criteria_count} criteria kept".
 - Exit 4 → show `errors[0]` to the user and continue.
+- Exit 1 → an error; nothing was written. On `LOCK_TIMEOUT` (another SPECTRA command is writing criteria),
+  retry the same command once. Otherwise — or if the retry also fails — report the `error_code`
+  (`CRITERIA_FILE_UNREADABLE`, `CRITERIA_FILE_COLLISION`, `INVALID_DOC_PATH`; `null` for a config problem) with
+  `errors[0]` to the user, stop for that document, and continue with the rest.
 
 **1b. Deleted documents** (`status: deleted`). Never retire anything on your own. For each, preview:
 ```
@@ -70,6 +74,10 @@ document's criteria. Only on an explicit yes, run:
 spectra docs retire --doc {path} --output-format json
 ```
 Otherwise leave it; it stays reported as `deleted` and nothing is removed.
+- Exit 1 from either retire call → an error; nothing was written. On `LOCK_TIMEOUT` (another SPECTRA command
+  is writing criteria), retry the same command once. Otherwise — or if the retry also fails — report the
+  `error_code` (`CRITERIA_FILE_UNREADABLE`, `CRITERIA_FILE_COLLISION`, `INVALID_DOC_PATH`; `null` for a config
+  problem) with `errors[0]` to the user, stop for that document, and continue with the rest.
 
 The Step 2 work-list is the `new` and `changed` entries only.
 
@@ -114,6 +122,11 @@ spectra ai ingest-criteria --doc {path} --component {component} --from .spectra/
   criteria, or used one `id` twice. Nothing was persisted. Regenerate using only ids from the prompt's
   "Existing criteria" list (or omit `id` for new requirements), rewrite `.spectra/criteria.json`, and
   re-ingest — same 2-attempt bound.
+- Exit 1 → an error; nothing was persisted. On `LOCK_TIMEOUT` (another SPECTRA command is writing criteria),
+  retry the same command once. Otherwise — or if the retry also fails — report the `error_code`
+  (`CRITERIA_FILE_UNREADABLE`, `CRITERIA_FILE_COLLISION`, `INVALID_DOC_PATH`; `null` for a config problem) with
+  `errors[0]` to the user, record that document as failed, stop for that document, and continue with the rest.
+  Do not regenerate the JSON — the response was not the problem.
 
 Update `.spectra/progress.json`: `{"active":2}` after the loop completes.
 

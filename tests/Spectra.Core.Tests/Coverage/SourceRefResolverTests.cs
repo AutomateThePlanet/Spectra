@@ -57,8 +57,8 @@ public sealed class SourceRefResolverTests : IDisposable
     [InlineData("   ", MissingReason.Empty)]
     [InlineData("#Only-Fragment", MissingReason.Empty)]
     [InlineData("/", MissingReason.Empty)]
-    [InlineData("../outside.md", MissingReason.OutsideRepository)]
-    [InlineData("docs/../../outside.md", MissingReason.OutsideRepository)]
+    [InlineData("../outside.md", MissingReason.OutsideAllowedRoots)]
+    [InlineData("docs/../../outside.md", MissingReason.OutsideAllowedRoots)]
     [InlineData("docs/gone.md", MissingReason.NotFound)]
     [InlineData("gone.md#X", MissingReason.NotFound)]
     public void Missing(string sourceRef, MissingReason reason)
@@ -72,7 +72,7 @@ public sealed class SourceRefResolverTests : IDisposable
     }
 
     [Fact]
-    public void FullyQualifiedPathOutsideRoot_IsOutsideRepository()
+    public void FullyQualifiedPathOutsideRoot_IsOutsideAllowedRoots()
     {
         var outside = Path.Combine(Path.GetTempPath(), "elsewhere-" + Guid.NewGuid().ToString("N") + ".md");
         File.WriteAllText(outside, "x");
@@ -127,5 +127,92 @@ public sealed class SourceRefResolverTests : IDisposable
 
         Assert.False(result.AnyResolved);
         Assert.Single(result.Missing);
+    }
+}
+
+/// <summary>
+/// Spec 080 A2 (FR-002, FR-002a): a source directory outside the repository (<c>../product-docs/docs</c>) is an
+/// allowed root. Refs that escape both the repository and the source directory are still refused, with a reason
+/// that says so.
+/// </summary>
+public sealed class SourceRefResolverOutsideSourceDirTests : IDisposable
+{
+    private readonly string _base = Path.Combine(Path.GetTempPath(), "spectra-resolver-ext-" + Guid.NewGuid().ToString("N"));
+    private readonly string _repo;
+    private readonly string _docs;
+    private readonly SourceRefResolver _resolver;
+
+    public SourceRefResolverOutsideSourceDirTests()
+    {
+        _repo = Path.Combine(_base, "repo");
+        _docs = Path.Combine(_base, "product-docs", "docs");
+        Directory.CreateDirectory(Path.Combine(_repo, "docs"));
+        Directory.CreateDirectory(_docs);
+        Directory.CreateDirectory(Path.Combine(_base, "elsewhere"));
+        File.WriteAllText(Path.Combine(_docs, "checkout.md"), "checkout");
+        File.WriteAllText(Path.Combine(_base, "elsewhere", "x.md"), "x");
+        File.WriteAllText(Path.Combine(_repo, "docs", "local.md"), "local");
+        _resolver = new SourceRefResolver(_repo, "../product-docs/docs");
+    }
+
+    public void Dispose() => Directory.Delete(_base, recursive: true);
+
+    [Theory]
+    [InlineData("checkout.md#Payment")]
+    [InlineData("checkout.md")]
+    [InlineData("../product-docs/docs/checkout.md")]
+    [InlineData("../product-docs/docs/checkout.md#Payment")]
+    public void RefsIntoTheSourceDir_Resolve(string sourceRef)
+    {
+        var resolved = Assert.Single(_resolver.Resolve([sourceRef]).Resolved);
+
+        Assert.Equal(Path.Combine(_docs, "checkout.md"), resolved.FullPath);
+        Assert.Equal("../product-docs/docs/checkout.md", resolved.RelativePath);
+    }
+
+    [Fact]
+    public void AbsoluteRefIntoTheSourceDir_Resolves()
+    {
+        var full = Path.Combine(_docs, "checkout.md");
+
+        var result = _resolver.Resolve([full, full.Replace('\\', '/') + "#Payment"]);
+
+        Assert.Equal(2, result.Resolved.Count);
+        Assert.Empty(result.Missing);
+    }
+
+    [Theory]
+    [InlineData("../elsewhere/x.md")]
+    [InlineData("../../x.md")]
+    public void RefsEscapingBothRoots_AreRefused(string sourceRef)
+    {
+        var missing = Assert.Single(_resolver.Resolve([sourceRef]).Missing);
+
+        Assert.Equal(MissingReason.OutsideAllowedRoots, missing.Reason);
+    }
+
+    [Fact]
+    public void AbsoluteRefEscapingBothRoots_IsRefused()
+    {
+        var missing = Assert.Single(_resolver.Resolve([Path.Combine(_base, "elsewhere", "x.md")]).Missing);
+
+        Assert.Equal(MissingReason.OutsideAllowedRoots, missing.Reason);
+    }
+
+    [Fact]
+    public void MissingFileInsideTheSourceDir_IsNotFound()
+    {
+        var missing = Assert.Single(_resolver.Resolve(["gone.md#X"]).Missing);
+
+        Assert.Equal(MissingReason.NotFound, missing.Reason);
+    }
+
+    [Fact]
+    public void RepoFiles_StillResolve_AndWinOverTheSourceDir()
+    {
+        File.WriteAllText(Path.Combine(_repo, "checkout.md"), "repo copy");
+
+        Assert.Equal("docs/local.md", Assert.Single(_resolver.Resolve(["docs/local.md"]).Resolved).RelativePath);
+        Assert.Equal("checkout.md", Assert.Single(_resolver.Resolve(["checkout.md"]).Resolved).RelativePath);
     }
 }

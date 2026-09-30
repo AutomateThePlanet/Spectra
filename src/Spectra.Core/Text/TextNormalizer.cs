@@ -26,7 +26,10 @@ public static partial class TextNormalizer
         s = ImageRegex().Replace(s, "$1");
         s = InlineLinkRegex().Replace(s, "$1");
         s = ReferenceLinkRegex().Replace(s, "$1");
-        // HTML tags, then entities (decoding after stripping keeps an escaped "&lt;b&gt;" as text).
+        // HTML comments and tags, then entities (decoding after stripping keeps an escaped "&lt;b&gt;" as text).
+        // Spec 080 B9: only well-formed tags of known HTML elements count, so comparisons such as
+        // "total<limit and qty>5" and placeholders such as "<Limit>" are text, not markup.
+        s = HtmlCommentRegex().Replace(s, " ");
         s = HtmlTagRegex().Replace(s, " ");
         s = WebUtility.HtmlDecode(s);
         // Inline code and emphasis. Markers only count outside words, so snake_case and "2 * 3" survive.
@@ -53,7 +56,17 @@ public static partial class TextNormalizer
     [GeneratedRegex(@"\[([^\]]+)\]\[[^\]]*\]", RegexOptions.CultureInvariant)]
     private static partial Regex ReferenceLinkRegex();
 
-    [GeneratedRegex(@"</?[A-Za-z!][^<>]*>", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"<!--[\s\S]*?-->", RegexOptions.CultureInvariant)]
+    private static partial Regex HtmlCommentRegex();
+
+    /// <summary>
+    /// An opening, closing or self-closing tag of a known inline/block HTML element, with well-formed attributes
+    /// (<c>name="v"</c>, <c>name='v'</c> or <c>name=v</c>). Anything else in angle brackets is kept as text.
+    /// </summary>
+    [GeneratedRegex(
+        @"</?(?:a|abbr|b|blockquote|br|cite|code|dd|del|div|dl|dt|em|h[1-6]|hr|i|img|ins|kbd|li|mark|ol|p|pre|q|s|small|span|strike|strong|sub|sup|table|tbody|td|th|thead|tr|u|ul|var)"
+        + @"(?:\s+[A-Za-z_:][-A-Za-z0-9_:.]*\s*=\s*(?:""[^""]*""|'[^']*'|[^\s""'=<>`]+))*\s*/?>",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex HtmlTagRegex();
 
     [GeneratedRegex(@"`+([^`]+?)`+", RegexOptions.CultureInvariant)]

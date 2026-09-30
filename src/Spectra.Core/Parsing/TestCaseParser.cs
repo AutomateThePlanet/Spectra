@@ -126,13 +126,8 @@ public sealed partial class TestCaseParser
     /// <summary>
     /// Frontmatter keys the typed model reads. Everything else is preserved verbatim as an unknown key.
     /// </summary>
-    public static readonly IReadOnlySet<string> KnownFrontmatterKeys = new HashSet<string>(StringComparer.Ordinal)
-    {
-        "id", "priority", "tags", "component", "description", "preconditions", "environment",
-        "depends_on", "source_refs", "scenario_from_doc", "estimated_duration", "criteria",
-        "requirements", "related_work_items", "bugs", "automated_by", "custom", "status",
-        "orphaned_reason", "orphaned_date", "grounding"
-    };
+    public static readonly IReadOnlySet<string> KnownFrontmatterKeys =
+        new HashSet<string>(TestCaseFrontmatterKeys.Ordered, StringComparer.Ordinal);
 
     private TestCase AttachLayout(TestCase baseline, string markdown)
     {
@@ -142,9 +137,10 @@ public sealed partial class TestCaseParser
         }
 
         IReadOnlyList<FrontmatterEntry> entries;
+        string leading, trailing;
         try
         {
-            entries = CaptureFrontmatterEntries(frontmatterText);
+            (entries, leading, trailing) = CaptureFrontmatterEntries(frontmatterText);
         }
         catch (YamlDotNet.Core.YamlException)
         {
@@ -157,12 +153,15 @@ public sealed partial class TestCaseParser
             baseline,
             entries,
             CaptureBodySegments(rawBody),
-            DetectNewline(markdown));
+            DetectNewline(markdown),
+            leading,
+            trailing);
 
         return baseline with { Layout = layout };
     }
 
-    private static IReadOnlyList<FrontmatterEntry> CaptureFrontmatterEntries(string yaml)
+    private static (IReadOnlyList<FrontmatterEntry> Entries, string Leading, string Trailing) CaptureFrontmatterEntries(
+        string yaml)
     {
         var keyStarts = new List<(string Key, int Index)>();
         var parser = new YamlDotNet.Core.Parser(new StringReader(yaml));
@@ -192,17 +191,62 @@ public sealed partial class TestCaseParser
             }
         }
 
-        var entries = new List<FrontmatterEntry>(keyStarts.Count);
-        for (var i = 0; i < keyStarts.Count; i++)
+        if (keyStarts.Count == 0)
         {
-            // The first entry also carries any leading comment lines.
-            var start = i == 0 ? 0 : keyStarts[i].Index;
-            var end = i + 1 < keyStarts.Count ? keyStarts[i + 1].Index : yaml.Length;
-            var key = keyStarts[i].Key;
-            entries.Add(new FrontmatterEntry(key, yaml[start..end], KnownFrontmatterKeys.Contains(key)));
+            return ([], yaml, "");
         }
 
-        return entries;
+        // Spec 080 A4: blank lines and column-0 comments at the end of an entry's span belong to the key below
+        // them (its prelude), or to the frontmatter's trailing text after the last key. Text before the first key
+        // is the leading text. Indented comment lines stay inside the value they sit in.
+        var entries = new List<FrontmatterEntry>(keyStarts.Count);
+        var leading = yaml[..keyStarts[0].Index];
+        var prelude = "";
+        for (var i = 0; i < keyStarts.Count; i++)
+        {
+            var start = keyStarts[i].Index;
+            var end = i + 1 < keyStarts.Count ? keyStarts[i + 1].Index : yaml.Length;
+            var cut = start + TrimTrailingDetachedLines(yaml[start..end]);
+            var key = keyStarts[i].Key;
+            entries.Add(new FrontmatterEntry(key, prelude, yaml[start..cut], KnownFrontmatterKeys.Contains(key)));
+            prelude = yaml[cut..end];
+        }
+
+        System.Diagnostics.Debug.Assert(
+            leading + string.Concat(entries.Select(e => e.Prelude + e.RawText)) + prelude == yaml,
+            "Frontmatter layout must reproduce the source exactly.");
+
+        return (entries, leading, prelude);
+    }
+
+    /// <summary>
+    /// Length of <paramref name="span"/> without its trailing blank and column-0 <c>#</c> lines. The first line (the
+    /// key itself) is always kept.
+    /// </summary>
+    private static int TrimTrailingDetachedLines(string span)
+    {
+        var firstLineEnd = span.IndexOf('\n');
+        if (firstLineEnd < 0)
+        {
+            return span.Length;
+        }
+
+        var keep = span.Length;
+        while (keep > firstLineEnd + 1)
+        {
+            // The last line of span[..keep] runs from just after the previous line break up to keep.
+            var searchFrom = span[keep - 1] == '\n' ? keep - 2 : keep - 1;
+            var lineStart = span.LastIndexOf('\n', searchFrom) + 1;
+            var line = span[lineStart..keep];
+            if (line.Trim().Length != 0 && !line.StartsWith('#'))
+            {
+                break;
+            }
+
+            keep = lineStart;
+        }
+
+        return keep;
     }
 
     private static IReadOnlyList<BodySegment> CaptureBodySegments(string body)

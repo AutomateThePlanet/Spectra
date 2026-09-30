@@ -427,4 +427,29 @@ public class SkillsManifestTests : IDisposable
         // Spec 078 wording is kept.
         Assert.Contains("it already contains the full document text", content);
     }
+
+    // Spec 080 B5: every criteria write step tells the session what to do on exit 1.
+    [Theory]
+    [InlineData("**1a.", "**1b.")]
+    [InlineData("**1b.", "The Step 2 work-list")]
+    [InlineData("**2c.", "Update `.spectra/progress.json`: `{\"active\":2}`")]
+    public void CriteriaSkill_WriteSteps_HandleExit1(string sectionStart, string sectionEnd)
+    {
+        var content = SkillContent.All["spectra-criteria"].Replace("\r\n", "\n");
+        var start = content.IndexOf(sectionStart, StringComparison.Ordinal);
+        Assert.True(start >= 0, sectionStart);
+        var end = content.IndexOf(sectionEnd, start, StringComparison.Ordinal);
+        Assert.True(end > start, sectionEnd);
+        var section = content[start..end];
+
+        Assert.Contains("Exit 1", section);
+        Assert.Contains("`error_code`", section);
+        Assert.Contains("stop for that document", section);
+        Assert.Contains("`LOCK_TIMEOUT`", section);
+        Assert.Contains("retry the same command once", section);
+        foreach (var code in new[] { "CRITERIA_FILE_UNREADABLE", "CRITERIA_FILE_COLLISION", "INVALID_DOC_PATH" })
+        {
+            Assert.Contains(code, section);
+        }
+    }
 }

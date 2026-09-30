@@ -20,15 +20,10 @@ namespace Spectra.CLI.IO;
 public sealed class TestFileWriter
 {
     /// <summary>
-    /// Fixed emission order of the frontmatter keys the typed model reads. Unknown keys follow, verbatim.
+    /// Fixed emission order of the frontmatter keys the typed model reads (the shared
+    /// <see cref="TestCaseFrontmatterKeys.Ordered"/>). Unknown keys follow, verbatim.
     /// </summary>
-    public static readonly IReadOnlyList<string> KeyOrder =
-    [
-        "id", "priority", "tags", "component", "description", "preconditions", "environment", "depends_on",
-        "source_refs", "scenario_from_doc", "estimated_duration", "criteria", "requirements",
-        "related_work_items", "bugs", "automated_by", "custom", "status", "orphaned_reason", "orphaned_date",
-        "grounding"
-    ];
+    public static IReadOnlyList<string> KeyOrder => TestCaseFrontmatterKeys.Ordered;
 
     private static readonly BodySegmentKind[] SectionOrder =
     [
@@ -97,12 +92,14 @@ public sealed class TestFileWriter
 
     private static void AppendFrontmatter(StringBuilder sb, TestCase test, TestCaseLayout? layout)
     {
-        var rawKnown = new Dictionary<string, string>(StringComparer.Ordinal);
+        var known = new Dictionary<string, FrontmatterEntry>(StringComparer.Ordinal);
         if (layout is not null)
         {
+            // Spec 080 A4: the leading block (header comment) stays at the top, whatever key comes first.
+            sb.Append(layout.FrontmatterLeading);
             foreach (var entry in layout.FrontmatterEntries.Where(e => e.IsKnown))
             {
-                rawKnown.TryAdd(entry.Key, entry.RawText);
+                known.TryAdd(entry.Key, entry);
             }
         }
 
@@ -110,10 +107,12 @@ public sealed class TestFileWriter
         {
             if (layout is not null && IsUnchanged(key, test, layout.Baseline))
             {
-                // Unchanged: reproduce the original exactly — its text if the key was present, nothing if absent.
-                if (rawKnown.TryGetValue(key, out var raw))
+                // Unchanged: reproduce the original exactly — its prelude and text if the key was present,
+                // nothing if absent.
+                if (known.TryGetValue(key, out var raw))
                 {
-                    AppendRaw(sb, raw);
+                    sb.Append(raw.Prelude);
+                    AppendRaw(sb, raw.RawText);
                 }
 
                 continue;
@@ -125,9 +124,15 @@ public sealed class TestFileWriter
                 continue;
             }
 
-            var rendered = RenderKey(key, test, emitEmptyCriteria: layout is null || rawKnown.ContainsKey("criteria"));
+            var rendered = RenderKey(key, test, emitEmptyCriteria: layout is null || known.ContainsKey("criteria"));
             if (rendered is not null)
             {
+                // A changed key keeps the comments above it; a removed key (rendered is null) drops them.
+                if (known.TryGetValue(key, out var original))
+                {
+                    sb.Append(original.Prelude);
+                }
+
                 sb.Append(rendered);
             }
         }
@@ -136,8 +141,11 @@ public sealed class TestFileWriter
         {
             foreach (var entry in layout.FrontmatterEntries.Where(e => !e.IsKnown))
             {
+                sb.Append(entry.Prelude);
                 AppendRaw(sb, entry.RawText);
             }
+
+            sb.Append(layout.FrontmatterTrailing);
         }
     }
 

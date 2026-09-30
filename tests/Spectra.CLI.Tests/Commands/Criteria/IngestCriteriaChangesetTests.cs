@@ -122,4 +122,22 @@ public sealed class IngestCriteriaChangesetTests : IDisposable
         Assert.False(CriteriaTestWorkspace.Json(err).GetProperty("success").GetBoolean()); // the whole of stderr is JSON
         Assert.DoesNotContain("Criteria changeset", err);
     }
+
+    // ---------- Spec 080 B4 ----------
+
+    [Fact]
+    public async Task ReIngest_WithTagsReorderedAndRecased_IsANoOp_AndKeepsTheStoredCasing()
+    {
+        await _ws.IngestAsync(Doc, new { text = "System MUST validate the card", rfc2119 = "MUST", tags = new[] { "UX", "payments" } });
+        var file = _ws.PathOf("docs/criteria/docs/checkout.criteria.yaml");
+        var before = File.ReadAllBytes(file);
+
+        var (exit, output, err) = await _ws.IngestAsync(Doc,
+            new { id = "AC-CHECKOUT-001", text = "System MUST validate the card", rfc2119 = "MUST", tags = new[] { "Payments", "ux" } });
+
+        Assert.True(exit == 0, err);
+        Assert.True(CriteriaTestWorkspace.Json(output).GetProperty("changeset").GetProperty("is_empty").GetBoolean());
+        Assert.Equal(before, File.ReadAllBytes(file));
+        Assert.Equal(["UX", "payments"], (await _ws.ReadCriteriaAsync("docs/checkout.criteria.yaml")).Single().Tags);
+    }
 }

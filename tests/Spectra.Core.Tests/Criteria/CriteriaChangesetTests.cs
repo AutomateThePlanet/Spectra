@@ -83,4 +83,28 @@ public class CriteriaChangesetTests
         Assert.Equal(["TC-101", "TC-140"], cs.Removed[0].TestIds);
         Assert.Equal(0, cs.Removed[1].ReferencingTests);
     }
+
+    // ---------- Spec 080 B4: tags compare as a case-insensitive set ----------
+
+    [Fact]
+    public void Tags_ReorderedOrRecased_AreNotAChange()
+    {
+        var previous = new[] { C("AC-X-001", "System MUST validate", tags: ["ux", "Login"]) };
+        var next = new[] { C("AC-X-001", "System MUST validate", tags: ["login", "UX", "ux"]) };
+
+        Assert.True(CriteriaChangeset.Build("docs/x.md", previous, next).IsEmpty);
+    }
+
+    [Fact]
+    public void Tags_WithADifferentSet_AreAChange_ReportedWithTheirOriginalText()
+    {
+        var previous = new[] { C("AC-X-001", "System MUST validate", tags: ["a"]) };
+        var next = new[] { C("AC-X-001", "System MUST validate", tags: ["a", "B"]) };
+
+        var change = Assert.Single(CriteriaChangeset.Build("docs/x.md", previous, next).Metadata);
+
+        Assert.Equal("tags", change.Field);
+        Assert.Equal("a", change.Old);
+        Assert.Equal("a, B", change.New);
+    }
 }

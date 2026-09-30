@@ -136,4 +136,29 @@ public sealed class IngestCriteriaIdentityTests : IDisposable
         Assert.Equal("CRITERIA_FILE_UNREADABLE", CriteriaTestWorkspace.Json(err).GetProperty("error_code").GetString());
         Assert.Equal(before, _ws.Snapshot());
     }
+
+    // ---------- Spec 080 B6: a rejected ingest has its own outcome ----------
+
+    [Fact]
+    public async Task RejectedIngest_ReportsOutcomeRejected_NotExtracted()
+    {
+        await SeedThreeAsync();
+
+        var (exit, _, err) = await _ws.IngestAsync(Doc, Item("anything", id: "AC-LOGIN-001"));
+
+        Assert.Equal(7, exit);
+        var failure = CriteriaTestWorkspace.Json(err);
+        Assert.False(failure.GetProperty("success").GetBoolean());
+        Assert.Equal("Rejected", failure.GetProperty("outcome").GetString());
+    }
+
+    [Fact]
+    public void RejectedResult_IsNeitherExtractedNorSuccess()
+    {
+        var rejected = Spectra.CLI.Extraction.CriteriaIngestResult.Rejected("INVALID_CRITERION_ID", "bad id");
+
+        Assert.Equal(Spectra.CLI.Extraction.ExtractionOutcome.Rejected, rejected.Outcome);
+        Assert.False(rejected.IsSuccess);
+        Assert.Equal("INVALID_CRITERION_ID", rejected.ErrorCode);
+    }
 }

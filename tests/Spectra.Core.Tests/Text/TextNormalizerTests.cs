@@ -70,4 +70,43 @@ public class TextNormalizerTests
             CultureInfo.CurrentCulture = previous;
         }
     }
+
+    // ---------- Spec 080 B9: only real HTML tags are stripped ----------
+
+    [Fact]
+    public void Comparisons_AreNotTags_SoDifferentCriteriaStayDifferent()
+    {
+        var five = TextNormalizer.Normalize("total<limit and qty>5");
+        var six = TextNormalizer.Normalize("total<limit and qty>6");
+
+        Assert.NotEqual(five, six);
+        Assert.Contains("limit and qty", five);
+        Assert.Equal("total<limit and qty>5", five);
+    }
+
+    [Theory]
+    [InlineData("a<b", "a<b")]
+    [InlineData("x > 3 and y < 2", "x > 3 and y < 2")]
+    [InlineData("if a<b and c>d then", "if a<b and c>d then")]
+    [InlineData("value <Limit> applies", "value <limit> applies")]
+    [InlineData("use <placeholder> here", "use <placeholder> here")]
+    public void AngleBrackets_ThatAreNotHtmlTags_AreKept(string input, string expected)
+    {
+        Assert.Equal(expected, TextNormalizer.Normalize(input));
+    }
+
+    [Theory]
+    [InlineData("<b>x</b>", "x")]
+    [InlineData("<b>a < b</b>", "a < b")]
+    [InlineData("line<br/>next", "line next")]
+    [InlineData("line<br>next", "line next")]
+    [InlineData("<span class=\"k\">v</span>", "v")]
+    [InlineData("<a href='x.html' title=\"T\">link</a>", "link")]
+    [InlineData("before <!-- note --> after", "before after")]
+    [InlineData("<P>Para</P>", "para")]
+    [InlineData("<td align=center>cell</td>", "cell")]
+    public void RealHtmlTags_AreStripped(string input, string expected)
+    {
+        Assert.Equal(expected, TextNormalizer.Normalize(input));
+    }
 }

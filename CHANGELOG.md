@@ -52,6 +52,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `source_doc` typed with backslashes or `./` never matched, so the document stayed `new` in `docs changed`.
 - The criteria index read-modify-write had no lock and a shared temp-file name.
 
+### Changed (review fixes, Spec 080)
+
+- **Config is loaded one way.** Every criteria command and the critic/repair compilers load
+  `spectra.config.json` through one loader. A malformed or invalid config is always an error (exit 1,
+  `spectra.config.json is invalid: …`); no command falls back to defaults on a config it could not parse (that
+  fallback emptied `existing_criteria` and churned IDs). A missing config gives the built-in defaults to read
+  commands (`compile-extraction-prompt`, `compile-critic-prompt`, `compile-repair-prompt`,
+  `compile-repair-batch`, `docs changed`) and exit 1 (`No spectra.config.json found. Run 'spectra init' first.`)
+  to write commands (`ingest-criteria`, `docs retire`, `docs apply-move`, `docs migrate-criteria`,
+  `ai analyze --import-criteria`). **`spectra docs changed` with no config now runs on the defaults** instead of
+  exiting 1.
+- **A source directory outside the repository works.** With `source.local_dir: ../product-docs/docs`, refs into
+  that folder resolve for `ai update` and the critic/repair compilers. Refs outside both the repository and the
+  source directory are still refused, and the message now says so ("outside the repository and the configured
+  source directory") instead of "not found".
+- **A rejected ingest reports `"outcome": "Rejected"`** (was `Extracted` with `success: false`). Exit codes are
+  unchanged.
+- **Failure output is always one JSON document in JSON mode.** `compile-extraction-prompt` failures carry a
+  `warnings` array (document not found → `DOCUMENT_NOT_FOUND`, unreadable → `DOCUMENT_UNREADABLE`); the early
+  errors of `ingest-criteria` (config, `--from` file not found) use the same failure shape as the other criteria
+  commands.
+
+### Fixed (review fixes, Spec 080)
+
+- `spectra ai update` wrote orphan marks and updates to `{id}.md` instead of the test's own file, creating a
+  second file with the same ID when the name differed, and `--delete-orphaned` deleted nothing (2.5.0).
+- YAML comments in test frontmatter were lost or moved on rewrite: a comment above a key belonged to the key
+  before it, and a leading comment travelled with the first key. Comments and blank lines now stay with the key
+  below them; the header stays at the top and trailing comments at the end. A removed key takes the comment above
+  it with it (2.5.0).
+- The known frontmatter keys were listed twice (parser and writer); they now come from one list, guarded by a
+  test against the frontmatter model (2.5.0).
+- Shared (pre-2.6 collided) criteria files: `compile-extraction-prompt` offered the other document's criteria (so
+  ingest rejected the IDs and the document could never be re-extracted), `docs apply-move` copied and relabelled
+  them, and a document leaving the file left its criteria behind, so they existed twice and a retired document's
+  criteria kept counting in coverage. All four now use the per-criterion `source_doc` provenance, and a document
+  leaving a shared file takes its criteria out of it.
+- Tags that differed only in order or case counted as a change and rewrote the criteria file; they now compare as
+  a set.
+- The text normaliser treated any `<letter…>` span as an HTML tag, so `total<limit and qty>5` lost text and two
+  different criteria could compare equal. Only well-formed tags of known HTML elements are stripped now.
+- `docs changed` had its own copy of the criteria-file scan; it now shares the criteria store's.
+- The `spectra-criteria` skill had no instruction for exit 1 from `ingest-criteria`, `apply-move` and `retire`;
+  it now reports the error code and stops for that document, retrying once on `LOCK_TIMEOUT`.
+
 ### Notes
 
 - **One-time `source_section` churn.** Because `source_section` is now read, the first re-extraction after
