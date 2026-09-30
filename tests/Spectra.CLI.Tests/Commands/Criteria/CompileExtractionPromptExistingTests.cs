@@ -106,7 +106,7 @@ public sealed class CompileExtractionPromptExistingTests : IDisposable
         Assert.Equal(string.Empty, output.Trim());
         var failure = CriteriaTestWorkspace.Json(err);
         Assert.Equal("DOCUMENT_NOT_FOUND", failure.GetProperty("error_code").GetString());
-        Assert.Contains("docs/missing.md", failure.GetProperty("message").GetString());
+        Assert.Contains("docs/missing.md", failure.GetProperty("errors")[0].GetString());
         Assert.Equal(0, failure.GetProperty("warnings").GetArrayLength());
     }
 
@@ -132,7 +132,8 @@ public sealed class CompileExtractionPromptExistingTests : IDisposable
 
         Assert.Equal(4, exit);
         var refusal = CriteriaTestWorkspace.Json(err);
-        Assert.True(refusal.GetProperty("refused").GetBoolean());
+        Assert.False(refusal.GetProperty("success").GetBoolean());
+        Assert.Equal("MISSING_INPUT", refusal.GetProperty("error_code").GetString());
         Assert.Equal("document_path", refusal.GetProperty("missing_input").GetString());
         Assert.Equal(0, refusal.GetProperty("warnings").GetArrayLength());
     }

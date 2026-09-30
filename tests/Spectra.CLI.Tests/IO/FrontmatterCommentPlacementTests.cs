@@ -125,4 +125,67 @@ public class FrontmatterCommentPlacementTests
 
         Assert.Equal(canonical, Write(Parse(canonical)));
     }
+
+    // ---------- Spec 081 C5: a keep-chomped block value keeps its trailing lines ----------
+
+    private const string Body = "---\n\n# Keep chomping\n\n## Steps\n\n1. Do it\n\n## Expected Result\n\nDone\n";
+
+    [Fact]
+    public void KeepChompedValue_KeepsItsTrailingLines_WhenTheNextKeyIsRemoved()
+    {
+        const string md = "---\nid: TC-300\npriority: high\ndescription: |+\n  first\n  second\n\n\ndepends_on: TC-001\n" + Body;
+        var original = Parse(md);
+        Assert.Equal("first\nsecond\n\n\n", original.Description);
+
+        var reparsed = Parse(Write(original with { DependsOn = null }));
+
+        Assert.Equal(original.Description, reparsed.Description);
+        Assert.Null(reparsed.DependsOn);
+    }
+
+    [Fact]
+    public void NestedKeepChompedValue_KeepsItsTrailingLines_WhenTheNextKeyIsRemoved()
+    {
+        const string md = "---\nid: TC-301\npriority: high\ncustom:\n  notes: |+\n    kept\n\n\nstatus: active\n" + Body;
+        var original = Parse(md);
+        Assert.Equal("kept\n\n\n", original.Custom!["notes"]);
+
+        var reparsed = Parse(Write(original with { Status = null }));
+
+        Assert.Equal(original.Custom!["notes"], reparsed.Custom!["notes"]);
+    }
+
+    [Fact]
+    public void FoldedKeepValue_WithIndentationIndicator_KeepsItsTrailingLines()
+    {
+        const string md = "---\nid: TC-302\npriority: high\ndescription: >2+\n  folded\n  text\n\n\ndepends_on: TC-001\n" + Body;
+        var original = Parse(md);
+
+        var reparsed = Parse(Write(original with { DependsOn = null }));
+
+        Assert.Equal(original.Description, reparsed.Description);
+    }
+
+    [Fact]
+    public void CommentAfterAKeepChompedValue_StillMovesWithTheKeyBelow()
+    {
+        const string md = "---\nid: TC-303\npriority: high\ndescription: |+\n  kept\n\n# above next\ndepends_on: TC-001\n" + Body;
+        var original = Parse(md);
+
+        var written = Write(original with { DependsOn = "TC-002" });
+        var lines = FrontmatterLines(written);
+
+        Assert.Equal("# above next", LineAbove(lines, "depends_on:"));
+        Assert.Equal(original.Description, Parse(written).Description);
+    }
+
+    [Fact]
+    public void KeepChompedValue_UnchangedFile_RewritesByteIdentically()
+    {
+        const string md = "---\nid: TC-304\npriority: high\ndescription: |+\n  kept\n\n\ndepends_on: TC-001\n" + Body;
+        var canonical = Write(Parse(md));
+
+        Assert.Equal(canonical, Write(Parse(canonical)));
+        Assert.Equal(md, canonical);
+    }
 }

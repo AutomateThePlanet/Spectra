@@ -109,4 +109,62 @@ public class TextNormalizerTests
     {
         Assert.Equal(expected, TextNormalizer.Normalize(input));
     }
+
+    // ---------- Spec 081 C3: more doc markup, and bare boolean attributes ----------
+
+    [Theory]
+    [InlineData("<figure>x</figure>", "x")]
+    [InlineData("<figcaption>x</figcaption>", "x")]
+    [InlineData("<details><summary>x</summary>y</details>", "x y")]
+    [InlineData("<section>x</section>", "x")]
+    [InlineData("<article>x</article>", "x")]
+    [InlineData("<aside>x</aside>", "x")]
+    [InlineData("<table><caption>x</caption></table>", "x")]
+    [InlineData("<colgroup><col span=2></colgroup>x", "x")]
+    [InlineData("<tfoot>x</tfoot>", "x")]
+    [InlineData("<center>x</center>", "x")]
+    [InlineData("<font color=red>x</font>", "x")]
+    [InlineData("<picture><source srcset=\"a.webp\">x</picture>", "x")]
+    [InlineData("<big>x</big> <tt>y</tt>", "x y")]
+    [InlineData("long<wbr>word", "long word")]
+    [InlineData("<samp>x</samp> <dfn>y</dfn>", "x y")]
+    [InlineData("<bdi>x</bdi> <bdo dir=rtl>y</bdo>", "x y")]
+    [InlineData("<ruby>x<rp>(</rp><rt>y</rt><rp>)</rp></ruby>", "x ( y )")]
+    [InlineData("<video src=\"a.mp4\">x</video>", "x")]
+    [InlineData("<audio src=a.mp3>x</audio>", "x")]
+    [InlineData("<iframe src=\"x.html\"></iframe>x", "x")]
+    [InlineData("<INPUT type=checkbox>x", "x")]
+    public void AddedElements_AreStripped(string input, string expected)
+    {
+        Assert.Equal(expected, TextNormalizer.Normalize(input));
+    }
+
+    [Theory]
+    [InlineData("<td nowrap>cell</td>", "cell")]
+    [InlineData("<details open><summary>s</summary>body</details>", "s body")]
+    [InlineData("<input disabled> x", "x")]
+    [InlineData("<video controls autoplay muted src=\"x\">v</video>", "v")]
+    [InlineData("<td align=center nowrap>c</td>", "c")]
+    [InlineData("<td nowrap align='left'>c</td>", "c")]
+    [InlineData("<input type=checkbox checked/> x", "x")]
+    [InlineData("<ol reversed>x</ol>", "x")]
+    public void BooleanAttributes_AreAccepted(string input, string expected)
+    {
+        Assert.Equal(expected, TextNormalizer.Normalize(input));
+    }
+
+    [Theory]
+    [InlineData("see <b openx> here", "see <b openx> here")]
+    [InlineData("if a<b and c>d then", "if a<b and c>d then")]
+    [InlineData("send <data> now", "send <data> now")]
+    [InlineData("the <time> field", "the <time> field")]
+    [InlineData("the <label> text", "the <label> text")]
+    [InlineData("the <header> row", "the <header> row")]
+    [InlineData("the <main> screen", "the <main> screen")]
+    [InlineData("press <button>", "press <button>")]
+    [InlineData("total<limit and qty>5", "total<limit and qty>5")]
+    public void StillText(string input, string expected)
+    {
+        Assert.Equal(expected, TextNormalizer.Normalize(input));
+    }
 }

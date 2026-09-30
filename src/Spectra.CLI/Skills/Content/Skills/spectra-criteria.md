@@ -102,7 +102,9 @@ spectra ai compile-extraction-prompt --doc {path} --component {component} --outp
 - Exit 0 with a prompt on stdout → proceed to 2b.
 - Exit 0 with `{ "short_circuit": true, "outcome": "Extracted", "criteria": [] }` → the document is
   empty; nothing to extract. Skip it (no model turn, no ingest needed).
-- Exit 4 (refused) → show the `message` and skip that doc.
+- Exit 4 (refused, `error_code` `MISSING_INPUT`) → show `errors[0]` and skip that doc.
+- Exit 1 (`DOCUMENT_NOT_FOUND`, `DOCUMENT_UNREADABLE`, or a config error with `error_code` `null`) → report the
+  `error_code` and `errors[0]` to the user and skip that doc.
 
 **2b. Extract IN-SESSION**: Read the compiled prompt — it already contains the full document text; do not
 read `{path}` separately — and identify every testable acceptance criterion exactly as the prompt

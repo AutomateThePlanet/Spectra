@@ -170,4 +170,23 @@ public class TestCaseLayoutTests
         Assert.Equal("Logged in.", baseline.Preconditions);
         Assert.Equal(["a"], baseline.Steps);
     }
+
+    // Spec 081 C5 (R5): pins where YamlDotNet puts a block scalar's start mark, which the keep-chomp scan relies on.
+    [Theory]
+    [InlineData("notes: |+\n  a\n\n\nnext: 1\n", "|+")]
+    [InlineData("notes: >2+\n  a\n\nnext: 1\n", ">2+")]
+    public void BlockScalar_StartMark_IsAtTheIndicator(string yaml, string header)
+    {
+        var parser = new YamlDotNet.Core.Parser(new StringReader(yaml));
+        YamlDotNet.Core.Events.Scalar? block = null;
+        while (parser.MoveNext())
+        {
+            if (parser.Current is YamlDotNet.Core.Events.Scalar { Value: not "notes" and not "next" and not "1" } scalar)
+                block = scalar;
+        }
+
+        Assert.NotNull(block);
+        Assert.True(block!.Style is YamlDotNet.Core.ScalarStyle.Literal or YamlDotNet.Core.ScalarStyle.Folded);
+        Assert.Equal(yaml.IndexOf(header, StringComparison.Ordinal), (int)block.Start.Index);
+    }
 }

@@ -111,7 +111,7 @@ public sealed class ConfigLoadingConsistencyTests : IDisposable
 
         Assert.Equal(1, exit);
         var failure = CriteriaTestWorkspace.Json(err);
-        Assert.StartsWith(ConfigLoader.InvalidConfigPrefix, failure.GetProperty("message").GetString());
+        Assert.StartsWith(ConfigLoader.InvalidConfigPrefix, failure.GetProperty("errors")[0].GetString());
         Assert.Equal(0, failure.GetProperty("warnings").GetArrayLength());
     }
 
@@ -188,5 +188,81 @@ public sealed class ConfigLoadingConsistencyTests : IDisposable
         var failure = CriteriaTestWorkspace.Json(err);
         Assert.False(failure.GetProperty("success").GetBoolean());
         Assert.False(failure.TryGetProperty("outcome", out _));
+    }
+
+    // ---------- Spec 081 C2: only the sections a command reads are checked ----------
+
+    private const string SourceJson = "\"source\": { \"local_dir\": \"docs/\" }";
+    private const string TestsJson = "\"tests\": { \"dir\": \"test-cases/\" }";
+    private const string CoverageJson = "\"coverage\": { \"criteria_dir\": \"docs/criteria\", \"criteria_file\": \"docs/criteria/_criteria_index.yaml\" }";
+
+    private void WriteConfig(params string[] sections) =>
+        File.WriteAllText(_ws.PathOf("spectra.config.json"), "{ " + string.Join(", ", sections) + " }");
+
+    [Theory]
+    [MemberData(nameof(ReadCommands))]
+    [MemberData(nameof(WriteCommands))]
+    public async Task NoAiSection_IsAcceptedByEveryCommand(string command)
+    {
+        WriteConfig(SourceJson, TestsJson, CoverageJson);
+
+        var (exit, output, err) = await RunAsync(command, json: false);
+
+        Assert.DoesNotContain(ConfigLoader.InvalidConfigPrefix, output + err);
+        Assert.DoesNotContain(ConfigLoader.MissingConfigMessage, output + err);
+        Assert.NotEqual(1, exit);
+    }
+
+    [Fact]
+    public async Task ReadCommand_MissingTests_UsesDefaults_AndWarns()
+    {
+        WriteConfig(SourceJson, CoverageJson);
+
+        var (exit, _, err) = await RunAsync("ai compile-critic-prompt --suite s --test TC-1", json: false);
+
+        Assert.True(exit == 0, err);
+        Assert.Contains(err.Split('\n'), l => l.StartsWith("Warning:", StringComparison.Ordinal) && l.Contains("'tests'"));
+    }
+
+    [Theory]
+    [InlineData("ai ingest-criteria --doc docs/a.md --from .spectra/criteria.json")]
+    [InlineData("docs retire --doc docs/gone.md")]
+    public async Task WriteCommand_MissingTests_Exits1_NamingTheSection_AndWritesNothing(string command)
+    {
+        WriteConfig(SourceJson, CoverageJson);
+        var before = _ws.Snapshot();
+
+        var (exit, output, err) = await RunAsync(command, json: false);
+
+        Assert.Equal(1, exit);
+        Assert.Contains("spectra.config.json is invalid: missing 'tests' section", output + err);
+        Assert.Equal(before, _ws.Snapshot());
+    }
+
+    [Theory]
+    [InlineData("docs apply-move --from docs/gone.md --to docs/a.md")]
+    [InlineData("docs migrate-criteria")]
+    [InlineData("ai analyze --import-criteria import.yaml")]
+    public async Task WriteCommand_ThatReadsNeither_IgnoresMissingSourceAndTests(string command)
+    {
+        WriteConfig(CoverageJson);
+
+        var (_, output, err) = await RunAsync(command, json: false);
+
+        Assert.DoesNotContain("missing 'source' section", output + err);
+        Assert.DoesNotContain("missing 'tests' section", output + err);
+        Assert.DoesNotContain(ConfigLoader.InvalidConfigPrefix, output + err);
+    }
+
+    [Fact]
+    public async Task DocsChanged_MissingSource_WarnsInItsJson()
+    {
+        WriteConfig(TestsJson, CoverageJson);
+
+        var (exit, output, err) = await RunAsync("docs changed", json: true);
+
+        Assert.True(exit == 0, err);
+        var warnings = CriteriaTestWorkspace.Json(output).GetProperty("warnings").EnumerateArray().Select(w => w.GetString());
+        Assert.Contains(warnings, w => w!.Contains("'source'"));
     }
 }

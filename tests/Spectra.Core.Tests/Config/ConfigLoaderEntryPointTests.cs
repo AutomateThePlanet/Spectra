@@ -66,18 +66,90 @@ public sealed class ConfigLoaderEntryPointTests : IDisposable
         Assert.StartsWith("spectra.config.json is invalid: ", result.Error);
     }
 
+    // Spec 081 C2: replaces 080's MissingAiSection_IsAnError test, which encoded the defect — no command reads `ai`.
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task MissingAiSection_IsAnError_ForBothEntryPoints(bool forWrite)
+    public async Task MissingAiSection_IsAccepted_ForBothEntryPoints(bool forWrite)
     {
         WriteConfig("""{ "source": { "local_dir": "docs/" }, "tests": { "dir": "test-cases/" } }""");
 
         var result = forWrite ? await ConfigLoader.LoadForWriteAsync(_root) : await ConfigLoader.LoadForReadAsync(_root);
 
+        Assert.Null(result.Error);
+        Assert.NotNull(result.Config);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public async Task Read_MissingSectionItReads_UsesDefaults_AndWarns()
+    {
+        WriteConfig("""{ "source": { "local_dir": "docs/" }, "ai": {} }""");
+
+        var result = await ConfigLoader.LoadForReadAsync(_root, ConfigSections.Tests);
+
+        Assert.Null(result.Error);
+        Assert.Equal("test-cases/", result.Config!.Tests.Dir);
+        var warning = Assert.Single(result.Warnings);
+        Assert.Contains("'tests'", warning);
+    }
+
+    [Fact]
+    public async Task Write_MissingSectionItReads_IsAnError_NamingTheSection()
+    {
+        WriteConfig("""{ "source": { "local_dir": "docs/" }, "ai": {} }""");
+
+        var result = await ConfigLoader.LoadForWriteAsync(_root, ConfigSections.Tests);
+
         Assert.Null(result.Config);
-        // `ai` is a required member, so this surfaces as a deserialization error; the contract is the prefix.
+        Assert.Equal("spectra.config.json is invalid: missing 'tests' section", result.Error);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task MissingSectionsItDoesNotRead_AreIgnored(bool forWrite)
+    {
+        WriteConfig("""{ "coverage": {} }""");
+
+        var result = forWrite
+            ? await ConfigLoader.LoadForWriteAsync(_root, ConfigSections.None)
+            : await ConfigLoader.LoadForReadAsync(_root, ConfigSections.None);
+
+        Assert.Null(result.Error);
+        Assert.Empty(result.Warnings);
+        Assert.Equal("docs/", result.Config!.Source.LocalDir);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task WrongSectionType_IsStillInvalid(bool forWrite)
+    {
+        WriteConfig("""{ "source": 5, "tests": {}, "ai": {} }""");
+
+        var result = forWrite ? await ConfigLoader.LoadForWriteAsync(_root) : await ConfigLoader.LoadForReadAsync(_root);
+
+        Assert.Null(result.Config);
         Assert.StartsWith(ConfigLoader.InvalidConfigPrefix, result.Error);
+    }
+
+    [Fact]
+    public async Task SectionKeys_MatchCaseInsensitively_AndCommentsAndTrailingCommasAreAllowed()
+    {
+        WriteConfig("""
+            {
+              // a comment
+              "Source": { "local_dir": "product-docs/" },
+              "TESTS": { "dir": "specs/" },
+            }
+            """);
+
+        var result = await ConfigLoader.LoadForWriteAsync(_root, ConfigSections.Source | ConfigSections.Tests);
+
+        Assert.Null(result.Error);
+        Assert.Equal("product-docs/", result.Config!.Source.LocalDir);
+        Assert.Equal("specs/", result.Config.Tests.Dir);
     }
 
     [Theory]

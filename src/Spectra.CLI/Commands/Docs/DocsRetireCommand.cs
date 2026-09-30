@@ -3,6 +3,7 @@ using System.Text.Json;
 using Spectra.CLI.Criteria;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
+using Spectra.Core.Config;
 using Spectra.Core.Criteria;
 
 namespace Spectra.CLI.Commands.Docs;
@@ -38,7 +39,7 @@ public sealed class DocsRetireCommand : Command
     private static async Task<int> RunAsync(string? docArg, bool dryRun, bool json, CancellationToken ct)
     {
         var root = Directory.GetCurrentDirectory();
-        var (config, error) = await CriteriaCommandIO.LoadConfigAsync(root, ct);
+        var (config, error) = await CriteriaCommandIO.LoadConfigAsync(root, ConfigSections.Tests, ct); // reference counts read tests
         if (config is null)
         {
             CriteriaCommandIO.WriteFailure(json, Name, null, error!);
@@ -81,7 +82,7 @@ public sealed class DocsRetireCommand : Command
                 var previous = string.IsNullOrWhiteSpace(file) ? [] : await ws.ReadStrictAsync(file, ct);
                 if (shared)
                 {
-                    previous = CriteriaProvenance.OwnedBy(previous, doc);
+                    previous = CriteriaProvenance.OwnedBy(previous, doc, root);
                 }
 
                 var (testsById, _) = await CriteriaReferenceCounter.LoadAsync(root, config, ct);
