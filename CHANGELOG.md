@@ -5,6 +5,109 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-09-29 — Stable acceptance-criteria identity
+
+### Changed (Spec 079)
+
+- **Re-extraction keeps criterion IDs.** `spectra ai compile-extraction-prompt` now lists the document's existing
+  criteria (`id`, `text`, `source_section`), and the model returns an existing `id` for a criterion that
+  expresses the same requirement, even when reworded. `spectra ai ingest-criteria` accepts that optional `id`
+  and honours it only when it belongs to this document and appears once; anything else exits **7**
+  (`INVALID_CRITERION_ID`) and writes nothing. A criterion without an `id` keeps its ID when its normalised text
+  (markup, whitespace and case ignored) is unchanged, and then its stored text is kept verbatim.
+- **IDs are never reused and unique across the repository.** New IDs come from `id_high_water_marks` in
+  `_criteria_index.yaml` (committed, per prefix such as `AC-CHECKOUT`) instead of "the highest number in this
+  doc's file". `ai analyze --import-criteria` uses the same allocator and merges before numbering, so a
+  re-import consumes no numbers.
+- **Every ingest reports a changeset**: `changeset` in the JSON result (`added`, `modified` with old/new text,
+  `removed` with `referencing_tests`/`test_ids` from the test indexes, `metadata` by field), plus `written`,
+  `duplicate_ids` and `migration`. A human summary is always printed — on stderr in JSON mode, so stdout stays
+  exactly the JSON. When nothing changed, nothing is written.
+- **One criteria file per document**, mirroring its path: `docs/a/login.md` → `docs/criteria/docs/a/login.criteria.yaml`.
+  `source_doc` is stored repository-relative with `/`, however `--doc` was typed.
+- **New `spectra docs migrate-criteria [--dry-run]`** moves an existing workspace to the new layout (IDs
+  preserved, idempotent, collisions reported). `ingest-criteria`, `docs retire`, `docs apply-move` and
+  `--import-criteria` run it automatically before they write; `docs changed` and `compile-extraction-prompt` only
+  warn.
+- **`spectra docs changed` reports `deleted` and `moved` documents**, plus `duplicate_ids`, `migration_needed` and
+  `warnings`. It compares normalised paths and stays read-only.
+- **New `spectra docs retire --doc <path> [--dry-run]`** retires a deleted document's criteria (index entry and
+  file) and reports every criterion as removed with the tests still referencing it. **New `spectra docs
+  apply-move --from <old> --to <new> [--dry-run]`** keeps a moved document's criteria and IDs without re-extraction.
+- **The `spectra-criteria` skill** applies moves, previews deleted documents and retires them only after you
+  confirm, and ends with a combined changeset summary including tests that reference removed criteria.
+- Criteria writers take `.spectra/criteria.lock` (added to the `spectra init` gitignore list), so concurrent
+  writers never lose an index update or issue the same ID.
+
+### Fixed (Spec 079)
+
+- Any rewording of a criterion used to give it a new ID, silently breaking the `criteria:` links in tests.
+- Removed criteria's numbers were handed out again, and two documents with the same component (including
+  same-named files in different folders) produced duplicate IDs.
+- `docs/a/login.md` and `docs/b/login.md` wrote the same `login.criteria.yaml` and overwrote each other.
+- The model's `source_section` was silently dropped when the extraction response was parsed.
+- A corrupt criteria file (or criteria index) was read as empty, restarting numbering; write paths now fail loud
+  with `CRITERIA_FILE_UNREADABLE`.
+- `spectra ai update` crashed on duplicate criterion IDs; it now uses the first definition and warns.
+- `source_doc` typed with backslashes or `./` never matched, so the document stayed `new` in `docs changed`.
+- The criteria index read-modify-write had no lock and a shared temp-file name.
+
+### Changed (review fixes, Spec 080)
+
+- **Config is loaded one way.** Every criteria command and the critic/repair compilers load
+  `spectra.config.json` through one loader. A malformed or invalid config is always an error (exit 1,
+  `spectra.config.json is invalid: …`); no command falls back to defaults on a config it could not parse (that
+  fallback emptied `existing_criteria` and churned IDs). A missing config gives the built-in defaults to read
+  commands (`compile-extraction-prompt`, `compile-critic-prompt`, `compile-repair-prompt`,
+  `compile-repair-batch`, `docs changed`) and exit 1 (`No spectra.config.json found. Run 'spectra init' first.`)
+  to write commands (`ingest-criteria`, `docs retire`, `docs apply-move`, `docs migrate-criteria`,
+  `ai analyze --import-criteria`). **`spectra docs changed` with no config now runs on the defaults** instead of
+  exiting 1.
+- **A source directory outside the repository works.** With `source.local_dir: ../product-docs/docs`, refs into
+  that folder resolve for `ai update` and the critic/repair compilers. Refs outside both the repository and the
+  source directory are still refused, and the message now says so ("outside the repository and the configured
+  source directory") instead of "not found".
+- **A rejected ingest reports `"outcome": "Rejected"`** (was `Extracted` with `success: false`). Exit codes are
+  unchanged.
+- **Failure output is always one JSON document in JSON mode.** `compile-extraction-prompt` failures carry a
+  `warnings` array (document not found → `DOCUMENT_NOT_FOUND`, unreadable → `DOCUMENT_UNREADABLE`); the early
+  errors of `ingest-criteria` (config, `--from` file not found) use the same failure shape as the other criteria
+  commands.
+
+### Fixed (review fixes, Spec 080)
+
+- `spectra ai update` wrote orphan marks and updates to `{id}.md` instead of the test's own file, creating a
+  second file with the same ID when the name differed, and `--delete-orphaned` deleted nothing (2.5.0).
+- YAML comments in test frontmatter were lost or moved on rewrite: a comment above a key belonged to the key
+  before it, and a leading comment travelled with the first key. Comments and blank lines now stay with the key
+  below them; the header stays at the top and trailing comments at the end. A removed key takes the comment above
+  it with it (2.5.0).
+- The known frontmatter keys were listed twice (parser and writer); they now come from one list, guarded by a
+  test against the frontmatter model (2.5.0).
+- Shared (pre-2.6 collided) criteria files: `compile-extraction-prompt` offered the other document's criteria (so
+  ingest rejected the IDs and the document could never be re-extracted), `docs apply-move` copied and relabelled
+  them, and a document leaving the file left its criteria behind, so they existed twice and a retired document's
+  criteria kept counting in coverage. All four now use the per-criterion `source_doc` provenance, and a document
+  leaving a shared file takes its criteria out of it.
+- Tags that differed only in order or case counted as a change and rewrote the criteria file; they now compare as
+  a set.
+- The text normaliser treated any `<letter…>` span as an HTML tag, so `total<limit and qty>5` lost text and two
+  different criteria could compare equal. Only well-formed tags of known HTML elements are stripped now.
+- `docs changed` had its own copy of the criteria-file scan; it now shares the criteria store's.
+- The `spectra-criteria` skill had no instruction for exit 1 from `ingest-criteria`, `apply-move` and `retire`;
+  it now reports the error code and stops for that document, retrying once on `LOCK_TIMEOUT`.
+
+### Notes
+
+- **One-time `source_section` churn.** Because `source_section` is now read, the first re-extraction after
+  upgrading reports a `source_section` metadata change on criteria extracted before.
+- **Custom prompt templates.** A `.spectra/prompts/criteria-extraction.md` override doesn't include the existing
+  criteria; `compile-extraction-prompt` warns. Run `spectra prompts reset criteria-extraction` to get ID reuse.
+- **Upgrading.** Run `spectra docs migrate-criteria --dry-run`, then without `--dry-run` (or let the next criteria
+  write do it). Two docs that already shared one file are reported as collisions; re-extract both.
+- **Known issue, not changed here:** an imported criterion with neither an `id` nor a `source` can't be matched
+  on re-import, so re-importing it adds a copy.
+
 ## [2.5.0] - 2026-09-24 — Lossless test writes and doc-reference resolution
 
 ### Changed — Breaking (Spec 078)

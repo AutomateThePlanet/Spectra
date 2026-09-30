@@ -32,6 +32,23 @@ Related: [Getting Started](getting-started.md) | [Configuration](configuration.m
 | 3 | Missing required arguments in non-interactive mode |
 | 130 | Cancelled by user |
 
+### Configuration
+
+The criteria commands and the critic/repair prompt compilers load `spectra.config.json` the same way:
+
+| Situation | Read commands¹ | Write commands² |
+|---|---|---|
+| `spectra.config.json` missing | Run with the built-in defaults | Exit 1: `No spectra.config.json found. Run 'spectra init' first.` |
+| Malformed JSON, or a missing `source` / `tests` / `ai` section | Exit 1: `spectra.config.json is invalid: …` | Exit 1: same message |
+
+¹ `ai compile-extraction-prompt`, `ai compile-critic-prompt`, `ai compile-repair-prompt`, `ai compile-repair-batch`,
+`docs changed`. ² `ai ingest-criteria`, `docs retire`, `docs apply-move`, `docs migrate-criteria`,
+`ai analyze --import-criteria`.
+
+No command continues on defaults after failing to parse a config. In JSON mode the criteria write commands put
+the message in their failure JSON on stderr, `--import-criteria` in its `ErrorResult` on stdout,
+`compile-extraction-prompt` in its failure JSON on stderr; the other read commands print it as a stderr line.
+
 ---
 
 ## Core Commands
@@ -159,6 +176,93 @@ Errors with exit code 1 + the available-suites list if `<suite-id>` is unknown.
 
 ---
 
+### `spectra docs changed`
+
+Lists the documents whose acceptance criteria need attention, by comparing each document's SHA-256 with the
+`doc_hash` recorded in `_criteria_index.yaml`. Read-only; calls no model.
+
+```bash
+spectra docs changed --output-format json
+spectra docs changed --include-unchanged      # also list up-to-date documents
+```
+
+Each entry in `changed` has a `status`:
+
+| Status | Meaning | What to do |
+|---|---|---|
+| `new` | No criteria extracted yet | Extract (`compile-extraction-prompt` → `ingest-criteria`) |
+| `changed` | Content changed since the last extraction | Re-extract; existing criterion IDs are offered for reuse |
+| `moved` | A new path whose content equals a deleted document's (`from`) | `spectra docs apply-move --from <from> --to <path>` |
+| `deleted` | An indexed document that no longer exists (`criteria_count`) | Review, then `spectra docs retire --doc <path>` |
+
+A move is reported only when exactly one new document and exactly one deleted document share the hash;
+otherwise they are listed as `new` and `deleted`. Imported criteria are never reported as deleted. Paths are
+compared normalised (repository-relative, `/`), so an index entry written as `docs\x.md` still matches.
+
+The result also carries `duplicate_ids` (criterion IDs defined more than once, with their files; reported,
+never renumbered), `migration_needed` (the criteria files still use the pre-2.6 layout) and `warnings`. The
+exit code is 0. With no `spectra.config.json` it runs on the built-in defaults; a malformed or invalid config
+exits 1 (see [Configuration](#configuration)).
+
+---
+
+### `spectra docs apply-move`
+
+Applies a move reported by `docs changed`. The criteria and their IDs are kept; only `source_doc` and the
+criteria file location follow the new path. No extraction runs.
+
+```bash
+spectra docs apply-move --from docs/refunds.md --to docs/billing/refunds.md [--dry-run]
+```
+
+Refuses (exit 4) unless `--from` is an indexed document that no longer exists (`NOT_INDEXED`,
+`DOC_STILL_EXISTS`), `--to` exists (`TARGET_MISSING`) and has no criteria yet (`TARGET_INDEXED`), and its
+content equals what was recorded for `--from` (`CONTENT_CHANGED`: extract it instead). Exit 1 on other errors.
+
+If `--from` shares its criteria file with another document (a pre-2.6 collision), only the criteria whose
+`source_doc` is `--from` move; they are taken out of the shared file, and the other document's criteria stay.
+
+---
+
+### `spectra docs retire`
+
+Retires a deleted document: removes its entry from `_criteria_index.yaml` and deletes its criteria file.
+Nothing is retired without this explicit call.
+
+```bash
+spectra docs retire --doc docs/old-feature.md --dry-run   # preview
+spectra docs retire --doc docs/old-feature.md
+```
+
+The result's `changeset` lists every criterion as removed, each with `referencing_tests` and `test_ids` (the
+tests whose `criteria:` still name it), so you can see which links break. In JSON mode the human summary goes to
+stderr. Refuses (exit 4) a document that still exists (`DOC_STILL_EXISTS`) or is not indexed (`NOT_INDEXED`).
+Criterion ID numbers are never freed for reuse.
+
+If the document shares its criteria file with another document (a pre-2.6 collision), only the criteria whose
+`source_doc` is that document are removed from the file; the file stays for the other document.
+
+---
+
+### `spectra docs migrate-criteria`
+
+Moves criteria files from the pre-2.6 layout (`docs/criteria/{basename}.criteria.yaml`) to one file per
+document, mirroring the document's repository path (`docs/a/login.md` → `docs/criteria/docs/a/login.criteria.yaml`).
+
+```bash
+spectra docs migrate-criteria --dry-run
+spectra docs migrate-criteria
+```
+
+- Every criterion ID is preserved, `source_doc` is normalised, and the ID high-water marks are seeded.
+- It is idempotent: a second run reports `already_migrated: true` and changes nothing.
+- Index entries that already share one file (two docs with the same file name overwrote each other in the old
+  layout) are reported under `collisions` and left as they are; re-extract both documents to split them.
+- `ingest-criteria`, `retire`, `apply-move` and `ai analyze --import-criteria` run the migration automatically
+  before they write. `docs changed` and `compile-extraction-prompt` never move files; they only warn.
+
+---
+
 ## AI Generation Commands
 
 ### `spectra ai compile-prompt` (inverted handoff)
@@ -217,12 +321,24 @@ spectra ai compile-extraction-prompt --doc docs/payment.md --component payment
 ```
 
 - It is deterministic, so identical inputs produce byte-identical output.
-- It refuses to emit when `--doc` is missing (or its content unreadable), writing nothing to
-  stdout and reporting the missing input (`missing_input` JSON field) while exiting **4**.
+- It refuses to emit when `--doc` is missing, writing nothing to stdout and reporting the missing input
+  (`missing_input` JSON field) while exiting **4**. A document that does not exist or cannot be read exits
+  **1** (`DOCUMENT_NOT_FOUND` / `DOCUMENT_UNREADABLE`).
+- In JSON mode every failure is exactly one JSON document on stderr, always with a `warnings` array:
+  `{ "refused": true, "missing_input", "message", "warnings" }` for a refusal, and
+  `{ "error_code", "message", "warnings" }` for an error (`error_code` is `null` for a config error). On success,
+  warnings are printed to stderr as text and the prompt is on stdout.
 - An empty or whitespace document short-circuits as a genuine
   "nothing to extract" (`Extracted, []`): it emits **no** prompt, performs no
   model turn, and exits **0**.
 - Writes nothing to disk.
+- The prompt lists the document's **existing criteria** (`id`, `text`, `source_section`, as compact JSON)
+  and asks the model to return an existing `id` when a criterion expresses the same requirement, so IDs stay
+  stable across rewordings. They are found through the document's `_criteria_index.yaml` entry, in either
+  storage layout. A customised `.spectra/prompts/criteria-extraction.md` without `{{existing_criteria}}` still
+  compiles, with a warning to run `spectra prompts reset criteria-extraction`.
+- When the document shares its criteria file with another document (a pre-2.6 collision), only the criteria whose
+  `source_doc` is this document are offered, which are the only IDs `ingest-criteria` accepts for it.
 
 ### `spectra ai ingest-criteria` (fail-loud boundary)
 
@@ -239,10 +355,29 @@ cat ./criteria.json | spectra ai ingest-criteria --doc docs/payment.md
   content persists **nothing** and reports the typed `outcome`
   (`EmptyResponse` / `ParseFailure`). There is no cache poisoning, because the criteria index is
   left untouched so a later run re-attempts.
-- A genuine `Extracted` result persists via the unchanged `.criteria.yaml` writer
-  + criteria-index upsert (`outcome: extracted`).
-- `--dry-run` classifies and reports without writing.
-- Exit code is `0` when extracted/persisted, `5` for `EmptyResponse`, and `6` for `ParseFailure`.
+- A genuine `Extracted` result persists to the document's own `.criteria.yaml` file plus a criteria-index
+  upsert (`outcome: extracted`). `source_doc` is stored repository-relative with `/`, however `--doc` was typed.
+- **Stable IDs.** Each criterion may carry an optional `id`. It is kept only if it is one of this document's
+  existing criteria and appears once; otherwise the ingest fails with exit **7** (`INVALID_CRITERION_ID`) and
+  writes nothing. A criterion without an `id` keeps an existing ID when its normalised text (markup, whitespace
+  and case ignored) is unchanged; then its stored text is kept verbatim.
+- **Never-reused IDs.** New IDs come from `id_high_water_marks` in `_criteria_index.yaml` (committed, per prefix
+  such as `AC-CHECKOUT`), so a removed criterion's number is never issued again, and two documents with the same
+  component never collide. Import uses the same allocator.
+- **Changeset.** The JSON result has `changeset` (`added`, `modified` with old/new text, `removed` with
+  `referencing_tests`/`test_ids`, `metadata` changes by field), plus `written`, `duplicate_ids` and `migration`.
+  A human summary of the changeset is always printed: on stderr in JSON mode (stdout is exactly the JSON) and on
+  stdout otherwise. When nothing changed, nothing is written and the criteria file stays byte-identical.
+- Writers take `.spectra/criteria.lock`, so concurrent ingests never lose an update or share an ID.
+- `--dry-run` computes everything (IDs, changeset) without writing.
+- Tags compare as a case-insensitive set: tags that differ only in order or case are not a change, and the
+  stored text is kept.
+- A classified response that is refused before anything is persisted reports `"outcome": "Rejected"` with its
+  `error_code`. Errors before any response is classified (config, `--from` file not found) use the same failure
+  JSON shape on stderr, without an `outcome`.
+- Exit code is `0` when extracted/persisted (or unchanged), `5` for `EmptyResponse`, `6` for `ParseFailure`,
+  `7` for `INVALID_CRITERION_ID`, and `1` for other errors (`CRITERIA_FILE_UNREADABLE`,
+  `CRITERIA_FILE_COLLISION`, `INVALID_DOC_PATH`, `LOCK_TIMEOUT`, config errors).
 
 > `spectra docs index` and `spectra ai analyze
 > --extract-criteria` still run their extraction in-process today; the
@@ -495,11 +630,13 @@ step ran. The exit code is the same either way (0 on success). Marking a test or
 
 **How `source_refs` are resolved.** A ref such as `docs/checkout.md#Payment` is resolved by dropping the
 `#fragment`, normalising `\` to `/`, and looking for the file relative to the repository root; bare
-legacy refs such as `checkout.md` fall back to the configured `source.local_dir`. Refs that point outside
-the repository never resolve. A test is classified ORPHANED for a missing source only when none of its
-referenced files exist, and it is compared with the text of all of its referenced documents.
-`compile-critic-prompt` and `compile-repair-prompt` resolve refs the same way and fail when one is
-missing.
+legacy refs such as `checkout.md` fall back to the configured `source.local_dir`. A ref resolves only to a
+file under the repository or under `source.local_dir`, which may lie outside the repository (for example
+`../product-docs/docs`); refs outside both never resolve. A test is classified ORPHANED for a missing source
+only when none of its referenced files exist, and it is compared with the text of all of its referenced
+documents. `compile-critic-prompt` and `compile-repair-prompt` resolve refs the same way and fail when one is
+missing, saying why: `Source ref not found: …` or `Source ref is outside the repository and the configured
+source directory: …`.
 
 `spectra ai update` is the **selector**: it classifies tests but does not rewrite them. The doc-aware targeted edit of an OUTDATED test runs in the interactive session via the `spectra-update` skill, over the deterministic update seam below.
 

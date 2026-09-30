@@ -48,6 +48,9 @@ public static class CriteriaResponseClassifier
                 .Where(i => !string.IsNullOrWhiteSpace(i!.Text))
                 .Select(i => new AcceptanceCriterion
                 {
+                    // Spec 079: the model's "id" (reuse of an existing criterion) travels on Id; empty means none.
+                    // CriteriaIngestor validates it and assigns the final ID.
+                    Id = i!.Id?.Trim() ?? string.Empty,
                     Text = i!.Text!.Trim(),
                     Rfc2119 = i.Rfc2119?.Trim().ToUpperInvariant(),
                     SourceDoc = source,
@@ -94,8 +97,14 @@ public static class CriteriaResponseClassifier
 
     private sealed class ExtractedCriterion
     {
+        [System.Text.Json.Serialization.JsonPropertyName("id")]
+        public string? Id { get; set; }
+
         public string? Text { get; set; }
         public string? Rfc2119 { get; set; }
+
+        // Spec 079: case-insensitive binding does not map underscores, so the snake_case name must be explicit.
+        [System.Text.Json.Serialization.JsonPropertyName("source_section")]
         public string? SourceSection { get; set; }
         public string? Priority { get; set; }
         public List<string>? Tags { get; set; }

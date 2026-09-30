@@ -49,6 +49,8 @@ public static class TestCaseEquivalence
         if ((e.Layout is null) != (a.Layout is null)) return nameof(TestCase.Layout);
         if (e.Layout is null || a.Layout is null) return null;
         if (e.Layout.Newline != a.Layout.Newline) return "Layout.Newline";
+        if (e.Layout.FrontmatterLeading != a.Layout.FrontmatterLeading) return "Layout.FrontmatterLeading";
+        if (e.Layout.FrontmatterTrailing != a.Layout.FrontmatterTrailing) return "Layout.FrontmatterTrailing";
         if (!e.Layout.FrontmatterEntries.SequenceEqual(a.Layout.FrontmatterEntries)) return "Layout.FrontmatterEntries";
         if (!e.Layout.BodySegments.SequenceEqual(a.Layout.BodySegments)) return "Layout.BodySegments";
         return null;

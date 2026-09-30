@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Spectra.CLI.Source;
 using Spectra.CLI.Verification;
+using Spectra.Core.Config;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
@@ -42,7 +43,16 @@ public sealed class CompileRepairBatchCommand : Command
     private static async Task<int> RunAsync(string suite, CancellationToken ct)
     {
         var currentDir = Directory.GetCurrentDirectory();
-        var testsDir = await ResolveTestsDirAsync(currentDir, ct);
+
+        // Spec 080 A5: read command — defaults when there is no config, exit 1 on a malformed or invalid one.
+        var loaded = await ConfigLoader.LoadForReadAsync(currentDir, ct);
+        if (!loaded.IsSuccess)
+        {
+            Console.Error.WriteLine(loaded.Error);
+            return ExitError;
+        }
+        var config = loaded.Config!;
+        var testsDir = config.Tests.Dir;
         var suitePath = Path.Combine(currentDir, testsDir, suite);
         var indexPath = IndexWriter.GetIndexPath(suitePath);
 
@@ -120,7 +130,7 @@ public sealed class CompileRepairBatchCommand : Command
 
             // Load source docs
             IReadOnlyList<SourceDocument> sourceDocs;
-            try { sourceDocs = await SourceRefDocumentLoader.LoadAsync(test.SourceRefs, currentDir, failOnMissing: false, ct); }
+            try { sourceDocs = await SourceRefDocumentLoader.LoadAsync(test.SourceRefs, currentDir, config.Source.LocalDir ?? "docs", failOnMissing: false, ct); }
             catch { sourceDocs = []; }
 
             var (prompt, _) = RepairPromptCompiler.Compile(test, nonGrounded, sourceDocs);
@@ -145,19 +155,6 @@ public sealed class CompileRepairBatchCommand : Command
         return ExitSuccess;
     }
 
-    private static async Task<string> ResolveTestsDirAsync(string currentDir, CancellationToken ct)
-    {
-        var configPath = Path.Combine(currentDir, "spectra.config.json");
-        if (!File.Exists(configPath)) return "test-cases";
-        try
-        {
-            var json = await File.ReadAllTextAsync(configPath, ct);
-            var config = JsonSerializer.Deserialize<SpectraConfig>(json,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return config?.Tests?.Dir ?? "test-cases";
-        }
-        catch { return "test-cases"; }
-    }
 }
 
 /// <summary>

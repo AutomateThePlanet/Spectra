@@ -74,4 +74,53 @@ public sealed class ExtractionPromptCompilerTests
         Assert.Equal("document_content", result.MissingInput);
         Assert.Null(result.Prompt);
     }
+
+    // ---------- Spec 079: existing criteria in the prompt ----------
+
+    private static IReadOnlyList<Spectra.Core.Models.Coverage.AcceptanceCriterion> Existing() =>
+    [
+        new() { Id = "AC-PAYMENT-001", Text = "System MUST validate the IBAN", SourceSection = "Validation" },
+        new() { Id = "AC-PAYMENT-002", Text = "System SHOULD show \"invalid\" inline" }
+    ];
+
+    private static Spectra.CLI.Prompts.PromptTemplateLoader BuiltInLoader() =>
+        new(Path.Combine(Path.GetTempPath(), "spectra-079-no-overrides-" + Guid.NewGuid().ToString("N")));
+
+    [Fact]
+    public void Compile_WithExistingCriteria_ListsThemAsCompactJsonInFileOrder()
+    {
+        var result = ExtractionPromptCompiler.Compile(Doc, Content, "payment", BuiltInLoader(), Existing());
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains("Existing criteria:", result.Prompt);
+        Assert.Contains(
+            """[{"id":"AC-PAYMENT-001","text":"System MUST validate the IBAN","source_section":"Validation"},{"id":"AC-PAYMENT-002","text":"System SHOULD show \"invalid\" inline"}]""",
+            result.Prompt);
+    }
+
+    [Fact]
+    public void Compile_WithExistingCriteria_IsByteIdentical()
+    {
+        var a = ExtractionPromptCompiler.Compile(Doc, Content, "payment", BuiltInLoader(), Existing()).Prompt;
+        var b = ExtractionPromptCompiler.Compile(Doc, Content, "payment", BuiltInLoader(), Existing()).Prompt;
+
+        Assert.Equal(a, b);
+    }
+
+    [Fact]
+    public void Compile_WithoutExistingCriteria_OmitsTheBlock()
+    {
+        var result = ExtractionPromptCompiler.Compile(Doc, Content, "payment", BuiltInLoader(), []);
+
+        Assert.DoesNotContain("Existing criteria:", result.Prompt);
+    }
+
+    [Fact]
+    public void Assemble_LenientFallback_AlsoListsExistingCriteria()
+    {
+        var prompt = ExtractionPromptCompiler.Assemble(Doc, Content, "payment", templateLoader: null, Existing());
+
+        Assert.Contains("Existing criteria:", prompt);
+        Assert.Contains("AC-PAYMENT-002", prompt);
+    }
 }

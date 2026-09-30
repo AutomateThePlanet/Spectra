@@ -95,4 +95,23 @@ public class CriteriaExtractorParseTests
         Assert.Equal(ExtractionOutcome.EmptyResponse, result.Outcome);
         Assert.False(result.IsCacheable);
     }
+
+    // ---- Spec 079: every schema field is read, including the optional id ----
+
+    [Fact]
+    public void Parse_ReadsSourceSectionAndId()
+    {
+        var json = """
+            [
+              {"id": "AC-PAYMENTS-003", "text": "System MUST validate IBAN", "source_section": "Payments"},
+              {"text": "System SHOULD log retries", "source_section": "Logging"},
+              {"text": "System MAY cache"}
+            ]
+            """;
+
+        var result = CriteriaResponseClassifier.Classify(json, source: "docs/payments.md", component: "payments");
+
+        Assert.Equal(["Payments", "Logging", null], result.Criteria.Select(c => c.SourceSection));
+        Assert.Equal(["AC-PAYMENTS-003", "", ""], result.Criteria.Select(c => c.Id));
+    }
 }

@@ -297,6 +297,17 @@ public sealed class UpdateHandler
             // Criteria loading is best-effort; continue without criteria
         }
 
+        // Spec 079 FR-011: duplicate criterion IDs (from older workspaces) are reported, never fatal.
+        foreach (var duplicate in (suiteCriteria ?? [])
+                     .Where(c => !string.IsNullOrWhiteSpace(c.Id))
+                     .GroupBy(c => c.Id, StringComparer.OrdinalIgnoreCase)
+                     .Where(g => g.Count() > 1)
+                     .Select(g => g.Key)
+                     .OrderBy(id => id, StringComparer.Ordinal))
+        {
+            _progress.Warning($"Criterion id {duplicate} is defined more than once; using the first definition.");
+        }
+
         // Classify tests using the classifier directly for better presentation
         var classifier = new TestClassifier();
         var classificationResults = await _progress.StatusAsync(
@@ -646,7 +657,7 @@ public sealed class UpdateHandler
         {
             if (proposal.ProposedTest is not null)
             {
-                var path = Path.Combine(suitePath, $"{proposal.OriginalTest.Id}.md");
+                var path = TestFilePathOf(proposal.OriginalTest, suitePath);
                 await writer.WriteAsync(path, proposal.ProposedTest, ct);
                 Console.WriteLine($"  Updated: {proposal.OriginalTest.Id}");
             }
@@ -669,7 +680,7 @@ public sealed class UpdateHandler
                     : new DateTimeOffset(DateTime.UtcNow.Date, TimeSpan.Zero)
             };
 
-            var path = Path.Combine(suitePath, $"{originalTest.Id}.md");
+            var path = TestFilePathOf(originalTest, suitePath);
             await writer.WriteAsync(path, orphanedTest, ct);
             Console.WriteLine($"  Marked orphaned: {originalTest.Id}");
             orphanedCount++;
@@ -679,7 +690,7 @@ public sealed class UpdateHandler
         // Delete tests
         foreach (var proposal in result.ToDelete)
         {
-            var path = Path.Combine(suitePath, $"{proposal.OriginalTest.Id}.md");
+            var path = TestFilePathOf(proposal.OriginalTest, suitePath);
             if (File.Exists(path))
             {
                 File.Delete(path);
@@ -689,6 +700,22 @@ public sealed class UpdateHandler
         }
 
         return orphanedCount;
+    }
+
+    /// <summary>
+    /// Spec 080 A1: the file a parsed test came from. Writes and deletes go there, never to a rebuilt
+    /// <c>{id}.md</c>, which for a file named differently would create a second test with the same ID.
+    /// </summary>
+    private static string TestFilePathOf(TestCase test, string suitePath)
+    {
+        if (string.IsNullOrWhiteSpace(test.FilePath))
+        {
+            return Path.Combine(suitePath, $"{test.Id}.md");
+        }
+
+        return Path.IsPathRooted(test.FilePath)
+            ? test.FilePath
+            : Path.GetFullPath(Path.Combine(suitePath, test.FilePath));
     }
 
     /// <summary>

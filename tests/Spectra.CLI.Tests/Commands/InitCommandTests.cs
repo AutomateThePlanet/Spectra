@@ -148,6 +148,7 @@ public class InitCommandTests : IDisposable
         var content = await File.ReadAllTextAsync(gitIgnorePath);
         Assert.Equal(1, content.Split(".spectra-result.json").Length - 1);
         Assert.Equal(1, content.Split(".spectra-progress.html").Length - 1);
+        Assert.Equal(1, content.Split(".spectra/criteria.lock").Length - 1); // Spec 079
     }
 
     [Fact]

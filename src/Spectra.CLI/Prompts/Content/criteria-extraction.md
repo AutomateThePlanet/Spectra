@@ -19,6 +19,7 @@ placeholders:
 You are a requirements analyst. Extract all testable acceptance criteria from this single document.
 
 For each criterion:
+- id (optional): the id of an existing criterion this one expresses (see "Existing criteria" below); omit it for a new requirement
 - text: Rewrite using RFC 2119 language (MUST, SHOULD, MAY). Preserve original meaning.
 - rfc2119: The primary RFC 2119 keyword used (MUST, MUST NOT, SHALL, SHALL NOT, SHOULD, SHOULD NOT, MAY, REQUIRED, RECOMMENDED, OPTIONAL)
 - source_section: The heading/section where this criterion was found
@@ -48,10 +49,21 @@ appropriate techniques when covering this criterion.
 {{#if component}}
 The document belongs to the "{{component}}" component.
 {{/if}}
+{{#if existing_criteria}}
+
+## Existing criteria
+
+This document already has acceptance criteria. For every criterion you extract that expresses the SAME requirement as one
+of these (even if you word it differently), return that criterion's "id" unchanged. Omit "id" for new requirements. Never
+invent an id, and never use the same id twice.
+
+Existing criteria:
+{{existing_criteria}}
+{{/if}}
 
 Respond ONLY with a JSON array. No markdown, no explanation, no code fences. Example:
 [
-  {"text": "System MUST validate IBAN format before payment", "rfc2119": "MUST", "source_section": "Payment Validation", "priority": "high", "tags": ["payment", "validation"], "technique_hint": "EP"},
+  {"id": "AC-PAYMENTS-001", "text": "System MUST validate IBAN format before payment", "rfc2119": "MUST", "source_section": "Payment Validation", "priority": "high", "tags": ["payment", "validation"], "technique_hint": "EP"},
   {"text": "System SHOULD display inline error within 500ms", "rfc2119": "SHOULD", "source_section": "UX Requirements", "priority": "medium", "tags": ["ux", "performance"]}
 ]
 

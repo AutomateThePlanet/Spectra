@@ -53,6 +53,12 @@ public class TestCaseLayoutTests
 
     private static readonly string Markdown = "---\n" + Frontmatter + "---\n" + Body;
 
+    // Spec 080 A4 invariant: leading + every entry's prelude and text + trailing is the frontmatter.
+    private static string Reassemble(TestCaseLayout layout) =>
+        layout.FrontmatterLeading +
+        string.Concat(layout.FrontmatterEntries.Select(e => e.Prelude + e.RawText)) +
+        layout.FrontmatterTrailing;
+
     private static TestCase Parse(string markdown)
     {
         var result = new TestCaseParser().Parse(markdown, "TC-1.md");
@@ -66,7 +72,7 @@ public class TestCaseLayoutTests
     {
         var layout = Parse(Markdown).Layout!;
 
-        Assert.Equal(Frontmatter, string.Concat(layout.FrontmatterEntries.Select(e => e.RawText)));
+        Assert.Equal(Frontmatter, Reassemble(layout));
     }
 
     [Fact]
@@ -90,11 +96,21 @@ public class TestCaseLayoutTests
     {
         var entries = Parse(Markdown).Layout!.FrontmatterEntries.ToDictionary(e => e.Key);
 
-        Assert.StartsWith("# leading comment\nid: TC-1", entries["id"].RawText);
+        var layout = Parse(Markdown).Layout!;
+
+        // Spec 080 A4: the header comment is the frontmatter's leading text, not part of the first key; a comment
+        // between keys belongs to the key below it; RawText is the key and its value only.
+        Assert.Equal("# leading comment\n", layout.FrontmatterLeading);
+        Assert.Equal("id: TC-1\n", entries["id"].RawText);
+        Assert.Equal("", entries["id"].Prelude);
         Assert.Equal("tags: [a, b]\n", entries["tags"].RawText);
         Assert.Equal("x_ticket: {id: 42, system: jira}\n", entries["x_ticket"].RawText);
         Assert.Contains("    first\n    second\n", entries["custom"].RawText);
-        Assert.EndsWith("# comment between keys\n", entries["custom"].RawText);
+        Assert.DoesNotContain("# comment between keys", entries["custom"].RawText);
+        Assert.Equal("# comment between keys\n", entries["criteria"].Prelude);
+        Assert.Equal("criteria: []\n", entries["criteria"].RawText);
+        Assert.Equal("", layout.FrontmatterTrailing);
+        Assert.Equal(Frontmatter, Reassemble(layout));
     }
 
     [Fact]
@@ -139,7 +155,7 @@ public class TestCaseLayoutTests
         var md = Markdown.Replace("\n", "\r\n");
         var layout = Parse(md).Layout!;
 
-        Assert.Equal(Frontmatter.Replace("\n", "\r\n"), string.Concat(layout.FrontmatterEntries.Select(e => e.RawText)));
+        Assert.Equal(Frontmatter.Replace("\n", "\r\n"), Reassemble(layout));
         Assert.Equal(Body.Replace("\n", "\r\n"), string.Concat(layout.BodySegments.Select(s => s.RawText)));
     }
 

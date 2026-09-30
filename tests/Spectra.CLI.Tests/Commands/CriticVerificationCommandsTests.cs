@@ -142,7 +142,80 @@ public sealed class CriticVerificationCommandsTests : IDisposable
         var (exit, _, error) = await RunCapturedAsync("ai", "compile-critic-prompt", "--suite", "auth", "--test", "TC-1");
 
         Assert.Equal(1, exit);
-        Assert.Contains("Source ref not found: ../outside.md", error);
+        // Spec 080 A2: the message says why the ref was refused.
+        Assert.Contains("Source ref is outside the repository and the configured source directory: ../outside.md", error);
+    }
+
+    // ---------- Spec 080 A2: a source directory outside the repository ----------
+
+    /// <summary>
+    /// Creates a sibling <c>product-docs/docs</c> folder next to the workspace, points <c>source.local_dir</c> at it
+    /// and returns the folder's full path. The caller deletes the sibling folder.
+    /// </summary>
+    private string UseSiblingSourceDir(out string siblingRoot)
+    {
+        var name = "product-docs-" + Guid.NewGuid().ToString("N");
+        siblingRoot = Path.GetFullPath(Path.Combine(_dir, "..", name));
+        var docs = Path.Combine(siblingRoot, "docs");
+        Directory.CreateDirectory(docs);
+        File.WriteAllText(Path.Combine(docs, "checkout.md"), "CHECKOUT-DOC-MARKER");
+        WriteFile("spectra.config.json",
+            $"{{\"source\": {{\"local_dir\": \"../{name}/docs\"}}, \"tests\": {{\"dir\": \"test-cases/\"}}, \"ai\": {{}}}}");
+        return docs;
+    }
+
+    [Fact]
+    public async Task CompileCriticPrompt_AbsoluteRefIntoOutOfRepoSourceDir_LoadsTheDoc()
+    {
+        var docs = UseSiblingSourceDir(out var sibling);
+        try
+        {
+            WriteSuiteTestWithRefs("auth", "TC-1", Path.Combine(docs, "checkout.md"), "checkout.md#Payment");
+
+            var (exit, output, error) = await RunCapturedAsync("ai", "compile-critic-prompt", "--suite", "auth", "--test", "TC-1");
+
+            Assert.True(exit == 0, error);
+            Assert.Equal(1, Occurrences(output, "CHECKOUT-DOC-MARKER"));
+        }
+        finally { Directory.Delete(sibling, recursive: true); }
+    }
+
+    [Fact]
+    public async Task CompileCriticPrompt_RefEscapingBothRoots_SaysWhy()
+    {
+        UseSiblingSourceDir(out var sibling);
+        var elsewhere = Path.GetFullPath(Path.Combine(_dir, "..", "elsewhere-" + Guid.NewGuid().ToString("N") + ".md"));
+        File.WriteAllText(elsewhere, "x");
+        try
+        {
+            WriteSuiteTestWithRefs("auth", "TC-1", elsewhere);
+
+            var (exit, _, error) = await RunCapturedAsync("ai", "compile-critic-prompt", "--suite", "auth", "--test", "TC-1");
+
+            Assert.Equal(1, exit);
+            Assert.Contains("Source ref is outside the repository and the configured source directory: ", error);
+        }
+        finally
+        {
+            Directory.Delete(sibling, recursive: true);
+            File.Delete(elsewhere);
+        }
+    }
+
+    [Fact]
+    public async Task CompileCriticPrompt_MissingRefInOutOfRepoSourceDir_IsNotFound()
+    {
+        UseSiblingSourceDir(out var sibling);
+        try
+        {
+            WriteSuiteTestWithRefs("auth", "TC-1", "gone.md#S");
+
+            var (exit, _, error) = await RunCapturedAsync("ai", "compile-critic-prompt", "--suite", "auth", "--test", "TC-1");
+
+            Assert.Equal(1, exit);
+            Assert.Contains("Source ref not found: gone.md#S", error);
+        }
+        finally { Directory.Delete(sibling, recursive: true); }
     }
 
     // ---------- compile-critic-prompt --suite (Spec 071: ID→path resolution) ----------

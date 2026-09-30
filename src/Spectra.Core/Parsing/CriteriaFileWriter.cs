@@ -40,7 +40,8 @@ public sealed class CriteriaFileWriter
         var doc = new CriteriaDocument { Criteria = criteria.ToList() };
         var yaml = Serializer.Serialize(doc);
 
-        var tempPath = filePath + ".tmp";
+        // Spec 079: a temp name unique per writer, so concurrent writers never clobber each other's temp file.
+        var tempPath = $"{filePath}.{Guid.NewGuid():N}.tmp";
         await File.WriteAllTextAsync(tempPath, header + yaml, ct);
         File.Move(tempPath, filePath, overwrite: true);
     }

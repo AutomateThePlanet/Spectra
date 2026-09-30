@@ -18,6 +18,42 @@ public sealed class ConfigLoader
 
     public const string ConfigFileName = "spectra.config.json";
 
+    /// <summary>Spec 080 A5: the message every write command gives when there is no config.</summary>
+    public const string MissingConfigMessage = "No spectra.config.json found. Run 'spectra init' first.";
+
+    /// <summary>Spec 080 A5: prefix of the one message every command gives for a malformed or invalid config.</summary>
+    public const string InvalidConfigPrefix = "spectra.config.json is invalid: ";
+
+    /// <summary>
+    /// Spec 080 A5 entry point for read-only commands: a missing config gives <see cref="SpectraConfig.Default"/>;
+    /// a malformed or invalid config is an error, never a fallback to defaults.
+    /// </summary>
+    public static Task<ConfigLoadResult> LoadForReadAsync(string repoRoot, CancellationToken ct = default) =>
+        LoadEntryAsync(repoRoot, missingIsError: false, ct);
+
+    /// <summary>
+    /// Spec 080 A5 entry point for commands that write: a missing config is an error
+    /// (<see cref="MissingConfigMessage"/>), and so is a malformed or invalid one.
+    /// </summary>
+    public static Task<ConfigLoadResult> LoadForWriteAsync(string repoRoot, CancellationToken ct = default) =>
+        LoadEntryAsync(repoRoot, missingIsError: true, ct);
+
+    private static async Task<ConfigLoadResult> LoadEntryAsync(string repoRoot, bool missingIsError, CancellationToken ct)
+    {
+        var path = Path.Combine(repoRoot, ConfigFileName);
+        if (!File.Exists(path))
+        {
+            return missingIsError
+                ? new ConfigLoadResult(null, MissingConfigMessage)
+                : new ConfigLoadResult(SpectraConfig.Default, null);
+        }
+
+        var result = await new ConfigLoader().LoadFromFileAsync(path, ct);
+        return result.IsSuccess
+            ? new ConfigLoadResult(result.Value, null)
+            : new ConfigLoadResult(null, InvalidConfigPrefix + result.Errors[0].Message);
+    }
+
     /// <summary>
     /// Loads configuration from a JSON string.
     /// </summary>
@@ -201,4 +237,13 @@ public sealed class ConfigLoader
 
         return errors;
     }
+}
+
+/// <summary>
+/// Spec 080 A5: outcome of <see cref="ConfigLoader.LoadForReadAsync"/> / <see cref="ConfigLoader.LoadForWriteAsync"/>.
+/// Exactly one of <see cref="Config"/> and <see cref="Error"/> is set; a non-null error means exit 1.
+/// </summary>
+public sealed record ConfigLoadResult(SpectraConfig? Config, string? Error)
+{
+    public bool IsSuccess => Error is null;
 }

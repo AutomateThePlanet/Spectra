@@ -401,4 +401,55 @@ public class SkillsManifestTests : IDisposable
         Assert.Contains("it already contains the full document text", content);
         Assert.Contains("do not\nread `{path}` separately", content.Replace("\r\n", "\n"));
     }
+
+    // ---- Spec 079: moved / deleted docs and the changeset summary ----
+
+    [Fact]
+    public void CriteriaSkill_AppliesMoves_AndRetiresDeletedDocsOnlyAfterConfirmation()
+    {
+        var content = SkillContent.All["spectra-criteria"].Replace("\r\n", "\n");
+
+        Assert.Contains("spectra docs apply-move --from {from} --to {path} --output-format json", content);
+        Assert.Contains("spectra docs retire --doc {path} --dry-run --output-format json", content);
+        Assert.Contains("Never retire anything on your own", content);
+        Assert.Contains("Only on an explicit yes, run:\n```\nspectra docs retire --doc {path} --output-format json", content);
+        Assert.Contains("referencing_tests", content);
+    }
+
+    [Fact]
+    public void CriteriaSkill_SummarisesChangesets_AndHandlesInvalidIds()
+    {
+        var content = SkillContent.All["spectra-criteria"];
+
+        Assert.Contains("criteria added / modified / removed", content);
+        Assert.Contains("removed** criterion id that tests still reference", content);
+        Assert.Contains("Exit 7 (`INVALID_CRITERION_ID`)", content);
+        // Spec 078 wording is kept.
+        Assert.Contains("it already contains the full document text", content);
+    }
+
+    // Spec 080 B5: every criteria write step tells the session what to do on exit 1.
+    [Theory]
+    [InlineData("**1a.", "**1b.")]
+    [InlineData("**1b.", "The Step 2 work-list")]
+    [InlineData("**2c.", "Update `.spectra/progress.json`: `{\"active\":2}`")]
+    public void CriteriaSkill_WriteSteps_HandleExit1(string sectionStart, string sectionEnd)
+    {
+        var content = SkillContent.All["spectra-criteria"].Replace("\r\n", "\n");
+        var start = content.IndexOf(sectionStart, StringComparison.Ordinal);
+        Assert.True(start >= 0, sectionStart);
+        var end = content.IndexOf(sectionEnd, start, StringComparison.Ordinal);
+        Assert.True(end > start, sectionEnd);
+        var section = content[start..end];
+
+        Assert.Contains("Exit 1", section);
+        Assert.Contains("`error_code`", section);
+        Assert.Contains("stop for that document", section);
+        Assert.Contains("`LOCK_TIMEOUT`", section);
+        Assert.Contains("retry the same command once", section);
+        foreach (var code in new[] { "CRITERIA_FILE_UNREADABLE", "CRITERIA_FILE_COLLISION", "INVALID_DOC_PATH" })
+        {
+            Assert.Contains(code, section);
+        }
+    }
 }

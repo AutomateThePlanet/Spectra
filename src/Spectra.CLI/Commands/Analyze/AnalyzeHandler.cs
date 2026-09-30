@@ -1,12 +1,14 @@
 using System.Text.Json;
 using Spectra.CLI.Agent.Tools;
 using Spectra.CLI.Coverage;
+using Spectra.CLI.Criteria;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Output;
 using Spectra.CLI.IO;
 using Spectra.CLI.Results;
 using Spectra.CLI.Source;
 using Spectra.Core.Coverage;
+using Spectra.Core.Criteria;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Coverage;
@@ -292,19 +294,10 @@ public sealed class AnalyzeHandler
                 return ExitCodes.Error;
             }
 
-            // Load config
-            var configPath = Path.Combine(currentDir, "spectra.config.json");
-            SpectraConfig? config = null;
-            if (File.Exists(configPath))
-            {
-                var configJson = await File.ReadAllTextAsync(configPath, ct);
-                config = JsonSerializer.Deserialize<SpectraConfig>(configJson, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-            }
-
-            if (config is null)
+            // Spec 080 A5: a write command — missing or invalid config is an error, reported on the command's
+            // usual path (ErrorResult on stdout in JSON mode, stderr text otherwise).
+            var loaded = await Spectra.Core.Config.ConfigLoader.LoadForWriteAsync(currentDir, ct);
+            if (!loaded.IsSuccess)
             {
                 if (_outputFormat == OutputFormat.Json)
                 {
@@ -312,15 +305,16 @@ public sealed class AnalyzeHandler
                     {
                         Command = "import-criteria",
                         Status = "failed",
-                        Error = "No spectra.config.json found. Run 'spectra init' first."
+                        Error = loaded.Error!
                     });
                 }
                 else
                 {
-                    Console.Error.WriteLine("No spectra.config.json found. Run 'spectra init' first.");
+                    Console.Error.WriteLine(loaded.Error);
                 }
                 return ExitCodes.Error;
             }
+            var config = loaded.Config!;
 
             // Migrate criteria folder from docs/requirements/ to docs/criteria/ if needed
             await MigrateCriteriaFolderAsync(currentDir, _verbosity);
@@ -382,159 +376,79 @@ public sealed class AnalyzeHandler
             var splitCount = 0;
             var normalizedCount = 0;
 
-            // 5. Assign IDs to criteria that don't have them
-            // Build a set of all existing IDs to avoid collisions
-            var indexReader = new CriteriaIndexReader();
-            var criteriaIndex = await indexReader.ReadAsync(criteriaIndexPath, ct);
-
-            var globalMaxId = 0;
-            var sourceMaxIds = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-
-            // Scan existing criteria files for used IDs
-            foreach (var source in criteriaIndex.Sources)
-            {
-                var sourceFilePath = Path.Combine(criteriaDir, source.File);
-                if (Path.IsPathRooted(source.File))
-                    sourceFilePath = source.File;
-
-                var fileReader = new CriteriaFileReader();
-                var existingInFile = await fileReader.ReadAsync(sourceFilePath, ct);
-                foreach (var c in existingInFile)
-                {
-                    if (string.IsNullOrEmpty(c.Id)) continue;
-
-                    // Try parse AC-{KEY}-{N} pattern
-                    if (c.Id.StartsWith("AC-", StringComparison.OrdinalIgnoreCase) && c.Id.Length > 3)
-                    {
-                        var rest = c.Id[3..];
-                        var lastDash = rest.LastIndexOf('-');
-                        if (lastDash > 0 && int.TryParse(rest[(lastDash + 1)..], out var n))
-                        {
-                            var key = rest[..lastDash].ToUpperInvariant();
-                            if (sourceMaxIds.TryGetValue(key, out var current))
-                                sourceMaxIds[key] = Math.Max(current, n);
-                            else
-                                sourceMaxIds[key] = n;
-                        }
-                        else if (int.TryParse(rest, out var plainN))
-                        {
-                            globalMaxId = Math.Max(globalMaxId, plainN);
-                        }
-                    }
-                }
-            }
-
-            // Also scan the imported criteria for existing IDs
-            foreach (var c in imported)
-            {
-                if (!string.IsNullOrEmpty(c.Id) && c.Id.StartsWith("AC-", StringComparison.OrdinalIgnoreCase))
-                {
-                    var rest = c.Id[3..];
-                    var lastDash = rest.LastIndexOf('-');
-                    if (lastDash > 0 && int.TryParse(rest[(lastDash + 1)..], out var n))
-                    {
-                        var key = rest[..lastDash].ToUpperInvariant();
-                        if (sourceMaxIds.TryGetValue(key, out var current))
-                            sourceMaxIds[key] = Math.Max(current, n);
-                        else
-                            sourceMaxIds[key] = n;
-                    }
-                    else if (int.TryParse(rest, out var plainN))
-                    {
-                        globalMaxId = Math.Max(globalMaxId, plainN);
-                    }
-                }
-            }
-
-            // Assign IDs to criteria without them
-            foreach (var criterion in imported)
-            {
-                if (!string.IsNullOrEmpty(criterion.Id))
-                    continue;
-
-                if (!string.IsNullOrEmpty(criterion.Source))
-                {
-                    var sourceKey = criterion.Source
-                        .Replace(' ', '-')
-                        .ToUpperInvariant();
-                    if (!sourceMaxIds.TryGetValue(sourceKey, out var nextN))
-                        nextN = 0;
-                    nextN++;
-                    sourceMaxIds[sourceKey] = nextN;
-                    criterion.Id = $"AC-{sourceKey}-{nextN:D3}";
-                }
-                else
-                {
-                    globalMaxId++;
-                    criterion.Id = $"AC-{globalMaxId:D3}";
-                }
-            }
-
-            // 6. Determine output file path
+            // 5–9 (Spec 079): under the criteria lock — migrate the old layout first, merge with the existing
+            // import file BEFORE numbering (so a criterion that keeps its ID consumes no number), then allocate IDs
+            // only for criteria still without one, from the committed per-prefix high-water marks, and persist the
+            // file and the index together.
             var inputFileName = Path.GetFileNameWithoutExtension(fullImportPath);
-            var importedDir = Path.Combine(criteriaDir, "imported");
-            var outputFilePath = Path.Combine(importedDir, $"{inputFileName}.criteria.yaml");
-
-            // 7. Merge or replace
-            var fileReaderForTarget = new CriteriaFileReader();
-            var existingCriteria = await fileReaderForTarget.ReadAsync(outputFilePath, ct);
-
-            var merger = new CriteriaMerger();
-            CriteriaMerger.MergeResult mergeResult;
-
-            if (replace)
-            {
-                mergeResult = merger.Replace(existingCriteria, imported);
-            }
-            else
-            {
-                mergeResult = merger.Merge(existingCriteria, imported);
-            }
-
-            // 8. Write criteria file
-            if (!dryRun)
-            {
-                Directory.CreateDirectory(importedDir);
-
-                var fileWriter = new CriteriaFileWriter();
-                await fileWriter.WriteAsync(outputFilePath, mergeResult.Criteria, importPath, null, ct);
-            }
-
-            // 9. Update master CriteriaIndex
-            var relativeOutputFile = Path.GetRelativePath(
-                Path.Combine(currentDir, config.Coverage.CriteriaDir),
-                outputFilePath).Replace('\\', '/');
-
-            // Use the imported dir relative path as the file entry
             var importedRelFile = $"imported/{inputFileName}.criteria.yaml";
+            var outputFilePath = Path.Combine(criteriaDir, "imported", $"{inputFileName}.criteria.yaml");
 
-            var existingSource = criteriaIndex.Sources
-                .FirstOrDefault(s => string.Equals(s.File, importedRelFile, StringComparison.OrdinalIgnoreCase));
-
-            if (!dryRun)
+            CriteriaIndex criteriaIndex = new();
+            var mergeResult = await CriteriaStore.WithLockAsync(currentDir, async () =>
             {
-                if (existingSource is not null)
+                var ws = await CriteriaStore.LoadAsync(config, currentDir, ct);
+                if (!dryRun && CriteriaPaths.IsOldLayout(ws.Index))
                 {
-                    existingSource.CriteriaCount = mergeResult.Criteria.Count;
-                    existingSource.ImportedAt = DateTime.UtcNow;
-                    existingSource.SourceType = "import";
-                }
-                else
-                {
-                    criteriaIndex.Sources.Add(new CriteriaSource
+                    var migration = await CriteriaLayoutMigrator.MigrateAsync(ws, dryRun: false, ct);
+                    if (!migration.AlreadyMigrated)
                     {
-                        File = importedRelFile,
-                        SourceDoc = importPath,
-                        SourceType = "import",
-                        CriteriaCount = mergeResult.Criteria.Count,
-                        ImportedAt = DateTime.UtcNow,
-                        Outcome = "extracted"
-                    });
+                        Console.Error.WriteLine($"Migrated criteria storage first: {migration.Moved.Count} file(s) moved, "
+                            + $"{migration.Collisions.Count} collision(s) reported.");
+                        ws = await CriteriaStore.LoadAsync(config, currentDir, ct);
+                    }
                 }
 
-                var indexWriter = new CriteriaIndexWriter();
-                await indexWriter.WriteAsync(criteriaIndexPath, criteriaIndex, ct);
-            }
+                var existingCriteria = await ws.ReadStrictAsync(importedRelFile, ct);
+                var merger = new CriteriaMerger();
+                var merged = replace ? merger.Replace(existingCriteria, imported) : merger.Merge(existingCriteria, imported);
+
+                var assignedIds = merged.Criteria.Select(c => c.Id).Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
+                foreach (var group in merged.Criteria
+                             .Where(c => string.IsNullOrWhiteSpace(c.Id))
+                             .GroupBy(ImportPrefix, StringComparer.Ordinal))
+                {
+                    var unassigned = group.ToList();
+                    var ids = CriteriaIdAllocator.Allocate(ws.Index, group.Key, unassigned.Count, ws.AllIds.Concat(assignedIds));
+                    for (var i = 0; i < unassigned.Count; i++)
+                    {
+                        unassigned[i].Id = ids[i];
+                    }
+
+                    assignedIds.AddRange(ids);
+                }
+
+                if (!dryRun)
+                {
+                    await ws.WriteCriteriaAsync(importedRelFile, merged.Criteria, importPath, null, ct);
+
+                    var existingSource = ws.Index.Sources
+                        .FirstOrDefault(s => string.Equals(s.File, importedRelFile, StringComparison.OrdinalIgnoreCase));
+                    if (existingSource is not null)
+                    {
+                        existingSource.CriteriaCount = merged.Criteria.Count;
+                        existingSource.ImportedAt = DateTime.UtcNow;
+                        existingSource.SourceType = "import";
+                    }
+                    else
+                    {
+                        ws.Index.Sources.Add(new CriteriaSource
+                        {
+                            File = importedRelFile,
+                            SourceDoc = importPath,
+                            SourceType = "import",
+                            CriteriaCount = merged.Criteria.Count,
+                            ImportedAt = DateTime.UtcNow,
+                            Outcome = "extracted"
+                        });
+                    }
+
+                    await ws.SaveIndexAsync(ct);
+                }
+
+                criteriaIndex = ws.Index;
+                return merged;
+            }, ct);
 
             // Build source breakdown
             var sourceBreakdown = imported
@@ -625,6 +539,15 @@ public sealed class AnalyzeHandler
             return ExitCodes.Error;
         }
     }
+
+    /// <summary>
+    /// Spec 079: the ID prefix for an imported criterion without an ID — <c>AC-{SOURCE}</c> (upper-cased, spaces →
+    /// dashes) when it names a source, otherwise <c>AC</c>. Numbers come from the shared high-water marks.
+    /// </summary>
+    private static string ImportPrefix(AcceptanceCriterion criterion) =>
+        string.IsNullOrWhiteSpace(criterion.Source)
+            ? "AC"
+            : $"AC-{criterion.Source.Trim().Replace(' ', '-').ToUpperInvariant()}";
 
     /// <summary>
     /// Lists all acceptance criteria with optional filters and coverage status.
