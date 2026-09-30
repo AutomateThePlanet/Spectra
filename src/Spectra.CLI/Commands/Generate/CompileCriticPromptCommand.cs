@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Text.Json;
+using Spectra.CLI.Criteria;
 using Spectra.CLI.Generation;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
@@ -128,10 +129,16 @@ public sealed class CompileCriticPromptCommand : Command
         string suite, string? testId, string? docsPath, string currentDir, bool json, CancellationToken ct)
     {
         // Spec 080 A5: read command — defaults when there is no config, exit 1 on a malformed or invalid one.
-        var loaded = await ConfigLoader.LoadForReadAsync(currentDir, ConfigSections.Source | ConfigSections.Tests, ct);
+        // Spec 082 A1: the criteria context reads `coverage` too.
+        var loaded = await ConfigLoader.LoadForReadAsync(
+            currentDir, ConfigSections.Source | ConfigSections.Tests | ConfigSections.Coverage, ct);
         if (!loaded.IsSuccess)
         {
-            Console.Error.WriteLine(loaded.Error);
+            // Spec 082 A4: in JSON mode a config failure is the shared failure document with its named code.
+            if (json)
+                CriteriaCommandIO.WriteFailureJson("compile-critic-prompt", loaded.ErrorCode, [loaded.Error!]);
+            else
+                Console.Error.WriteLine(loaded.Error);
             return ExitError;
         }
         var config = loaded.Config!;

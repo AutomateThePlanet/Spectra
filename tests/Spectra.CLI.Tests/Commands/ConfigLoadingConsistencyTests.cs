@@ -115,11 +115,11 @@ public sealed class ConfigLoadingConsistencyTests : IDisposable
         Assert.Equal(0, failure.GetProperty("warnings").GetArrayLength());
     }
 
+    // Spec 082 A4: only the two repair compilers keep a plain line — they have no JSON mode. compile-critic-prompt and
+    // docs changed now report config failures as the shared failure document (see ConfigErrorCodes_JsonMode).
     [Theory]
-    [InlineData("ai compile-critic-prompt --suite s --test TC-1")]
     [InlineData("ai compile-repair-prompt --suite s --test TC-1")]
     [InlineData("ai compile-repair-batch --suite s")]
-    [InlineData("docs changed")]
     public async Task MalformedConfig_JsonMode_OtherReadCommands_ReportThePlainMessage(string command)
     {
         BreakConfig();
@@ -224,19 +224,73 @@ public sealed class ConfigLoadingConsistencyTests : IDisposable
         Assert.Contains(err.Split('\n'), l => l.StartsWith("Warning:", StringComparison.Ordinal) && l.Contains("'tests'"));
     }
 
+    // Spec 082 A1: replaces 081's WriteCommand_MissingTests_Exits1 — `tests` only feeds the referencing-test counts,
+    // so a missing `tests` is a warning for the criteria writes, never a refusal.
     [Theory]
     [InlineData("ai ingest-criteria --doc docs/a.md --from .spectra/criteria.json")]
     [InlineData("docs retire --doc docs/gone.md")]
-    public async Task WriteCommand_MissingTests_Exits1_NamingTheSection_AndWritesNothing(string command)
+    public async Task WriteCommand_MissingTests_Warns_AndSucceeds(string command)
     {
+        if (command.StartsWith("docs retire", StringComparison.Ordinal))
+        {
+            // An indexed document that has since been deleted (seeded with the full config).
+            _ws.WriteDoc("docs/gone.md", "# Gone\n\nGone MUST work.\n");
+            var (seedExit, _, seedErr) = await _ws.IngestAsync("docs/gone.md", new { text = "Gone MUST work", rfc2119 = "MUST" });
+            Assert.True(seedExit == 0, seedErr);
+            File.Delete(_ws.PathOf("docs/gone.md"));
+        }
         WriteConfig(SourceJson, CoverageJson);
-        var before = _ws.Snapshot();
 
         var (exit, output, err) = await RunAsync(command, json: false);
 
+        Assert.True(exit == 0, $"exit {exit}: {err}");
+        var warnings = (output + "\n" + err).Split('\n')
+            .Where(l => l.TrimStart().StartsWith("Warning:", StringComparison.Ordinal) && l.Contains("'tests'"))
+            .ToList();
+        Assert.Single(warnings);
+    }
+
+    public static TheoryData<string, bool> WriteCommandsWithDryRun => new()
+    {
+        { "ai ingest-criteria --doc docs/a.md --from .spectra/criteria.json", false },
+        { "ai ingest-criteria --doc docs/a.md --from .spectra/criteria.json", true },
+        { "docs retire --doc docs/gone.md", false },
+        { "docs retire --doc docs/gone.md", true },
+        { "docs apply-move --from docs/gone.md --to docs/a.md", false },
+        { "docs apply-move --from docs/gone.md --to docs/a.md", true },
+        { "docs migrate-criteria", false },
+        { "docs migrate-criteria", true },
+        { "ai analyze --import-criteria import.yaml", false },
+        { "ai analyze --import-criteria import.yaml", true }
+    };
+
+    [Theory]
+    [MemberData(nameof(WriteCommandsWithDryRun))]
+    public async Task WriteCommand_MissingCoverage_Exits1_AndWritesNothing(string command, bool dryRun)
+    {
+        WriteConfig(SourceJson, TestsJson);
+        var before = _ws.Snapshot();
+
+        var (exit, output, err) = await RunAsync(dryRun ? command + " --dry-run" : command, json: false);
+
         Assert.Equal(1, exit);
-        Assert.Contains("spectra.config.json is invalid: missing 'tests' section", output + err);
+        Assert.Contains("missing 'coverage' section", output + err);
         Assert.Equal(before, _ws.Snapshot());
+    }
+
+    [Theory]
+    [InlineData("ai compile-extraction-prompt --doc docs/a.md")]
+    [InlineData("ai compile-critic-prompt --suite s --test TC-1")]
+    [InlineData("docs changed")]
+    public async Task ReadCommand_MissingCoverage_UsesDefaults_AndWarns(string command)
+    {
+        WriteConfig(SourceJson, TestsJson);
+
+        var (exit, output, err) = await RunAsync(command, json: false);
+
+        Assert.True(exit == 0, $"exit {exit}: {err}");
+        Assert.Contains((output + "\n" + err).Split('\n'),
+            l => l.Contains("Warning:", StringComparison.Ordinal) && l.Contains("'coverage'"));
     }
 
     [Theory]
@@ -264,5 +318,86 @@ public sealed class ConfigLoadingConsistencyTests : IDisposable
         Assert.True(exit == 0, err);
         var warnings = CriteriaTestWorkspace.Json(output).GetProperty("warnings").EnumerateArray().Select(w => w.GetString());
         Assert.Contains(warnings, w => w!.Contains("'source'"));
+    }
+
+    // ---------- Spec 082 A3: null sections behave like missing ones ----------
+
+    [Fact]
+    public async Task NullAi_IsAccepted()
+    {
+        WriteConfig(SourceJson, TestsJson, CoverageJson, "\"ai\": null");
+
+        var (exit, _, err) = await RunAsync("docs changed", json: true);
+
+        Assert.True(exit == 0, err);
+    }
+
+    [Fact]
+    public async Task NullCoverage_RefusesAWrite_NamingTheSection()
+    {
+        WriteConfig(SourceJson, TestsJson, "\"coverage\": null");
+        var before = _ws.Snapshot();
+
+        var (exit, output, err) = await RunAsync("ai ingest-criteria --doc docs/a.md --from .spectra/criteria.json", json: false);
+
+        Assert.Equal(1, exit);
+        Assert.Contains("missing 'coverage' section", output + err);
+        Assert.Equal(before, _ws.Snapshot());
+    }
+
+    [Fact]
+    public async Task NullSource_OnARead_UsesDefaults_AndWarns()
+    {
+        WriteConfig("\"source\": null", TestsJson, CoverageJson);
+
+        var (exit, output, err) = await RunAsync("docs changed", json: true);
+
+        Assert.True(exit == 0, err);
+        var warnings = CriteriaTestWorkspace.Json(output).GetProperty("warnings").EnumerateArray().Select(w => w.GetString());
+        Assert.Contains(warnings, w => w!.Contains("'source'"));
+    }
+
+    // ---------- Spec 082 A4: named config error codes in every JSON failure document ----------
+
+    public static TheoryData<string, string, string, string> ConfigFailures => new()
+    {
+        // command, config state, expected code, stream
+        { "ai ingest-criteria --doc docs/a.md --from .spectra/criteria.json", "none", "CONFIG_MISSING", "stderr" },
+        { "docs retire --doc docs/gone.md", "none", "CONFIG_MISSING", "stderr" },
+        { "docs apply-move --from docs/gone.md --to docs/a.md", "none", "CONFIG_MISSING", "stderr" },
+        { "docs migrate-criteria", "none", "CONFIG_MISSING", "stderr" },
+        { "ai analyze --import-criteria import.yaml", "none", "CONFIG_MISSING", "stdout" },
+        { "ai ingest-criteria --doc docs/a.md --from .spectra/criteria.json", "malformed", "CONFIG_INVALID", "stderr" },
+        { "docs retire --doc docs/gone.md", "malformed", "CONFIG_INVALID", "stderr" },
+        { "docs apply-move --from docs/gone.md --to docs/a.md", "malformed", "CONFIG_INVALID", "stderr" },
+        { "docs migrate-criteria", "malformed", "CONFIG_INVALID", "stderr" },
+        { "ai compile-extraction-prompt --doc docs/a.md", "malformed", "CONFIG_INVALID", "stderr" },
+        { "ai compile-critic-prompt --suite s --test TC-1", "malformed", "CONFIG_INVALID", "stderr" },
+        { "docs changed", "malformed", "CONFIG_INVALID", "stderr" },
+        { "ai analyze --import-criteria import.yaml", "malformed", "CONFIG_INVALID", "stdout" },
+        { "ai ingest-criteria --doc docs/a.md --from .spectra/criteria.json", "nocoverage", "CONFIG_SECTION_MISSING", "stderr" },
+        { "docs retire --doc docs/gone.md", "nocoverage", "CONFIG_SECTION_MISSING", "stderr" },
+        { "docs apply-move --from docs/gone.md --to docs/a.md", "nocoverage", "CONFIG_SECTION_MISSING", "stderr" },
+        { "docs migrate-criteria", "nocoverage", "CONFIG_SECTION_MISSING", "stderr" },
+        { "ai analyze --import-criteria import.yaml", "nocoverage", "CONFIG_SECTION_MISSING", "stdout" }
+    };
+
+    [Theory]
+    [MemberData(nameof(ConfigFailures))]
+    public async Task ConfigErrorCodes_JsonMode(string command, string state, string code, string stream)
+    {
+        switch (state)
+        {
+            case "none": RemoveConfig(); break;
+            case "malformed": BreakConfig(); break;
+            default: WriteConfig(SourceJson, TestsJson); break;
+        }
+
+        var (exit, output, err) = await RunAsync(command, json: true);
+
+        Assert.Equal(1, exit);
+        var failure = CriteriaTestWorkspace.Json(stream == "stdout" ? output : err);
+        Assert.Equal(code, failure.GetProperty("error_code").GetString());
+        Assert.True(failure.TryGetProperty("command", out _));
     }
 }

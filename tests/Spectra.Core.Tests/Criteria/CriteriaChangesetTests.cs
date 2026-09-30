@@ -107,4 +107,16 @@ public class CriteriaChangesetTests
         Assert.Equal("a", change.Old);
         Assert.Equal("a, B", change.New);
     }
+
+    // Spec 082 A2: a change inside a capitalised placeholder is a real change.
+    [Fact]
+    public void PlaceholderChange_IsAModification()
+    {
+        var previous = new[] { C("AC-X-001", "Enter <Summary> and press Save") };
+        var next = new[] { C("AC-X-001", "Enter <Details> and press Save") };
+
+        var modified = Assert.Single(CriteriaChangeset.Build("docs/x.md", previous, next).Modified);
+
+        Assert.Equal("AC-X-001", modified.Id);
+    }
 }

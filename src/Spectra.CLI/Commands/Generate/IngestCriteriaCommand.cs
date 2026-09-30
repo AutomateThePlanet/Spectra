@@ -58,12 +58,15 @@ public sealed class IngestCriteriaCommand : Command
         }
 
         var currentDir = Directory.GetCurrentDirectory();
-        var (config, configError) = await CriteriaCommandIO.LoadConfigAsync(currentDir, ConfigSections.Tests, ct); // reference counts read tests
-        if (config is null)
+        // Spec 082 A1: criteria are written under `coverage` (required); `tests` only feeds the reference counts.
+        var loaded = await CriteriaCommandIO.LoadConfigAsync(currentDir, ConfigSections.Coverage, ConfigSections.Tests, ct);
+        if (!loaded.IsSuccess)
         {
-            CriteriaCommandIO.WriteFailure(json, "ingest-criteria", null, configError!);
+            CriteriaCommandIO.WriteFailure(json, "ingest-criteria", loaded.ErrorCode, loaded.Error!);
             return ExitError;
         }
+        var config = loaded.Config!;
+        var configWarnings = loaded.Warnings;
 
         // Read agent content from file or stdin.
         string content;
@@ -71,7 +74,7 @@ public sealed class IngestCriteriaCommand : Command
         {
             if (!File.Exists(from))
             {
-                CriteriaCommandIO.WriteFailure(json, "ingest-criteria", null, $"Content file not found: {from}");
+                CriteriaCommandIO.WriteFailure(json, "ingest-criteria", null, $"Content file not found: {from}", configWarnings);
                 return ExitError;
             }
             content = await File.ReadAllTextAsync(from, ct);
@@ -108,7 +111,7 @@ public sealed class IngestCriteriaCommand : Command
                     changeset = result.Changeset,
                     duplicate_ids = result.DuplicateIds,
                     migration = result.Migration,
-                    warnings = result.Warnings
+                    warnings = configWarnings.Concat(result.Warnings).ToArray()
                 }));
             }
 
@@ -133,7 +136,7 @@ public sealed class IngestCriteriaCommand : Command
             }
 
             CriteriaChangesetPresenter.WriteDuplicates(human, result.DuplicateIds);
-            foreach (var warning in result.Warnings)
+            foreach (var warning in configWarnings.Concat(result.Warnings))
             {
                 human.WriteLine($"Warning: {warning}");
             }

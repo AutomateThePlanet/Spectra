@@ -65,13 +65,14 @@ public sealed class CompileExtractionPromptCommand : Command
 
         // Spec 080 A5: read command — defaults when there is no config, exit 1 on a malformed or invalid one
         // (never a silent fallback, which emptied existing_criteria and churned IDs).
-        var loaded = await ConfigLoader.LoadForReadAsync(currentDir, ConfigSections.None, ct); // reads only coverage
+        var loaded = await ConfigLoader.LoadForReadAsync(currentDir, ConfigSections.Coverage, ct);
         if (!loaded.IsSuccess)
         {
-            WriteFailure(json, null, loaded.Error!, warnings);
+            WriteFailure(json, loaded.ErrorCode, loaded.Error!, warnings);
             return ExitError;
         }
         var config = loaded.Config!;
+        warnings.AddRange(loaded.Warnings); // Spec 082 A1: e.g. no `coverage` section — default criteria location
 
         var docFullPath = Path.IsPathRooted(doc) ? doc : Path.Combine(currentDir, doc);
         if (!File.Exists(docFullPath))
