@@ -21,13 +21,11 @@ public static class CriteriaCommandIO
     /// Loads <c>spectra.config.json</c> for a criteria write command (Spec 080 A5: through
     /// <see cref="ConfigLoader.LoadForWriteAsync"/> — missing or invalid is an error); never throws.
     /// </summary>
-    /// <param name="reads">Spec 081 C2: the sections the command reads; a missing one is an error, others are ignored.</param>
-    public static async Task<(SpectraConfig? Config, string? Error)> LoadConfigAsync(
-        string repoRoot, ConfigSections reads, CancellationToken ct)
-    {
-        var loaded = await ConfigLoader.LoadForWriteAsync(repoRoot, reads, ct);
-        return (loaded.Config, loaded.Error);
-    }
+    /// <param name="requires">Spec 082 A1: sections the command must have (criteria writes: <c>coverage</c>).</param>
+    /// <param name="reads">Sections it only reads; a missing one gives defaults plus a warning.</param>
+    public static Task<ConfigLoadResult> LoadConfigAsync(
+        string repoRoot, ConfigSections requires, ConfigSections reads, CancellationToken ct) =>
+        ConfigLoader.LoadForWriteAsync(repoRoot, requires, reads, ct);
 
     /// <summary>Failure output: JSON on stderr in JSON mode, a plain message otherwise. Never a human summary.</summary>
     public static void WriteFailure(

@@ -167,4 +167,43 @@ public class TextNormalizerTests
     {
         Assert.Equal(expected, TextNormalizer.Normalize(input));
     }
+
+    // ---------- Spec 082 A2: only HTML-form tags are markup; capitalised placeholders are text ----------
+
+    [Theory]
+    [InlineData("<Source>")]
+    [InlineData("<Summary>")]
+    [InlineData("<Section>")]
+    [InlineData("<Input>")]
+    [InlineData("<Details>")]
+    [InlineData("<Caption>")]
+    [InlineData("<LIMIT>")]
+    [InlineData("<BR>")]
+    public void CapitalisedPlaceholders_AreText(string placeholder)
+    {
+        Assert.Equal($"enter {placeholder.ToLowerInvariant()} now", TextNormalizer.Normalize($"Enter {placeholder} now"));
+    }
+
+    [Fact]
+    public void PlaceholderSwaps_AreChanges()
+    {
+        Assert.NotEqual(TextNormalizer.Normalize("Enter <Summary> and press Save"),
+            TextNormalizer.Normalize("Enter <Details> and press Save"));
+        Assert.NotEqual(TextNormalizer.Normalize("Select <Source> from the list"),
+            TextNormalizer.Normalize("Select <Target> from the list"));
+    }
+
+    [Theory]
+    [InlineData("<details open>x</details>", "x")]
+    [InlineData("x</Summary>", "x")]
+    [InlineData("<Details open>x", "x")]
+    [InlineData("<P>Para</P>", "para")]
+    [InlineData("<Summary>x</Summary>", "x")]
+    [InlineData("<figure><figcaption>c</figcaption></figure>", "c")]
+    [InlineData("<INPUT type=checkbox>x", "x")]
+    [InlineData("<Span class=\"k\">v</Span>", "v")]
+    public void HtmlForm_IsStillMarkup(string input, string expected)
+    {
+        Assert.Equal(expected, TextNormalizer.Normalize(input));
+    }
 }

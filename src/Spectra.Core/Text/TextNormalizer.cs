@@ -59,22 +59,33 @@ public static partial class TextNormalizer
     [GeneratedRegex(@"<!--[\s\S]*?-->", RegexOptions.CultureInvariant)]
     private static partial Regex HtmlCommentRegex();
 
+    // Known HTML elements (lowercase) and the bare boolean attributes a tag may carry (Spec 080 B9, Spec 081 C3).
+    private const string ElementNames =
+        "a|abbr|article|aside|audio|b|bdi|bdo|big|blockquote|br|caption|center|cite|code|col|colgroup|dd|del"
+        + "|details|dfn|div|dl|dt|em|figcaption|figure|font|h[1-6]|hr|i|iframe|img|input|ins|kbd|li|mark|ol|p|picture"
+        + "|pre|q|rp|rt|ruby|s|samp|section|small|source|span|strike|strong|sub|summary|sup|table|tbody|td|tfoot|th"
+        + "|thead|tr|tt|u|ul|var|video|wbr";
+
+    private const string Attribute =
+        @"\s+(?:[A-Za-z_:][-A-Za-z0-9_:.]*\s*=\s*(?:""[^""]*""|'[^']*'|[^\s""'=<>`]+)"
+        + "|(?:allowfullscreen|async|autofocus|autoplay|checked|compact|controls|default|defer|disabled|hidden|ismap"
+        + "|loop|multiple|muted|nohref|noresize|noshade|novalidate|nowrap|open|readonly|required|reversed|selected)"
+        + @"(?=[\s/>]))";
+
     /// <summary>
-    /// An opening, closing or self-closing tag of a known HTML element, with well-formed attributes: valued
-    /// (<c>name="v"</c>, <c>name='v'</c>, <c>name=v</c>) or a bare HTML boolean attribute (<c>nowrap</c>, <c>open</c>,
-    /// <c>disabled</c>, …), in any mix. Anything else in angle brackets is kept as text, so comparisons
-    /// (<c>total&lt;limit and qty&gt;5</c>, <c>a&lt;b and c&gt;d</c>) and placeholder words (<c>&lt;Limit&gt;</c>,
-    /// <c>&lt;data&gt;</c>, <c>&lt;time&gt;</c>, <c>&lt;label&gt;</c>) survive (Spec 080 B9, Spec 081 C3).
+    /// A tag of a known HTML element written in HTML form (Spec 082 A2) — one of:
+    /// (a) a closing tag, any case (<c>&lt;/Summary&gt;</c>);
+    /// (b) a tag with at least one attribute, valued or a bare boolean one, any case (<c>&lt;Details open&gt;</c>);
+    /// (c) a bare tag with an all-lowercase name (<c>&lt;details&gt;</c>, <c>&lt;br/&gt;</c>);
+    /// (d) a bare opening tag, any case, closed later in the text (<c>&lt;P&gt;Para&lt;/P&gt;</c>).
+    /// Anything else in angle brackets is text: comparisons (<c>total&lt;limit and qty&gt;5</c>), placeholders
+    /// (<c>&lt;Summary&gt;</c>, <c>&lt;Source&gt;</c>, <c>&lt;Limit&gt;</c>, <c>&lt;LIMIT&gt;</c>, <c>&lt;BR&gt;</c>).
     /// </summary>
     [GeneratedRegex(
-        @"</?(?:a|abbr|article|aside|audio|b|bdi|bdo|big|blockquote|br|caption|center|cite|code|col|colgroup|dd|del"
-        + @"|details|dfn|div|dl|dt|em|figcaption|figure|font|h[1-6]|hr|i|iframe|img|input|ins|kbd|li|mark|ol|p|picture"
-        + @"|pre|q|rp|rt|ruby|s|samp|section|small|source|span|strike|strong|sub|summary|sup|table|tbody|td|tfoot|th"
-        + @"|thead|tr|tt|u|ul|var|video|wbr)"
-        + @"(?:\s+(?:[A-Za-z_:][-A-Za-z0-9_:.]*\s*=\s*(?:""[^""]*""|'[^']*'|[^\s""'=<>`]+)"
-        + @"|(?:allowfullscreen|async|autofocus|autoplay|checked|compact|controls|default|defer|disabled|hidden|ismap"
-        + @"|loop|multiple|muted|nohref|noresize|noshade|novalidate|nowrap|open|readonly|required|reversed|selected)"
-        + @"(?=[\s/>])))*\s*/?>",
+        "</(?:" + ElementNames + @")\s*>"
+        + "|<(?:" + ElementNames + ")(?:" + Attribute + @")+\s*/?>"
+        + "|<(?-i:" + ElementNames + @")\s*/?>"
+        + "|<(?<n>" + ElementNames + @")\s*>(?=[\s\S]*?</\k<n>\s*>)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex HtmlTagRegex();
 

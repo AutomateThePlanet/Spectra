@@ -466,4 +466,17 @@ public class SkillsManifestTests : IDisposable
         Assert.Contains("errors[0]", section);
         Assert.DoesNotContain("`message`", section);
     }
+
+    // Spec 082 A4: config problems are named, never inferred from a null error code.
+    [Fact]
+    public void CriteriaSkill_NamesConfigErrorCodes()
+    {
+        var content = SkillContent.All["spectra-criteria"];
+
+        Assert.Contains("CONFIG_MISSING", content);
+        Assert.Contains("CONFIG_INVALID", content);
+        Assert.Contains("CONFIG_SECTION_MISSING", content);
+        Assert.DoesNotContain("`null` for a config", content);
+        Assert.DoesNotContain("with `error_code` `null`", content);
+    }
 }

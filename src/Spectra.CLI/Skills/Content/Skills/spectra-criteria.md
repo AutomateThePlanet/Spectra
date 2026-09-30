@@ -60,7 +60,7 @@ spectra docs apply-move --from {from} --to {path} --output-format json
 - Exit 4 → show `errors[0]` to the user and continue.
 - Exit 1 → an error; nothing was written. On `LOCK_TIMEOUT` (another SPECTRA command is writing criteria),
   retry the same command once. Otherwise — or if the retry also fails — report the `error_code`
-  (`CRITERIA_FILE_UNREADABLE`, `CRITERIA_FILE_COLLISION`, `INVALID_DOC_PATH`; `null` for a config problem) with
+  (`CRITERIA_FILE_UNREADABLE`, `CRITERIA_FILE_COLLISION`, `INVALID_DOC_PATH`; `CONFIG_MISSING` / `CONFIG_INVALID` / `CONFIG_SECTION_MISSING` for a config problem — fix `spectra.config.json` first) with
   `errors[0]` to the user, stop for that document, and continue with the rest.
 
 **1b. Deleted documents** (`status: deleted`). Never retire anything on your own. For each, preview:
@@ -76,8 +76,8 @@ spectra docs retire --doc {path} --output-format json
 Otherwise leave it; it stays reported as `deleted` and nothing is removed.
 - Exit 1 from either retire call → an error; nothing was written. On `LOCK_TIMEOUT` (another SPECTRA command
   is writing criteria), retry the same command once. Otherwise — or if the retry also fails — report the
-  `error_code` (`CRITERIA_FILE_UNREADABLE`, `CRITERIA_FILE_COLLISION`, `INVALID_DOC_PATH`; `null` for a config
-  problem) with `errors[0]` to the user, stop for that document, and continue with the rest.
+  `error_code` (`CRITERIA_FILE_UNREADABLE`, `CRITERIA_FILE_COLLISION`, `INVALID_DOC_PATH`; `CONFIG_MISSING` / `CONFIG_INVALID` / `CONFIG_SECTION_MISSING` for
+  a config problem — fix `spectra.config.json` first) with `errors[0]` to the user, stop for that document, and continue with the rest.
 
 The Step 2 work-list is the `new` and `changed` entries only.
 
@@ -103,7 +103,8 @@ spectra ai compile-extraction-prompt --doc {path} --component {component} --outp
 - Exit 0 with `{ "short_circuit": true, "outcome": "Extracted", "criteria": [] }` → the document is
   empty; nothing to extract. Skip it (no model turn, no ingest needed).
 - Exit 4 (refused, `error_code` `MISSING_INPUT`) → show `errors[0]` and skip that doc.
-- Exit 1 (`DOCUMENT_NOT_FOUND`, `DOCUMENT_UNREADABLE`, or a config error with `error_code` `null`) → report the
+- Exit 1 (`DOCUMENT_NOT_FOUND`, `DOCUMENT_UNREADABLE`, or a config problem: `CONFIG_MISSING` / `CONFIG_INVALID` /
+  `CONFIG_SECTION_MISSING`) → report the
   `error_code` and `errors[0]` to the user and skip that doc.
 
 **2b. Extract IN-SESSION**: Read the compiled prompt — it already contains the full document text; do not
@@ -126,7 +127,7 @@ spectra ai ingest-criteria --doc {path} --component {component} --from .spectra/
   re-ingest — same 2-attempt bound.
 - Exit 1 → an error; nothing was persisted. On `LOCK_TIMEOUT` (another SPECTRA command is writing criteria),
   retry the same command once. Otherwise — or if the retry also fails — report the `error_code`
-  (`CRITERIA_FILE_UNREADABLE`, `CRITERIA_FILE_COLLISION`, `INVALID_DOC_PATH`; `null` for a config problem) with
+  (`CRITERIA_FILE_UNREADABLE`, `CRITERIA_FILE_COLLISION`, `INVALID_DOC_PATH`; `CONFIG_MISSING` / `CONFIG_INVALID` / `CONFIG_SECTION_MISSING` for a config problem — fix `spectra.config.json` first) with
   `errors[0]` to the user, record that document as failed, stop for that document, and continue with the rest.
   Do not regenerate the JSON — the response was not the problem.
 

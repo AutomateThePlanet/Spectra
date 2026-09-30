@@ -25,6 +25,18 @@ public sealed class ConfigLoader
     /// <summary>Spec 080 A5: prefix of the one message every command gives for a malformed or invalid config.</summary>
     public const string InvalidConfigPrefix = "spectra.config.json is invalid: ";
 
+    /// <summary>Spec 082 A4: no <c>spectra.config.json</c> where one is required.</summary>
+    public const string ErrorConfigMissing = "CONFIG_MISSING";
+
+    /// <summary>Spec 082 A4: not valid JSON, not an object, unreadable, or fails validation.</summary>
+    public const string ErrorConfigInvalid = "CONFIG_INVALID";
+
+    /// <summary>Spec 082 A4: a section the command requires is missing or <c>null</c>.</summary>
+    public const string ErrorConfigSectionMissing = "CONFIG_SECTION_MISSING";
+
+    private static ConfigLoadResult Fail(string errorCode, string message) =>
+        new(null, message) { ErrorCode = errorCode };
+
     /// <summary>
     /// Spec 080 A5 / 081 C2 entry point for read-only commands. A missing config gives
     /// <see cref="SpectraConfig.Default"/>. A missing section the command <paramref name="reads"/> gives that
@@ -33,34 +45,40 @@ public sealed class ConfigLoader
     /// </summary>
     public static Task<ConfigLoadResult> LoadForReadAsync(
         string repoRoot, ConfigSections reads = ConfigSections.None, CancellationToken ct = default) =>
-        LoadEntryAsync(repoRoot, reads, forWrite: false, ct);
+        LoadEntryAsync(repoRoot, ConfigSections.None, reads, forWrite: false, ct);
 
     /// <summary>
-    /// Spec 080 A5 / 081 C2 entry point for commands that write. A missing config is an error
-    /// (<see cref="MissingConfigMessage"/>), and so is a missing section the command <paramref name="reads"/>
-    /// (<c>missing '&lt;section&gt;' section</c>) or a malformed or invalid config. Sections it doesn't read are never
-    /// required.
+    /// Spec 080 A5 / 081 C2 / 082 A1 entry point for commands that write. A missing config is an error
+    /// (<see cref="MissingConfigMessage"/>), and so is a missing section the command <paramref name="requires"/>
+    /// (<c>missing '&lt;section&gt;' section</c> — for the criteria writes that is <c>coverage</c>, where they write)
+    /// or a malformed or invalid config. A missing section it only <paramref name="reads"/> gives defaults plus a
+    /// warning; sections it doesn't declare are never required.
     /// </summary>
     public static Task<ConfigLoadResult> LoadForWriteAsync(
-        string repoRoot, ConfigSections reads = ConfigSections.None, CancellationToken ct = default) =>
-        LoadEntryAsync(repoRoot, reads, forWrite: true, ct);
+        string repoRoot, ConfigSections requires = ConfigSections.None, ConfigSections reads = ConfigSections.None,
+        CancellationToken ct = default) =>
+        LoadEntryAsync(repoRoot, requires, reads, forWrite: true, ct);
 
-    /// <summary>Top-level sections the typed model requires, with the flag a command uses to declare it reads them.</summary>
-    private static readonly (string Name, ConfigSections Flag)[] RequiredSections =
+    /// <summary>
+    /// Top-level sections the loader checks, with the flag a command uses to declare it reads (or requires) them. A
+    /// missing one is filled with an empty object so its built-in defaults apply.
+    /// </summary>
+    private static readonly (string Name, ConfigSections Flag)[] CheckedSections =
     [
         ("source", ConfigSections.Source),
         ("tests", ConfigSections.Tests),
+        ("coverage", ConfigSections.Coverage),
         ("ai", ConfigSections.None) // no in-scope command reads `ai`; it is never required
     ];
 
     private static async Task<ConfigLoadResult> LoadEntryAsync(
-        string repoRoot, ConfigSections reads, bool forWrite, CancellationToken ct)
+        string repoRoot, ConfigSections requires, ConfigSections reads, bool forWrite, CancellationToken ct)
     {
         var path = Path.Combine(repoRoot, ConfigFileName);
         if (!File.Exists(path))
         {
             return forWrite
-                ? new ConfigLoadResult(null, MissingConfigMessage)
+                ? Fail(ErrorConfigMissing, MissingConfigMessage)
                 : new ConfigLoadResult(SpectraConfig.Default, null);
         }
 
@@ -71,7 +89,7 @@ public sealed class ConfigLoader
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return new ConfigLoadResult(null, InvalidConfigPrefix + $"Error reading configuration file: {ex.Message}");
+            return Fail(ErrorConfigInvalid, InvalidConfigPrefix + $"Error reading configuration file: {ex.Message}");
         }
 
         // Spec 081 C2: find which required sections are absent (keys match case-insensitively, as the deserializer
@@ -86,40 +104,54 @@ public sealed class ConfigLoader
             });
             if (node is not JsonObject obj)
             {
-                return new ConfigLoadResult(null, InvalidConfigPrefix + "the configuration must be a JSON object");
+                return Fail(ErrorConfigInvalid, InvalidConfigPrefix + "the configuration must be a JSON object");
             }
             root = obj;
         }
         catch (JsonException ex)
         {
-            return new ConfigLoadResult(null, InvalidConfigPrefix + $"Invalid JSON syntax: {ex.Message}");
+            return Fail(ErrorConfigInvalid, InvalidConfigPrefix + $"Invalid JSON syntax: {ex.Message}");
         }
 
+        // Spec 082 A3: a section written as `null` is a missing section. Every key matching it case-insensitively is
+        // considered; a present, non-null one wins, otherwise the null ones are dropped and an empty object added.
         var missing = new List<(string Name, ConfigSections Flag)>();
-        foreach (var section in RequiredSections)
+        foreach (var section in CheckedSections)
         {
-            if (!root.Any(kv => string.Equals(kv.Key, section.Name, StringComparison.OrdinalIgnoreCase)))
+            var matches = root
+                .Where(kv => string.Equals(kv.Key, section.Name, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (matches.Any(kv => kv.Value is not null))
             {
-                root[section.Name] = new JsonObject();
-                missing.Add(section);
+                continue;
             }
+
+            foreach (var match in matches)
+            {
+                root.Remove(match.Key);
+            }
+            root[section.Name] = new JsonObject();
+            missing.Add(section);
         }
 
         var result = new ConfigLoader().Load(root.ToJsonString(), path);
         if (!result.IsSuccess)
         {
-            return new ConfigLoadResult(null, InvalidConfigPrefix + result.Errors[0].Message);
+            return Fail(ErrorConfigInvalid, InvalidConfigPrefix + result.Errors[0].Message);
         }
 
-        var needed = missing.Where(m => m.Flag != ConfigSections.None && reads.HasFlag(m.Flag)).ToList();
-        if (needed.Count > 0 && forWrite)
+        // Spec 082 A1: a missing section the command requires refuses a write; one it only reads gives defaults plus
+        // a warning; one it doesn't declare is filled silently.
+        var declared = missing.Where(m => m.Flag != ConfigSections.None).ToList();
+        if (forWrite && declared.FirstOrDefault(m => requires.HasFlag(m.Flag)) is { Name: not null } required)
         {
-            return new ConfigLoadResult(null, InvalidConfigPrefix + $"missing '{needed[0].Name}' section");
+            return Fail(ErrorConfigSectionMissing, InvalidConfigPrefix + $"missing '{required.Name}' section");
         }
 
         return new ConfigLoadResult(result.Value, null)
         {
-            Warnings = needed
+            Warnings = declared
+                .Where(m => reads.HasFlag(m.Flag) && !requires.HasFlag(m.Flag))
                 .Select(m => $"spectra.config.json has no '{m.Name}' section; using the built-in defaults.")
                 .ToList()
         };
@@ -318,19 +350,28 @@ public sealed record ConfigLoadResult(SpectraConfig? Config, string? Error)
 {
     public bool IsSuccess => Error is null;
 
-    /// <summary>Spec 081 C2: read commands only — sections the command reads that were missing (defaults used).</summary>
+    /// <summary>Spec 081 C2: sections the command reads that were missing (defaults used).</summary>
     public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    /// <summary>
+    /// Spec 082 A4: <see cref="ConfigLoader.ErrorConfigMissing"/>, <see cref="ConfigLoader.ErrorConfigInvalid"/> or
+    /// <see cref="ConfigLoader.ErrorConfigSectionMissing"/> when <see cref="Error"/> is set; otherwise null.
+    /// </summary>
+    public string? ErrorCode { get; init; }
 }
 
 /// <summary>
-/// Spec 081 C2: the top-level config sections a command reads. A missing section a command reads gives defaults plus a
-/// warning (read commands) or an error (write commands); sections it doesn't read are never required. <c>coverage</c>
-/// is always optional and <c>ai</c> is read by no in-scope command, so neither has a flag.
+/// Spec 081 C2 / 082 A1: the top-level config sections a command declares. A missing section a command requires
+/// refuses a write; one it only reads gives defaults plus a warning; undeclared sections are never required. <c>ai</c>
+/// is read by no in-scope command, so it has no flag.
 /// </summary>
 [Flags]
 public enum ConfigSections
 {
     None = 0,
     Source = 1,
-    Tests = 2
+    Tests = 2,
+
+    /// <summary>Spec 082 A1: where criteria are written (<c>criteria_dir</c>, <c>criteria_file</c>).</summary>
+    Coverage = 4
 }

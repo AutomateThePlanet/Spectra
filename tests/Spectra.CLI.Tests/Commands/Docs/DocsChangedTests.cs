@@ -21,7 +21,7 @@ public sealed class DocsChangedTests : IDisposable
         Directory.CreateDirectory(Path.Combine(_dir, "docs"));
         Directory.CreateDirectory(Path.Combine(_dir, "docs", "criteria"));
         File.WriteAllText(Path.Combine(_dir, "spectra.config.json"),
-            """{ "source": { "mode": "local", "local_dir": "docs/" }, "tests": { "dir": "test-cases/" }, "ai": { "providers": [] } }""");
+            """{ "source": { "mode": "local", "local_dir": "docs/" }, "tests": { "dir": "test-cases/" }, "coverage": {}, "ai": { "providers": [] } }""");
     }
 
     public void Dispose()

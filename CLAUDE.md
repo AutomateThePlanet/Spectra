@@ -147,6 +147,15 @@ system-under-test is unrelated to SPECTRA's removed execution adapter.
 - File-based (Markdown/YAML/JSON in `test-cases/`, `docs/_index/`, `docs/criteria/`, `_index.json`, `_manifest.yaml`, `_checksums.json`, `_criteria_index.yaml`) (045-doc-index-restructure)
 
 ## Recent Changes
+- **082-review-fixes-081 (v2.6.0, unreleased)**: Review fixes for 081; no features; each item has a test that fails on `7df3fef`.
+  - **A1:** `ConfigSections.Coverage`, and `ConfigLoader.LoadForWriteAsync(repoRoot, requires, reads, ct)`. A missing section in `requires` → `CONFIG_SECTION_MISSING`; one only in `reads` → defaults + warning.
+    - Criteria writes (ingest, retire, apply-move, migrate, `--import-criteria`) require `Coverage`. Ingest and retire read `Tests`, and only warn when it is missing.
+    - Read declarations: compile-extraction `Coverage`; critic `Source|Tests|Coverage`; repair and repair-batch `Source|Tests`; `docs changed` `Source|Coverage`.
+    - `CriteriaCommandIO.LoadConfigAsync` returns `ConfigLoadResult`.
+  - **A2:** the `TextNormalizer` tag regex is four alternatives over the unchanged element and boolean-attribute lists: closing tag; tag with attributes; bare lowercase tag; bare tag closed later (`<P>Para</P>`). Capitalised or all-caps bare placeholders (`<Summary>`, `<Source>`, `<LIMIT>`, `<BR>`) are text.
+  - **A3:** the pre-scan treats a `null` section like a missing one (the non-null key wins among case-insensitive matches).
+  - **A4:** `ConfigLoadResult.ErrorCode`, with `ConfigLoader.ErrorConfigMissing/Invalid/SectionMissing`, flows into every failure writer. `ErrorResult.error_code` is new. `compile-critic-prompt` and `docs changed` emit `WriteFailureJson` on config failures in JSON mode. The `spectra-criteria` skill names the codes.
+  - Core 812 / CLI 1568 (1 pre-existing unrelated failure: ProfileFormatLoaderTests) / Execution 228 / Integration 8.
 - **081-review-fixes-080 (v2.6.0, unreleased)**: Part C review fixes for 080; no features; each item has a test that fails on `1c8d8de`.
   - **C1:** `CriteriaProvenance.OwnedBy(criteria, doc, repoRoot)` and the new `SameDocument(a, b, repoRoot)` compare `CriteriaPaths.NormalizeSourceDoc` forms. They are used for ownership (ingest, apply-move, retire, compile, `LeaveSharedFileAsync`) and for index lookup (`CriteriaWorkspace.FindDocumentSource`, compile, `DocsChangedHandler`). An absolute in-repo `source_doc` matches; out-of-repo or empty belongs to no document.
   - **C2:** `ConfigLoader.LoadForReadAsync/LoadForWriteAsync(repoRoot, ConfigSections reads, ct)`, with `[Flags] ConfigSections { None, Source, Tests }`.

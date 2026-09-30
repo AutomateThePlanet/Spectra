@@ -45,10 +45,14 @@ public sealed class DocsChangedHandler
         // Spec 080 A5: a read command — built-in defaults when there is no config; exit 1 on a malformed or
         // invalid one (never a silent fallback).
         var loaded = await Spectra.Core.Config.ConfigLoader.LoadForReadAsync(
-            currentDir, Spectra.Core.Config.ConfigSections.Source, ct);
+            currentDir, Spectra.Core.Config.ConfigSections.Source | Spectra.Core.Config.ConfigSections.Coverage, ct);
         if (!loaded.IsSuccess)
         {
-            Console.Error.WriteLine(loaded.Error);
+            // Spec 082 A4: in JSON mode a config failure is the shared failure document with its named code.
+            if (_outputFormat == OutputFormat.Json)
+                CriteriaCommandIO.WriteFailureJson("docs-changed", loaded.ErrorCode, [loaded.Error!]);
+            else
+                Console.Error.WriteLine(loaded.Error);
             return ExitCodes.Error;
         }
         var config = loaded.Config!;

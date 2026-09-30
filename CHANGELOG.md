@@ -125,6 +125,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A test file's keep-chomped block value (`|+`, `>+`) lost its trailing blank lines when the key after it was removed
   on rewrite. Those lines now stay with the value.
 
+### Changed (review fixes, Spec 082)
+
+- **Criteria writes require `coverage`, not `tests`.** `ingest-criteria`, `docs retire`, `docs apply-move`,
+  `docs migrate-criteria` and `ai analyze --import-criteria` exit 1 with
+  `spectra.config.json is invalid: missing 'coverage' section` when `coverage` (where criteria are written) is
+  missing, also under `--dry-run`, and write nothing. A missing `tests` section, which only feeds the
+  referencing-test counts, is now a warning for `ingest-criteria` and `docs retire`, not an error.
+  `compile-extraction-prompt`, `compile-critic-prompt` and `docs changed` warn and use the default criteria location
+  when `coverage` is missing.
+- **A section set to `null` is treated as missing.** Before, it failed validation in every command, and
+  `"coverage": null` crashed.
+- **Named config error codes.** In JSON mode, config failures carry `error_code` `CONFIG_MISSING`, `CONFIG_INVALID`
+  or `CONFIG_SECTION_MISSING` instead of `null`. `ai analyze --import-criteria`'s `ErrorResult` gains `error_code`.
+  `compile-critic-prompt` and `docs changed` now report a config failure in JSON mode as the shared failure
+  document, where before it was a plain text line. Human-mode wording is unchanged. The `spectra-criteria` skill names
+  the codes.
+
+### Fixed (review fixes, Spec 082)
+
+- Capitalised placeholders that share a name with an HTML element (`<Source>`, `<Summary>`, `<Section>`, `<Input>`,
+  `<Details>`, `<Caption>`) were stripped as markup, so a change inside one went unnoticed. A tag now counts as markup
+  only in HTML form: lowercase, closing, with attributes, or opened and later closed (`<P>Para</P>`).
+
 ### Notes
 
 - **One-time `source_section` churn.** Because `source_section` is now read, the first re-extraction after

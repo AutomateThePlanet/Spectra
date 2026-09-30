@@ -31,12 +31,14 @@ public sealed class DocsMigrateCriteriaCommand : Command
     private static async Task<int> RunAsync(bool dryRun, bool json, CancellationToken ct)
     {
         var root = Directory.GetCurrentDirectory();
-        var (config, error) = await CriteriaCommandIO.LoadConfigAsync(root, ConfigSections.None, ct);
-        if (config is null)
+        // Spec 082 A1: criteria are written under `coverage`, so it is required.
+        var loaded = await CriteriaCommandIO.LoadConfigAsync(root, ConfigSections.Coverage, ConfigSections.None, ct);
+        if (!loaded.IsSuccess)
         {
-            CriteriaCommandIO.WriteFailure(json, "docs-migrate-criteria", null, error!);
+            CriteriaCommandIO.WriteFailure(json, "docs-migrate-criteria", loaded.ErrorCode, loaded.Error!);
             return ExitCodes.Error;
         }
+        var config = loaded.Config!;
 
         MigrationReport report;
         try

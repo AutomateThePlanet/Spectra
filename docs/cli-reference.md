@@ -38,20 +38,36 @@ The criteria commands and the critic/repair prompt compilers load `spectra.confi
 
 | Situation | Read commands¹ | Write commands² |
 |---|---|---|
-| `spectra.config.json` missing | Run with the built-in defaults | Exit 1: `No spectra.config.json found. Run 'spectra init' first.` |
-| A section the command doesn't read is missing (e.g. `ai`, which none of them reads) | Accepted | Accepted |
-| A section the command reads is missing | That section's defaults + `Warning: spectra.config.json has no '<section>' section; using the built-in defaults.` | Exit 1: `spectra.config.json is invalid: missing '<section>' section` |
-| Malformed JSON, or a value of the wrong type | Exit 1: `spectra.config.json is invalid: …` | Exit 1: same message |
+| `spectra.config.json` missing | Run with the built-in defaults | Exit 1: `No spectra.config.json found. Run 'spectra init' first.` (`CONFIG_MISSING`) |
+| A section the command doesn't declare is missing or `null` (e.g. `ai`, which none of them reads) | Accepted | Accepted |
+| A section the command reads is missing or `null` | That section's defaults + `Warning: spectra.config.json has no '<section>' section; using the built-in defaults.` | Same (defaults + warning) |
+| A section the command requires is missing or `null` | — | Exit 1: `spectra.config.json is invalid: missing '<section>' section` (`CONFIG_SECTION_MISSING`), nothing written, also under `--dry-run` |
+| Malformed JSON, a top level that is not an object, or a value of the wrong type | Exit 1: `spectra.config.json is invalid: …` (`CONFIG_INVALID`) | Exit 1: same |
 
 ¹ `ai compile-extraction-prompt`, `ai compile-critic-prompt`, `ai compile-repair-prompt`, `ai compile-repair-batch`,
 `docs changed`. ² `ai ingest-criteria`, `docs retire`, `docs apply-move`, `docs migrate-criteria`,
 `ai analyze --import-criteria`.
 
-Sections each command reads: the critic and repair compilers read `source` and `tests`; `docs changed` reads
-`source`; `ingest-criteria` and `docs retire` read `tests` (for the reference counts); the others read neither.
-`coverage` is always optional. No command continues on defaults after failing to parse a config. In JSON mode the criteria write commands put
-the message in their failure JSON on stderr, `--import-criteria` in its `ErrorResult` on stdout,
-`compile-extraction-prompt` in its failure JSON on stderr; the other read commands print it as a stderr line.
+Sections each command declares:
+
+| Command | Requires | Reads |
+|---|---|---|
+| `ingest-criteria`, `docs retire` | `coverage` | `tests` (referencing-test counts) |
+| `docs apply-move`, `docs migrate-criteria`, `--import-criteria` | `coverage` | — |
+| `compile-extraction-prompt` | — | `coverage` |
+| `compile-critic-prompt` | — | `source`, `tests`, `coverage` |
+| `compile-repair-prompt`, `compile-repair-batch` | — | `source`, `tests` |
+| `docs changed` | — | `source`, `coverage` |
+
+An empty object (`"coverage": {}`) counts as present, with its built-in defaults and no warning. No command continues
+on defaults after failing to parse a config.
+
+In JSON mode the named code (`CONFIG_MISSING`, `CONFIG_INVALID`, `CONFIG_SECTION_MISSING`) is in the failure JSON:
+- on stderr for the criteria write commands, `compile-extraction-prompt`, `compile-critic-prompt` and `docs changed`,
+  in the shared shape `{ command, success, error_code, errors, warnings }`;
+- on stdout for `--import-criteria`, as `ErrorResult.error_code`.
+
+`compile-repair-prompt` and `compile-repair-batch` have no JSON mode, so they print the message as a stderr line.
 
 ---
 
@@ -381,8 +397,10 @@ cat ./criteria.json | spectra ai ingest-criteria --doc docs/payment.md
   that is refused, or fails to parse, adds `outcome` (`Rejected`, `EmptyResponse`, `ParseFailure`). Errors before
   any response is classified (config, `--from` file not found) carry no `outcome`.
 - Comparing criterion text ignores markup: Markdown emphasis, links and code, HTML comments, and tags of known HTML
-  elements (with valued or bare boolean attributes such as `<td nowrap>`). Angle brackets used as comparisons
-  (`a<b and c>d`) or placeholders (`<Limit>`, `<data>`) are text.
+  elements written in HTML form — lowercase (`<details>`), closing (`</Summary>`), with attributes (`<td nowrap>`,
+  `<Details open>`), or opened and later closed (`<P>Para</P>`). Angle brackets used as comparisons (`a<b and c>d`)
+  or placeholders (`<Limit>`, `<data>`, `<Summary>`, `<Source>`, `<LIMIT>`) are text, so a change inside them is a
+  change.
 - Exit code is `0` when extracted/persisted (or unchanged), `5` for `EmptyResponse`, `6` for `ParseFailure`,
   `7` for `INVALID_CRITERION_ID`, and `1` for other errors (`CRITERIA_FILE_UNREADABLE`,
   `CRITERIA_FILE_COLLISION`, `INVALID_DOC_PATH`, `LOCK_TIMEOUT`, config errors).

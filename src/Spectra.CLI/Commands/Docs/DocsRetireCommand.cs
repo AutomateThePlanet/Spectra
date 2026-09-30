@@ -39,17 +39,20 @@ public sealed class DocsRetireCommand : Command
     private static async Task<int> RunAsync(string? docArg, bool dryRun, bool json, CancellationToken ct)
     {
         var root = Directory.GetCurrentDirectory();
-        var (config, error) = await CriteriaCommandIO.LoadConfigAsync(root, ConfigSections.Tests, ct); // reference counts read tests
-        if (config is null)
+        // Spec 082 A1: criteria are written under `coverage` (required); `tests` only feeds the reference counts.
+        var loaded = await CriteriaCommandIO.LoadConfigAsync(root, ConfigSections.Coverage, ConfigSections.Tests, ct);
+        if (!loaded.IsSuccess)
         {
-            CriteriaCommandIO.WriteFailure(json, Name, null, error!);
+            CriteriaCommandIO.WriteFailure(json, Name, loaded.ErrorCode, loaded.Error!);
             return ExitCodes.Error;
         }
+        var config = loaded.Config!;
+        var configWarnings = loaded.Warnings;
 
         var normalized = CriteriaPaths.NormalizeSourceDoc(docArg, root);
         if (!normalized.IsSuccess)
         {
-            CriteriaCommandIO.WriteFailure(json, Name, normalized.ErrorCode, $"The document path must be inside the repository: {docArg}");
+            CriteriaCommandIO.WriteFailure(json, Name, normalized.ErrorCode, $"The document path must be inside the repository: {docArg}", configWarnings);
             return ExitCodes.Error;
         }
 
@@ -105,7 +108,7 @@ public sealed class DocsRetireCommand : Command
 
             if (outcome.ErrorCode is not null)
             {
-                CriteriaCommandIO.WriteFailure(json, Name, outcome.ErrorCode, outcome.Message!);
+                CriteriaCommandIO.WriteFailure(json, Name, outcome.ErrorCode, outcome.Message!, configWarnings);
                 return ExitCodes.NotFound; // 4: refused
             }
 
@@ -123,13 +126,18 @@ public sealed class DocsRetireCommand : Command
                 }, CriteriaCommandIO.Json));
             }
 
+            foreach (var warning in configWarnings)
+            {
+                (json ? Console.Error : Console.Out).WriteLine($"Warning: {warning}");
+            }
+
             CriteriaChangesetPresenter.Write(json ? Console.Error : Console.Out, outcome.Changeset!,
                 dryRun ? $"Retiring {doc} would remove (dry run — nothing written):" : $"Retired {doc}; removed:");
             return ExitCodes.Success;
         }
         catch (CriteriaStoreException ex)
         {
-            CriteriaCommandIO.WriteFailure(json, Name, ex.ErrorCode, ex.Message);
+            CriteriaCommandIO.WriteFailure(json, Name, ex.ErrorCode, ex.Message, configWarnings);
             return ExitCodes.Error;
         }
     }
