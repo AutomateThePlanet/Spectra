@@ -32,6 +32,23 @@ Related: [Getting Started](getting-started.md) | [Configuration](configuration.m
 | 3 | Missing required arguments in non-interactive mode |
 | 130 | Cancelled by user |
 
+### Configuration
+
+The criteria commands and the critic/repair prompt compilers load `spectra.config.json` the same way:
+
+| Situation | Read commands¹ | Write commands² |
+|---|---|---|
+| `spectra.config.json` missing | Run with the built-in defaults | Exit 1: `No spectra.config.json found. Run 'spectra init' first.` |
+| Malformed JSON, or a missing `source` / `tests` / `ai` section | Exit 1: `spectra.config.json is invalid: …` | Exit 1: same message |
+
+¹ `ai compile-extraction-prompt`, `ai compile-critic-prompt`, `ai compile-repair-prompt`, `ai compile-repair-batch`,
+`docs changed`. ² `ai ingest-criteria`, `docs retire`, `docs apply-move`, `docs migrate-criteria`,
+`ai analyze --import-criteria`.
+
+No command continues on defaults after failing to parse a config. In JSON mode the criteria write commands put
+the message in their failure JSON on stderr, `--import-criteria` in its `ErrorResult` on stdout,
+`compile-extraction-prompt` in its failure JSON on stderr; the other read commands print it as a stderr line.
+
 ---
 
 ## Core Commands
@@ -184,7 +201,8 @@ compared normalised (repository-relative, `/`), so an index entry written as `do
 
 The result also carries `duplicate_ids` (criterion IDs defined more than once, with their files; reported,
 never renumbered), `migration_needed` (the criteria files still use the pre-2.6 layout) and `warnings`. The
-exit code is always 0.
+exit code is 0. With no `spectra.config.json` it runs on the built-in defaults; a malformed or invalid config
+exits 1 (see [Configuration](#configuration)).
 
 ---
 
@@ -200,6 +218,9 @@ spectra docs apply-move --from docs/refunds.md --to docs/billing/refunds.md [--d
 Refuses (exit 4) unless `--from` is an indexed document that no longer exists (`NOT_INDEXED`,
 `DOC_STILL_EXISTS`), `--to` exists (`TARGET_MISSING`) and has no criteria yet (`TARGET_INDEXED`), and its
 content equals what was recorded for `--from` (`CONTENT_CHANGED`: extract it instead). Exit 1 on other errors.
+
+If `--from` shares its criteria file with another document (a pre-2.6 collision), only the criteria whose
+`source_doc` is `--from` move; they are taken out of the shared file, and the other document's criteria stay.
 
 ---
 
@@ -217,6 +238,9 @@ The result's `changeset` lists every criterion as removed, each with `referencin
 tests whose `criteria:` still name it), so you can see which links break. In JSON mode the human summary goes to
 stderr. Refuses (exit 4) a document that still exists (`DOC_STILL_EXISTS`) or is not indexed (`NOT_INDEXED`).
 Criterion ID numbers are never freed for reuse.
+
+If the document shares its criteria file with another document (a pre-2.6 collision), only the criteria whose
+`source_doc` is that document are removed from the file; the file stays for the other document.
 
 ---
 
@@ -297,8 +321,13 @@ spectra ai compile-extraction-prompt --doc docs/payment.md --component payment
 ```
 
 - It is deterministic, so identical inputs produce byte-identical output.
-- It refuses to emit when `--doc` is missing (or its content unreadable), writing nothing to
-  stdout and reporting the missing input (`missing_input` JSON field) while exiting **4**.
+- It refuses to emit when `--doc` is missing, writing nothing to stdout and reporting the missing input
+  (`missing_input` JSON field) while exiting **4**. A document that does not exist or cannot be read exits
+  **1** (`DOCUMENT_NOT_FOUND` / `DOCUMENT_UNREADABLE`).
+- In JSON mode every failure is exactly one JSON document on stderr, always with a `warnings` array:
+  `{ "refused": true, "missing_input", "message", "warnings" }` for a refusal, and
+  `{ "error_code", "message", "warnings" }` for an error (`error_code` is `null` for a config error). On success,
+  warnings are printed to stderr as text and the prompt is on stdout.
 - An empty or whitespace document short-circuits as a genuine
   "nothing to extract" (`Extracted, []`): it emits **no** prompt, performs no
   model turn, and exits **0**.
@@ -308,6 +337,8 @@ spectra ai compile-extraction-prompt --doc docs/payment.md --component payment
   stable across rewordings. They are found through the document's `_criteria_index.yaml` entry, in either
   storage layout. A customised `.spectra/prompts/criteria-extraction.md` without `{{existing_criteria}}` still
   compiles, with a warning to run `spectra prompts reset criteria-extraction`.
+- When the document shares its criteria file with another document (a pre-2.6 collision), only the criteria whose
+  `source_doc` is this document are offered, which are the only IDs `ingest-criteria` accepts for it.
 
 ### `spectra ai ingest-criteria` (fail-loud boundary)
 
@@ -339,9 +370,14 @@ cat ./criteria.json | spectra ai ingest-criteria --doc docs/payment.md
   stdout otherwise. When nothing changed, nothing is written and the criteria file stays byte-identical.
 - Writers take `.spectra/criteria.lock`, so concurrent ingests never lose an update or share an ID.
 - `--dry-run` computes everything (IDs, changeset) without writing.
+- Tags compare as a case-insensitive set: tags that differ only in order or case are not a change, and the
+  stored text is kept.
+- A classified response that is refused before anything is persisted reports `"outcome": "Rejected"` with its
+  `error_code`. Errors before any response is classified (config, `--from` file not found) use the same failure
+  JSON shape on stderr, without an `outcome`.
 - Exit code is `0` when extracted/persisted (or unchanged), `5` for `EmptyResponse`, `6` for `ParseFailure`,
   `7` for `INVALID_CRITERION_ID`, and `1` for other errors (`CRITERIA_FILE_UNREADABLE`,
-  `CRITERIA_FILE_COLLISION`, `INVALID_DOC_PATH`, `LOCK_TIMEOUT`).
+  `CRITERIA_FILE_COLLISION`, `INVALID_DOC_PATH`, `LOCK_TIMEOUT`, config errors).
 
 > `spectra docs index` and `spectra ai analyze
 > --extract-criteria` still run their extraction in-process today; the
@@ -594,11 +630,13 @@ step ran. The exit code is the same either way (0 on success). Marking a test or
 
 **How `source_refs` are resolved.** A ref such as `docs/checkout.md#Payment` is resolved by dropping the
 `#fragment`, normalising `\` to `/`, and looking for the file relative to the repository root; bare
-legacy refs such as `checkout.md` fall back to the configured `source.local_dir`. Refs that point outside
-the repository never resolve. A test is classified ORPHANED for a missing source only when none of its
-referenced files exist, and it is compared with the text of all of its referenced documents.
-`compile-critic-prompt` and `compile-repair-prompt` resolve refs the same way and fail when one is
-missing.
+legacy refs such as `checkout.md` fall back to the configured `source.local_dir`. A ref resolves only to a
+file under the repository or under `source.local_dir`, which may lie outside the repository (for example
+`../product-docs/docs`); refs outside both never resolve. A test is classified ORPHANED for a missing source
+only when none of its referenced files exist, and it is compared with the text of all of its referenced
+documents. `compile-critic-prompt` and `compile-repair-prompt` resolve refs the same way and fail when one is
+missing, saying why: `Source ref not found: …` or `Source ref is outside the repository and the configured
+source directory: …`.
 
 `spectra ai update` is the **selector**: it classifies tests but does not rewrite them. The doc-aware targeted edit of an OUTDATED test runs in the interactive session via the `spectra-update` skill, over the deterministic update seam below.
 

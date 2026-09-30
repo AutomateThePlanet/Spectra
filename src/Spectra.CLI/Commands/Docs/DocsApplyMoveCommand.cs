@@ -93,21 +93,28 @@ public sealed class DocsApplyMoveCommand : Command
                 if (ws.FileOwnedByOther(newFile, source) is { } owner)
                     return MoveOutcome.Error(CriteriaPaths.ErrorFileCollision, $"Criteria file '{newFile}' already belongs to '{owner.SourceDoc ?? owner.File}'.");
 
+                // Spec 080 B1: on a shared (collided) file only the moved doc's criteria move with it.
+                var sharedOld = CriteriaProvenance.IsShared(ws.Index, source);
                 var criteria = string.IsNullOrWhiteSpace(oldFile) ? [] : await ws.ReadStrictAsync(oldFile, ct);
+                if (sharedOld)
+                    criteria = CriteriaProvenance.OwnedBy(criteria, from);
+
                 if (!dryRun)
                 {
                     foreach (var criterion in criteria)
                         criterion.SourceDoc = to;
                     await ws.WriteCriteriaAsync(newFile, criteria, to, source.DocHash, ct);
 
-                    var sharedOld = ws.Index.Sources.Any(s => !ReferenceEquals(s, source)
-                        && string.Equals(CriteriaPaths.NormalizeLexical(s.File), oldFile, StringComparison.OrdinalIgnoreCase));
                     if (!sharedOld && oldFile != newFile && File.Exists(ws.FullPath(oldFile)))
                         File.Delete(ws.FullPath(oldFile));
 
                     source.SourceDoc = to;
                     source.File = newFile;
                     await ws.SaveIndexAsync(ct);
+
+                    // Spec 080 B2: the moved doc's criteria leave the shared file (deleted once empty and unreferenced).
+                    if (sharedOld && oldFile != newFile)
+                        await ws.LeaveSharedFileAsync(oldFile, from, ct);
                 }
 
                 return MoveOutcome.Done(criteria.Count, migration);

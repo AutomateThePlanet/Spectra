@@ -130,8 +130,7 @@ public sealed class CriteriaIngestor
         if (source is not null && !string.IsNullOrWhiteSpace(source.File))
         {
             previousFile = CriteriaPaths.NormalizeLexical(source.File);
-            sharedFile = ws.Index.Sources.Count(s => CriteriaPaths.IsDocumentSource(s)
-                && string.Equals(CriteriaPaths.NormalizeLexical(s.File), previousFile, StringComparison.OrdinalIgnoreCase)) > 1;
+            sharedFile = CriteriaProvenance.IsShared(ws.Index, source);
             if (!sharedFile)
             {
                 target = previousFile;
@@ -148,9 +147,7 @@ public sealed class CriteriaIngestor
         if (sharedFile)
         {
             // A past base-name collision: only the criteria this doc wrote are its own (per-criterion provenance).
-            previous = previous
-                .Where(p => string.Equals(CriteriaPaths.NormalizeLexical(p.SourceDoc), doc, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            previous = CriteriaProvenance.OwnedBy(previous, doc);
         }
 
         // FR-004/FR-005: validate returned IDs, then the one-to-one normalised-text fallback.
@@ -215,12 +212,11 @@ public sealed class CriteriaIngestor
             source.Outcome = "extracted";
             await ws.SaveIndexAsync(ct);
 
-            // A shared (collided) file that no source references any more would be double-counted by the
-            // recursive criteria scanners, so it goes once the last doc has moved off it.
-            if (sharedFile && previousFile is not null && previousFile != target
-                && !ws.Index.Sources.Any(s => string.Equals(CriteriaPaths.NormalizeLexical(s.File), previousFile, StringComparison.OrdinalIgnoreCase)))
+            // Spec 080 B2: leaving a shared (collided) file takes this doc's criteria out of it, so they are not
+            // counted twice by the recursive criteria scanners; the file goes once it is empty and unreferenced.
+            if (sharedFile && previousFile is not null && previousFile != target)
             {
-                File.Delete(ws.FullPath(previousFile));
+                await ws.LeaveSharedFileAsync(previousFile, doc, ct);
             }
 
             written = true;
@@ -264,8 +260,9 @@ public sealed record CriteriaIngestResult
     /// <summary>The classified outcome from <see cref="CriteriaExtractor.ClassifyResponse"/>.</summary>
     public ExtractionOutcome Outcome { get; private init; }
 
-    /// <summary>True when the outcome is <see cref="ExtractionOutcome.Extracted"/> and nothing was rejected.</summary>
-    public bool IsSuccess => Outcome == ExtractionOutcome.Extracted && ErrorCode is null;
+    /// <summary>True when the outcome is <see cref="ExtractionOutcome.Extracted"/> (a rejection is
+    /// <see cref="ExtractionOutcome.Rejected"/>, Spec 080 B6).</summary>
+    public bool IsSuccess => Outcome == ExtractionOutcome.Extracted;
 
     /// <summary>Spec 079: machine-readable reason for a rejected ingest (e.g. <c>INVALID_CRITERION_ID</c>).</summary>
     public string? ErrorCode { get; private init; }
@@ -306,7 +303,7 @@ public sealed record CriteriaIngestResult
     /// <summary>Spec 079: a classified response that was rejected before persisting (nothing written).</summary>
     public static CriteriaIngestResult Rejected(string errorCode, params string[] errors) => new()
     {
-        Outcome = ExtractionOutcome.Extracted,
+        Outcome = ExtractionOutcome.Rejected,
         ErrorCode = errorCode,
         Errors = errors ?? []
     };

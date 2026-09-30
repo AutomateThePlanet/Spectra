@@ -94,4 +94,101 @@ public sealed class CompileExtractionPromptExistingTests : IDisposable
         Assert.Equal(0, exit);
         Assert.Contains("prompts reset criteria-extraction", err);
     }
+
+    // ---------- Spec 080 B7: every JSON-mode failure is one JSON document with a `warnings` field ----------
+
+    [Fact]
+    public async Task MissingDocument_JsonMode_StderrIsOneJsonDocument()
+    {
+        var (exit, output, err) = await _ws.RunAsync("ai", "compile-extraction-prompt", "--doc", "docs/missing.md", "--output-format", "json");
+
+        Assert.Equal(1, exit);
+        Assert.Equal(string.Empty, output.Trim());
+        var failure = CriteriaTestWorkspace.Json(err);
+        Assert.Equal("DOCUMENT_NOT_FOUND", failure.GetProperty("error_code").GetString());
+        Assert.Contains("docs/missing.md", failure.GetProperty("message").GetString());
+        Assert.Equal(0, failure.GetProperty("warnings").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task UnreadableDocument_JsonMode_StderrIsOneJsonDocument()
+    {
+        // An exclusive handle blocks the read reliably on Windows only; elsewhere (a) and (d) carry this item.
+        if (!OperatingSystem.IsWindows()) return;
+
+        using var hold = new FileStream(_ws.PathOf("docs/checkout.md"), FileMode.Open, FileAccess.Read, FileShare.None);
+        var (exit, _, err) = await _ws.RunAsync("ai", "compile-extraction-prompt", "--doc", "docs/checkout.md", "--output-format", "json");
+
+        Assert.Equal(1, exit);
+        var failure = CriteriaTestWorkspace.Json(err);
+        Assert.Equal("DOCUMENT_UNREADABLE", failure.GetProperty("error_code").GetString());
+        Assert.Equal(0, failure.GetProperty("warnings").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task MissingDocArgument_JsonMode_RefusalIsOneJsonDocument()
+    {
+        var (exit, _, err) = await _ws.RunAsync("ai", "compile-extraction-prompt", "--output-format", "json");
+
+        Assert.Equal(4, exit);
+        var refusal = CriteriaTestWorkspace.Json(err);
+        Assert.True(refusal.GetProperty("refused").GetBoolean());
+        Assert.Equal("document_path", refusal.GetProperty("missing_input").GetString());
+        Assert.Equal(0, refusal.GetProperty("warnings").GetArrayLength());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void FailureHelper_CarriesCollectedWarnings_InOneJsonDocument(bool refusal)
+    {
+        var original = Console.Error;
+        var captured = new StringWriter();
+        try
+        {
+            Console.SetError(captured);
+            string[] warnings = ["first warning", "second warning"];
+            if (refusal)
+                Spectra.CLI.Commands.Generate.CompileExtractionPromptCommand.WriteRefusal(true, "document_content", "no content", warnings);
+            else
+                Spectra.CLI.Commands.Generate.CompileExtractionPromptCommand.WriteFailure(true, "DOCUMENT_NOT_FOUND", "gone", warnings);
+        }
+        finally
+        {
+            Console.SetError(original);
+        }
+
+        var json = CriteriaTestWorkspace.Json(captured.ToString());
+        Assert.Equal(["first warning", "second warning"], json.GetProperty("warnings").EnumerateArray().Select(w => w.GetString()));
+    }
+
+    [Fact]
+    public void FailureHelper_HumanMode_PrintsWarningsThenTheError()
+    {
+        var original = Console.Error;
+        var captured = new StringWriter();
+        try
+        {
+            Console.SetError(captured);
+            Spectra.CLI.Commands.Generate.CompileExtractionPromptCommand.WriteFailure(false, "DOCUMENT_NOT_FOUND", "Document not found: x.md", ["w1"]);
+        }
+        finally
+        {
+            Console.SetError(original);
+        }
+
+        var lines = captured.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => l.TrimEnd('\r')).ToArray();
+        Assert.Equal(["Warning: w1", "Document not found: x.md"], lines);
+    }
+
+    [Fact]
+    public async Task EmptyDocument_StillShortCircuitsToStdout()
+    {
+        _ws.WriteDoc("docs/empty.md", "   \n");
+
+        var (exit, output, err) = await _ws.RunAsync("ai", "compile-extraction-prompt", "--doc", "docs/empty.md", "--output-format", "json");
+
+        Assert.True(exit == 0, err);
+        Assert.True(CriteriaTestWorkspace.Json(output).GetProperty("short_circuit").GetBoolean());
+    }
 }

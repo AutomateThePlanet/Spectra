@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Spectra.Core.Coverage;
 using Spectra.Core.Models;
 
@@ -14,20 +13,23 @@ public static class SourceRefDocumentLoader
     /// <summary>
     /// Resolves and reads the referenced documents, each file once, in first-reference order.
     /// Blank refs are ignored. With <paramref name="failOnMissing"/>, a ref that does not resolve throws
-    /// <see cref="FileNotFoundException"/> (<c>Source ref not found: {ref}</c>); otherwise it is skipped.
+    /// <see cref="FileNotFoundException"/> whose message says why (<see cref="MissingMessage"/>); otherwise it is
+    /// skipped. <paramref name="sourceDir"/> is the configured <c>source.local_dir</c> (Spec 080 A2/A5: callers
+    /// read it through <c>ConfigLoader</c>; it may lie outside the repository).
     /// </summary>
     public static async Task<IReadOnlyList<SourceDocument>> LoadAsync(
         IReadOnlyList<string> sourceRefs,
         string repoRoot,
+        string sourceDir,
         bool failOnMissing,
         CancellationToken ct)
     {
-        var resolver = new SourceRefResolver(repoRoot, await ReadSourceDirAsync(repoRoot, ct));
+        var resolver = new SourceRefResolver(repoRoot, sourceDir);
         var resolution = resolver.Resolve(sourceRefs);
 
         if (failOnMissing && resolution.Missing.FirstOrDefault(m => m.Reason != MissingReason.Empty) is { } missing)
         {
-            throw new FileNotFoundException($"Source ref not found: {missing.Ref}", missing.Ref);
+            throw new FileNotFoundException(MissingMessage(missing), missing.Ref);
         }
 
         var docs = new List<SourceDocument>();
@@ -45,29 +47,8 @@ public static class SourceRefDocumentLoader
         return docs;
     }
 
-    /// <summary>The configured <c>source.local_dir</c> (default <c>docs</c>), tolerant of a missing or invalid config.</summary>
-    private static async Task<string> ReadSourceDirAsync(string repoRoot, CancellationToken ct)
-    {
-        const string fallback = "docs";
-        var configPath = Path.Combine(repoRoot, "spectra.config.json");
-        if (!File.Exists(configPath))
-        {
-            return fallback;
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(configPath, ct));
-            return doc.RootElement.TryGetProperty("source", out var source)
-                   && source.TryGetProperty("local_dir", out var dir)
-                   && dir.ValueKind == JsonValueKind.String
-                   && !string.IsNullOrWhiteSpace(dir.GetString())
-                ? dir.GetString()!
-                : fallback;
-        }
-        catch (JsonException)
-        {
-            return fallback;
-        }
-    }
+    /// <summary>Spec 080 A2: the refusal message names the reason, not just "not found".</summary>
+    public static string MissingMessage(MissingSourceRef missing) => missing.Reason == MissingReason.OutsideAllowedRoots
+        ? $"Source ref is outside the repository and the configured source directory: {missing.Ref}"
+        : $"Source ref not found: {missing.Ref}";
 }

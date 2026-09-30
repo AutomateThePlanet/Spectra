@@ -72,19 +72,33 @@ public static class CriteriaStore
             throw new CriteriaStoreException(ErrorFileUnreadable, ex.Message);
         }
 
+        var files = await ScanFilesAsync(criteriaDir, ct);
+        return new CriteriaWorkspace(repoRoot, criteriaDir, indexPath, index, files);
+    }
+
+    /// <summary>
+    /// Spec 080 B8: the one criteria-file scan. Every <c>*.criteria.yaml</c> under <paramref name="criteriaDir"/>,
+    /// recursively, in ordinal path order, read leniently (they are only scanned for IDs and duplicates). File
+    /// names are relative to the criteria dir with <c>/</c> separators.
+    /// </summary>
+    public static async Task<IReadOnlyList<(string File, IReadOnlyList<AcceptanceCriterion> Criteria)>> ScanFilesAsync(
+        string criteriaDir, CancellationToken ct)
+    {
         var files = new List<(string File, IReadOnlyList<AcceptanceCriterion> Criteria)>();
-        if (Directory.Exists(criteriaDir))
+        if (!Directory.Exists(criteriaDir))
         {
-            var reader = new CriteriaFileReader();
-            foreach (var path in Directory.GetFiles(criteriaDir, CriteriaPattern, SearchOption.AllDirectories)
-                         .OrderBy(p => p, StringComparer.Ordinal))
-            {
-                var relative = Path.GetRelativePath(criteriaDir, path).Replace('\\', '/');
-                files.Add((relative, await reader.ReadAsync(path, ct)));
-            }
+            return files;
         }
 
-        return new CriteriaWorkspace(repoRoot, criteriaDir, indexPath, index, files);
+        var reader = new CriteriaFileReader();
+        foreach (var path in Directory.GetFiles(criteriaDir, CriteriaPattern, SearchOption.AllDirectories)
+                     .OrderBy(p => p, StringComparer.Ordinal))
+        {
+            var relative = Path.GetRelativePath(criteriaDir, path).Replace('\\', '/');
+            files.Add((relative, await reader.ReadAsync(path, ct)));
+        }
+
+        return files;
     }
 }
 
@@ -152,4 +166,40 @@ public sealed class CriteriaWorkspace(
         new CriteriaFileWriter().WriteAsync(FullPath(fileRelativeToCriteriaDir), criteria, sourceDoc, docHash, ct);
 
     public Task SaveIndexAsync(CancellationToken ct) => new CriteriaIndexWriter().WriteAsync(IndexPath, Index, ct);
+
+    /// <summary>
+    /// Spec 080 B2: <paramref name="doc"/> leaves a shared criteria file. Its criteria (by provenance) are removed
+    /// from the file; the file is deleted when nothing is left in it and no index source references it any more.
+    /// Call after the index no longer points <paramref name="doc"/> at the file. Returns true when the file changed.
+    /// </summary>
+    public async Task<bool> LeaveSharedFileAsync(string fileRelativeToCriteriaDir, string doc, CancellationToken ct)
+    {
+        var path = FullPath(fileRelativeToCriteriaDir);
+        if (!File.Exists(path))
+        {
+            return false;
+        }
+
+        var criteria = await ReadStrictAsync(fileRelativeToCriteriaDir, ct);
+        var owned = CriteriaProvenance.OwnedBy(criteria, doc);
+        var remaining = criteria.Where(c => !owned.Contains(c)).ToList();
+        var file = CriteriaPaths.NormalizeLexical(fileRelativeToCriteriaDir);
+        var referenced = Index.Sources.Any(s =>
+            string.Equals(CriteriaPaths.NormalizeLexical(s.File), file, StringComparison.OrdinalIgnoreCase));
+
+        if (remaining.Count == 0 && !referenced)
+        {
+            File.Delete(path);
+            return true;
+        }
+
+        if (owned.Count == 0)
+        {
+            return false;
+        }
+
+        // Still shared by other documents: no single source_doc or doc hash describes the whole file.
+        await new CriteriaFileWriter().WriteAsync(path, remaining, sourceDoc: null, docHash: null, ct);
+        return true;
+    }
 }

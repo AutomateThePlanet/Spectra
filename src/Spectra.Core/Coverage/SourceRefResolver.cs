@@ -7,7 +7,9 @@ namespace Spectra.Core.Coverage;
 /// <remarks>
 /// Per ref: strip the <c>#fragment</c> and normalise separators; then try, in order, a fully-qualified path
 /// under the repo root, the ref relative to the repo root, and the ref relative to the configured source
-/// directory (legacy bare refs such as <c>file.md</c>). Candidates outside the repo root never resolve.
+/// directory (legacy bare refs such as <c>file.md</c>). A candidate resolves only when it is an existing file
+/// under an allowed root: the repo root or the configured source directory. The source directory is allowed even
+/// when it lies outside the repository (Spec 080 A2, e.g. <c>../product-docs/docs</c>).
 /// </remarks>
 public sealed class SourceRefResolver
 {
@@ -62,10 +64,19 @@ public sealed class SourceRefResolver
             return (null, MissingReason.Empty);
         }
 
-        // 1. Fully-qualified path (e.g. C:/repo/docs/a.md, or /abs on Unix) that lies under the repo root.
-        if (Path.IsPathFullyQualified(path) && TryFile(path) is { } absolute)
+        // 1. Fully-qualified path (e.g. C:/repo/docs/a.md, or /abs on Unix) under an allowed root.
+        if (Path.IsPathFullyQualified(path))
         {
-            return (Resolved(sourceRef, absolute), MissingReason.NotFound);
+            if (TryFile(path) is { } absolute)
+            {
+                return (Resolved(sourceRef, absolute), MissingReason.NotFound);
+            }
+
+            var full = FullPathOrNull(path);
+            if (full is not null && IsUnderAllowedRoot(full))
+            {
+                return (null, MissingReason.NotFound);
+            }
         }
 
         var relative = path.TrimStart('/');
@@ -74,11 +85,11 @@ public sealed class SourceRefResolver
             return (null, MissingReason.Empty);
         }
 
-        // A repo-relative ref that climbs out of the repository never resolves, even via the fallback.
+        // A repo-relative ref that climbs out of both allowed roots never resolves, even via the fallback.
         var repoCandidate = FullPathOrNull(Path.Combine(_repoRoot, relative));
-        if (repoCandidate is null || !IsUnderRoot(repoCandidate))
+        if (repoCandidate is null || !IsUnderAllowedRoot(repoCandidate))
         {
-            return (null, MissingReason.OutsideRepository);
+            return (null, MissingReason.OutsideAllowedRoots);
         }
 
         // 2. Relative to the repo root (the default generation profile writes docs/<file>.md#<Section>).
@@ -92,11 +103,11 @@ public sealed class SourceRefResolver
     private ResolvedSourceRef Resolved(string sourceRef, string fullPath) =>
         new(sourceRef, Path.GetRelativePath(_repoRoot, fullPath).Replace('\\', '/'), fullPath);
 
-    /// <summary>The candidate's full path when it is an existing file under the repo root; otherwise null.</summary>
+    /// <summary>The candidate's full path when it is an existing file under an allowed root; otherwise null.</summary>
     private string? TryFile(string candidate)
     {
         var full = FullPathOrNull(candidate);
-        return full is not null && IsUnderRoot(full) && File.Exists(full) ? full : null;
+        return full is not null && IsUnderAllowedRoot(full) && File.Exists(full) ? full : null;
     }
 
     private static string? FullPathOrNull(string candidate)
@@ -111,8 +122,11 @@ public sealed class SourceRefResolver
         }
     }
 
-    private bool IsUnderRoot(string fullPath) =>
-        fullPath.StartsWith(_repoRoot + Path.DirectorySeparatorChar, PathComparison);
+    private bool IsUnderAllowedRoot(string fullPath) =>
+        IsUnder(fullPath, _repoRoot) || IsUnder(fullPath, _sourceDir);
+
+    private static bool IsUnder(string fullPath, string root) =>
+        fullPath.StartsWith(Path.TrimEndingDirectorySeparator(root) + Path.DirectorySeparatorChar, PathComparison);
 }
 
 /// <summary>Result of resolving a set of source refs.</summary>
@@ -139,8 +153,8 @@ public enum MissingReason
 {
     /// <summary>Nothing left after stripping the fragment (e.g. <c>""</c> or <c>#Section</c>).</summary>
     Empty,
-    /// <summary>No candidate file exists inside the repository.</summary>
+    /// <summary>No candidate file exists under the repository or the configured source directory.</summary>
     NotFound,
-    /// <summary>Every candidate lies outside the repository root.</summary>
-    OutsideRepository
+    /// <summary>The ref lies outside both the repository and the configured source directory (Spec 080 A2).</summary>
+    OutsideAllowedRoots
 }

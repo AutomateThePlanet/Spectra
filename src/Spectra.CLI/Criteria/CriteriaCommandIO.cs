@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Spectra.Core.Config;
 using Spectra.Core.Models.Config;
 
 namespace Spectra.CLI.Criteria;
@@ -16,25 +17,14 @@ public static class CriteriaCommandIO
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
-    /// <summary>Loads <c>spectra.config.json</c>; returns an error message instead of throwing.</summary>
+    /// <summary>
+    /// Loads <c>spectra.config.json</c> for a criteria write command (Spec 080 A5: through
+    /// <see cref="ConfigLoader.LoadForWriteAsync"/> — missing or invalid is an error); never throws.
+    /// </summary>
     public static async Task<(SpectraConfig? Config, string? Error)> LoadConfigAsync(string repoRoot, CancellationToken ct)
     {
-        var configPath = Path.Combine(repoRoot, "spectra.config.json");
-        if (!File.Exists(configPath))
-        {
-            return (null, "No spectra.config.json found. Run 'spectra init' first.");
-        }
-
-        try
-        {
-            var config = JsonSerializer.Deserialize<SpectraConfig>(await File.ReadAllTextAsync(configPath, ct),
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return config is null ? (null, "Could not parse spectra.config.json.") : (config, null);
-        }
-        catch (JsonException ex)
-        {
-            return (null, $"Error reading config: {ex.Message}");
-        }
+        var loaded = await ConfigLoader.LoadForWriteAsync(repoRoot, ct);
+        return (loaded.Config, loaded.Error);
     }
 
     /// <summary>Failure output: JSON on stderr in JSON mode, a plain message otherwise. Never a human summary.</summary>

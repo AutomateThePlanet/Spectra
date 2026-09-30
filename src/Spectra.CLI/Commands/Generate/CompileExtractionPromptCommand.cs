@@ -4,6 +4,7 @@ using Spectra.CLI.Extraction;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
 using Spectra.CLI.Prompts;
+using Spectra.Core.Config;
 using Spectra.Core.Criteria;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Coverage;
@@ -24,6 +25,9 @@ public sealed class CompileExtractionPromptCommand : Command
     private const int ExitSuccess = 0;
     private const int ExitRefused = 4;
     private const int ExitError = 1;
+
+    public const string ErrorDocumentNotFound = "DOCUMENT_NOT_FOUND";
+    public const string ErrorDocumentUnreadable = "DOCUMENT_UNREADABLE";
 
     public CompileExtractionPromptCommand()
         : base("compile-extraction-prompt",
@@ -46,17 +50,30 @@ public sealed class CompileExtractionPromptCommand : Command
 
     private static async Task<int> RunAsync(string? doc, string? component, bool json, CancellationToken ct)
     {
+        // Spec 080 B7: warnings are collected, not printed eagerly, so every JSON-mode failure is one document.
+        var warnings = new List<string>();
         if (string.IsNullOrWhiteSpace(doc))
         {
-            EmitRefusal(json, "document_path", "A source document path is required (--doc).");
+            WriteRefusal(json, "document_path", "A source document path is required (--doc).", warnings);
             return ExitRefused;
         }
 
         var currentDir = Directory.GetCurrentDirectory();
+
+        // Spec 080 A5: read command — defaults when there is no config, exit 1 on a malformed or invalid one
+        // (never a silent fallback, which emptied existing_criteria and churned IDs).
+        var loaded = await ConfigLoader.LoadForReadAsync(currentDir, ct);
+        if (!loaded.IsSuccess)
+        {
+            WriteFailure(json, null, loaded.Error!, warnings);
+            return ExitError;
+        }
+        var config = loaded.Config!;
+
         var docFullPath = Path.IsPathRooted(doc) ? doc : Path.Combine(currentDir, doc);
         if (!File.Exists(docFullPath))
         {
-            Console.Error.WriteLine($"Document not found: {doc}");
+            WriteFailure(json, ErrorDocumentNotFound, $"Document not found: {doc}", warnings);
             return ExitError;
         }
 
@@ -67,7 +84,7 @@ public sealed class CompileExtractionPromptCommand : Command
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Error reading document: {ex.Message}");
+            WriteFailure(json, ErrorDocumentUnreadable, $"Error reading document: {ex.Message}", warnings);
             return ExitError;
         }
 
@@ -95,7 +112,7 @@ public sealed class CompileExtractionPromptCommand : Command
 
         // Spec 079 FR-001/FR-016c-d: read (never write) this doc's existing criteria through the index `file`
         // entry, so the prompt carries their IDs in both the old and the per-doc layout.
-        var (existing, warnings) = await LoadExistingCriteriaAsync(currentDir, doc, ct);
+        var existing = await LoadExistingCriteriaAsync(currentDir, config, doc, warnings, ct);
         if (existing.Count > 0
             && !templateLoader.LoadTemplate("criteria-extraction").Body.Contains("existing_criteria", StringComparison.Ordinal))
         {
@@ -103,20 +120,20 @@ public sealed class CompileExtractionPromptCommand : Command
                 + "so existing criterion IDs are not offered for reuse. Run 'spectra prompts reset criteria-extraction' to update it.");
         }
 
+        var result = ExtractionPromptCompiler.Compile(doc, content, component, templateLoader, existing);
+
+        if (!result.IsSuccess)
+        {
+            WriteRefusal(json, result.MissingInput!, result.Message!, warnings);
+            return ExitRefused;
+        }
+
+        // Success: warnings go to stderr as text; the prompt IS the artifact on stdout. Nothing is written to disk.
         foreach (var warning in warnings)
         {
             Console.Error.WriteLine($"Warning: {warning}");
         }
 
-        var result = ExtractionPromptCompiler.Compile(doc, content, component, templateLoader, existing);
-
-        if (!result.IsSuccess)
-        {
-            EmitRefusal(json, result.MissingInput!, result.Message!);
-            return ExitRefused;
-        }
-
-        // Success: the prompt IS the artifact. Print to stdout; write nothing to disk.
         Console.Out.Write(result.Prompt);
         if (!result.Prompt!.EndsWith('\n')) Console.Out.WriteLine();
         return ExitSuccess;
@@ -124,27 +141,12 @@ public sealed class CompileExtractionPromptCommand : Command
 
     /// <summary>
     /// The doc's current criteria, located via its index entry's <c>file</c> (lenient: a missing or unreadable
-    /// config, index or file gives no criteria plus a warning). Never writes and never migrates.
+    /// index or file gives no criteria). Adds any layout warning to <paramref name="warnings"/>. Never writes and
+    /// never migrates.
     /// </summary>
-    private static async Task<(IReadOnlyList<AcceptanceCriterion> Criteria, List<string> Warnings)> LoadExistingCriteriaAsync(
-        string currentDir, string doc, CancellationToken ct)
+    private static async Task<IReadOnlyList<AcceptanceCriterion>> LoadExistingCriteriaAsync(
+        string currentDir, SpectraConfig config, string doc, List<string> warnings, CancellationToken ct)
     {
-        var warnings = new List<string>();
-        var config = SpectraConfig.Default;
-        var configPath = Path.Combine(currentDir, "spectra.config.json");
-        if (File.Exists(configPath))
-        {
-            try
-            {
-                config = JsonSerializer.Deserialize<SpectraConfig>(await File.ReadAllTextAsync(configPath, ct),
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? SpectraConfig.Default;
-            }
-            catch (JsonException)
-            {
-                warnings.Add("spectra.config.json could not be parsed; using default criteria paths.");
-            }
-        }
-
         var index = await new CriteriaIndexReader().ReadAsync(Path.Combine(currentDir, config.Coverage.CriteriaFile), ct);
         if (CriteriaPaths.IsOldLayout(index))
         {
@@ -157,15 +159,27 @@ public sealed class CompileExtractionPromptCommand : Command
             && string.Equals(CriteriaPaths.NormalizeLexical(s.SourceDoc), normalized, StringComparison.OrdinalIgnoreCase));
         if (source is null || string.IsNullOrWhiteSpace(source.File))
         {
-            return ([], warnings);
+            return [];
         }
 
         var filePath = Path.Combine(currentDir, config.Coverage.CriteriaDir, source.File);
         var criteria = await new CriteriaFileReader().ReadAsync(filePath, ct);
-        return (criteria, warnings);
+
+        // Spec 080 B3: on a shared (collided) file only this doc's criteria are offered — exactly what ingest
+        // accepts — so a returned ID is never another doc's (which ingest would reject with exit 7).
+        if (CriteriaProvenance.IsShared(index, source))
+        {
+            criteria = CriteriaProvenance.OwnedBy(criteria, normalized);
+        }
+
+        return criteria;
     }
 
-    private static void EmitRefusal(bool json, string missingInput, string message)
+    /// <summary>
+    /// Spec 080 B7: a refusal (exit 4). JSON mode writes one object to stderr, always with <c>warnings</c>; human mode
+    /// prints the warnings, then the refusal line.
+    /// </summary>
+    internal static void WriteRefusal(bool json, string missingInput, string message, IReadOnlyList<string> warnings)
     {
         if (json)
         {
@@ -173,12 +187,42 @@ public sealed class CompileExtractionPromptCommand : Command
             {
                 refused = true,
                 missing_input = missingInput,
-                message
+                message,
+                warnings
             }));
+            return;
         }
-        else
+
+        WriteWarnings(warnings);
+        Console.Error.WriteLine($"Refusing to emit prompt — missing required input '{missingInput}': {message}");
+    }
+
+    /// <summary>
+    /// Spec 080 B7: an error (exit 1). JSON mode writes one object to stderr, always with <c>warnings</c>; human mode
+    /// prints the warnings, then the error line.
+    /// </summary>
+    internal static void WriteFailure(bool json, string? errorCode, string message, IReadOnlyList<string> warnings)
+    {
+        if (json)
         {
-            Console.Error.WriteLine($"Refusing to emit prompt — missing required input '{missingInput}': {message}");
+            Console.Error.WriteLine(JsonSerializer.Serialize(new
+            {
+                error_code = errorCode,
+                message,
+                warnings
+            }));
+            return;
+        }
+
+        WriteWarnings(warnings);
+        Console.Error.WriteLine(message);
+    }
+
+    private static void WriteWarnings(IReadOnlyList<string> warnings)
+    {
+        foreach (var warning in warnings)
+        {
+            Console.Error.WriteLine($"Warning: {warning}");
         }
     }
 }

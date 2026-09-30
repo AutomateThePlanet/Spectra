@@ -48,35 +48,19 @@ public sealed class IngestCriteriaCommand : Command
     private static async Task<int> RunAsync(
         string? doc, string? component, string? from, bool dryRun, bool json, CancellationToken ct)
     {
+        // Spec 080 A5 / SC-006: early errors (before any response is classified) use the shared criteria failure
+        // shape, so JSON mode is always one document on stderr. They carry no `outcome`.
         if (string.IsNullOrWhiteSpace(doc))
         {
-            Console.Error.WriteLine("A source document is required (--doc).");
+            CriteriaCommandIO.WriteFailure(json, "ingest-criteria", null, "A source document is required (--doc).");
             return ExitError;
         }
 
         var currentDir = Directory.GetCurrentDirectory();
-        var configPath = Path.Combine(currentDir, "spectra.config.json");
-        if (!File.Exists(configPath))
-        {
-            Console.Error.WriteLine("No spectra.config.json found. Run 'spectra init' first.");
-            return ExitError;
-        }
-
-        SpectraConfig? config;
-        try
-        {
-            config = JsonSerializer.Deserialize<SpectraConfig>(
-                await File.ReadAllTextAsync(configPath, ct),
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        }
-        catch (JsonException ex)
-        {
-            Console.Error.WriteLine($"Error reading config: {ex.Message}");
-            return ExitError;
-        }
+        var (config, configError) = await CriteriaCommandIO.LoadConfigAsync(currentDir, ct);
         if (config is null)
         {
-            Console.Error.WriteLine("Could not parse spectra.config.json.");
+            CriteriaCommandIO.WriteFailure(json, "ingest-criteria", null, configError!);
             return ExitError;
         }
 
@@ -86,7 +70,7 @@ public sealed class IngestCriteriaCommand : Command
         {
             if (!File.Exists(from))
             {
-                Console.Error.WriteLine($"Content file not found: {from}");
+                CriteriaCommandIO.WriteFailure(json, "ingest-criteria", null, $"Content file not found: {from}");
                 return ExitError;
             }
             content = await File.ReadAllTextAsync(from, ct);

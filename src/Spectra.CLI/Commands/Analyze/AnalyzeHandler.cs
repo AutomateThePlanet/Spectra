@@ -294,19 +294,10 @@ public sealed class AnalyzeHandler
                 return ExitCodes.Error;
             }
 
-            // Load config
-            var configPath = Path.Combine(currentDir, "spectra.config.json");
-            SpectraConfig? config = null;
-            if (File.Exists(configPath))
-            {
-                var configJson = await File.ReadAllTextAsync(configPath, ct);
-                config = JsonSerializer.Deserialize<SpectraConfig>(configJson, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-            }
-
-            if (config is null)
+            // Spec 080 A5: a write command — missing or invalid config is an error, reported on the command's
+            // usual path (ErrorResult on stdout in JSON mode, stderr text otherwise).
+            var loaded = await Spectra.Core.Config.ConfigLoader.LoadForWriteAsync(currentDir, ct);
+            if (!loaded.IsSuccess)
             {
                 if (_outputFormat == OutputFormat.Json)
                 {
@@ -314,15 +305,16 @@ public sealed class AnalyzeHandler
                     {
                         Command = "import-criteria",
                         Status = "failed",
-                        Error = "No spectra.config.json found. Run 'spectra init' first."
+                        Error = loaded.Error!
                     });
                 }
                 else
                 {
-                    Console.Error.WriteLine("No spectra.config.json found. Run 'spectra init' first.");
+                    Console.Error.WriteLine(loaded.Error);
                 }
                 return ExitCodes.Error;
             }
+            var config = loaded.Config!;
 
             // Migrate criteria folder from docs/requirements/ to docs/criteria/ if needed
             await MigrateCriteriaFolderAsync(currentDir, _verbosity);

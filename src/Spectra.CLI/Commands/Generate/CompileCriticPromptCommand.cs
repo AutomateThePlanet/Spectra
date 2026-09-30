@@ -5,6 +5,7 @@ using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
 using Spectra.CLI.Source;
 using Spectra.CLI.Verification;
+using Spectra.Core.Config;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
@@ -126,8 +127,15 @@ public sealed class CompileCriticPromptCommand : Command
     private static async Task<int> RunSuiteAsync(
         string suite, string? testId, string? docsPath, string currentDir, bool json, CancellationToken ct)
     {
-        var (testsDir, config) = await ResolveTestsDirAndConfigAsync(currentDir, ct);
-        var suitePath = Path.Combine(currentDir, testsDir, suite);
+        // Spec 080 A5: read command — defaults when there is no config, exit 1 on a malformed or invalid one.
+        var loaded = await ConfigLoader.LoadForReadAsync(currentDir, ct);
+        if (!loaded.IsSuccess)
+        {
+            Console.Error.WriteLine(loaded.Error);
+            return ExitError;
+        }
+        var config = loaded.Config!;
+        var suitePath = Path.Combine(currentDir, config.Tests.Dir, suite);
         var indexPath = IndexWriter.GetIndexPath(suitePath);
 
         MetadataIndex? index;
@@ -213,7 +221,8 @@ public sealed class CompileCriticPromptCommand : Command
             {
                 try
                 {
-                    docs = await SourceRefDocumentLoader.LoadAsync(test.SourceRefs, currentDir, failOnMissing: true, ct);
+                    docs = await SourceRefDocumentLoader.LoadAsync(
+                        test.SourceRefs, currentDir, config.Source.LocalDir ?? "docs", failOnMissing: true, ct);
                 }
                 catch (FileNotFoundException ex)
                 {
@@ -258,30 +267,6 @@ public sealed class CompileCriticPromptCommand : Command
             }
         }
         return ExitSuccess;
-    }
-
-    /// <summary>
-    /// Resolves the configured tests directory (default <c>test-cases</c>) from spectra.config.json if present.
-    /// Lenient by design: a missing/unparseable config falls back to the default, mirroring the sibling compilers.
-    /// </summary>
-    private static async Task<(string Dir, SpectraConfig? Config)> ResolveTestsDirAndConfigAsync(
-        string currentDir, CancellationToken ct)
-    {
-        var configPath = Path.Combine(currentDir, "spectra.config.json");
-        if (!File.Exists(configPath))
-            return ("test-cases", null);
-
-        try
-        {
-            var configJson = await File.ReadAllTextAsync(configPath, ct);
-            var config = JsonSerializer.Deserialize<SpectraConfig>(configJson,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return (config?.Tests?.Dir ?? "test-cases", config);
-        }
-        catch (JsonException)
-        {
-            return ("test-cases", null);
-        }
     }
 
     private static async Task<TestCase?> LoadTestAsync(string fullPath, string currentDir, CancellationToken ct)
