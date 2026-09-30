@@ -134,10 +134,13 @@ public sealed class CriteriaWorkspace(
     public string FullPath(string fileRelativeToCriteriaDir) =>
         Path.GetFullPath(Path.Combine(CriteriaDir, fileRelativeToCriteriaDir.Replace('/', Path.DirectorySeparatorChar)));
 
-    /// <summary>The index source for a document, matched on the lexically normalised <c>source_doc</c>.</summary>
+    /// <summary>
+    /// The index source for a document, matched repo-aware (Spec 081 C1: an entry stored as an absolute path, or with
+    /// <c>\</c> / <c>./</c>, still matches — this matters under <c>--dry-run</c>, which skips migration).
+    /// </summary>
     public CriteriaSource? FindDocumentSource(string normalizedDoc) =>
         Index.Sources.FirstOrDefault(s => CriteriaPaths.IsDocumentSource(s)
-            && string.Equals(CriteriaPaths.NormalizeLexical(s.SourceDoc), normalizedDoc, StringComparison.OrdinalIgnoreCase));
+            && CriteriaProvenance.SameDocument(s.SourceDoc, normalizedDoc, RepoRoot));
 
     /// <summary>
     /// The index source other than <paramref name="self"/> whose file is <paramref name="file"/>, if any
@@ -181,7 +184,7 @@ public sealed class CriteriaWorkspace(
         }
 
         var criteria = await ReadStrictAsync(fileRelativeToCriteriaDir, ct);
-        var owned = CriteriaProvenance.OwnedBy(criteria, doc);
+        var owned = CriteriaProvenance.OwnedBy(criteria, doc, RepoRoot);
         var remaining = criteria.Where(c => !owned.Contains(c)).ToList();
         var file = CriteriaPaths.NormalizeLexical(fileRelativeToCriteriaDir);
         var referenced = Index.Sources.Any(s =>

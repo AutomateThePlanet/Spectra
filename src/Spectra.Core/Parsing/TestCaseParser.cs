@@ -164,12 +164,20 @@ public sealed partial class TestCaseParser
         string yaml)
     {
         var keyStarts = new List<(string Key, int Index)>();
+        // Spec 081 C5: per entry, whether its last scalar (at any depth) is a keep-chomped block scalar.
+        var keepChomped = new List<bool>();
         var parser = new YamlDotNet.Core.Parser(new StringReader(yaml));
         var depth = 0;
         var expectKey = true;
 
         while (parser.MoveNext())
         {
+            if (parser.Current is YamlDotNet.Core.Events.Scalar any && keyStarts.Count > 0
+                && !(depth == 1 && expectKey))
+            {
+                keepChomped[^1] = IsKeepChompedBlock(yaml, any);
+            }
+
             switch (parser.Current)
             {
                 case YamlDotNet.Core.Events.MappingStart:
@@ -182,7 +190,11 @@ public sealed partial class TestCaseParser
                     if (depth == 1) expectKey = true; // a collection value finished
                     break;
                 case YamlDotNet.Core.Events.Scalar scalar when depth == 1:
-                    if (expectKey) keyStarts.Add((scalar.Value, (int)scalar.Start.Index));
+                    if (expectKey)
+                    {
+                        keyStarts.Add((scalar.Value, (int)scalar.Start.Index));
+                        keepChomped.Add(false);
+                    }
                     expectKey = !expectKey;
                     break;
                 case YamlDotNet.Core.Events.AnchorAlias when depth == 1:
@@ -206,7 +218,7 @@ public sealed partial class TestCaseParser
         {
             var start = keyStarts[i].Index;
             var end = i + 1 < keyStarts.Count ? keyStarts[i + 1].Index : yaml.Length;
-            var cut = start + TrimTrailingDetachedLines(yaml[start..end]);
+            var cut = start + TrimTrailingDetachedLines(yaml[start..end], keepChomped[i]);
             var key = keyStarts[i].Key;
             entries.Add(new FrontmatterEntry(key, prelude, yaml[start..cut], KnownFrontmatterKeys.Contains(key)));
             prelude = yaml[cut..end];
@@ -220,10 +232,41 @@ public sealed partial class TestCaseParser
     }
 
     /// <summary>
-    /// Length of <paramref name="span"/> without its trailing blank and column-0 <c>#</c> lines. The first line (the
-    /// key itself) is always kept.
+    /// Spec 081 C5: true when <paramref name="scalar"/> is a literal or folded block scalar with keep chomping
+    /// (<c>|+</c>, <c>&gt;+</c>, <c>|2+</c>, <c>&gt;+1</c>, …), whose trailing line breaks are part of its value. The
+    /// scalar's start mark is at the <c>|</c>/<c>&gt;</c> indicator (pinned by <c>TestCaseLayoutTests</c>).
     /// </summary>
-    private static int TrimTrailingDetachedLines(string span)
+    private static bool IsKeepChompedBlock(string yaml, YamlDotNet.Core.Events.Scalar scalar)
+    {
+        if (scalar.Style is not (YamlDotNet.Core.ScalarStyle.Literal or YamlDotNet.Core.ScalarStyle.Folded))
+        {
+            return false;
+        }
+
+        var i = (int)scalar.Start.Index;
+        if (i < 0 || i >= yaml.Length || (yaml[i] != '|' && yaml[i] != '>'))
+        {
+            return false;
+        }
+
+        for (i++; i < yaml.Length && (yaml[i] is '+' or '-' || char.IsAsciiDigit(yaml[i])); i++)
+        {
+            if (yaml[i] == '+')
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Length of <paramref name="span"/> without its trailing blank and column-0 <c>#</c> lines. The first line (the
+    /// key itself) is always kept. When the entry ends with a keep-chomped block scalar
+    /// (<paramref name="keepTrailing"/>), its trailing blank lines are value content: only the lines from the first
+    /// column-0 comment onwards detach (Spec 081 C5).
+    /// </summary>
+    private static int TrimTrailingDetachedLines(string span, bool keepTrailing)
     {
         var firstLineEnd = span.IndexOf('\n');
         if (firstLineEnd < 0)
@@ -246,7 +289,25 @@ public sealed partial class TestCaseParser
             keep = lineStart;
         }
 
-        return keep;
+        if (!keepTrailing)
+        {
+            return keep;
+        }
+
+        // Keep chomping: blank lines before the first trailing comment belong to the value.
+        for (var pos = keep; pos < span.Length;)
+        {
+            var next = span.IndexOf('\n', pos);
+            var lineEnd = next < 0 ? span.Length : next + 1;
+            if (span[pos..lineEnd].StartsWith('#'))
+            {
+                return pos;
+            }
+
+            pos = lineEnd;
+        }
+
+        return span.Length;
     }
 
     private static IReadOnlyList<BodySegment> CaptureBodySegments(string body)

@@ -128,13 +128,17 @@ public sealed class CompileCriticPromptCommand : Command
         string suite, string? testId, string? docsPath, string currentDir, bool json, CancellationToken ct)
     {
         // Spec 080 A5: read command — defaults when there is no config, exit 1 on a malformed or invalid one.
-        var loaded = await ConfigLoader.LoadForReadAsync(currentDir, ct);
+        var loaded = await ConfigLoader.LoadForReadAsync(currentDir, ConfigSections.Source | ConfigSections.Tests, ct);
         if (!loaded.IsSuccess)
         {
             Console.Error.WriteLine(loaded.Error);
             return ExitError;
         }
         var config = loaded.Config!;
+        foreach (var warning in loaded.Warnings)
+        {
+            Console.Error.WriteLine($"Warning: {warning}");
+        }
         var suitePath = Path.Combine(currentDir, config.Tests.Dir, suite);
         var indexPath = IndexWriter.GetIndexPath(suitePath);
 

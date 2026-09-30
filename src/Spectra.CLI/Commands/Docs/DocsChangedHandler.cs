@@ -44,13 +44,18 @@ public sealed class DocsChangedHandler
     {
         // Spec 080 A5: a read command — built-in defaults when there is no config; exit 1 on a malformed or
         // invalid one (never a silent fallback).
-        var loaded = await Spectra.Core.Config.ConfigLoader.LoadForReadAsync(currentDir, ct);
+        var loaded = await Spectra.Core.Config.ConfigLoader.LoadForReadAsync(
+            currentDir, Spectra.Core.Config.ConfigSections.Source, ct);
         if (!loaded.IsSuccess)
         {
             Console.Error.WriteLine(loaded.Error);
             return ExitCodes.Error;
         }
         var config = loaded.Config!;
+        foreach (var warning in loaded.Warnings)
+        {
+            Console.Error.WriteLine($"Warning: {warning}");
+        }
 
         var criteriaIndexPath = Path.Combine(currentDir, config.Coverage.CriteriaFile);
 
@@ -85,7 +90,7 @@ public sealed class DocsChangedHandler
 
             // Spec 079 FR-017: compare normalised paths, so an index entry written as docs\x.md or ./docs/x.md
             // still matches.
-            var existing = FindDocumentSource(criteriaIndex, path);
+            var existing = FindDocumentSource(criteriaIndex, path, currentDir);
             var indexedHash = existing?.DocHash;
 
             var status = indexedHash is null
@@ -99,7 +104,8 @@ public sealed class DocsChangedHandler
         // filtered out of discovery, e.g. an archived suite, is not deleted.)
         var deleted = criteriaIndex.Sources
             .Where(CriteriaPaths.IsDocumentSource)
-            .Select(s => (Source: s, Path: CriteriaPaths.NormalizeLexical(s.SourceDoc)))
+            .Select(s => (Source: s, Path: CriteriaPaths.NormalizeSourceDoc(s.SourceDoc, currentDir).Path
+                ?? CriteriaPaths.NormalizeLexical(s.SourceDoc)))
             .Where(x => !discovered.Contains(x.Path) && !File.Exists(Path.Combine(currentDir, x.Path)))
             .GroupBy(x => x.Path, StringComparer.OrdinalIgnoreCase)
             .Select(g => g.First())
@@ -133,7 +139,7 @@ public sealed class DocsChangedHandler
         var duplicates = CriteriaDuplicateScanner.Scan(
             await CriteriaStore.ScanFilesAsync(Path.GetFullPath(Path.Combine(currentDir, config.Coverage.CriteriaDir)), ct));
         var migrationNeeded = CriteriaPaths.IsOldLayout(criteriaIndex);
-        var warnings = new List<string>();
+        var warnings = new List<string>(loaded.Warnings);
         if (migrationNeeded)
         {
             warnings.Add("Criteria files use the pre-2.6 layout; run 'spectra docs migrate-criteria' "
@@ -204,9 +210,10 @@ public sealed class DocsChangedHandler
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
     };
 
-    private static CriteriaSource? FindDocumentSource(CriteriaIndex index, string path) =>
+    // Spec 081 C1: repo-aware comparison, so an index entry stored as an absolute path still matches.
+    private static CriteriaSource? FindDocumentSource(CriteriaIndex index, string path, string currentDir) =>
         index.Sources.FirstOrDefault(s => CriteriaPaths.IsDocumentSource(s)
-            && string.Equals(CriteriaPaths.NormalizeLexical(s.SourceDoc), path, StringComparison.OrdinalIgnoreCase));
+            && CriteriaProvenance.SameDocument(s.SourceDoc, path, currentDir));
 
     private static string DeriveComponent(string path) =>
         Path.GetFileNameWithoutExtension(path).Replace(' ', '-').ToLowerInvariant();

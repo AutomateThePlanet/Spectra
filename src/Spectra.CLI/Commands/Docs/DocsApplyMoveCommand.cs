@@ -3,6 +3,7 @@ using System.Text.Json;
 using Spectra.CLI.Criteria;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
+using Spectra.Core.Config;
 using Spectra.Core.Criteria;
 
 namespace Spectra.CLI.Commands.Docs;
@@ -41,7 +42,7 @@ public sealed class DocsApplyMoveCommand : Command
     private static async Task<int> RunAsync(string? fromArg, string? toArg, bool dryRun, bool json, CancellationToken ct)
     {
         var root = Directory.GetCurrentDirectory();
-        var (config, error) = await CriteriaCommandIO.LoadConfigAsync(root, ct);
+        var (config, error) = await CriteriaCommandIO.LoadConfigAsync(root, ConfigSections.None, ct);
         if (config is null)
         {
             CriteriaCommandIO.WriteFailure(json, Name, null, error!);
@@ -97,7 +98,7 @@ public sealed class DocsApplyMoveCommand : Command
                 var sharedOld = CriteriaProvenance.IsShared(ws.Index, source);
                 var criteria = string.IsNullOrWhiteSpace(oldFile) ? [] : await ws.ReadStrictAsync(oldFile, ct);
                 if (sharedOld)
-                    criteria = CriteriaProvenance.OwnedBy(criteria, from);
+                    criteria = CriteriaProvenance.OwnedBy(criteria, from, root);
 
                 if (!dryRun)
                 {

@@ -4,6 +4,7 @@ using Spectra.CLI.Criteria;
 using Spectra.CLI.Extraction;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
+using Spectra.Core.Config;
 using Spectra.Core.Models.Config;
 
 namespace Spectra.CLI.Commands.Generate;
@@ -57,7 +58,7 @@ public sealed class IngestCriteriaCommand : Command
         }
 
         var currentDir = Directory.GetCurrentDirectory();
-        var (config, configError) = await CriteriaCommandIO.LoadConfigAsync(currentDir, ct);
+        var (config, configError) = await CriteriaCommandIO.LoadConfigAsync(currentDir, ConfigSections.Tests, ct); // reference counts read tests
         if (config is null)
         {
             CriteriaCommandIO.WriteFailure(json, "ingest-criteria", null, configError!);
@@ -143,13 +144,12 @@ public sealed class IngestCriteriaCommand : Command
         // Fail loud — nothing persisted (FR-003, FR-006). Failure output stays machine-readable, no summary.
         if (json)
         {
-            Console.Error.WriteLine(JsonSerializer.Serialize(new
-            {
-                success = false,
-                outcome = result.Outcome.ToString(),
-                error_code = result.ErrorCode,
-                errors = result.Errors
-            }));
+            // Spec 081 C4: the shared criteria failure shape, plus the ingest outcome.
+            CriteriaCommandIO.WriteFailureJson(
+                "ingest-criteria",
+                result.ErrorCode,
+                result.Errors.Count > 0 ? result.Errors : [result.Outcome.ToString()],
+                extras: new Dictionary<string, object?> { ["outcome"] = result.Outcome.ToString() });
         }
         else
         {

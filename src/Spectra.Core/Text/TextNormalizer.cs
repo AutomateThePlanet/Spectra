@@ -60,12 +60,21 @@ public static partial class TextNormalizer
     private static partial Regex HtmlCommentRegex();
 
     /// <summary>
-    /// An opening, closing or self-closing tag of a known inline/block HTML element, with well-formed attributes
-    /// (<c>name="v"</c>, <c>name='v'</c> or <c>name=v</c>). Anything else in angle brackets is kept as text.
+    /// An opening, closing or self-closing tag of a known HTML element, with well-formed attributes: valued
+    /// (<c>name="v"</c>, <c>name='v'</c>, <c>name=v</c>) or a bare HTML boolean attribute (<c>nowrap</c>, <c>open</c>,
+    /// <c>disabled</c>, …), in any mix. Anything else in angle brackets is kept as text, so comparisons
+    /// (<c>total&lt;limit and qty&gt;5</c>, <c>a&lt;b and c&gt;d</c>) and placeholder words (<c>&lt;Limit&gt;</c>,
+    /// <c>&lt;data&gt;</c>, <c>&lt;time&gt;</c>, <c>&lt;label&gt;</c>) survive (Spec 080 B9, Spec 081 C3).
     /// </summary>
     [GeneratedRegex(
-        @"</?(?:a|abbr|b|blockquote|br|cite|code|dd|del|div|dl|dt|em|h[1-6]|hr|i|img|ins|kbd|li|mark|ol|p|pre|q|s|small|span|strike|strong|sub|sup|table|tbody|td|th|thead|tr|u|ul|var)"
-        + @"(?:\s+[A-Za-z_:][-A-Za-z0-9_:.]*\s*=\s*(?:""[^""]*""|'[^']*'|[^\s""'=<>`]+))*\s*/?>",
+        @"</?(?:a|abbr|article|aside|audio|b|bdi|bdo|big|blockquote|br|caption|center|cite|code|col|colgroup|dd|del"
+        + @"|details|dfn|div|dl|dt|em|figcaption|figure|font|h[1-6]|hr|i|iframe|img|input|ins|kbd|li|mark|ol|p|picture"
+        + @"|pre|q|rp|rt|ruby|s|samp|section|small|source|span|strike|strong|sub|summary|sup|table|tbody|td|tfoot|th"
+        + @"|thead|tr|tt|u|ul|var|video|wbr)"
+        + @"(?:\s+(?:[A-Za-z_:][-A-Za-z0-9_:.]*\s*=\s*(?:""[^""]*""|'[^']*'|[^\s""'=<>`]+)"
+        + @"|(?:allowfullscreen|async|autofocus|autoplay|checked|compact|controls|default|defer|disabled|hidden|ismap"
+        + @"|loop|multiple|muted|nohref|noresize|noshade|novalidate|nowrap|open|readonly|required|reversed|selected)"
+        + @"(?=[\s/>])))*\s*/?>",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex HtmlTagRegex();
 

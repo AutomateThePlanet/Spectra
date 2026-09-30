@@ -52,13 +52,17 @@ public sealed class CompileRepairPromptCommand : Command
         var currentDir = Directory.GetCurrentDirectory();
 
         // Spec 080 A5: read command — defaults when there is no config, exit 1 on a malformed or invalid one.
-        var loaded = await ConfigLoader.LoadForReadAsync(currentDir, ct);
+        var loaded = await ConfigLoader.LoadForReadAsync(currentDir, ConfigSections.Source | ConfigSections.Tests, ct);
         if (!loaded.IsSuccess)
         {
             Console.Error.WriteLine(loaded.Error);
             return ExitError;
         }
         var config = loaded.Config!;
+        foreach (var warning in loaded.Warnings)
+        {
+            Console.Error.WriteLine($"Warning: {warning}");
+        }
         var testsDir = config.Tests.Dir;
         var suitePath = Path.Combine(currentDir, testsDir, suite);
         var indexPath = IndexWriter.GetIndexPath(suitePath);

@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Text.Json;
+using Spectra.CLI.Criteria;
 using Spectra.CLI.Extraction;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
@@ -27,6 +28,8 @@ public sealed class CompileExtractionPromptCommand : Command
     private const int ExitError = 1;
 
     public const string ErrorDocumentNotFound = "DOCUMENT_NOT_FOUND";
+    public const string ErrorMissingInput = "MISSING_INPUT";
+    private const string CommandName = "compile-extraction-prompt";
     public const string ErrorDocumentUnreadable = "DOCUMENT_UNREADABLE";
 
     public CompileExtractionPromptCommand()
@@ -62,7 +65,7 @@ public sealed class CompileExtractionPromptCommand : Command
 
         // Spec 080 A5: read command — defaults when there is no config, exit 1 on a malformed or invalid one
         // (never a silent fallback, which emptied existing_criteria and churned IDs).
-        var loaded = await ConfigLoader.LoadForReadAsync(currentDir, ct);
+        var loaded = await ConfigLoader.LoadForReadAsync(currentDir, ConfigSections.None, ct); // reads only coverage
         if (!loaded.IsSuccess)
         {
             WriteFailure(json, null, loaded.Error!, warnings);
@@ -155,8 +158,9 @@ public sealed class CompileExtractionPromptCommand : Command
         }
 
         var normalized = CriteriaPaths.NormalizeSourceDoc(doc, currentDir).Path ?? CriteriaPaths.NormalizeLexical(doc);
+        // Spec 081 C1: repo-aware comparison, so an index entry stored as an absolute path still matches.
         var source = index.Sources.FirstOrDefault(s => CriteriaPaths.IsDocumentSource(s)
-            && string.Equals(CriteriaPaths.NormalizeLexical(s.SourceDoc), normalized, StringComparison.OrdinalIgnoreCase));
+            && CriteriaProvenance.SameDocument(s.SourceDoc, normalized, currentDir));
         if (source is null || string.IsNullOrWhiteSpace(source.File))
         {
             return [];
@@ -169,7 +173,7 @@ public sealed class CompileExtractionPromptCommand : Command
         // accepts — so a returned ID is never another doc's (which ingest would reject with exit 7).
         if (CriteriaProvenance.IsShared(index, source))
         {
-            criteria = CriteriaProvenance.OwnedBy(criteria, normalized);
+            criteria = CriteriaProvenance.OwnedBy(criteria, normalized, currentDir);
         }
 
         return criteria;
@@ -183,13 +187,9 @@ public sealed class CompileExtractionPromptCommand : Command
     {
         if (json)
         {
-            Console.Error.WriteLine(JsonSerializer.Serialize(new
-            {
-                refused = true,
-                missing_input = missingInput,
-                message,
-                warnings
-            }));
+            // Spec 081 C4: the shared criteria failure shape; the refusal keeps which input was missing.
+            CriteriaCommandIO.WriteFailureJson(CommandName, ErrorMissingInput, [message], warnings,
+                new Dictionary<string, object?> { ["missing_input"] = missingInput });
             return;
         }
 
@@ -205,12 +205,7 @@ public sealed class CompileExtractionPromptCommand : Command
     {
         if (json)
         {
-            Console.Error.WriteLine(JsonSerializer.Serialize(new
-            {
-                error_code = errorCode,
-                message,
-                warnings
-            }));
+            CriteriaCommandIO.WriteFailureJson(CommandName, errorCode, [message], warnings);
             return;
         }
 

@@ -39,13 +39,17 @@ The criteria commands and the critic/repair prompt compilers load `spectra.confi
 | Situation | Read commands¹ | Write commands² |
 |---|---|---|
 | `spectra.config.json` missing | Run with the built-in defaults | Exit 1: `No spectra.config.json found. Run 'spectra init' first.` |
-| Malformed JSON, or a missing `source` / `tests` / `ai` section | Exit 1: `spectra.config.json is invalid: …` | Exit 1: same message |
+| A section the command doesn't read is missing (e.g. `ai`, which none of them reads) | Accepted | Accepted |
+| A section the command reads is missing | That section's defaults + `Warning: spectra.config.json has no '<section>' section; using the built-in defaults.` | Exit 1: `spectra.config.json is invalid: missing '<section>' section` |
+| Malformed JSON, or a value of the wrong type | Exit 1: `spectra.config.json is invalid: …` | Exit 1: same message |
 
 ¹ `ai compile-extraction-prompt`, `ai compile-critic-prompt`, `ai compile-repair-prompt`, `ai compile-repair-batch`,
 `docs changed`. ² `ai ingest-criteria`, `docs retire`, `docs apply-move`, `docs migrate-criteria`,
 `ai analyze --import-criteria`.
 
-No command continues on defaults after failing to parse a config. In JSON mode the criteria write commands put
+Sections each command reads: the critic and repair compilers read `source` and `tests`; `docs changed` reads
+`source`; `ingest-criteria` and `docs retire` read `tests` (for the reference counts); the others read neither.
+`coverage` is always optional. No command continues on defaults after failing to parse a config. In JSON mode the criteria write commands put
 the message in their failure JSON on stderr, `--import-criteria` in its `ErrorResult` on stdout,
 `compile-extraction-prompt` in its failure JSON on stderr; the other read commands print it as a stderr line.
 
@@ -324,9 +328,9 @@ spectra ai compile-extraction-prompt --doc docs/payment.md --component payment
 - It refuses to emit when `--doc` is missing, writing nothing to stdout and reporting the missing input
   (`missing_input` JSON field) while exiting **4**. A document that does not exist or cannot be read exits
   **1** (`DOCUMENT_NOT_FOUND` / `DOCUMENT_UNREADABLE`).
-- In JSON mode every failure is exactly one JSON document on stderr, always with a `warnings` array:
-  `{ "refused": true, "missing_input", "message", "warnings" }` for a refusal, and
-  `{ "error_code", "message", "warnings" }` for an error (`error_code` is `null` for a config error). On success,
+- In JSON mode every failure is exactly one JSON document on stderr, in the shape shared by all criteria commands:
+  `{ "command": "compile-extraction-prompt", "success": false, "error_code", "errors", "warnings" }`. A refusal has
+  `error_code: "MISSING_INPUT"` and adds `missing_input`; `error_code` is `null` for a config error. On success,
   warnings are printed to stderr as text and the prompt is on stdout.
 - An empty or whitespace document short-circuits as a genuine
   "nothing to extract" (`Extracted, []`): it emits **no** prompt, performs no
@@ -372,9 +376,13 @@ cat ./criteria.json | spectra ai ingest-criteria --doc docs/payment.md
 - `--dry-run` computes everything (IDs, changeset) without writing.
 - Tags compare as a case-insensitive set: tags that differ only in order or case are not a change, and the
   stored text is kept.
-- A classified response that is refused before anything is persisted reports `"outcome": "Rejected"` with its
-  `error_code`. Errors before any response is classified (config, `--from` file not found) use the same failure
-  JSON shape on stderr, without an `outcome`.
+- Failures in JSON mode are one document on stderr in the shape shared by all criteria commands:
+  `{ "command": "ingest-criteria", "success": false, "error_code", "errors", "warnings" }`. A classified response
+  that is refused, or fails to parse, adds `outcome` (`Rejected`, `EmptyResponse`, `ParseFailure`). Errors before
+  any response is classified (config, `--from` file not found) carry no `outcome`.
+- Comparing criterion text ignores markup: Markdown emphasis, links and code, HTML comments, and tags of known HTML
+  elements (with valued or bare boolean attributes such as `<td nowrap>`). Angle brackets used as comparisons
+  (`a<b and c>d`) or placeholders (`<Limit>`, `<data>`) are text.
 - Exit code is `0` when extracted/persisted (or unchanged), `5` for `EmptyResponse`, `6` for `ParseFailure`,
   `7` for `INVALID_CRITERION_ID`, and `1` for other errors (`CRITERIA_FILE_UNREADABLE`,
   `CRITERIA_FILE_COLLISION`, `INVALID_DOC_PATH`, `LOCK_TIMEOUT`, config errors).

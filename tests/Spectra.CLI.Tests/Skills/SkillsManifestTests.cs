@@ -452,4 +452,18 @@ public class SkillsManifestTests : IDisposable
             Assert.Contains(code, section);
         }
     }
+
+    // Spec 081 C4: the compile step reads the unified failure fields.
+    [Fact]
+    public void CriteriaSkill_CompileStep_ReadsErrorsNotMessage()
+    {
+        var content = SkillContent.All["spectra-criteria"];
+        var start = content.IndexOf("**2a.", StringComparison.Ordinal);
+        var end = content.IndexOf("**2b.", start, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start);
+        var section = content[start..end];
+
+        Assert.Contains("errors[0]", section);
+        Assert.DoesNotContain("`message`", section);
+    }
 }

@@ -147,7 +147,7 @@ public sealed class CriteriaIngestor
         if (sharedFile)
         {
             // A past base-name collision: only the criteria this doc wrote are its own (per-criterion provenance).
-            previous = CriteriaProvenance.OwnedBy(previous, doc);
+            previous = CriteriaProvenance.OwnedBy(previous, doc, currentDir);
         }
 
         // FR-004/FR-005: validate returned IDs, then the one-to-one normalised-text fallback.

@@ -97,6 +97,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `spectra-criteria` skill had no instruction for exit 1 from `ingest-criteria`, `apply-move` and `retire`;
   it now reports the error code and stops for that document, retrying once on `LOCK_TIMEOUT`.
 
+### Changed (review fixes, Spec 081)
+
+- **Config sections a command doesn't read are never required.** A `spectra.config.json` without an `ai` section is
+  accepted by every criteria and compile command (none of them reads it). Each command checks only the sections it
+  reads. If one of those is missing, a read command (`compile-critic-prompt`, `compile-repair-prompt`,
+  `compile-repair-batch`, `docs changed`) uses that section's built-in defaults and prints a warning naming it. A write
+  command (`ingest-criteria`, `docs retire`) exits 1 with `spectra.config.json is invalid: missing '<section>' section`.
+  `coverage` stays optional. Malformed JSON and wrong types are still exit 1 everywhere.
+- **One failure shape for the criteria commands.** In JSON mode, every failure of `compile-extraction-prompt`,
+  `ingest-criteria`, `docs retire`, `docs apply-move` and `docs migrate-criteria` is one document on stderr:
+  `{ "command", "success": false, "error_code", "errors", "warnings" }`, plus `outcome` on ingest failures and
+  `missing_input` on compile refusals (`error_code: "MISSING_INPUT"`). `compile-extraction-prompt` no longer emits
+  `refused` or `message`. Exit codes and human-mode output are unchanged.
+- **More doc markup is ignored when comparing criteria.** The normaliser also strips `figure`, `figcaption`, `details`,
+  `summary`, `section`, `article`, `aside`, `caption`, `col`, `colgroup`, `tfoot`, `center`, `font`, `picture`, `source`,
+  `big`, `tt`, `wbr`, `samp`, `dfn`, `bdi`, `bdo`, `ruby`, `rt`, `rp`, `input`, `video`, `audio` and `iframe` tags,
+  and accepts bare boolean attributes (`<td nowrap>`, `<details open>`). Comparisons such as `a<b and c>d`, and
+  placeholder words such as `<data>`, `<time>`, `<label>` and `<header>`, stay text.
+
+### Fixed (review fixes, Spec 081)
+
+- In a shared (pre-2.6) criteria file, a criterion whose `source_doc` was stored as an absolute path belonged to no
+  document. Re-extraction changed every ID, and retire and apply-move left the criteria behind. Ownership, and the
+  index lookup in `compile-extraction-prompt`, `docs changed` and the write commands (incl. `--dry-run`), now compare
+  repository-relative paths.
+- A test file's keep-chomped block value (`|+`, `>+`) lost its trailing blank lines when the key after it was removed
+  on rewrite. Those lines now stay with the value.
+
 ### Notes
 
 - **One-time `source_section` churn.** Because `source_section` is now read, the first re-extraction after

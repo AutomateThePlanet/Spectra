@@ -147,6 +147,16 @@ system-under-test is unrelated to SPECTRA's removed execution adapter.
 - File-based (Markdown/YAML/JSON in `test-cases/`, `docs/_index/`, `docs/criteria/`, `_index.json`, `_manifest.yaml`, `_checksums.json`, `_criteria_index.yaml`) (045-doc-index-restructure)
 
 ## Recent Changes
+- **081-review-fixes-080 (v2.6.0, unreleased)**: Part C review fixes for 080; no features; each item has a test that fails on `1c8d8de`.
+  - **C1:** `CriteriaProvenance.OwnedBy(criteria, doc, repoRoot)` and the new `SameDocument(a, b, repoRoot)` compare `CriteriaPaths.NormalizeSourceDoc` forms. They are used for ownership (ingest, apply-move, retire, compile, `LeaveSharedFileAsync`) and for index lookup (`CriteriaWorkspace.FindDocumentSource`, compile, `DocsChangedHandler`). An absolute in-repo `source_doc` matches; out-of-repo or empty belongs to no document.
+  - **C2:** `ConfigLoader.LoadForReadAsync/LoadForWriteAsync(repoRoot, ConfigSections reads, ct)`, with `[Flags] ConfigSections { None, Source, Tests }`.
+    - Missing `source`/`tests`/`ai` are filled with `{}` before deserializing, so `SpectraConfig` is untouched.
+    - A missing section in `reads` gives `ConfigLoadResult.Warnings` (read commands) or `spectra.config.json is invalid: missing '<s>' section` (write commands).
+    - Reads: critic/repair/repair-batch `Source|Tests`; `docs changed` `Source`; ingest/retire `Tests`; others `None`. `coverage` stays optional; `ai` is never required.
+  - **C3:** the `TextNormalizer` tag whitelist gains figure/figcaption/details/summary/section/article/aside/caption/col/colgroup/tfoot/center/font/picture/source/big/tt/wbr/samp/dfn/bdi/bdo/ruby/rt/rp/input/video/audio/iframe, plus bare boolean attributes from a fixed list. Placeholder-prone names (header/footer/nav/main/time/data/label/button) stay text.
+  - **C4:** `CriteriaCommandIO.WriteFailureJson` is the one failure shape: `{command, success, error_code, errors, warnings}` plus extras (`outcome` on ingest, `missing_input` on compile refusals with `MISSING_INPUT`). `compile-extraction-prompt` lost `refused`/`message`; the skill's Step 2a reads `errors[0]`.
+  - **C5:** `TestCaseParser` tracks each entry's last scalar. For a keep-chomped block (`|+`, `>+`, any depth, indicator order-free; the start mark is at the indicator, pinned by a test), trailing blank lines stay in `RawText`, and only lines from the first column-0 comment detach.
+  - Core 785 / CLI 1535 (1 pre-existing unrelated failure: ProfileFormatLoaderTests) / Execution 228 / Integration 8.
 - **080-review-fixes-078-079 (v2.6.0, unreleased)**: Review fixes for 078 and 079; no features; each item has a test that fails on `1ba172a`.
   - **A1:** `UpdateHandler.ApplyChangesAsync` writes and deletes the test's own file (`TestFilePathOf`), not `{id}.md`.
   - **A2:** `SourceRefResolver` allows the repo root **and** the configured source dir, even outside the repo; `MissingReason.OutsideRepository` → `OutsideAllowedRoots`. `SourceRefDocumentLoader.LoadAsync` takes the source dir and says why a ref was refused (`MissingMessage`).
