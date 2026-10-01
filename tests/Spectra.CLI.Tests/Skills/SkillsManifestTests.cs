@@ -475,7 +475,8 @@ public class SkillsManifestTests : IDisposable
 
         Assert.Contains("CONFIG_MISSING", content);
         Assert.Contains("CONFIG_INVALID", content);
-        Assert.Contains("CONFIG_SECTION_MISSING", content);
+        // Spec 083: no section is ever required, so CONFIG_SECTION_MISSING no longer exists.
+        Assert.DoesNotContain("CONFIG_SECTION_MISSING", content);
         Assert.DoesNotContain("`null` for a config", content);
         Assert.DoesNotContain("with `error_code` `null`", content);
     }

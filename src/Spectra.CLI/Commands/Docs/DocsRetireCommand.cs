@@ -39,8 +39,8 @@ public sealed class DocsRetireCommand : Command
     private static async Task<int> RunAsync(string? docArg, bool dryRun, bool json, CancellationToken ct)
     {
         var root = Directory.GetCurrentDirectory();
-        // Spec 082 A1: criteria are written under `coverage` (required); `tests` only feeds the reference counts.
-        var loaded = await CriteriaCommandIO.LoadConfigAsync(root, ConfigSections.Coverage, ConfigSections.Tests, ct);
+        // Spec 083: reads `tests` (reference counts) — a missing one warns; no section is required.
+        var loaded = await CriteriaCommandIO.LoadConfigAsync(root, ConfigSections.Tests, ct);
         if (!loaded.IsSuccess)
         {
             CriteriaCommandIO.WriteFailure(json, Name, loaded.ErrorCode, loaded.Error!);

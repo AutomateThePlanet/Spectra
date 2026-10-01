@@ -296,9 +296,9 @@ public sealed class AnalyzeHandler
 
             // Spec 080 A5: a write command — missing or invalid config is an error, reported on the command's
             // usual path (ErrorResult on stdout in JSON mode, stderr text otherwise).
-            // Spec 082 A1: imported criteria are written under `coverage`, so it is required.
+            // Spec 083: no section is required; the config FILE is what a write needs.
             var loaded = await Spectra.Core.Config.ConfigLoader.LoadForWriteAsync(
-                currentDir, Spectra.Core.Config.ConfigSections.Coverage, Spectra.Core.Config.ConfigSections.None, ct);
+                currentDir, Spectra.Core.Config.ConfigSections.None, ct);
             if (!loaded.IsSuccess)
             {
                 if (_outputFormat == OutputFormat.Json)
