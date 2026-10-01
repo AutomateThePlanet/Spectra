@@ -147,6 +147,17 @@ system-under-test is unrelated to SPECTRA's removed execution adapter.
 - File-based (Markdown/YAML/JSON in `test-cases/`, `docs/_index/`, `docs/criteria/`, `_index.json`, `_manifest.yaml`, `_checksums.json`, `_criteria_index.yaml`) (045-doc-index-restructure)
 
 ## Recent Changes
+- **083-review-fixes-082 (v2.6.0, unreleased)**: One config rule, checked against real workspaces. **Root cause of 080→081→082:** config rules were checked against `SpectraConfig.Default` and fixtures, never against the embedded init template (`src/Spectra.CLI/Templates/spectra.config.json`, which had no `coverage`). So 082 broke every init-created and pre-existing workspace.
+  - **Rule:** no section is ever required.
+    - `ConfigLoader.LoadForReadAsync` / `LoadForWriteAsync(repoRoot, reads, ct)`; `requires`, `ConfigSections.Coverage` and `CONFIG_SECTION_MISSING` are removed.
+    - `source`/`tests` missing or null → defaults + a warning, only where read. `coverage` and `ai` are filled silently.
+    - The only codes are `CONFIG_MISSING` (write commands, no file) and `CONFIG_INVALID`.
+    - Reads: ingest/retire `Tests`; critic/repair/repair-batch `Source|Tests`; `docs changed` `Source`; others `None`.
+  - **F1:** the init template gains `coverage` (`docs/criteria`, `docs/criteria/_criteria_index.yaml`).
+  - **F3:** case-variant duplicate top-level keys → `CONFIG_INVALID` naming both spellings. An exact duplicate (which threw `ArgumentException` and crashed) → `CONFIG_INVALID`.
+  - **F4:** the `TextNormalizer` tag regex plus the `IsMarkup` evaluator give five HTML forms: closing; with attributes; self-closing bare (any case); lowercase `br`/`hr`/`wbr`; bare opening closed later with **exactly** the same spelling. Everything else is text. Residual documented.
+  - **Guards:** `ConfigRuleMatrixTests` (T1, rows built from the embedded template) and `InitTemplateWorkspaceTests` (T2: the real `spectra init` → full criteria workflow; T3: the same without `coverage`). Any future config rule must keep these green.
+  - Core 839 / CLI 1592 (1 pre-existing unrelated failure: ProfileFormatLoaderTests) / Execution 228 / Integration 8.
 - **082-review-fixes-081 (v2.6.0, unreleased)**: Review fixes for 081; no features; each item has a test that fails on `7df3fef`.
   - **A1:** `ConfigSections.Coverage`, and `ConfigLoader.LoadForWriteAsync(repoRoot, requires, reads, ct)`. A missing section in `requires` → `CONFIG_SECTION_MISSING`; one only in `reads` → defaults + warning.
     - Criteria writes (ingest, retire, apply-move, migrate, `--import-criteria`) require `Coverage`. Ingest and retire read `Tests`, and only warn when it is missing.

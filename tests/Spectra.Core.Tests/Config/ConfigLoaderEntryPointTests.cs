@@ -94,25 +94,15 @@ public sealed class ConfigLoaderEntryPointTests : IDisposable
         Assert.Contains("'tests'", warning);
     }
 
-    // Spec 082 A1: replaces 081's Write_MissingSectionItReads_IsAnError (which refused a write for a missing `tests`).
-    // A write refuses only for a section it requires — `coverage`, where criteria are written.
+    // Spec 083: no section is ever required. (082's Write_MissingRequiredSection_IsAnError is removed — requiring
+    // `coverage` broke every workspace created by `spectra init`, whose template had no `coverage`.) `reads:` is always
+    // passed by name so the call means the same on 3594d62, where the second positional parameter was `requires`.
     [Fact]
-    public async Task Write_MissingRequiredSection_IsAnError_NamingTheSection()
-    {
-        WriteConfig("""{ "source": { "local_dir": "docs/" }, "tests": {}, "ai": {} }""");
-
-        var result = await ConfigLoader.LoadForWriteAsync(_root, requires: ConfigSections.Coverage);
-
-        Assert.Null(result.Config);
-        Assert.Equal("spectra.config.json is invalid: missing 'coverage' section", result.Error);
-    }
-
-    [Fact]
-    public async Task Write_MissingSectionItOnlyReads_Warns()
+    public async Task Write_MissingSectionItReads_Warns()
     {
         WriteConfig("""{ "source": {}, "coverage": { "criteria_dir": "req/" }, "ai": {} }""");
 
-        var result = await ConfigLoader.LoadForWriteAsync(_root, requires: ConfigSections.Coverage, reads: ConfigSections.Tests);
+        var result = await ConfigLoader.LoadForWriteAsync(_root, reads: ConfigSections.Tests);
 
         Assert.Null(result.Error);
         Assert.Equal("test-cases/", result.Config!.Tests.Dir);
@@ -121,17 +111,23 @@ public sealed class ConfigLoaderEntryPointTests : IDisposable
         Assert.Contains("'tests'", warning);
     }
 
-    [Fact]
-    public async Task Read_MissingCoverage_UsesDefaults_AndWarns()
+    // Spec 083: a missing `coverage` gives its built-in defaults silently, for every command (replaces 082's
+    // Read_MissingCoverage_UsesDefaults_AndWarns — pre-083 workspaces have no `coverage`, so it warned on every run).
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task MissingCoverage_UsesDefaults_WithoutWarning(bool forWrite)
     {
         WriteConfig("""{ "source": {}, "tests": {}, "ai": {} }""");
 
-        var result = await ConfigLoader.LoadForReadAsync(_root, ConfigSections.Coverage);
+        var result = forWrite
+            ? await ConfigLoader.LoadForWriteAsync(_root, reads: ConfigSections.Source | ConfigSections.Tests)
+            : await ConfigLoader.LoadForReadAsync(_root, reads: ConfigSections.Source | ConfigSections.Tests);
 
         Assert.Null(result.Error);
         Assert.Equal("docs/criteria", result.Config!.Coverage.CriteriaDir);
-        var warning = Assert.Single(result.Warnings);
-        Assert.Contains("'coverage'", warning);
+        Assert.Equal("docs/criteria/_criteria_index.yaml", result.Config.Coverage.CriteriaFile);
+        Assert.Empty(result.Warnings);
     }
 
     [Theory]
@@ -213,8 +209,8 @@ public sealed class ConfigLoaderEntryPointTests : IDisposable
     private async Task<(ConfigLoadResult Read, ConfigLoadResult Write)> LoadBothAsync(string json)
     {
         WriteConfig(json);
-        return (await ConfigLoader.LoadForReadAsync(_root, ConfigSections.Source | ConfigSections.Tests | ConfigSections.Coverage),
-            await ConfigLoader.LoadForWriteAsync(_root, requires: ConfigSections.Coverage, reads: ConfigSections.Tests));
+        return (await ConfigLoader.LoadForReadAsync(_root, reads: ConfigSections.Source | ConfigSections.Tests),
+            await ConfigLoader.LoadForWriteAsync(_root, reads: ConfigSections.Tests));
     }
 
     private static void AssertSameOutcome(ConfigLoadResult missing, ConfigLoadResult nulled)
@@ -246,6 +242,12 @@ public sealed class ConfigLoaderEntryPointTests : IDisposable
 
         AssertSameOutcome(missing.Read, nulled.Read);
         AssertSameOutcome(missing.Write, nulled.Write);
+
+        // Spec 083: only `source` and `tests` (when read) warn; `coverage` and `ai` are filled silently.
+        var expected = section is "source" or "tests" ? 1 : 0;
+        Assert.Equal(expected, nulled.Read.Warnings.Count);
+        Assert.Null(nulled.Read.Error);
+        Assert.Null(nulled.Write.Error);
     }
 
     [Theory]
@@ -274,12 +276,41 @@ public sealed class ConfigLoaderEntryPointTests : IDisposable
             Assert.Equal("CONFIG_INVALID", (await ConfigLoader.LoadForWriteAsync(_root)).ErrorCode);
         }
 
+        // Spec 083: CONFIG_SECTION_MISSING no longer exists — a config without `coverage` loads for writes too.
         WriteConfig("{ \"source\": {}, \"tests\": {} }");
-        var sectionMissing = await ConfigLoader.LoadForWriteAsync(_root, requires: ConfigSections.Coverage);
-        Assert.Equal("CONFIG_SECTION_MISSING", sectionMissing.ErrorCode);
-        Assert.Contains("'coverage'", sectionMissing.Error);
-
-        var ok = await ConfigLoader.LoadForReadAsync(_root, ConfigSections.Coverage);
+        var ok = await ConfigLoader.LoadForWriteAsync(_root, reads: ConfigSections.Tests);
         Assert.Null(ok.ErrorCode);
+        Assert.Null(ok.Error);
+    }
+
+    // ---------- Spec 083 F3: duplicate top-level keys ----------
+
+    [Theory]
+    [InlineData("{ \"tests\": {}, \"Tests\": null }", "tests", "Tests")]
+    [InlineData("{ \"generation\": {}, \"Generation\": {} }", "generation", "Generation")]
+    public async Task CaseVariantDuplicateKeys_AreInvalid_NamingTheKey(string json, string first, string second)
+    {
+        WriteConfig(json);
+
+        foreach (var result in new[] { await ConfigLoader.LoadForReadAsync(_root), await ConfigLoader.LoadForWriteAsync(_root) })
+        {
+            Assert.Null(result.Config);
+            Assert.Equal("CONFIG_INVALID", result.ErrorCode);
+            Assert.Contains($"'{first}'", result.Error);
+            Assert.Contains($"'{second}'", result.Error);
+        }
+    }
+
+    [Fact]
+    public async Task ExactDuplicateKey_IsInvalid_NotAnException()
+    {
+        WriteConfig("{ \"source\": {}, \"source\": {} }");
+
+        var read = await ConfigLoader.LoadForReadAsync(_root);
+        var write = await ConfigLoader.LoadForWriteAsync(_root);
+
+        Assert.Equal("CONFIG_INVALID", read.ErrorCode);
+        Assert.Equal("CONFIG_INVALID", write.ErrorCode);
+        Assert.StartsWith(ConfigLoader.InvalidConfigPrefix, read.Error);
     }
 }

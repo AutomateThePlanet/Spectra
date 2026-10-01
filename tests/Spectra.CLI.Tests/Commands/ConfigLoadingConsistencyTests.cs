@@ -264,33 +264,58 @@ public sealed class ConfigLoadingConsistencyTests : IDisposable
         { "ai analyze --import-criteria import.yaml", true }
     };
 
+    /// <summary>
+    /// Seeds, with the full config, whatever a write command needs to succeed: an indexed-then-deleted
+    /// <c>docs/gone.md</c> for retire, and one with <c>docs/a.md</c>'s content for apply-move (so the move is valid).
+    /// </summary>
+    private async Task SeedForAsync(string command)
+    {
+        if (command.StartsWith("docs retire", StringComparison.Ordinal) || command.StartsWith("docs apply-move", StringComparison.Ordinal))
+        {
+            var content = command.StartsWith("docs apply-move", StringComparison.Ordinal)
+                ? File.ReadAllText(_ws.PathOf("docs/a.md"))
+                : "# Gone\n\nGone MUST work.\n";
+            _ws.WriteDoc("docs/gone.md", content);
+            var (seedExit, _, seedErr) = await _ws.IngestAsync("docs/gone.md", new { text = "Gone MUST work", rfc2119 = "MUST" });
+            Assert.True(seedExit == 0, seedErr);
+            File.Delete(_ws.PathOf("docs/gone.md"));
+        }
+    }
+
+    // Spec 083: replaces 082's WriteCommand_MissingCoverage_Exits1_AndWritesNothing. No section is ever required —
+    // requiring `coverage` broke every workspace `spectra init` had created (its template had no `coverage`).
     [Theory]
     [MemberData(nameof(WriteCommandsWithDryRun))]
-    public async Task WriteCommand_MissingCoverage_Exits1_AndWritesNothing(string command, bool dryRun)
+    public async Task WriteCommand_MissingCoverage_Succeeds_WithoutWarning(string command, bool dryRun)
     {
+        await SeedForAsync(command);
         WriteConfig(SourceJson, TestsJson);
         var before = _ws.Snapshot();
 
         var (exit, output, err) = await RunAsync(dryRun ? command + " --dry-run" : command, json: false);
 
-        Assert.Equal(1, exit);
-        Assert.Contains("missing 'coverage' section", output + err);
-        Assert.Equal(before, _ws.Snapshot());
+        Assert.True(exit == 0, $"exit {exit}: {output} {err}");
+        Assert.DoesNotContain("missing 'coverage'", output + err);
+        Assert.DoesNotContain("'coverage'", output + err);
+        if (dryRun)
+            Assert.Equal(before, _ws.Snapshot());
+        else if (command.StartsWith("ai ingest-criteria", StringComparison.Ordinal))
+            Assert.True(File.Exists(_ws.PathOf("docs/criteria/docs/a.criteria.yaml")));
     }
 
+    // Spec 083: replaces 082's ReadCommand_MissingCoverage_UsesDefaults_AndWarns — `coverage` never warns.
     [Theory]
     [InlineData("ai compile-extraction-prompt --doc docs/a.md")]
     [InlineData("ai compile-critic-prompt --suite s --test TC-1")]
     [InlineData("docs changed")]
-    public async Task ReadCommand_MissingCoverage_UsesDefaults_AndWarns(string command)
+    public async Task ReadCommand_MissingCoverage_NoWarning(string command)
     {
         WriteConfig(SourceJson, TestsJson);
 
         var (exit, output, err) = await RunAsync(command, json: false);
 
         Assert.True(exit == 0, $"exit {exit}: {err}");
-        Assert.Contains((output + "\n" + err).Split('\n'),
-            l => l.Contains("Warning:", StringComparison.Ordinal) && l.Contains("'coverage'"));
+        Assert.DoesNotContain("'coverage'", output + err);
     }
 
     [Theory]
@@ -332,17 +357,17 @@ public sealed class ConfigLoadingConsistencyTests : IDisposable
         Assert.True(exit == 0, err);
     }
 
+    // Spec 083: replaces 082's NullCoverage_RefusesAWrite — a null `coverage` means its built-in defaults, silently.
     [Fact]
-    public async Task NullCoverage_RefusesAWrite_NamingTheSection()
+    public async Task NullCoverage_WriteSucceeds_WithoutWarning()
     {
         WriteConfig(SourceJson, TestsJson, "\"coverage\": null");
-        var before = _ws.Snapshot();
 
         var (exit, output, err) = await RunAsync("ai ingest-criteria --doc docs/a.md --from .spectra/criteria.json", json: false);
 
-        Assert.Equal(1, exit);
-        Assert.Contains("missing 'coverage' section", output + err);
-        Assert.Equal(before, _ws.Snapshot());
+        Assert.True(exit == 0, $"exit {exit}: {err}");
+        Assert.DoesNotContain("'coverage'", output + err);
+        Assert.True(File.Exists(_ws.PathOf("docs/criteria/docs/a.criteria.yaml")));
     }
 
     [Fact]
@@ -375,11 +400,7 @@ public sealed class ConfigLoadingConsistencyTests : IDisposable
         { "ai compile-critic-prompt --suite s --test TC-1", "malformed", "CONFIG_INVALID", "stderr" },
         { "docs changed", "malformed", "CONFIG_INVALID", "stderr" },
         { "ai analyze --import-criteria import.yaml", "malformed", "CONFIG_INVALID", "stdout" },
-        { "ai ingest-criteria --doc docs/a.md --from .spectra/criteria.json", "nocoverage", "CONFIG_SECTION_MISSING", "stderr" },
-        { "docs retire --doc docs/gone.md", "nocoverage", "CONFIG_SECTION_MISSING", "stderr" },
-        { "docs apply-move --from docs/gone.md --to docs/a.md", "nocoverage", "CONFIG_SECTION_MISSING", "stderr" },
-        { "docs migrate-criteria", "nocoverage", "CONFIG_SECTION_MISSING", "stderr" },
-        { "ai analyze --import-criteria import.yaml", "nocoverage", "CONFIG_SECTION_MISSING", "stdout" }
+
     };
 
     [Theory]
@@ -390,7 +411,7 @@ public sealed class ConfigLoadingConsistencyTests : IDisposable
         {
             case "none": RemoveConfig(); break;
             case "malformed": BreakConfig(); break;
-            default: WriteConfig(SourceJson, TestsJson); break;
+            default: throw new ArgumentOutOfRangeException(nameof(state), state, "Spec 083: no section is ever required.");
         }
 
         var (exit, output, err) = await RunAsync(command, json: true);
@@ -399,5 +420,22 @@ public sealed class ConfigLoadingConsistencyTests : IDisposable
         var failure = CriteriaTestWorkspace.Json(stream == "stdout" ? output : err);
         Assert.Equal(code, failure.GetProperty("error_code").GetString());
         Assert.True(failure.TryGetProperty("command", out _));
+    }
+
+    // ---------- Spec 083 F3 / SC-004: every in-scope command rejects case-variant duplicate keys ----------
+
+    [Theory]
+    [MemberData(nameof(ReadCommands))]
+    [MemberData(nameof(WriteCommands))]
+    public async Task CaseVariantDuplicateKey_IsRejected_ByEveryCommand(string command)
+    {
+        WriteConfig(SourceJson, TestsJson, CoverageJson, "\"Tests\": null");
+
+        var (exit, output, err) = await RunAsync(command, json: false);
+
+        Assert.Equal(1, exit);
+        Assert.Contains(ConfigLoader.InvalidConfigPrefix, output + err);
+        Assert.Contains("'tests'", output + err);
+        Assert.Contains("'Tests'", output + err);
     }
 }

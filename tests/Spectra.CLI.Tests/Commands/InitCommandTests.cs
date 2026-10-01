@@ -437,4 +437,17 @@ public class InitCommandTests : IDisposable
         var usagePath = Path.Combine(_testDir, "USAGE.md");
         Assert.False(File.Exists(usagePath), "USAGE.md should NOT exist when --skip-skills");
     }
+
+    // Spec 083 F1: the config `spectra init` writes shows where criteria go.
+    [Fact]
+    public async Task Init_WritesCoverageSection()
+    {
+        var exitCode = await new InitHandler(_logger, _testDir).HandleAsync(force: false);
+
+        Assert.Equal(ExitCodes.Success, exitCode);
+        using var config = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(_testDir, "spectra.config.json")));
+        var coverage = config.RootElement.GetProperty("coverage");
+        Assert.Equal("docs/criteria", coverage.GetProperty("criteria_dir").GetString());
+        Assert.Equal("docs/criteria/_criteria_index.yaml", coverage.GetProperty("criteria_file").GetString());
+    }
 }

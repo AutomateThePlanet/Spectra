@@ -31,8 +31,8 @@ public sealed class DocsMigrateCriteriaCommand : Command
     private static async Task<int> RunAsync(bool dryRun, bool json, CancellationToken ct)
     {
         var root = Directory.GetCurrentDirectory();
-        // Spec 082 A1: criteria are written under `coverage`, so it is required.
-        var loaded = await CriteriaCommandIO.LoadConfigAsync(root, ConfigSections.Coverage, ConfigSections.None, ct);
+        // Spec 083: reads no checked section; no section is required, the config FILE is what a write needs.
+        var loaded = await CriteriaCommandIO.LoadConfigAsync(root, ConfigSections.None, ct);
         if (!loaded.IsSuccess)
         {
             CriteriaCommandIO.WriteFailure(json, "docs-migrate-criteria", loaded.ErrorCode, loaded.Error!);

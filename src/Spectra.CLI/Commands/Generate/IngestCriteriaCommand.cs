@@ -58,8 +58,8 @@ public sealed class IngestCriteriaCommand : Command
         }
 
         var currentDir = Directory.GetCurrentDirectory();
-        // Spec 082 A1: criteria are written under `coverage` (required); `tests` only feeds the reference counts.
-        var loaded = await CriteriaCommandIO.LoadConfigAsync(currentDir, ConfigSections.Coverage, ConfigSections.Tests, ct);
+        // Spec 083: reads `tests` (reference counts) — a missing one warns; no section is required.
+        var loaded = await CriteriaCommandIO.LoadConfigAsync(currentDir, ConfigSections.Tests, ct);
         if (!loaded.IsSuccess)
         {
             CriteriaCommandIO.WriteFailure(json, "ingest-criteria", loaded.ErrorCode, loaded.Error!);

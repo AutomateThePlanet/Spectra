@@ -206,4 +206,38 @@ public class TextNormalizerTests
     {
         Assert.Equal(expected, TextNormalizer.Normalize(input));
     }
+
+    // ---------- Spec 083 F4: when an angle-bracket word counts as HTML (decision table, FR-012) ----------
+    // Markup only as: a closing tag; a tag with attributes; a self-closing bare tag; lowercase <br>/<hr>/<wbr>; or a bare
+    // opening tag closed later with EXACTLY the same spelling. Everything else is text — a missed change is worse than a
+    // spurious one. Residual (documented): a lowercase placeholder whose exact lowercase close follows is markup.
+    [Theory]
+    [InlineData("x</Summary>", "x")]
+    [InlineData("<details open>x", "x")]
+    [InlineData("<Details open>x", "x")]
+    [InlineData("<source srcset=\"a.webp\">x", "x")]
+    [InlineData("<col span=2>x", "x")]
+    [InlineData("a<br/>b", "a b")]
+    [InlineData("a<hr />b", "a b")]
+    [InlineData("a<BR/>b", "a b")]
+    [InlineData("a<br>b", "a b")]
+    [InlineData("a<hr>b", "a b")]
+    [InlineData("a<wbr>b", "a b")]
+    [InlineData("<p>x</p>", "x")]
+    [InlineData("<P>x</P>", "x")]
+    [InlineData("<details><summary>x</summary></details>", "x")]
+    [InlineData("Enter <summary> x </summary>", "enter x")]
+    [InlineData("send <source> now", "send <source> now")]
+    [InlineData("<input> field", "<input> field")]
+    [InlineData("the <summary> text", "the <summary> text")]
+    [InlineData("the <section> box", "the <section> box")]
+    [InlineData("<Summary>", "<summary>")]
+    [InlineData("<Source>", "<source>")]
+    [InlineData("<LIMIT>", "<limit>")]
+    [InlineData("<BR>", "<br>")]
+    [InlineData("<Summary> and </summary>", "<summary> and")]
+    public void HtmlForms_DecisionTable(string input, string expected)
+    {
+        Assert.Equal(expected, TextNormalizer.Normalize(input));
+    }
 }

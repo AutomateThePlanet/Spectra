@@ -30,7 +30,8 @@ public static partial class TextNormalizer
         // Spec 080 B9: only well-formed tags of known HTML elements count, so comparisons such as
         // "total<limit and qty>5" and placeholders such as "<Limit>" are text, not markup.
         s = HtmlCommentRegex().Replace(s, " ");
-        s = HtmlTagRegex().Replace(s, " ");
+        var source = s;
+        s = HtmlTagRegex().Replace(s, m => IsMarkup(m, source) ? " " : m.Value);
         s = WebUtility.HtmlDecode(s);
         // Inline code and emphasis. Markers only count outside words, so snake_case and "2 * 3" survive.
         s = InlineCodeRegex().Replace(s, "$1");
@@ -73,21 +74,41 @@ public static partial class TextNormalizer
         + @"(?=[\s/>]))";
 
     /// <summary>
-    /// A tag of a known HTML element written in HTML form (Spec 082 A2) — one of:
-    /// (a) a closing tag, any case (<c>&lt;/Summary&gt;</c>);
-    /// (b) a tag with at least one attribute, valued or a bare boolean one, any case (<c>&lt;Details open&gt;</c>);
-    /// (c) a bare tag with an all-lowercase name (<c>&lt;details&gt;</c>, <c>&lt;br/&gt;</c>);
-    /// (d) a bare opening tag, any case, closed later in the text (<c>&lt;P&gt;Para&lt;/P&gt;</c>).
-    /// Anything else in angle brackets is text: comparisons (<c>total&lt;limit and qty&gt;5</c>), placeholders
-    /// (<c>&lt;Summary&gt;</c>, <c>&lt;Source&gt;</c>, <c>&lt;Limit&gt;</c>, <c>&lt;LIMIT&gt;</c>, <c>&lt;BR&gt;</c>).
+    /// Candidate tags of a known HTML element (Spec 083 F4). The alternatives, in order:
+    /// a closing tag <c>&lt;/name&gt;</c> (any case); a tag with at least one well-formed attribute — valued or a known
+    /// bare boolean one — (any case); a self-closing bare tag <c>&lt;name/&gt;</c> (any case); the void elements
+    /// <c>&lt;br&gt;</c>, <c>&lt;hr&gt;</c>, <c>&lt;wbr&gt;</c> in lowercase; and a bare opening tag, captured as
+    /// <c>bare</c>, which <see cref="IsMarkup"/> accepts only when a closing tag of exactly the same spelling follows.
     /// </summary>
     [GeneratedRegex(
         "</(?:" + ElementNames + @")\s*>"
         + "|<(?:" + ElementNames + ")(?:" + Attribute + @")+\s*/?>"
-        + "|<(?-i:" + ElementNames + @")\s*/?>"
-        + "|<(?<n>" + ElementNames + @")\s*>(?=[\s\S]*?</\k<n>\s*>)",
+        + "|<(?:" + ElementNames + @")\s*/>"
+        + @"|<(?-i:br|hr|wbr)\s*>"
+        + "|<(?<bare>" + ElementNames + @")\s*>",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex HtmlTagRegex();
+
+    /// <summary>
+    /// Spec 083 F4: whether a candidate tag is markup. Every form except a bare opening tag is; a bare opening tag is
+    /// markup only when <c>&lt;/</c> + its exact spelling (case-sensitive) + <c>&gt;</c> appears later in the same text —
+    /// <c>&lt;p&gt;x&lt;/p&gt;</c>, <c>&lt;P&gt;x&lt;/P&gt;</c>. Anything else stays text, because a hidden wording change
+    /// is worse than a spurious "modified": <c>&lt;source&gt;</c> or <c>&lt;summary&gt;</c> with no matching close,
+    /// <c>&lt;Summary&gt;</c>, <c>&lt;LIMIT&gt;</c>, <c>&lt;BR&gt;</c>, and <c>&lt;Summary&gt;</c> when only
+    /// <c>&lt;/summary&gt;</c> follows. Accepted residual: a lowercase placeholder whose exact lowercase closing tag also
+    /// appears later in the same text is treated as markup.
+    /// </summary>
+    private static bool IsMarkup(Match match, string text)
+    {
+        var bare = match.Groups["bare"];
+        if (!bare.Success)
+        {
+            return true;
+        }
+
+        var after = text[(match.Index + match.Length)..];
+        return Regex.IsMatch(after, "</" + Regex.Escape(bare.Value) + @"\s*>", RegexOptions.CultureInvariant);
+    }
 
     [GeneratedRegex(@"`+([^`]+?)`+", RegexOptions.CultureInvariant)]
     private static partial Regex InlineCodeRegex();

@@ -148,6 +148,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `<Details>`, `<Caption>`) were stripped as markup, so a change inside one went unnoticed. A tag now counts as markup
   only in HTML form: lowercase, closing, with attributes, or opened and later closed (`<P>Para</P>`).
 
+### Changed (review fixes, Spec 083)
+
+- **One config rule; no section is ever required.** It replaces the per-section rules of the Spec 081 and 082
+  entries above:
+  - no `spectra.config.json`: read commands use the defaults, and write commands exit 1 with `CONFIG_MISSING`;
+  - a config that isn't valid JSON, isn't an object, can't be read, or has duplicate top-level keys (including keys
+    that differ only in case): exit 1 with `CONFIG_INVALID`;
+  - `source` or `tests` missing or `null`: the defaults, plus one warning, only in the commands that read that section;
+  - `coverage` missing or `null`: the defaults, with no warning;
+  - anything else: ignored.
+
+  **`CONFIG_SECTION_MISSING` is removed.**
+- **`spectra init` writes a `coverage` section** (`criteria_dir: docs/criteria`, `criteria_file:
+  docs/criteria/_criteria_index.yaml`), so new workspaces show where criteria go. Existing workspaces need no change.
+- **When criterion text counts as HTML.** A known element name in angle brackets is markup only as:
+  - a closing tag;
+  - a tag with attributes;
+  - a self-closing bare tag;
+  - a lowercase `<br>`, `<hr>` or `<wbr>`;
+  - or an opening tag closed later with exactly the same spelling.
+
+  Lowercase placeholders with no matching close (`<source>`, `<summary>`) are now text, and so is `<Summary>` when
+  only `</summary>` follows. Known residual: a lowercase placeholder with its exact lowercase close later in the text
+  counts as markup.
+
+### Fixed (review fixes, Spec 083)
+
+- **Criteria commands were broken in every real workspace.** The Spec 082 entry above made `ingest-criteria`,
+  `docs retire`, `docs apply-move`, `docs migrate-criteria` and `--import-criteria` refuse a config without
+  `coverage` (`CONFIG_SECTION_MISSING`). It also made `compile-extraction-prompt`, `compile-critic-prompt` and
+  `docs changed` warn about `coverage` on every run. But the config `spectra init` writes had no `coverage` section,
+  and neither do workspaces created before this release. The rule had been checked against the typed default config
+  and test fixtures, never against the init template. New end-to-end tests now run the real `spectra init`, and a
+  workspace without `coverage`, through the whole criteria workflow.
+- **Duplicate keys.** A config with an exact duplicate top-level key crashed the command with an unhandled exception.
+  Keys that differ only in case were silently resolved to the last one, possibly `null`. Both are now `CONFIG_INVALID`.
+
 ### Notes
 
 - **One-time `source_section` churn.** Because `source_section` is now read, the first re-extraction after

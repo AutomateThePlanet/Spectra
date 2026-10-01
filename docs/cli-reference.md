@@ -34,40 +34,44 @@ Related: [Getting Started](getting-started.md) | [Configuration](configuration.m
 
 ### Configuration
 
-The criteria commands and the critic/repair prompt compilers load `spectra.config.json` the same way:
+The criteria commands and the critic/repair prompt compilers load `spectra.config.json` by one rule. **No config
+section is ever required.** For write commands, the required config *file* is the protection against writing into
+the wrong folder.
 
 | Situation | Read commands¹ | Write commands² |
 |---|---|---|
-| `spectra.config.json` missing | Run with the built-in defaults | Exit 1: `No spectra.config.json found. Run 'spectra init' first.` (`CONFIG_MISSING`) |
-| A section the command doesn't declare is missing or `null` (e.g. `ai`, which none of them reads) | Accepted | Accepted |
-| A section the command reads is missing or `null` | That section's defaults + `Warning: spectra.config.json has no '<section>' section; using the built-in defaults.` | Same (defaults + warning) |
-| A section the command requires is missing or `null` | — | Exit 1: `spectra.config.json is invalid: missing '<section>' section` (`CONFIG_SECTION_MISSING`), nothing written, also under `--dry-run` |
-| Malformed JSON, a top level that is not an object, or a value of the wrong type | Exit 1: `spectra.config.json is invalid: …` (`CONFIG_INVALID`) | Exit 1: same |
+| No `spectra.config.json` | built-in defaults, no warning | exit 1, `No spectra.config.json found. Run 'spectra init' first.` (`CONFIG_MISSING`) |
+| Not valid JSON, not an object, unreadable, or an exact duplicate key | exit 1, `spectra.config.json is invalid: …` (`CONFIG_INVALID`) | same |
+| Two top-level keys that differ only in case (`coverage` and `Coverage`) | exit 1, `CONFIG_INVALID` naming both spellings | same |
+| `source` or `tests` missing or `null`, and the command reads it | defaults + one `Warning: spectra.config.json has no '<section>' section; using the built-in defaults.` | same |
+| `coverage` missing or `null` | defaults (`docs/criteria`, `docs/criteria/_criteria_index.yaml`), no warning | same |
+| Any section the command doesn't read, missing or `null` | ignored | ignored |
 
 ¹ `ai compile-extraction-prompt`, `ai compile-critic-prompt`, `ai compile-repair-prompt`, `ai compile-repair-batch`,
 `docs changed`. ² `ai ingest-criteria`, `docs retire`, `docs apply-move`, `docs migrate-criteria`,
 `ai analyze --import-criteria`.
 
-Sections each command declares:
+Sections each command reads, which are the only ones that can warn:
 
-| Command | Requires | Reads |
-|---|---|---|
-| `ingest-criteria`, `docs retire` | `coverage` | `tests` (referencing-test counts) |
-| `docs apply-move`, `docs migrate-criteria`, `--import-criteria` | `coverage` | — |
-| `compile-extraction-prompt` | — | `coverage` |
-| `compile-critic-prompt` | — | `source`, `tests`, `coverage` |
-| `compile-repair-prompt`, `compile-repair-batch` | — | `source`, `tests` |
-| `docs changed` | — | `source`, `coverage` |
+| Command | Reads |
+|---|---|
+| `ingest-criteria`, `docs retire` | `tests` (for the referencing-test counts) |
+| `compile-critic-prompt`, `compile-repair-prompt`, `compile-repair-batch` | `source`, `tests` |
+| `docs changed` | `source` |
+| `docs apply-move`, `docs migrate-criteria`, `--import-criteria`, `compile-extraction-prompt` | — |
 
-An empty object (`"coverage": {}`) counts as present, with its built-in defaults and no warning. No command continues
-on defaults after failing to parse a config.
+A warning appears in the command's `warnings` (JSON), or as a `Warning:` line. It never changes the exit code.
 
-In JSON mode the named code (`CONFIG_MISSING`, `CONFIG_INVALID`, `CONFIG_SECTION_MISSING`) is in the failure JSON:
+In JSON mode the error code (`CONFIG_MISSING` or `CONFIG_INVALID`) is in the failure JSON:
 - on stderr for the criteria write commands, `compile-extraction-prompt`, `compile-critic-prompt` and `docs changed`,
   in the shared shape `{ command, success, error_code, errors, warnings }`;
 - on stdout for `--import-criteria`, as `ErrorResult.error_code`.
 
 `compile-repair-prompt` and `compile-repair-batch` have no JSON mode, so they print the message as a stderr line.
+`CONFIG_SECTION_MISSING` (2.6.0 pre-release) no longer exists.
+
+Any future config rule is checked against the config `spectra init` writes and against a workspace created before the
+rule. The test suite does this end to end (`InitTemplateWorkspaceTests`).
 
 ---
 
@@ -81,7 +85,8 @@ Initialize a repository for SPECTRA.
 spectra init
 ```
 
-Creates `spectra.config.json`, `docs/`, `test-cases/`, `docs/criteria/_criteria_index.yaml`, `profiles/_default.yaml`, `.spectra/prompts/` (5 templates), `.claude/skills/` (12 bundled SKILLs), `.claude/agents/` (2 agent prompts), `CUSTOMIZATION.md`, and `USAGE.md`.
+Creates `spectra.config.json` (including a `coverage` section with `criteria_dir: docs/criteria` and `criteria_file:
+docs/criteria/_criteria_index.yaml`), `docs/`, `test-cases/`, `docs/criteria/_criteria_index.yaml`, `profiles/_default.yaml`, `.spectra/prompts/` (5 templates), `.claude/skills/` (12 bundled SKILLs), `.claude/agents/` (2 agent prompts), `CUSTOMIZATION.md`, and `USAGE.md`.
 
 **Options:**
 
@@ -397,10 +402,17 @@ cat ./criteria.json | spectra ai ingest-criteria --doc docs/payment.md
   that is refused, or fails to parse, adds `outcome` (`Rejected`, `EmptyResponse`, `ParseFailure`). Errors before
   any response is classified (config, `--from` file not found) carry no `outcome`.
 - Comparing criterion text ignores markup: Markdown emphasis, links and code, HTML comments, and tags of known HTML
-  elements written in HTML form — lowercase (`<details>`), closing (`</Summary>`), with attributes (`<td nowrap>`,
-  `<Details open>`), or opened and later closed (`<P>Para</P>`). Angle brackets used as comparisons (`a<b and c>d`)
-  or placeholders (`<Limit>`, `<data>`, `<Summary>`, `<Source>`, `<LIMIT>`) are text, so a change inside them is a
-  change.
+  elements in one of five HTML forms:
+  1. a closing tag (`</Summary>`);
+  2. a tag with at least one attribute (`<details open>`, `<col span=2>`);
+  3. a self-closing bare tag (`<br/>`, `<hr />`);
+  4. lowercase `<br>`, `<hr>`, `<wbr>`;
+  5. an opening tag closed later with **exactly** the same spelling (`<p>x</p>`, `<P>x</P>`).
+
+  Everything else in angle brackets is text, so a change inside it is reported. That includes `<source>`, `<input>`,
+  `<summary>` with no matching close, `<Summary>`, `<Source>`, `<LIMIT>`, `<BR>`, comparisons such as `a<b and c>d`,
+  and `<Summary>` when only `</summary>` follows. Known residual: a lowercase placeholder whose exact lowercase closing
+  tag appears later in the same text is treated as markup.
 - Exit code is `0` when extracted/persisted (or unchanged), `5` for `EmptyResponse`, `6` for `ParseFailure`,
   `7` for `INVALID_CRITERION_ID`, and `1` for other errors (`CRITERIA_FILE_UNREADABLE`,
   `CRITERIA_FILE_COLLISION`, `INVALID_DOC_PATH`, `LOCK_TIMEOUT`, config errors).
