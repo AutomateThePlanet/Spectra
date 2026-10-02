@@ -1,5 +1,7 @@
 using System.CommandLine;
 using System.Text.Json;
+using Spectra.CLI.Baseline;
+using Spectra.CLI.Criteria;
 using Spectra.CLI.Generation;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.IO;
@@ -95,7 +97,50 @@ public sealed class IngestTestsCommand : Command
             new TestFileWriter(), new IndexGenerator(), new IndexWriter());
         var ingestor = new GeneratedTestIngestor(persistence);
 
-        var result = await ingestor.IngestAsync(content, testsPath, suite, existingTests, ct);
+        // Spec 084 FR-027: take the baseline lock and load the suite baseline strictly BEFORE persisting, so an
+        // unreadable baseline or a lock timeout persists nothing; record entries for the persisted tests after.
+        IngestResult result;
+        BaselineWriteSummary? baselineSummary = null;
+        BaselineStoreException? afterPersist = null;
+        try
+        {
+            result = await BaselineStore.WithLockAsync(currentDir, async () =>
+            {
+                var baseline = await BaselineStore.LoadSuiteAsync(currentDir, testsPath, suite, ct);
+                var ingested = await ingestor.IngestAsync(content, testsPath, suite, existingTests, ct);
+                if (ingested.IsSuccess)
+                {
+                    try
+                    {
+                        var live = existingTests.Select(t => t.Id).Concat(ingested.PersistedTests.Select(t => t.Id));
+                        baselineSummary = await BaselineRecorder.RecordPersistedAsync(
+                            currentDir, config, testsPath, suite, baseline, ingested.PersistedTests, live, ct);
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or BaselineStoreException)
+                    {
+                        afterPersist = ex as BaselineStoreException
+                            ?? new BaselineStoreException(BaselineStore.ErrorBaselineWriteFailed, ex.Message);
+                    }
+                }
+
+                return ingested;
+            }, ct);
+        }
+        catch (BaselineStoreException ex)
+        {
+            CriteriaCommandIO.WriteFailure(json, "ingest-tests", ex.ErrorCode, ex.Message + " Nothing was persisted.");
+            return ExitError;
+        }
+
+        if (result.IsSuccess && afterPersist is not null)
+        {
+            var ids = result.PersistedTests.Select(t => t.Id).ToList();
+            CriteriaCommandIO.WriteFailure(json, "ingest-tests", afterPersist.ErrorCode,
+                $"The tests were persisted ({string.Join(", ", ids)}) but their baseline was not recorded: {afterPersist.Message} "
+                + $"Run 'spectra ai source-baseline --init --suite {suite}' to record it.",
+                extras: new Dictionary<string, object?> { ["persisted"] = ids });
+            return ExitError;
+        }
 
         if (result.IsSuccess)
         {
@@ -105,13 +150,15 @@ public sealed class IngestTestsCommand : Command
                 {
                     success = true,
                     persisted = result.PersistedTests.Count,
-                    ids = result.PersistedTests.Select(t => t.Id).ToArray()
+                    ids = result.PersistedTests.Select(t => t.Id).ToArray(),
+                    baseline = baselineSummary!.ToJson()
                 }));
             }
             else
             {
                 Console.Out.WriteLine($"Persisted {result.PersistedTests.Count} test(s) into '{suite}': "
                     + string.Join(", ", result.PersistedTests.Select(t => t.Id)));
+                Console.Out.WriteLine(baselineSummary!.ToHuman());
             }
             return ExitSuccess;
         }

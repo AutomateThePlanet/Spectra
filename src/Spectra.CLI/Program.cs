@@ -32,6 +32,10 @@ public class Program
     /// </summary>
     public static async Task<int> Main(string[] args)
     {
+        // Spec 084: stdout/stderr are UTF-8 (no BOM). On Windows a redirected console stream otherwise uses the legacy
+        // code page, so non-ASCII text in JSON or prompts read by the skills (→, —, Ü …) arrived as '?' or 0x1A.
+        Console.OutputEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+
         var rootCommand = CreateRootCommand();
         return await rootCommand.InvokeAsync(args);
     }

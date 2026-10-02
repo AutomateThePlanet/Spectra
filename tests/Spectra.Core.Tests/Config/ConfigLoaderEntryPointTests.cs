@@ -313,4 +313,51 @@ public sealed class ConfigLoaderEntryPointTests : IDisposable
         Assert.Equal("CONFIG_INVALID", write.ErrorCode);
         Assert.StartsWith(ConfigLoader.InvalidConfigPrefix, read.Error);
     }
+
+    // ---- Spec 084: the optional update-triage keys (FR-029) ----
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(", \"update\": null")]
+    [InlineData(", \"update\": {}")]
+    [InlineData(", \"update\": { \"group_size\": null, \"light_threshold_words\": null }")]
+    [InlineData(", \"update\": { \"chunk_size\": 5 }")]
+    public async Task Update_MissingOrNull_UsesTheDefaults_WithoutWarning(string update)
+    {
+        WriteConfig("{ \"source\": {}, \"tests\": {}, \"ai\": {}" + update + " }");
+
+        var result = await ConfigLoader.LoadForWriteAsync(_root, reads: ConfigSections.Source | ConfigSections.Tests);
+
+        Assert.Null(result.Error);
+        Assert.Equal(10, result.Config!.Update.EffectiveGroupSize);
+        Assert.Equal(12, result.Config.Update.EffectiveLightThresholdWords);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public async Task Update_Values_AreUsed()
+    {
+        WriteConfig("""{ "source": {}, "tests": {}, "update": { "group_size": 4, "light_threshold_words": 0 } }""");
+
+        var result = await ConfigLoader.LoadForReadAsync(_root, reads: ConfigSections.None);
+
+        Assert.Equal(4, result.Config!.Update.EffectiveGroupSize);
+        Assert.Equal(0, result.Config.Update.EffectiveLightThresholdWords);
+    }
+
+    [Theory]
+    [InlineData("{ \"group_size\": 0 }", "update.group_size")]
+    [InlineData("{ \"group_size\": -3 }", "update.group_size")]
+    [InlineData("{ \"group_size\": \"x\" }", "group_size")]
+    [InlineData("{ \"group_size\": 1.5 }", "group_size")]
+    [InlineData("{ \"light_threshold_words\": -1 }", "update.light_threshold_words")]
+    public async Task Update_OutOfRangeOrWrongType_IsInvalid_NamingTheKey(string update, string key)
+    {
+        WriteConfig("{ \"source\": {}, \"tests\": {}, \"update\": " + update + " }");
+
+        var result = await ConfigLoader.LoadForWriteAsync(_root, reads: ConfigSections.None);
+
+        Assert.Equal(ConfigLoader.ErrorConfigInvalid, result.ErrorCode);
+        Assert.Contains(key, result.Error);
+    }
 }

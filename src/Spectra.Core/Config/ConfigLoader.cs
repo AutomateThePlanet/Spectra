@@ -40,6 +40,7 @@ public sealed class ConfigLoader
     //   top-level keys equal ignoring case                      CONFIG_INVALID naming the key (both)
     //   `source` / `tests` missing or null, and read            defaults + one warning naming the section
     //   `coverage` (or any unread section) missing or null      defaults, silently
+    //   Spec 084: `update` missing or null, or its keys null       defaults, silently; out-of-range → CONFIG_INVALID
     // Any future config rule MUST be checked against the embedded init template (Templates/spectra.config.json, what
     // `spectra init` writes) and a pre-existing workspace — the InitTemplateWorkspaceTests guard. 080–082 checked rules
     // against SpectraConfig.Default and fixtures only, and 082 broke every init-created workspace.
@@ -72,7 +73,9 @@ public sealed class ConfigLoader
         ("source", ConfigSections.Source),
         ("tests", ConfigSections.Tests),
         ("coverage", ConfigSections.None),
-        ("ai", ConfigSections.None)
+        ("ai", ConfigSections.None),
+        // Spec 084: `"update": null` would otherwise leave SpectraConfig.Update null.
+        ("update", ConfigSections.None)
     ];
 
     private static async Task<ConfigLoadResult> LoadEntryAsync(
@@ -345,6 +348,19 @@ public sealed class ConfigLoader
         if (config.Ai is null)
         {
             errors.Add(new ParseError("MISSING_AI", "Configuration must have an 'ai' section", filePath));
+        }
+
+        // Spec 084: the optional update-triage keys (a missing or null key means its default).
+        if (config.Update is { GroupSize: < 1 })
+        {
+            errors.Add(new ParseError("INVALID_UPDATE_GROUP_SIZE",
+                "update.group_size must be an integer ≥ 1", filePath));
+        }
+
+        if (config.Update is { LightThresholdWords: < 0 })
+        {
+            errors.Add(new ParseError("INVALID_UPDATE_LIGHT_THRESHOLD",
+                "update.light_threshold_words must be an integer ≥ 0", filePath));
         }
 
         return errors;

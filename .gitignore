@@ -32,6 +32,8 @@ TestResults/
 
 # SPECTRA lock files
 .spectra.lock
+.spectra/baseline.lock
+.spectra/update-triage.json
 
 # SPECTRA per-session verdict files, drop trail, and repair scratch (scratch, not committed)
 .spectra/verdicts/

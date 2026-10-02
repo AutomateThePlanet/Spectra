@@ -400,6 +400,10 @@ public sealed class InitHandler
             ".spectra-progress.html",
             // Spec 079: cross-process lock for criteria index/file writes.
             ".spectra/criteria.lock",
+            // Spec 084: the baseline lock and the update-triage detail (scratch). The baselines
+            // (test-cases/*/_source-baseline.json) and .spectra/source-snapshots/ are committed.
+            ".spectra/baseline.lock",
+            ".spectra/update-triage.json",
         };
         var newEntries = new List<string>();
 

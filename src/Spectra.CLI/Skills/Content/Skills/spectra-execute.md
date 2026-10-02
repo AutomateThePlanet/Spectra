@@ -135,7 +135,7 @@ For these tasks, read the named SKILL first, then follow its steps exactly, runn
 
 | Task | SKILL | CLI command |
 |------|-------|-------------|
-| Update test cases | `spectra-update` | `spectra ai update --suite {suite} --dry-run --no-interaction --output-format json --verbosity quiet` |
+| Update test cases | `spectra-update` | `spectra ai update-triage --suite {suite} --dry-run --output-format json --verbosity quiet` |
 | Coverage analysis | `spectra-coverage` | `spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet` |
 | Dashboard | `spectra-dashboard` | (follow the SKILL) |
 | Extract criteria | `spectra-criteria` | (follow the SKILL) |

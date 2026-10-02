@@ -334,6 +334,12 @@ cat ./generated.json | spectra ai ingest-tests reporting
   `ingest-update` both enforce this on every round, including second-round re-ingests where
   existing test files are picked up from disk.
 - Exit code is `0` on success, `5` on a content-class failure, and `6` when the schema is invalid.
+- Spec 084: it takes `.spectra/baseline.lock` and loads the suite's `_source-baseline.json` **before** persisting
+  (`LOCK_TIMEOUT` / `BASELINE_UNREADABLE`, exit 1, persist nothing), then records a baseline entry for every test it
+  persisted; the success JSON gains `"baseline":{created,updated,unchanged,snapshots_written}`. If recording fails
+  after the tests were persisted, it exits 1 with `BASELINE_WRITE_FAILED` (or the store's code) and `persisted:[ids]`,
+  naming the recovery command. Baseline failures use the shared failure shape; the content and schema failures
+  (exit 5/6) keep their `{success, error_code, errors}` shape.
 
 ### `spectra ai compile-extraction-prompt` (criteria re-homing)
 
@@ -627,7 +633,145 @@ extraction (`ai analyze --extract-criteria` / `docs index`) write full entries t
 Duplicate detection (>80% title similarity) and the `ai.critic.max_concurrent` critic-throughput lever
 continue to apply to the verification path.
 
-### `spectra ai update`
+### `spectra ai update-triage` (Spec 084)
+
+Reports, per test, what changed in the doc sections it references (`source_refs`) and the acceptance criteria it
+links (`criteria`) since the test was written, edited or acknowledged. Deterministic and model-free; no git. This is
+the replacement for `spectra ai update`'s word-overlap classification.
+
+```bash
+spectra ai update-triage --suite checkout --output-format json
+spectra ai update-triage --all-suites --output-format json
+spectra ai update-triage --suite checkout --no-auto-ack     # report COSMETIC changes instead of acknowledging them
+spectra ai update-triage --suite checkout --dry-run         # write nothing at all
+```
+
+| Option | Description |
+|--------|-------------|
+| `--suite <s>` / `--all-suites` | The scope (exactly one is required) |
+| `--no-auto-ack` | Report COSMETIC refs instead of refreshing their baseline |
+| `--dry-run` | Write nothing: no auto-ack, no detail file, no lock file |
+
+**The unit of change.** A ref `file#anchor` is a section: the first heading whose key matches the anchor's key,
+through to the next heading of the same or a higher level (or the end of the file); the heading line is included. A
+ref without an anchor (or `file#`) is the whole file. The file is resolved as for every other command (repo root,
+then `source.local_dir`). The key is lowercase letters and digits only (percent-escapes decoded), so GitBook
+(`#Create-customer-records`), GitHub (`#create-customer-records`) and generator-style anchors all match the heading
+"Create customer records"; when two headings share a key, the first wins and `notes` says so. Headings inside fenced
+code (```` ``` ```` / `~~~`) are ignored.
+
+**States per ref**
+
+| State | Rule |
+|---|---|
+| UNCHANGED | The section's fingerprint equals the baseline's |
+| COSMETIC | It differs, but its normalised text equals the baseline snapshot: only markup, whitespace or case changed. Acknowledged automatically unless `--no-auto-ack` / `--dry-run` |
+| LOAD | The normalised text changed and a number changed, a modal word changed (`must`, `should`, `may`, `cannot`, `required`, `only`, `not`), more than `update.light_threshold_words` words changed, or no diff could be computed (snapshot missing, or a side over 5,000 words) |
+| LIGHT | Any other change of the normalised text |
+| REMOVED | The file no longer resolves, or the anchor matches no heading |
+
+Per linked criterion: CRITERIA_CHANGED (its normalised text changed) or CRITERIA_REMOVED (the ID is in no criteria
+file). A test's **bucket** is its worst state: REMOVED > CRITERIA_REMOVED > LOAD > CRITERIA_CHANGED > LIGHT > COSMETIC
+> UNCHANGED. A test with no baseline entry is **UNBASELINED** — reported apart, never as changed; one whose entry
+lacks some of its current refs or criteria is **partial** (bucketed on the rest).
+
+Fingerprints are `sha256:` over the section's raw text with line endings normalised to LF and a BOM removed (so
+Windows and Linux checkouts agree); the comparison text is the `TextNormalizer` key. Documented residuals: a
+case-only change (`Save` → `SAVE`) is COSMETIC; setext headings (`===` / `---` underlines) are not section
+boundaries; anchors keep diacritics (`#über` matches "Über", `#uber` does not). A changed word is counted as the
+larger of the words removed and the words added (a one-word replacement counts as 1).
+
+**Groups.** Tests in the same suite and bucket with the same set of changed refs and criteria form a group, chunked at
+`update.group_size` (default 10) in test-ID order and numbered `G1`, `G2`, … across the run (suite, then bucket worst
+first). COSMETIC and UNCHANGED tests form no groups.
+
+**Output.** stdout (JSON mode) is one compact line — `suites[].counts` (non-zero buckets only, plus `unbaselined` /
+`partial`; a missing bucket is 0), `groups` (`id`, `suite`, `bucket`, `refs`, `criteria`, `tests`, `why` such as
+`numbers: 10gb→50gb`, `modal: must→should`, `words: 15`, `no diff: snapshot missing`, `anchor not found`), `removed`,
+`unbaselined` (counts per suite), `no_tests` (headings of a document with a changed section that no triaged test
+references — generation hints; a whole-file ref covers its document, a section ref covers its sub-headings, and a
+parent of a covered heading counts as covered), `notes`, `auto_acked` (or `would_auto_ack` on `--dry-run`),
+`detail_file` and `warnings`. The full detail — every test's states, both fingerprints, the word diffs, the
+unbaselined IDs and the group membership — goes to `.spectra/update-triage.json` (gitignored scratch, not written on
+`--dry-run`). The human summary (counts, groups, hints) is printed in every mode: stderr in JSON mode, stdout
+otherwise. Exit code `0` whatever triage finds.
+
+### `spectra ai update-ack` (Spec 084)
+
+"Reviewed, no edit needed": refreshes the named tests' baseline entries (refs and criteria) to current content. Never
+writes a test file.
+
+```bash
+spectra ai update-ack --suite checkout --ids TC-104,TC-107
+spectra ai update-ack --suite checkout --group G2          # a group from the last update-triage
+```
+
+- `--group` resolves through `.spectra/update-triage.json`, and is refused (`TRIAGE_STALE`) when any member's sections
+  or criteria changed since that triage, so an ack never swallows a change triage didn't show.
+- A test that still lists a REMOVED ref or criterion can't be acknowledged (`REF_REMOVED` / `CRITERION_REMOVED`):
+  fix or drop the ref in its `source_refs` / `criteria` (then ack), or delete the test if the feature is gone.
+- An entry is recomputed in full, so refs and criteria the test no longer lists are dropped.
+- A change that is never acknowledged (or edited) stays in the baseline as it was and is reported on every triage.
+
+### `spectra ai source-baseline --init` (Spec 084)
+
+Adopts current content as the baseline for tests that have none — the bootstrap for a workspace created before 084.
+
+```bash
+spectra ai source-baseline --init --all-suites
+spectra ai source-baseline --init --suite checkout --force   # recompute every entry from current content
+```
+
+Without `--force` it creates missing entries and adds missing refs/criteria to partial entries, but never changes a
+recorded fingerprint or drops a key. Refs that don't resolve and unknown criterion IDs are left out (they show as
+unbaselined). Never writes a test file.
+
+**Storage.**
+
+| Path | Committed | Content |
+|---|---|---|
+| `{tests_dir}/{suite}/_source-baseline.json` | yes | `{"version":1,"tests":{"<id>":{"refs":{"<ref as written>":"sha256:…"},"criteria":{"<id>":"sha256:…"}}}}` — keys sorted, LF, one test per block (a test's change is a local diff); moves with `suite rename`, goes with `suite delete`; never read as a test by any other command |
+| `.spectra/source-snapshots/{hex}.txt` | yes | The normalised text of a section, named by its fingerprint; shared across suites; never pruned automatically (a missing one only means no diff) |
+| `.spectra/update-triage.json` | no (gitignored) | The last triage's detail |
+| `.spectra/baseline.lock` | no (gitignored) | The cross-process lock every baseline writer takes |
+
+Writers: `update-ack`, `source-baseline --init`, triage's COSMETIC auto-ack, `ingest-tests` (new tests) and
+`ingest-update` (the edited test). A write also drops entries for tests that no longer exist in the suite.
+
+**Config** (optional, in the existing `update` section; missing or `null` → the defaults, silently; not in the init
+template):
+
+```json
+"update": { "group_size": 10, "light_threshold_words": 12 }
+```
+
+`group_size` must be an integer ≥ 1 and `light_threshold_words` an integer ≥ 0; otherwise `CONFIG_INVALID` naming the
+key.
+
+**Errors** (all three commands are write commands under the config rule: no config → `CONFIG_MISSING`; they read
+`source` and `tests`). Every failure is one JSON document on stderr — `{command, success, error_code, errors,
+warnings}` — and human mode ends with `[CODE]`.
+
+| Code | Exit | When |
+|---|---|---|
+| `CONFIG_MISSING` / `CONFIG_INVALID` | 1 | No config / a malformed or invalid one |
+| `BASELINE_UNREADABLE` | 1 | A `_source-baseline.json` that is invalid JSON or the wrong shape (names the file; never treated as empty) |
+| `LOCK_TIMEOUT` | 1 | `.spectra/baseline.lock` held for more than 10 s |
+| `INVALID_ARGUMENTS` | 4 | Both or neither of `--suite`/`--all-suites` or `--ids`/`--group`; `source-baseline` without `--init` |
+| `SUITE_NOT_FOUND` | 4 | `--suite` names no suite folder |
+| `TEST_NOT_FOUND` | 4 | An `--ids` entry is not a test in the suite |
+| `TRIAGE_MISSING` / `GROUP_NOT_FOUND` / `TRIAGE_STALE` | 4 | `--group`: no triage for the suite / no such group / the group changed since |
+| `REF_REMOVED` / `CRITERION_REMOVED` | 4 | A named test still lists a REMOVED ref / criterion |
+
+Option-parsing errors from the command-line framework itself (an unknown option, a missing value) keep the
+framework's own output.
+
+All `spectra` output is UTF-8 without a BOM (Spec 084), also when redirected on Windows.
+
+### `spectra ai update` (legacy)
+
+> **Legacy (Spec 084).** `spectra ai update` and its word-overlap classifier are unchanged but no longer used by any
+> skill; `spectra ai update-triage` replaces them. They will be removed in a later phase.
 
 Update existing test cases when documentation changes. Classifies test cases as UP_TO_DATE, OUTDATED, ORPHANED, or REDUNDANT.
 
@@ -708,6 +852,11 @@ spectra ai ingest-update checkout --test-id TC-104 --from .spectra/updated.json
 | `--from` | File with the edited-test JSON (omit to read stdin) |
 
 Exit code is `0` when persisted (id unchanged), `5` when the content is invalid or `DRIFT_DETECTED`, `6` when the schema is invalid, and `1` on a config/I/O error or when the original is not found; on any non-zero exit nothing is persisted.
+
+Spec 084: like `ingest-tests`, it locks and strictly loads the suite baseline before persisting and then replaces the
+edited test's entry (the single form and `--all`, which takes one lock for the batch); both JSON outputs gain
+`baseline`. Baseline failures use the shared failure shape; the content, drift and schema failures (exit 5/6) keep
+their `{success, error_code, errors}` shape.
 
 ### `spectra ai analyze --coverage`
 
