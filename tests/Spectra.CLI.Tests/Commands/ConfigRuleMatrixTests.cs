@@ -69,7 +69,11 @@ public sealed class ConfigRuleMatrixTests : IDisposable
         ["ai null (not read)"] = FromTemplate(r => r["ai"] = null),
         ["generation missing (not read)"] = FromTemplate(r => r.Remove("generation")),
         ["tests / Tests duplicate"] = FromTemplate(r => r["Tests"] = null),
-        ["generation / Generation duplicate"] = FromTemplate(r => r["Generation"] = new JsonObject())
+        ["generation / Generation duplicate"] = FromTemplate(r => r["Generation"] = new JsonObject()),
+        // Spec 084 FR-029: the optional update-triage keys.
+        ["update null"] = FromTemplate(r => r["update"] = null),
+        ["update.group_size null"] = FromTemplate(r => r["update"] = new JsonObject { ["group_size"] = null }),
+        ["update.group_size 0"] = FromTemplate(r => r["update"] = new JsonObject { ["group_size"] = 0 })
     };
 
     public static TheoryData<string, int, string?, int, int, string?, int> Rows => new()
@@ -89,7 +93,10 @@ public sealed class ConfigRuleMatrixTests : IDisposable
         { "ai null (not read)",               0, null, 0,                   0, null, 0 },
         { "generation missing (not read)",    0, null, 0,                   0, null, 0 },
         { "tests / Tests duplicate",          1, "CONFIG_INVALID", 0,       1, "CONFIG_INVALID", 0 },
-        { "generation / Generation duplicate", 1, "CONFIG_INVALID", 0,      1, "CONFIG_INVALID", 0 }
+        { "generation / Generation duplicate", 1, "CONFIG_INVALID", 0,      1, "CONFIG_INVALID", 0 },
+        { "update null",                      0, null, 0,                   0, null, 0 },
+        { "update.group_size null",           0, null, 0,                   0, null, 0 },
+        { "update.group_size 0",              1, "CONFIG_INVALID", 0,       1, "CONFIG_INVALID", 0 }
     };
 
     private void UseConfig(string row)

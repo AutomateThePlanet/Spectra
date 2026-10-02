@@ -450,4 +450,20 @@ public class InitCommandTests : IDisposable
         Assert.Equal("docs/criteria", coverage.GetProperty("criteria_dir").GetString());
         Assert.Equal("docs/criteria/_criteria_index.yaml", coverage.GetProperty("criteria_file").GetString());
     }
+
+    // Spec 084 FR-010: the baseline lock and the triage scratch are ignored; the baselines and snapshots are not.
+    [Fact]
+    public async Task Init_GitIgnoresBaselineScratch_ButNotTheBaselineOrSnapshots()
+    {
+        var gitIgnorePath = Path.Combine(_testDir, ".gitignore");
+
+        Assert.Equal(ExitCodes.Success, await new InitHandler(_logger, _testDir).HandleAsync(force: false));
+        Assert.Equal(ExitCodes.Success, await new InitHandler(_logger, _testDir).HandleAsync(force: true));
+
+        var content = await File.ReadAllTextAsync(gitIgnorePath);
+        Assert.Equal(1, content.Split(".spectra/baseline.lock").Length - 1);
+        Assert.Equal(1, content.Split(".spectra/update-triage.json").Length - 1);
+        Assert.DoesNotContain("source-snapshots", content);
+        Assert.DoesNotContain("_source-baseline", content);
+    }
 }

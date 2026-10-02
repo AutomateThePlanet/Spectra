@@ -260,7 +260,9 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void LongRunningSkills_IncludeProgressPageStep()
     {
-        var longRunningSkills = new[] { "spectra-update", "spectra-coverage", "spectra-dashboard", "spectra-docs" };
+        // Spec 084: spectra-update no longer runs a long command with a progress page (triage takes seconds); its
+        // in-session edit loop uses the seam progress page instead (UpdateSkill_UsesTheSeamProgressPage).
+        var longRunningSkills = new[] { "spectra-coverage", "spectra-dashboard", "spectra-docs" };
 
         foreach (var skillName in longRunningSkills)
         {
@@ -274,7 +276,8 @@ public class SkillsManifestTests : IDisposable
     {
         // Spec 059: spectra-generate reads command stdout from the compile/ingest seam rather
         // than the legacy `.spectra-result.json` sink, so it is excluded here.
-        var skillsWithResultFile = new[] { "spectra-update", "spectra-coverage", "spectra-dashboard",
+        // Spec 084: spectra-update reads update-triage's stdout too (no long-running command writes a result file).
+        var skillsWithResultFile = new[] { "spectra-coverage", "spectra-dashboard",
             "spectra-validate", "spectra-criteria", "spectra-docs" };
 
         foreach (var skillName in skillsWithResultFile)
@@ -307,8 +310,11 @@ public class SkillsManifestTests : IDisposable
         // browser/openBrowserPage tool name is gone; the progress-page affordance survives.
         var content = SkillContent.Update;
         Assert.DoesNotContain("browser/openBrowserPage", content);
-        Assert.Contains(".spectra-progress.html", content);
     }
+
+    [Fact]
+    public void UpdateSkill_UsesTheSeamProgressPage() =>
+        Assert.Contains("spectra ai init-seam-progress", SkillContent.Update);
 
     [Fact]
     public void GenerationAgent_ContainsUpdateDelegation()
@@ -374,20 +380,85 @@ public class SkillsManifestTests : IDisposable
 
     // ---- Spec 078: classification call sites never write ----
 
+    // Spec 084: the delegation rows point at update-triage (with --dry-run: they only look). The legacy
+    // `spectra ai update` (matched exactly, not update-triage/update-ack) is no longer called by any of these skills.
     [Theory]
-    [InlineData("spectra-update")]
     [InlineData("spectra-generate")]
     [InlineData("spectra-execute")]
-    public void AiUpdateCallSites_PassDryRun(string skill)
+    public void UpdateDelegationRows_UseTriage_WithDryRun(string skill)
     {
         var lines = SkillContent.All[skill]
             .Split('\n')
-            .Where(l => l.Contains("spectra ai update"))
+            .Where(l => l.Contains("spectra ai update-triage"))
             .ToList();
 
         Assert.NotEmpty(lines);
         Assert.All(lines, l => Assert.Contains("--dry-run", l));
     }
+
+    [Theory]
+    [InlineData("spectra-update")]
+    [InlineData("spectra-generate")]
+    [InlineData("spectra-execute")]
+    [InlineData("spectra-help")]
+    public void Skills_NeverCallTheLegacyUpdateCommand(string skill) =>
+        Assert.DoesNotMatch(@"spectra ai update(\s|$)", SkillContent.All[skill]);
+
+    // ---- Spec 084: the update skill drives triage (FR-032) ----
+
+    [Fact]
+    public void UpdateSkill_DrivesTriage()
+    {
+        var content = SkillContent.Update;
+
+        foreach (var expected in new[]
+                 {
+                     "spectra ai update-triage", "spectra ai update-ack", "compile-update-prompt", "ingest-update",
+                     "LOAD only (recommended)", "LOAD + LIGHT", "report only", "REMOVED", "CRITERIA_REMOVED",
+                     "CONFIG_MISSING", "CONFIG_INVALID", "LOCK_TIMEOUT", "NON-STOP"
+                 })
+        {
+            Assert.Contains(expected, content);
+        }
+    }
+
+    [Fact]
+    public void UpdateSkill_RemovedStep_PointsAtTheFixAckAndDelete_NeverAtTheEditLoop()
+    {
+        var content = SkillContent.Update;
+        var start = content.IndexOf("**Step 3**", StringComparison.Ordinal);
+        var end = content.IndexOf("**Step 4**", StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start);
+        var step = content[start..end];
+
+        Assert.Contains("REMOVED", step);
+        Assert.Contains("update-ack", step);
+        Assert.Contains("source_refs", step);
+        Assert.Contains("spectra-delete", step);
+        Assert.Contains("spectra delete", step);
+        Assert.DoesNotContain("compile-update-prompt", step);
+        Assert.DoesNotContain("--force", step);
+    }
+
+    [Fact]
+    public void UpdateSkill_BucketOptions()
+    {
+        var content = SkillContent.Update;
+        var start = content.IndexOf("**Step 4**", StringComparison.Ordinal);
+        var end = content.IndexOf("**Step 5**", StringComparison.Ordinal);
+        var step = content[start..end];
+
+        Assert.Contains("LOAD only (recommended)", step);
+        Assert.Contains("`CRITERIA_CHANGED`", step);
+        Assert.Contains("LOAD + LIGHT", step);
+        Assert.Contains("`LIGHT`", step);
+        Assert.Contains("choose groups", step);
+        Assert.Contains("never enter the edit loop", step);
+    }
+
+    [Fact]
+    public void UpdateSkill_AllSuitesIsOneTriageCall() =>
+        Assert.Contains("update-triage --all-suites", SkillContent.Update);
 
     // ---- Spec 078: criteria extraction reads each document once ----
 

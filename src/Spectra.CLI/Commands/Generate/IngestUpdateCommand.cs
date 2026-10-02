@@ -1,5 +1,7 @@
 using System.CommandLine;
 using System.Text.Json;
+using Spectra.CLI.Baseline;
+using Spectra.CLI.Criteria;
 using Spectra.CLI.Generation;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.IO;
@@ -135,7 +137,35 @@ public sealed class IngestUpdateCommand : Command
             new TestFileWriter(), new IndexGenerator(), new IndexWriter());
         var ingestor = new UpdatedTestIngestor(persistence);
 
-        var result = await ingestor.IngestAsync(content, testsPath, suite, original, existingTests, ct);
+        // Spec 084 FR-027: lock and strict baseline load before persisting; replace the edited test's entry after.
+        IngestResult result;
+        BaselineWriteSummary? baselineSummary = null;
+        BaselineStoreException? afterPersist = null;
+        try
+        {
+            result = await BaselineStore.WithLockAsync(currentDir, async () =>
+            {
+                var baseline = await BaselineStore.LoadSuiteAsync(currentDir, testsPath, suite, ct);
+                var ingested = await ingestor.IngestAsync(content, testsPath, suite, original, existingTests, ct);
+                if (ingested.IsSuccess)
+                {
+                    (baselineSummary, afterPersist) = await RecordAsync(
+                        currentDir, config, testsPath, suite, baseline, ingested.PersistedTests, existingTests, ct);
+                }
+
+                return ingested;
+            }, ct);
+        }
+        catch (BaselineStoreException ex)
+        {
+            CriteriaCommandIO.WriteFailure(json, "ingest-update", ex.ErrorCode, ex.Message + " Nothing was persisted.");
+            return ExitError;
+        }
+
+        if (result.IsSuccess && afterPersist is not null)
+        {
+            return WriteAfterPersistFailure(json, suite, result.PersistedTests.Select(t => t.Id).ToList(), afterPersist);
+        }
 
         if (result.IsSuccess)
         {
@@ -146,12 +176,14 @@ public sealed class IngestUpdateCommand : Command
                 {
                     success = true,
                     persisted = result.PersistedTests.Count,
-                    id
+                    id,
+                    baseline = baselineSummary!.ToJson()
                 }));
             }
             else
             {
                 Console.Out.WriteLine($"Updated test '{id}' in suite '{suite}' (id preserved).");
+                Console.Out.WriteLine(baselineSummary!.ToHuman());
             }
             return ExitSuccess;
         }
@@ -221,7 +253,42 @@ public sealed class IngestUpdateCommand : Command
         var ingestor = new UpdatedTestIngestor(persistence);
 
         int written = 0, skippedNoOriginal = 0, errors = 0;
+        var persisted = new List<TestCase>();
+        BaselineWriteSummary? baselineSummary = null;
+        BaselineStoreException? afterPersist = null;
 
+        // Spec 084 FR-027: one baseline lock for the batch; strict load before the first persist.
+        try
+        {
+            await BaselineStore.WithLockAsync(currentDir, async () =>
+            {
+                var baseline = await BaselineStore.LoadSuiteAsync(currentDir, testsPath, suite, ct);
+                await IngestStagedAsync();
+                if (persisted.Count > 0)
+                {
+                    (baselineSummary, afterPersist) = await RecordAsync(
+                        currentDir, config, testsPath, suite, baseline, persisted, existingTests, ct);
+                }
+
+                return 0;
+            }, ct);
+        }
+        catch (BaselineStoreException ex)
+        {
+            CriteriaCommandIO.WriteFailure(json, "ingest-update", ex.ErrorCode, ex.Message + " Nothing was persisted.");
+            return ExitError;
+        }
+
+        if (afterPersist is not null)
+        {
+            return WriteAfterPersistFailure(json, suite, persisted.Select(t => t.Id).ToList(), afterPersist);
+        }
+
+        EmitBatchResult(json, suite, written, skippedNoOriginal, errors, baselineSummary);
+        return ExitSuccess;
+
+        async Task IngestStagedAsync()
+        {
         var stagingFiles = Directory.GetFiles(stagingDir, "updated-*.json").OrderBy(f => f);
         foreach (var sf in stagingFiles)
         {
@@ -249,16 +316,43 @@ public sealed class IngestUpdateCommand : Command
             catch { errors++; continue; }
 
             if (result.IsSuccess)
+            {
                 written++;
+                persisted.AddRange(result.PersistedTests);
+            }
             else
                 errors++;
         }
-
-        EmitBatchResult(json, suite, written, skippedNoOriginal, errors);
-        return ExitSuccess;
+        }
     }
 
-    private static void EmitBatchResult(bool json, string suite, int written, int skippedNoOriginal, int errors)
+    /// <summary>Spec 084: records the persisted tests' entries; an I/O failure here is reported, not thrown.</summary>
+    private static async Task<(BaselineWriteSummary?, BaselineStoreException?)> RecordAsync(
+        string root, SpectraConfig config, string testsPath, string suite, Spectra.Core.Baseline.SourceBaseline baseline,
+        IReadOnlyList<TestCase> persisted, IReadOnlyList<TestCase> existingTests, CancellationToken ct)
+    {
+        try
+        {
+            var live = existingTests.Select(t => t.Id).Concat(persisted.Select(t => t.Id));
+            return (await BaselineRecorder.RecordPersistedAsync(root, config, testsPath, suite, baseline, persisted, live, ct), null);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or BaselineStoreException)
+        {
+            return (null, ex as BaselineStoreException ?? new BaselineStoreException(BaselineStore.ErrorBaselineWriteFailed, ex.Message));
+        }
+    }
+
+    private static int WriteAfterPersistFailure(bool json, string suite, List<string> ids, BaselineStoreException error)
+    {
+        CriteriaCommandIO.WriteFailure(json, "ingest-update", error.ErrorCode,
+            $"The tests were persisted ({string.Join(", ", ids)}) but their baseline was not recorded: {error.Message} "
+            + $"Run 'spectra ai update-ack --suite {suite} --ids {string.Join(",", ids)}' to record it.",
+            extras: new Dictionary<string, object?> { ["persisted"] = ids });
+        return ExitError;
+    }
+
+    private static void EmitBatchResult(
+        bool json, string suite, int written, int skippedNoOriginal, int errors, BaselineWriteSummary? baseline = null)
     {
         if (json)
         {
@@ -269,7 +363,8 @@ public sealed class IngestUpdateCommand : Command
                 suite,
                 written,
                 skipped_no_original = skippedNoOriginal,
-                errors
+                errors,
+                baseline = (baseline ?? new BaselineWriteSummary()).ToJson()
             }));
         }
         else

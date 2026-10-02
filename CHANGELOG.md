@@ -185,6 +185,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Duplicate keys.** A config with an exact duplicate top-level key crashed the command with an unhandled exception.
   Keys that differ only in case were silently resolved to the last one, possibly `null`. Both are now `CONFIG_INVALID`.
 
+### Added (Spec 084 — source change baseline, Phase 2a)
+
+- **Deterministic change detection for test updates, without git.** Each suite gets a committed
+  `test-cases/{suite}/_source-baseline.json`: per test, a fingerprint of every doc section its `source_refs` point at
+  (`file#anchor` → that heading through to the next heading of the same or a higher level; no anchor → the whole
+  file) and of every criterion it links. Normalised section snapshots live in `.spectra/source-snapshots/` (committed,
+  shared, never pruned). Anchors match tolerantly (lowercase letters and digits only), so GitBook, GitHub and
+  generator-style anchors all find "Create customer records".
+- **`spectra ai update-triage (--suite <s> | --all-suites) [--no-auto-ack] [--dry-run]`** reports each test's state
+  since its baseline — UNCHANGED, COSMETIC (markup/whitespace/case only; acknowledged automatically), LIGHT, LOAD (a
+  number, a modal word such as must/should/not, or more than `update.light_threshold_words` words changed), REMOVED,
+  CRITERIA_CHANGED, CRITERIA_REMOVED — buckets each test by its worst state, groups tests with the same changes
+  (`update.group_size`), and says why (`numbers: 10gb→50gb`). Tests without a baseline are UNBASELINED, never
+  changed. Compact JSON on stdout, word diffs in `.spectra/update-triage.json`, the summary table in every mode.
+  A 2,500-test workspace triages in about 2 s.
+- **`spectra ai update-ack --suite <s> (--ids a,b | --group <gid>)`** acknowledges reviewed tests (refreshes their
+  baseline, never their files). A group that changed since triage is refused (`TRIAGE_STALE`); a test that still
+  lists a REMOVED ref or criterion is refused (`REF_REMOVED` / `CRITERION_REMOVED`).
+- **`spectra ai source-baseline --init (--suite <s> | --all-suites) [--force]`** adopts current content as the
+  baseline for tests that have none — run it once in a workspace created before this release.
+- **Config:** optional `update.group_size` (default 10) and `update.light_threshold_words` (default 12). Missing or
+  `null` → the defaults, silently; the init template doesn't carry them.
+
+### Changed (Spec 084)
+
+- **`ingest-tests` and `ingest-update` record baselines.** They take `.spectra/baseline.lock` and load the suite
+  baseline before persisting (`LOCK_TIMEOUT` / `BASELINE_UNREADABLE` persist nothing), then record the persisted
+  tests' entries; their success JSON gains a `baseline` object. Their content and schema failures (exit 5/6) are
+  unchanged.
+- **The `spectra-update` skill drives triage:** summary → REMOVED / CRITERIA_REMOVED for review (fix the ref, or
+  delete the test with `spectra-delete`) → which buckets to edit (LOAD only, recommended, includes
+  CRITERIA_CHANGED; LOAD + LIGHT; chosen groups; report only) → the existing edit loop → `update-ack` for tests kept
+  as they are. The `spectra-generate` / `spectra-execute` update rows point at `update-triage --dry-run`.
+- **`spectra init`** gitignores `.spectra/baseline.lock` and `.spectra/update-triage.json`.
+- **Legacy:** `spectra ai update` and `TestClassifier` are unchanged but no longer used by any skill.
+
+### Fixed (Spec 084)
+
+- **Non-ASCII output on Windows.** The CLI now writes UTF-8 (no BOM) to stdout and stderr. A redirected stream —
+  how the skills read every command — used the legacy console code page, so characters such as `→`, `—` or `Ü` in
+  JSON results and compiled prompts arrived as `?` or a control character.
+
 ### Notes
 
 - **One-time `source_section` churn.** Because `source_section` is now read, the first re-extraction after

@@ -130,9 +130,47 @@ Checks: required frontmatter fields, unique test IDs, valid priority enum values
 
 > "Update test cases for checkout since the payment docs changed"
 
-Classifies every test case in the suite as **UP_TO_DATE**, **OUTDATED**, **ORPHANED**, or **REDUNDANT** (deterministic, no model call). For each **OUTDATED** test, the assistant then **edits the affected parts in-session** through a deterministic seam: `compile-update-prompt` builds an edit prompt from the existing test plus the changed docs/criteria, the assistant edits it, and `ingest-update` validates and persists it. The edit **preserves the test's id and any manual verdict/notes**, and **fails loud** if it would change a field the doc change didn't implicate (priority, component, tags), so untouched fields can't silently drift. UP_TO_DATE tests are left alone; ORPHANED/REDUNDANT tests are flagged for your review, not edited.
+SPECTRA keeps, for every test, a fingerprint of each doc section it references (`source_refs`, e.g.
+`docs/checkout.md#Payment`) and each acceptance criterion it links (`criteria`), in
+`test-cases/{suite}/_source-baseline.json`. They are recorded automatically when a test is generated
+(`ingest-tests`) or edited (`ingest-update`). The `spectra-update` skill then runs:
 
-Classification never changes files: the assistant runs it with `--dry-run`, and in CI
+1. **Triage** — `spectra ai update-triage --suite checkout` reports what changed since each test was written, with
+   no model and no git. Every test lands in a bucket:
+   - **LOAD** — a number, a modal word (must, should, may, cannot, required, only, not) or many words changed;
+   - **CRITERIA_CHANGED** — a linked criterion was reworded;
+   - **LIGHT** — a small wording change;
+   - **COSMETIC** — markup, whitespace or case only; acknowledged automatically;
+   - **REMOVED / CRITERIA_REMOVED** — the referenced section or criterion is gone;
+   - **UNCHANGED**, and **UNBASELINED** for tests with no baseline yet.
+
+   Tests that share the same changes are grouped, and each group says why (`numbers: 10gb→50gb`). Sections of a
+   changed doc that no test references are listed as generation hints.
+2. **Review** — the assistant shows the summary and lists REMOVED tests for you to fix (rename the ref, drop it, or
+   delete the test if the feature is gone). It never edits those itself.
+3. **Choose** — LOAD only (recommended; includes CRITERIA_CHANGED), LOAD + LIGHT, chosen groups, or report only.
+4. **Edit** — for each selected test the assistant edits it in-session through `compile-update-prompt` →
+   `ingest-update`, which keeps the test's id and manual notes, fails loud on out-of-scope drift, and records the
+   new baseline.
+5. **Acknowledge** — tests you reviewed and kept as they are get `spectra ai update-ack --suite checkout --ids …`,
+   so they leave triage. A change you neither edit nor acknowledge is reported again next time.
+
+"Update all" is one `spectra ai update-triage --all-suites`.
+
+**Existing workspaces.** A workspace from before this feature has no baselines, so every test shows as UNBASELINED.
+Run `spectra ai source-baseline --init --all-suites` once: it adopts the current docs as the baseline.
+
+**Commit the baseline.** Commit `test-cases/*/_source-baseline.json` and `.spectra/source-snapshots/` (the snapshots
+let triage show word diffs); `.spectra/update-triage.json` and `.spectra/baseline.lock` are gitignored by
+`spectra init`. Git is the undo for a wrong acknowledgement.
+
+`spectra ai update` (the older word-overlap classifier) still works but is legacy; no skill uses it.
+
+### Legacy: `spectra ai update`
+
+`spectra ai update` classifies every test case in the suite as **UP_TO_DATE**, **OUTDATED**, **ORPHANED**, or **REDUNDANT** by word overlap with the *current* docs (deterministic, no model call). It has no record of what the docs said when a test was written, so a change that keeps the vocabulary (`10GB` → `50GB`) stays UP_TO_DATE — which is why triage replaced it. No skill uses it any more.
+
+Classification never changes files with `--dry-run`, and in CI
 `spectra ai update <suite> --no-interaction` also only classifies and reports. To mark orphaned tests
 from a script, add `--no-review`; marking changes only a test's `status`, `orphaned_reason` and
 `orphaned_date`. Tests are matched to their documents through `source_refs` such as

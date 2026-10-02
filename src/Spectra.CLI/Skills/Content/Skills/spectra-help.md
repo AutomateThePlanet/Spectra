@@ -119,7 +119,7 @@ spectra validate
 spectra list
 spectra show TC-100
 spectra docs index --force
-spectra ai update --suite notification --diff
+spectra ai update-triage --suite notification
 ```
 
 ---

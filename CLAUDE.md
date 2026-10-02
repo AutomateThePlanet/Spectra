@@ -79,8 +79,11 @@ spectra ai generate X --auto-complete --output-format json  # CI: all phases, no
 spectra ai generate X --from-suggestions [1,3]        # From previous suggestions
 spectra ai generate X --from-description "..." --context "..."  # User-described test
 
-# Update
-spectra ai update [suite] [--diff] [--dry-run] [--no-interaction] [--no-review]  # --no-interaction alone = classify only
+# Update (Spec 084: source-change baseline; `ai update` is legacy)
+spectra ai update-triage (--suite X | --all-suites) [--no-auto-ack] [--dry-run]  # what changed since each test's baseline
+spectra ai update-ack --suite X (--ids a,b | --group G2) [--dry-run]            # reviewed, no edit needed
+spectra ai source-baseline --init (--suite X | --all-suites) [--force] [--dry-run]  # bootstrap baselines
+spectra ai update [suite] [--diff] [--dry-run] [--no-interaction] [--no-review]  # LEGACY word-overlap classifier
 
 # Dashboard
 spectra dashboard --output ./site [--title "..."] [--dry-run] [--preview]
@@ -147,6 +150,16 @@ system-under-test is unrelated to SPECTRA's removed execution adapter.
 - File-based (Markdown/YAML/JSON in `test-cases/`, `docs/_index/`, `docs/criteria/`, `_index.json`, `_manifest.yaml`, `_checksums.json`, `_criteria_index.yaml`) (045-doc-index-restructure)
 
 ## Recent Changes
+- **084-source-change-baseline (v2.6.0, unreleased)**: Phase 2a of the doc-change → criteria → test workflow — deterministic change detection, no git, model-free.
+  - **Core `Spectra.Core.Baseline/` (pure):** `SectionExtractor` (ATX headings outside ``` / ~~~ fences; `file#anchor` = first heading with the anchor's key through to the next heading of level ≤; no anchor = whole file; `CoveredHeadings`), `AnchorKey` (lowercase letters+digits, percent-decoded), `SourceFingerprint` (`sha256:` over LF/BOM-normalised raw text; criteria over `TextNormalizer` text), `WordDiff` (punctuation-trimmed tokens, 5,000-word cap, prefix/suffix trim + `ushort` LCS within 4M cells, else whole middle), `ChangeClassifier` (REMOVED → UNCHANGED → no snapshot = LOAD → snapshot == current normalised = COSMETIC → cap = LOAD → numbers/modal/size = LOAD else LIGHT; `why` strings), `BucketRules` (`Bucket` enum = precedence; `Wire()`), `TriageGrouper` (suite+bucket+changed-item signature, chunked, `G1…`), `SourceBaseline` + `SourceBaselineSerializer` (Utf8JsonWriter, sorted, LF; strict `Parse` → `BaselineFormatException`).
+  - **CLI `Spectra.CLI.Baseline/`:** `BaselineStore` (`.spectra/baseline.lock` via `FileLockHandle`, `LOCK_TIMEOUT`, strict load → `BASELINE_UNREADABLE`, prune + skip-identical + atomic save, content-addressed snapshots; `LockTimeoutOverride` for tests), `BaselineContext` (per-run caches; notes for ambiguous anchors / duplicate criteria), `BaselineRecorder` (`ComputeAsync` omits unresolved refs/unknown criteria; `Replace` = full recompute drops stale keys; `Complete` = add missing keys only; `RecordPersistedAsync`), `TriageEngine`, `TriagePresenter`, `BaselineCommandIO` (refusal codes → exit 4, else 1; shared failure shape via `CriteriaCommandIO`).
+  - **Commands (`Commands/Baseline/`, registered in `AiCommand`):** `update-triage` (auto-acks COSMETIC under the lock unless `--no-auto-ack`/`--dry-run`; stdout = compact JSON with non-zero counts only and no empty arrays — SC-004; detail `.spectra/update-triage.json`; summary on stderr in JSON mode; exit 0), `update-ack` (`--group` via the detail file: `TRIAGE_MISSING`/`GROUP_NOT_FOUND`/`TRIAGE_STALE`; REMOVED → `REF_REMOVED`/`CRITERION_REMOVED`), `source-baseline --init` (`--force` recomputes). All are write commands under the 083 rule, reading `Source|Tests`.
+  - **Writers:** `ingest-tests` / `ingest-update` (single and `--all`) lock + strict-load before persisting, record after; `baseline` in success JSON; `BASELINE_WRITE_FAILED` + `persisted` after a persist; 5/6 failure shape unchanged. Stale keys drop only on full recompute (FR-026a).
+  - **Config:** `UpdateConfig.GroupSize`/`LightThresholdWords` (`int?`, `Effective*` 10/12); `ConfigLoader.CheckedSections += update`; range errors → `CONFIG_INVALID`. `InitHandler` gitignores `.spectra/baseline.lock`, `.spectra/update-triage.json`.
+  - **Skill:** `spectra-update` rewritten (triage → summary → REMOVED review incl. `spectra-delete` hint → bucket question, LOAD only = LOAD + CRITERIA_CHANGED → edit loop → `update-ack`); generate/execute delegation rows → `update-triage --dry-run`; no skill calls `spectra ai update`.
+  - **Fix:** `Program.Main` sets `Console.OutputEncoding` to UTF-8 (no BOM): redirected stdout on Windows used the OEM code page and turned `→`/`—`/`Ü` into `?`/0x1A (`Utf8StdoutTests` runs the built CLI as a child process).
+  - Guards: `BaselineInitTemplateTests` (real init template; pre-084 workspace), `BaselineFileGuardTests` (every suite-enumerating command, rename/delete), `BaselineDeterminismTests`, `UpdateTriagePerformanceTests` (2,500 tests ≈ 2 s, stdout ≈ 7 KB).
+  - Core 1025 / CLI 1699 (1 pre-existing unrelated failure: ProfileFormatLoaderTests) / Execution 228 / Integration 8.
 - **083-review-fixes-082 (v2.6.0, unreleased)**: One config rule, checked against real workspaces. **Root cause of 080→081→082:** config rules were checked against `SpectraConfig.Default` and fixtures, never against the embedded init template (`src/Spectra.CLI/Templates/spectra.config.json`, which had no `coverage`). So 082 broke every init-created and pre-existing workspace.
   - **Rule:** no section is ever required.
     - `ConfigLoader.LoadForReadAsync` / `LoadForWriteAsync(repoRoot, reads, ct)`; `requires`, `ConfigSections.Coverage` and `CONFIG_SECTION_MISSING` are removed.
