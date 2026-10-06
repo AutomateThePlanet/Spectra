@@ -151,12 +151,20 @@ public static class UpdateTriageHandler
             ["suite"] = group.Suite,
             ["bucket"] = group.Bucket.Wire()
         };
-        var refs = group.Items.Where(i => !i.IsCriterion).Select(i => new Dictionary<string, object?> { ["ref"] = i.Key, ["state"] = i.State }).ToList();
+        var refs = group.Items.Where(i => !i.IsCriterion).Select(RefItemJson).ToList();
         var criteria = group.Items.Where(i => i.IsCriterion).Select(i => new Dictionary<string, object?> { ["id"] = i.Key, ["state"] = i.State }).ToList();
         if (refs.Count > 0) json["refs"] = refs;
         if (criteria.Count > 0) json["criteria"] = criteria;
         json["tests"] = group.Tests;
         json["why"] = group.Why;
+        return json;
+    }
+
+    /// <summary>A group's ref item: <c>ref</c>, <c>state</c>, and (Spec 086, RELINK only) the <c>target</c>.</summary>
+    private static Dictionary<string, object?> RefItemJson(ChangedItem item)
+    {
+        var json = new Dictionary<string, object?> { ["ref"] = item.Key, ["state"] = item.State };
+        if (item.Target is not null) json["target"] = item.Target;
         return json;
     }
 
@@ -206,21 +214,7 @@ public static class UpdateTriageHandler
         ["version"] = 1,
         ["scope"] = BaselineCommandIO.ScopeJson(suite),
         ["config"] = new Dictionary<string, object?> { ["group_size"] = run.GroupSize, ["light_threshold_words"] = run.LightThreshold },
-        ["tests"] = run.Suites.SelectMany(s => s.Tests).Select(t => new Dictionary<string, object?>
-        {
-            ["suite"] = t.Suite,
-            ["id"] = t.Id,
-            ["bucket"] = t.Bucket.Wire(),
-            ["partial"] = t.Partial,
-            ["refs"] = t.Refs.Select(r => RefDetail(r.Verdict)).ToList(),
-            ["criteria"] = t.Criteria.Select(c => new Dictionary<string, object?>
-            {
-                ["id"] = c.Id, ["state"] = c.State.Wire(), ["baseline"] = c.Baseline, ["current"] = c.Current
-            }).ToList(),
-            ["unbaselined_refs"] = t.UnbaselinedRefs,
-            ["unbaselined_criteria"] = t.UnbaselinedCriteria,
-            ["current"] = new Dictionary<string, object?> { ["refs"] = t.CurrentRefs, ["criteria"] = t.CurrentCriteria }
-        }).ToList(),
+        ["tests"] = run.Suites.SelectMany(s => s.Tests).Select(TestDetail).ToList(),
         ["groups"] = run.Groups.Select(g => new Dictionary<string, object?>
         {
             ["id"] = g.Id, ["suite"] = g.Suite, ["bucket"] = g.Bucket.Wire(), ["tests"] = g.Tests,
@@ -233,7 +227,29 @@ public static class UpdateTriageHandler
         ["notes"] = run.Notes.ToList()
     };
 
-    private static Dictionary<string, object?> RefDetail(RefVerdict verdict)
+    /// <summary>One test's detail record. Spec 086 (analysis C6): a RELINK test with no entry adds <c>unbaselined: true</c>.</summary>
+    private static Dictionary<string, object?> TestDetail(TriagedTest t)
+    {
+        var detail = new Dictionary<string, object?>
+        {
+            ["suite"] = t.Suite,
+            ["id"] = t.Id,
+            ["bucket"] = t.Bucket.Wire(),
+            ["partial"] = t.Partial && !t.NoEntry,
+            ["refs"] = t.Refs.Select(r => RefDetail(r.Verdict, r.Target)).ToList(),
+            ["criteria"] = t.Criteria.Select(c => new Dictionary<string, object?>
+            {
+                ["id"] = c.Id, ["state"] = c.State.Wire(), ["baseline"] = c.Baseline, ["current"] = c.Current
+            }).ToList(),
+            ["unbaselined_refs"] = t.UnbaselinedRefs,
+            ["unbaselined_criteria"] = t.UnbaselinedCriteria,
+            ["current"] = new Dictionary<string, object?> { ["refs"] = t.CurrentRefs, ["criteria"] = t.CurrentCriteria }
+        };
+        if (t.NoEntry) detail["unbaselined"] = true;
+        return detail;
+    }
+
+    private static Dictionary<string, object?> RefDetail(RefVerdict verdict, string? target)
     {
         var detail = new Dictionary<string, object?>
         {
@@ -242,6 +258,7 @@ public static class UpdateTriageHandler
             ["baseline"] = verdict.Baseline,
             ["current"] = verdict.Current
         };
+        if (target is not null) detail["target"] = target;
         if (verdict.Why.Count > 0) detail["why"] = verdict.Why;
         if (verdict.Diff.Count > 0)
         {

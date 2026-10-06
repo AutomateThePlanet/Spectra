@@ -28,6 +28,58 @@ public sealed class SourceRefResolver
         _sourceDir = Path.GetFullPath(Path.IsPathRooted(sourceDir) ? sourceDir : Path.Combine(_repoRoot, sourceDir));
     }
 
+    /// <summary>The repository root, full path without a trailing separator.</summary>
+    public string RepoRoot => _repoRoot;
+
+    /// <summary>The configured source directory, full path.</summary>
+    public string SourceDir => _sourceDir;
+
+    /// <summary>Whether <paramref name="fullPath"/> is under the repo root or the source directory.</summary>
+    public bool IsUnderAllowedRoots(string fullPath) => IsUnderAllowedRoot(fullPath);
+
+    /// <summary>Whether <paramref name="fullPath"/> is under the source directory.</summary>
+    public bool IsUnderSourceDir(string fullPath) => IsUnder(fullPath, _sourceDir);
+
+    /// <summary>
+    /// Spec 086: the places <see cref="Resolve"/> looks for <paramref name="sourceRef"/>'s file, in the same order — a
+    /// fully-qualified path; or the repo-relative path, then the source-dir fallback. Only candidates under an
+    /// allowed root are listed; an empty ref, or a ref that climbs out of both roots, has none.
+    /// </summary>
+    public IReadOnlyList<RefLocation> CandidateLocations(string sourceRef)
+    {
+        var path = SourceRefNormalizer.StripFragment(sourceRef ?? string.Empty).Trim().Replace('\\', '/');
+        if (path.Length == 0)
+        {
+            return [];
+        }
+
+        if (Path.IsPathFullyQualified(path))
+        {
+            var full = FullPathOrNull(path);
+            if (full is not null && IsUnderAllowedRoot(full))
+            {
+                return [new RefLocation(full, RefLocationKind.Absolute)];
+            }
+        }
+
+        var relative = path.TrimStart('/');
+        var repoCandidate = relative.Length == 0 ? null : FullPathOrNull(Path.Combine(_repoRoot, relative));
+        if (repoCandidate is null || !IsUnderAllowedRoot(repoCandidate))
+        {
+            return [];
+        }
+
+        var locations = new List<RefLocation> { new(repoCandidate, RefLocationKind.RepoRelative) };
+        var sourceCandidate = FullPathOrNull(Path.Combine(_sourceDir, relative));
+        if (sourceCandidate is not null && IsUnderAllowedRoot(sourceCandidate)
+            && !string.Equals(sourceCandidate, repoCandidate, PathComparison))
+        {
+            locations.Add(new RefLocation(sourceCandidate, RefLocationKind.SourceDirRelative));
+        }
+
+        return locations;
+    }
+
     public SourceRefResolution Resolve(IEnumerable<string> refs)
     {
         ArgumentNullException.ThrowIfNull(refs);
@@ -128,6 +180,17 @@ public sealed class SourceRefResolver
     private static bool IsUnder(string fullPath, string root) =>
         fullPath.StartsWith(Path.TrimEndingDirectorySeparator(root) + Path.DirectorySeparatorChar, PathComparison);
 }
+
+/// <summary>Spec 086: how a ref's path was interpreted at one candidate location.</summary>
+public enum RefLocationKind
+{
+    Absolute,
+    RepoRelative,
+    SourceDirRelative
+}
+
+/// <summary>Spec 086: one place a ref's file was looked for.</summary>
+public sealed record RefLocation(string FullPath, RefLocationKind Kind);
 
 /// <summary>Result of resolving a set of source refs.</summary>
 /// <param name="Resolved">Refs that resolved to an existing file, in input order.</param>

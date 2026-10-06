@@ -14,7 +14,8 @@ public static class TriagePresenter
         foreach (var suite in run.Suites)
         {
             writer.WriteLine($"Update triage — {suite.Suite} ({suite.TestCount} tests)");
-            var counts = BucketRules.WorstFirst.Select(b =>
+            // Spec 086: RELINK is shown only when a test has it, so a workspace without renames reads as under 085.
+            var counts = BucketRules.WorstFirst.Where(b => b != Bucket.Relink || suite.Tests.Any(t => t.Bucket == b)).Select(b =>
             {
                 var n = suite.Tests.Count(t => t.Bucket == b);
                 var suffix = b == Bucket.Cosmetic && n > 0 && autoAck ? (dryRun ? " (would be auto-acked)" : " (auto-acked)") : "";

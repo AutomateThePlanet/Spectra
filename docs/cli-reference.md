@@ -286,6 +286,28 @@ spectra docs migrate-criteria
 - `ingest-criteria`, `retire`, `apply-move` and `ai analyze --import-criteria` run the migration automatically
   before they write. `docs changed` and `compile-extraction-prompt` never move files; they only warn.
 
+### `spectra docs topology` (Spec 086)
+
+Read-only diagnostic: which git repositories own the docs your tests reference. It explains why relinking or a history
+bootstrap is, or isn't, available for a doc.
+
+```bash
+spectra docs topology
+spectra docs topology --output-format json
+```
+
+```json
+{"command":"docs-topology","success":true,
+ "owners":[{"root":".","is_submodule":false,"head":"<40 hex>","shallow":false,"referenced_docs":12},
+           {"root":"docs/requirements/gitbook-repo","is_submodule":true,"head":"<40 hex>","shallow":false,"referenced_docs":340}],
+ "unowned":[{"doc":"/abs/path/shared/x.md","reason":"not in a git repository"}],"warnings":[]}
+```
+
+"Referenced docs" are the files the refs of every test in every suite resolve to. `root` and `doc` are repo-relative
+when inside the repository, absolute otherwise; owners are ordered by root, unowned docs by path. A `shallow` owner
+can't see renames older than its history (`(shallow history)` in the reasons). The human table is printed in every
+mode (stderr in JSON mode). Exit `0`; a missing config means defaults.
+
 ---
 
 ## AI Generation Commands
@@ -636,8 +658,9 @@ continue to apply to the verification path.
 ### `spectra ai update-triage` (Spec 084)
 
 Reports, per test, what changed in the doc sections it references (`source_refs`) and the acceptance criteria it
-links (`criteria`) since the test was written, edited or acknowledged. Deterministic and model-free; no git. This is
-the replacement for `spectra ai update`'s word-overlap classification.
+links (`criteria`) since the test was written, edited or acknowledged. Deterministic and model-free. Git is only read
+(Spec 086), and only when a referenced file is missing, to find where it was renamed (see [Git access](#git-access-spec-086)).
+This is the replacement for `spectra ai update`'s word-overlap classification.
 
 ```bash
 spectra ai update-triage --suite checkout --output-format json
@@ -682,12 +705,20 @@ HTML-like text inside inline code (`` `<br>` ``) no longer matches; no supported
 | COSMETIC | It differs, but its normalised text equals the baseline snapshot: only markup, whitespace or case changed. Acknowledged automatically unless `--no-auto-ack` / `--dry-run` |
 | LOAD | The normalised text changed and a number changed, a word that flips a rule's meaning changed (`must`, `should`, `may`, `required`, `no`, `not`, `never`, `none`, `nothing`, `cannot`, `can't`, `don't`, `doesn't`, `won't`, `isn't`, `aren't`, `shouldn't`, `mustn't`, `without`, `unless`, `except`, `only`, `always`, `all`, `any`, `every`; a curly apostrophe counts as a straight one), more than `update.light_threshold_words` words changed, or no diff could be computed (snapshot missing, or a side over 5,000 words) |
 | LIGHT | Any other change of the normalised text |
-| REMOVED | The file no longer resolves, or the anchor matches no heading |
+| RELINK | Spec 086: the file is missing, and git history names the file it was renamed or moved to (`why`: `renamed to <path>`; the group's ref item carries `target`). Cleared by `relink-sources` |
+| REMOVED | The file no longer resolves (and history names no rename), or the anchor matches no heading. A missing file's reason is `not found; <why>`: `not found; no git`, `not found; not in a git repository`, `not found; no rename found at 90% similarity` (`(shallow history)` appended for a shallow clone), `not found; ambiguous rename`, `not found; rename chain ends at a missing file`, `not found; renamed outside the allowed roots` |
 
 Per linked criterion: CRITERIA_CHANGED (its normalised text changed) or CRITERIA_REMOVED (the ID is in no criteria
-file). A test's **bucket** is its worst state: REMOVED > CRITERIA_REMOVED > LOAD > CRITERIA_CHANGED > LIGHT > COSMETIC
-> UNCHANGED. A test with no baseline entry is **UNBASELINED** — reported apart, never as changed; one whose entry
-lacks some of its current refs or criteria is **partial** (bucketed on the rest).
+file). A test's **bucket** is its worst state: RELINK > REMOVED > CRITERIA_REMOVED > LOAD > CRITERIA_CHANGED > LIGHT >
+COSMETIC > UNCHANGED. A test with no baseline entry is **UNBASELINED** — reported apart, never as changed; one whose
+entry lacks some of its current refs or criteria is **partial** (bucketed on the rest).
+
+**RELINK without a baseline (Spec 086).** A ref broken before the first baseline is never baselined, so RELINK also
+covers refs without one: an unbaselined ref of a baselined test is RELINK (not listed as unbaselined), and the refs of
+a test with no entry are checked for RELINK only. Such a test is listed once, under RELINK, with `"unbaselined": true`
+in the detail file (same record as any triaged test), and is left out of `unbaselined.full`, `counts.unbaselined` and
+the human UNBASELINED line, so the counts add up. The RELINK bucket is shown in the human summary only when it is not
+empty. Triage always uses a 90% rename similarity; `relink-sources --min-similarity` can go lower.
 
 Fingerprints are `sha256:` over the section's raw text with line endings normalised to LF and a BOM removed (so
 Windows and Linux checkouts agree); the comparison text is the `TextNormalizer` key. Documented residuals: a
@@ -724,6 +755,9 @@ spectra ai update-ack --suite checkout --group G2          # a group from the la
   or criteria changed since that triage, so an ack never swallows a change triage didn't show.
 - A test that still lists a REMOVED ref or criterion can't be acknowledged (`REF_REMOVED` / `CRITERION_REMOVED`):
   fix or drop the ref in its `source_refs` / `criteria` (then ack), or delete the test if the feature is gone.
+- Spec 086: neither can a test with a RELINK ref (`REF_REMOVED`, the message names `relink-sources`) — with `--ids`
+  (every missing file is checked, baselined or not, also for a test with no entry, which never gets an entry from an
+  ack) and with `--group` (a `RELINK` group).
 - An entry is recomputed in full, so refs and criteria the test no longer lists are dropped.
 - A change that is never acknowledged (or edited) stays in the baseline as it was and is reported on every triage.
 
@@ -739,6 +773,71 @@ spectra ai source-baseline --init --suite checkout --force   # recompute every e
 Without `--force` it creates missing entries and adds missing refs/criteria to partial entries, but never changes a
 recorded fingerprint or drops a key. Refs that don't resolve and unknown criterion IDs are left out (they show as
 unbaselined). Never writes a test file.
+
+**History bootstrap (Spec 086).** Baselines can start in the past, so doc changes made since the tests were written
+show up at the next triage:
+
+```bash
+spectra ai source-baseline --init --all-suites --from-date 2026-03-01           # each repo's last commit at or before the date
+spectra ai source-baseline --init --all-suites --from-ref v2.4 --owner docs/requirements/gitbook-repo
+```
+
+- **The point.** `--from-date <ISO date>`: per owner repository, the last commit at or before the date (a date without
+  a time means the end of that day, UTC). `--from-ref <rev> --owner <path>`: the repository containing `<path>` uses
+  that commit; docs of other repositories use current content, with one warning naming them.
+- **Per ref** without a baseline key: the file at the point, following the renames made since back to its old path;
+  the section by the 085 matcher; fingerprint and snapshot as usual. Criteria always use current content.
+- **Fills missing keys only**: an existing fingerprint is never changed (a partial entry gets only its missing refs).
+- **Left unbaselined, with a reason** (`suites[].unbaselined: [{test, ref, reason}]`): `file did not exist at <hash>`,
+  `anchor did not exist at <hash>`, `no commit at or before <date>`, or the ref's current missing reason.
+- **No git / no repository**: current content, with a warning listing the docs. Never an error.
+- **Refused** with `INVALID_ARGUMENTS`: `--force` with `--from-*`; `--from-ref` without `--owner`; `--owner` without
+  `--from-ref`; `--from-date` or `--from-ref` without `--init`; both `--from-date` and `--from-ref`; an unparseable date.
+  With `GIT_REF_UNAVAILABLE` (exit 4): an `--owner` that isn't a readable repository, or a `--from-ref` that doesn't
+  name a commit in it. Nothing is written.
+- The JSON gains `"from": {"date": "…"}` or `{"ref": "…", "owner": "…"}` (only with `--from-*`).
+
+### `spectra ai relink-sources` (Spec 086)
+
+Relinks refs whose doc file was renamed or moved, as found in git history. For every ref whose file is missing and has
+a rename candidate — baselined or not:
+
+1. rewrites **only the ref's path** in the test file (the `#anchor` is kept exactly; the value keeps its quoting
+   style; a ref whose new value the test already lists is dropped instead of duplicated; the rest of the file is
+   byte-identical);
+2. updates the suite's `_index.json`;
+3. moves the baseline key **with its old fingerprint** (never re-baselined, so content the rename commit also changed
+   shows as LOAD/LIGHT at the next triage); an existing entry for the new key wins; a ref or test without a baseline
+   gets no key — the new ref stays unbaselined until the next `--init`;
+4. removes `status`, `orphaned_reason` and `orphaned_date` from an orphaned test when every ref then resolves (file
+   and anchor).
+
+```bash
+spectra ai relink-sources --suite checkout --dry-run          # preview old → new; writes nothing, not even the lock
+spectra ai relink-sources --all-suites
+spectra ai relink-sources --suite checkout --min-similarity 60 --dry-run   # also heavier-edited renames
+```
+
+| Option | Description |
+|--------|-------------|
+| `--suite <s>` / `--all-suites` | The scope (exactly one is required) |
+| `--min-similarity <N>` | Git's rename similarity threshold in percent, 50–100 (default 90) |
+| `--dry-run` | Report the same plan, write nothing |
+
+**Candidates.** One rename scan per owner repository (`git log -l0 -M<N>% --diff-filter=R`, so a large restructure
+commit is still seen as renames). A path with two or more distinct rename targets anywhere in its history is
+ambiguous and never a candidate; otherwise the chain (`a → b → c`) is followed to a file that exists now. The target
+must be under the repo root or `source.local_dir`. A bare legacy ref (`checkout.md`) is checked at the same places the
+resolver looks, in the same order. The new ref keeps the original's base when the target is under it
+(source-dir-relative stays source-dir-relative), otherwise it is repo-root-relative. Heading renames inside a file
+(`anchor not found`) are not relinked.
+
+**Output.** `{command, success, scope, dry_run, min_similarity, relinked: [{suite, test, refs: [{from, to}],
+orphan_cleared}], not_relinked: [{suite, test, ref, reason}], counts: {tests_relinked, refs_relinked,
+refs_not_relinked}, warnings}`; `reason` is the bare reason (`no git`, `no rename found at 90% similarity`,
+`ambiguous rename`, …). The human list (old → new per test) is printed in every mode: stderr in JSON mode. Exit `0`
+whatever it finds. If an in-place edit can't be verified by re-parsing, the canonical writer is used and a warning
+names the file. Takes `.spectra/baseline.lock` (not on `--dry-run`).
 
 **Storage.**
 
@@ -776,11 +875,32 @@ warnings}` — and human mode ends with `[CODE]`.
 | `CONFIG_MISSING` / `CONFIG_INVALID` | 1 | No config / a malformed or invalid one |
 | `BASELINE_UNREADABLE` | 1 | A `_source-baseline.json` that is invalid JSON or the wrong shape (names the file; never treated as empty) |
 | `LOCK_TIMEOUT` | 1 | `.spectra/baseline.lock` held for more than 10 s |
-| `INVALID_ARGUMENTS` | 4 | Both or neither of `--suite`/`--all-suites` or `--ids`/`--group`; `source-baseline` without `--init` |
+| `INVALID_ARGUMENTS` | 4 | Both or neither of `--suite`/`--all-suites` or `--ids`/`--group`; `source-baseline` without `--init`; `--min-similarity` outside 50–100; the `--from-*` combinations above |
+| `GIT_REF_UNAVAILABLE` | 4 | `--owner` isn't a readable git repository, or `--from-ref` names no commit in it (Spec 086) |
 | `SUITE_NOT_FOUND` | 4 | `--suite` names no suite folder |
 | `TEST_NOT_FOUND` | 4 | An `--ids` entry is not a test in the suite |
 | `TRIAGE_MISSING` / `GROUP_NOT_FOUND` / `TRIAGE_STALE` | 4 | `--group`: no triage for the suite / no such group / the group changed since |
-| `REF_REMOVED` / `CRITERION_REMOVED` | 4 | A named test still lists a REMOVED ref / criterion |
+| `REF_REMOVED` / `CRITERION_REMOVED` | 4 | A named test still lists a REMOVED (or RELINK) ref / a REMOVED criterion |
+
+The four baseline commands (`update-triage`, `update-ack`, `source-baseline`, `relink-sources`) share these codes.
+
+#### Git access (Spec 086)
+
+`update-triage`, `update-ack`, `relink-sources`, `source-baseline --from-*` and `docs topology` read git; nothing else
+does, and **no SPECTRA command ever writes to a git repository**.
+
+- **Read-only subcommands only**: `rev-parse`, `log`, `show`, `ls-files`, `cat-file`. Every call is
+  `git -C <repo> -c core.quotepath=false …` with `GIT_OPTIONAL_LOCKS=0` (no `index.lock`, no contention with a
+  concurrent `git`) and `GIT_TERMINAL_PROMPT=0`; output is NUL-separated where possible and read as UTF-8, so
+  non-ASCII paths round-trip.
+- **Owners.** A doc's repository is the nearest one containing it (from its folder, or the nearest existing parent
+  when the folder is gone). Submodules and nested submodules are ordinary owners; docs may also live in
+  `source.local_dir` outside the repo, or outside git entirely.
+- **Never required.** When git is missing, a doc is in no repository, git refuses a repository ("dubious ownership"),
+  or a call fails, git features are skipped for that path with a reason — `no git`, `not in a git repository`,
+  `repository not readable (dubious ownership)`, `git failed: <message>` — and the command carries on. Without git
+  every command behaves as under 085, except that a missing file's REMOVED reason says `not found; no git`.
+- Triage runs git only when a referenced file is missing; each repository's history is scanned once per command.
 
 Option-parsing errors from the command-line framework itself (an unknown option, a missing value) keep the
 framework's own output.

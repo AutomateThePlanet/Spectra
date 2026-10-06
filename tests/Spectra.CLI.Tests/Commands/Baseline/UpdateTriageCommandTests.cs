@@ -140,7 +140,7 @@ public sealed class UpdateTriageCommandTests : IDisposable
 
     [Theory]
     [InlineData("## Quotas", "## Storage quotas", "anchor not found")]
-    [InlineData(null, null, "not found")]
+    [InlineData(null, null, "not found; not in a git repository")] // Spec 086 FR-013: a missing file names the git reason
     public async Task RenamedHeadingOrDeletedFile_IsRemoved(string? from, string? to, string reason)
     {
         _ws.WriteTest("storage", "TC-101", ["docs/storage.md#Quotas"]);

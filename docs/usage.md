@@ -136,7 +136,8 @@ SPECTRA keeps, for every test, a fingerprint of each doc section it references (
 (`ingest-tests`) or edited (`ingest-update`). The `spectra-update` skill then runs:
 
 1. **Triage** — `spectra ai update-triage --suite checkout` reports what changed since each test was written, with
-   no model and no git. Every test lands in a bucket:
+   no model (git is only read, to find renamed docs). Every test lands in a bucket:
+   - **RELINK** — a referenced doc file was renamed or moved, and git history says where to;
    - **LOAD** — a number, a modal word (must, should, may, cannot, required, only, not) or many words changed;
    - **CRITERIA_CHANGED** — a linked criterion was reworded;
    - **LIGHT** — a small wording change;
@@ -146,19 +147,45 @@ SPECTRA keeps, for every test, a fingerprint of each doc section it references (
 
    Tests that share the same changes are grouped, and each group says why (`numbers: 10gb→50gb`). Sections of a
    changed doc that no test references are listed as generation hints.
-2. **Review** — the assistant shows the summary and lists REMOVED tests for you to fix (rename the ref, drop it, or
-   delete the test if the feature is gone). It never edits those itself.
-3. **Choose** — LOAD only (recommended; includes CRITERIA_CHANGED), LOAD + LIGHT, chosen groups, or report only.
-4. **Edit** — for each selected test the assistant edits it in-session through `compile-update-prompt` →
+2. **Relink** — if there are RELINK tests, the assistant previews `spectra ai relink-sources --suite checkout
+   --dry-run` (old → new ref per test), asks you, and only on your yes runs it for real, then triages again. Only the
+   ref's path changes (the `#anchor` is kept); the baseline entry moves with its old fingerprint, so anything the
+   rename commit also changed now shows as LOAD or LIGHT in the right section.
+3. **Review** — the assistant shows the summary and lists REMOVED tests for you to fix (rename the ref, drop it, or
+   delete the test if the feature is gone). It never edits those itself. A `not found; no rename found at 90%
+   similarity` reason may still be a rename with heavier edits: `relink-sources --min-similarity 60 --dry-run` looks
+   further.
+4. **Choose** — LOAD only (recommended; includes CRITERIA_CHANGED), LOAD + LIGHT, chosen groups, or report only.
+5. **Edit** — for each selected test the assistant edits it in-session through `compile-update-prompt` →
    `ingest-update`, which keeps the test's id and manual notes, fails loud on out-of-scope drift, and records the
    new baseline.
-5. **Acknowledge** — tests you reviewed and kept as they are get `spectra ai update-ack --suite checkout --ids …`,
+6. **Acknowledge** — tests you reviewed and kept as they are get `spectra ai update-ack --suite checkout --ids …`,
    so they leave triage. A change you neither edit nor acknowledge is reported again next time.
 
 "Update all" is one `spectra ai update-triage --all-suites`.
 
 **Existing workspaces.** A workspace from before this feature has no baselines, so every test shows as UNBASELINED.
 Run `spectra ai source-baseline --init --all-suites` once: it adopts the current docs as the baseline.
+
+**Adopting with history.** Adopting today's docs hides every doc change made since the tests were written. In a git
+repository you can start the baselines in the past instead:
+
+```bash
+spectra ai relink-sources --all-suites --dry-run       # first: refs to docs that were renamed since
+spectra ai relink-sources --all-suites
+spectra ai source-baseline --init --all-suites --from-date 2026-03-01
+spectra ai update-triage --all-suites                  # changes since 2026-03-01 show as LOAD / LIGHT
+```
+
+Relink first, so the bootstrap follows each doc back through its renames to the old content. `--from-date` uses each
+repository's (and submodule's) last commit at or before the date; `--from-ref <rev> --owner <path>` pins one
+repository to a commit instead. It only fills missing entries; refs whose file or section didn't exist then stay
+unbaselined, with the reason. RELINK shows up for tests without a baseline too, so a restructure made before the first
+baseline is still relinkable.
+
+**Where are my docs?** `spectra docs topology` lists the repositories (including submodules) that own the referenced
+docs, and the docs in none — the reason relinking or a history bootstrap isn't available for them. SPECTRA only ever
+reads git; without git everything works as before and missing files are REMOVED with `not found; no git`.
 
 **Repairs and broken files.** Critic repairs during generation or flagged-test review keep the test's baseline
 (`ingest-update --keep-baseline`), so a pending doc change is still in triage afterwards. A test file that fails to

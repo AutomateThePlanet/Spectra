@@ -477,6 +477,72 @@ public class SkillsManifestTests : IDisposable
     public void UpdateSkill_AllSuitesIsOneTriageCall() =>
         Assert.Contains("update-triage --all-suites", SkillContent.Update);
 
+    // ---- Spec 086 FR-023/FR-024: the relink step ----
+
+    private static string Section(string content, string from, string to)
+    {
+        var start = content.IndexOf(from, StringComparison.Ordinal);
+        var end = content.IndexOf(to, start + 1, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start, $"no section {from} … {to}");
+        return content[start..end];
+    }
+
+    [Fact]
+    public void UpdateSkill_RelinkStep_DryRunThenConfirmThenRelinkThenRetriage()
+    {
+        var step = Section(SkillContent.Update, "**Step 2a**", "**Step 3**");
+        var lines = step.Split('\n').Where(l => l.Contains("spectra ai relink-sources")).ToList();
+
+        Assert.True(lines.Count >= 2);
+        Assert.Contains("--dry-run", lines[0]); // the first occurrence previews
+        Assert.Contains(lines.Skip(1), l => !l.Contains("--dry-run"));
+        Assert.Contains("only after the user says yes", step);
+        Assert.Contains("re-run triage", step);
+        var preview = step.IndexOf("--dry-run", StringComparison.Ordinal);
+        var ask = step.IndexOf("Ask the user", StringComparison.Ordinal);
+        var relink = step.IndexOf(lines.Skip(1).First(l => !l.Contains("--dry-run")).Trim(), StringComparison.Ordinal);
+        Assert.True(preview < ask && ask < relink, "preview, then ask, then relink");
+    }
+
+    [Fact]
+    public void UpdateSkill_RelinkStep_OnNo_LeavesTheTestsForLater() =>
+        Assert.Contains("report the RELINK tests as left for later and go on with the\n   other buckets",
+            Section(SkillContent.Update, "**Step 2a**", "**Step 3**").Replace("\r\n", "\n"));
+
+    [Fact]
+    public void UpdateSkill_NamesRelinkInTheBucketList() =>
+        Assert.Contains("- **RELINK**", Section(SkillContent.Update, "## Buckets", "## Suggest next steps"));
+
+    [Fact]
+    public void UpdateSkill_RemovedStep_HintsAtMinSimilarity_DryRunFirst()
+    {
+        var step = Section(SkillContent.Update, "**Step 3**", "**Step 4**");
+
+        Assert.Contains("not found; no rename found at 90% similarity", step);
+        Assert.Contains("relink-sources --suite <suite> --min-similarity <N> --dry-run", step);
+        Assert.Contains("between 50 and 100", step);
+    }
+
+    [Fact]
+    public void UpdateSkill_FirstTimeSetup_RelinksBeforeInit_ThenOffersFromDate()
+    {
+        // Analysis H1/U2: no source-baseline --init is offered before the RELINK step unless there is no RELINK group,
+        // and the offer after relinking uses --from-date, with plain --init as the fallback.
+        var content = SkillContent.Update.Replace("\r\n", "\n");
+        var relinkStep = content.IndexOf("**Step 2a**", StringComparison.Ordinal);
+        var paragraphs = content[..relinkStep].Split("\n\n");
+        foreach (var paragraph in paragraphs.Where(p => p.Contains("source-baseline --init")))
+        {
+            Assert.Contains("no `RELINK` group", paragraph);
+        }
+
+        var after = content[relinkStep..];
+        var firstInit = after.IndexOf("spectra ai source-baseline --init", StringComparison.Ordinal);
+        Assert.True(firstInit > after.IndexOf("spectra ai relink-sources", StringComparison.Ordinal));
+        Assert.Contains("--from-date", after[firstInit..after.IndexOf('\n', firstInit)]);
+        Assert.Contains("plain\n`spectra ai source-baseline --init --suite <suite> --output-format json", after);
+    }
+
     // ---- Spec 078: criteria extraction reads each document once ----
 
     [Fact]

@@ -7,7 +7,7 @@ public class BucketAndGroupingTests
 {
     private static readonly Bucket[] Precedence =
     [
-        Bucket.Removed, Bucket.CriteriaRemoved, Bucket.Load, Bucket.CriteriaChanged, Bucket.Light, Bucket.Cosmetic, Bucket.Unchanged
+        Bucket.Relink, Bucket.Removed, Bucket.CriteriaRemoved, Bucket.Load, Bucket.CriteriaChanged, Bucket.Light, Bucket.Cosmetic, Bucket.Unchanged
     ];
 
     public static IEnumerable<object[]> Pairs() =>
@@ -31,6 +31,7 @@ public class BucketAndGroupingTests
     public void WorstFirst_IsThePrecedenceOrder() => Assert.Equal(Precedence, BucketRules.WorstFirst);
 
     [Theory]
+    [InlineData(Bucket.Relink, "RELINK")]
     [InlineData(Bucket.Removed, "REMOVED")]
     [InlineData(Bucket.CriteriaRemoved, "CRITERIA_REMOVED")]
     [InlineData(Bucket.Load, "LOAD")]
@@ -48,6 +49,7 @@ public class BucketAndGroupingTests
         {
             switch (bucket)
             {
+                case Bucket.Relink: refs.Add(RefState.Relink); break;
                 case Bucket.Removed: refs.Add(RefState.Removed); break;
                 case Bucket.Load: refs.Add(RefState.Load); break;
                 case Bucket.Light: refs.Add(RefState.Light); break;
@@ -122,6 +124,22 @@ public class BucketAndGroupingTests
         Assert.Equal(["a/REMOVED/TC-5", "a/LOAD/TC-4", "a/LOAD/TC-3", "b/LOAD/TC-9"],
             groups.Select(g => $"{g.Suite}/{g.Bucket.Wire()}/{string.Join(",", g.Tests)}"));
         Assert.Equal(["G1", "G2", "G3", "G4"], groups.Select(g => g.Id));
+    }
+
+    [Fact]
+    public void RelinkGroups_SplitByTarget()
+    {
+        // Spec 086 FR-013: the same missing ref renamed to different targets (e.g. via different source dirs) is two groups.
+        var toB = new ChangedItem(false, "docs/a.md#X", "RELINK", "docs/b.md");
+        var toC = new ChangedItem(false, "docs/a.md#X", "RELINK", "docs/c.md");
+
+        var groups = TriageGrouper.Group(
+            [V("s", "TC-1", Bucket.Relink, "renamed to docs/b.md", toB), V("s", "TC-2", Bucket.Relink, "renamed to docs/c.md", toC),
+             V("s", "TC-3", Bucket.Relink, "renamed to docs/b.md", toB)], 10);
+
+        Assert.Equal(["TC-1,TC-3", "TC-2"], groups.Select(g => string.Join(",", g.Tests)));
+        Assert.All(groups, g => Assert.Equal(Bucket.Relink, g.Bucket));
+        Assert.Equal("ref:docs/a.md#X=RELINK→docs/b.md", groups[0].Items[0].Signature);
     }
 
     [Fact]

@@ -58,6 +58,7 @@ public sealed class AiCommand : Command
         AddCommand(new UpdateTriageCommand());
         AddCommand(new UpdateAckCommand());
         AddCommand(new SourceBaselineCommand());
+        AddCommand(new RelinkSourcesCommand());
 
         // Throwaway seam-skill progress poller (superseded when execution console generalises).
         AddCommand(new InitSeamProgressCommand());

@@ -4,13 +4,16 @@ using Spectra.Core.Models.Config;
 
 namespace Spectra.CLI.Baseline;
 
-/// <summary>One ref of a triaged test: its verdict and where it resolved.</summary>
-public sealed record TriagedRef(RefVerdict Verdict, RefSection Section);
+/// <summary>One ref of a triaged test: its verdict, where it resolved, and (RELINK only) the rename target.</summary>
+public sealed record TriagedRef(RefVerdict Verdict, RefSection Section, string? Target = null);
 
 /// <summary>One criterion of a triaged test.</summary>
 public sealed record TriagedCriterion(string Id, CriterionState State, string Baseline, string? Current);
 
-/// <summary>A baselined test's full triage result.</summary>
+/// <summary>
+/// A triaged test's full result. Spec 086: <see cref="NoEntry"/> marks a test without a baseline entry that is listed
+/// only because one of its refs is RELINK (FR-012); it is not counted as unbaselined.
+/// </summary>
 public sealed record TriagedTest(
     string Suite,
     string Id,
@@ -21,7 +24,8 @@ public sealed record TriagedTest(
     IReadOnlyList<string> UnbaselinedCriteria,
     IReadOnlyDictionary<string, string?> CurrentRefs,
     IReadOnlyDictionary<string, string?> CurrentCriteria,
-    TestVerdict Verdict)
+    TestVerdict Verdict,
+    bool NoEntry = false)
 {
     public bool Partial => UnbaselinedRefs.Count > 0 || UnbaselinedCriteria.Count > 0;
 }
@@ -80,7 +84,16 @@ public static class TriageEngine
             {
                 if (!baseline.Tests.TryGetValue(test.Id, out var entry))
                 {
-                    unbaselined.Add(test.Id);
+                    // Spec 086 FR-012: a test with no entry is evaluated for RELINK only.
+                    if (await TriageNoEntryTestAsync(suite, test, context, ct) is { } relink)
+                    {
+                        triaged.Add(relink);
+                    }
+                    else
+                    {
+                        unbaselined.Add(test.Id);
+                    }
+
                     continue;
                 }
 
@@ -93,7 +106,7 @@ public static class TriageEngine
             }
 
             triagedSuites.Add(new TriagedSuite(
-                suite, loaded.Tests.Count, triaged, unbaselined, triaged.Where(t => t.Partial).Select(t => t.Id).ToList(),
+                suite, loaded.Tests.Count, triaged, unbaselined, triaged.Where(t => t.Partial && !t.NoEntry).Select(t => t.Id).ToList(),
                 loaded.Scan));
         }
 
@@ -116,7 +129,27 @@ public static class TriageEngine
             currentRefs[sourceRef] = section.Current.Fingerprint;
             if (!entry.Refs.TryGetValue(sourceRef, out var baselineFp))
             {
-                unbaselinedRefs.Add(sourceRef);
+                // Spec 086 FR-012: a never-baselined ref whose file was renamed is RELINK, not unbaselined.
+                if (await context.RelinkCandidateAsync(sourceRef, context.Renames, ct) is { NewRef: not null } unbaselinedCandidate)
+                {
+                    refs.Add(Relink(sourceRef, null, unbaselinedCandidate, section));
+                }
+                else
+                {
+                    unbaselinedRefs.Add(sourceRef);
+                }
+
+                continue;
+            }
+
+            if (await context.RelinkCandidateAsync(sourceRef, context.Renames, ct) is { } candidate)
+            {
+                // Spec 086 FR-012/FR-013: a missing file is RELINK when history names its new path; otherwise REMOVED
+                // with "not found; <reason>".
+                refs.Add(candidate.NewRef is not null
+                    ? Relink(sourceRef, baselineFp, candidate, section)
+                    : new TriagedRef(new RefVerdict(sourceRef, RefState.Removed, baselineFp, null,
+                        [$"{BaselineContext.NotFound}; {candidate.Reason}"], []), section));
                 continue;
             }
 
@@ -142,6 +175,60 @@ public static class TriageEngine
             criteria.Add(new TriagedCriterion(id, ChangeClassifier.ClassifyCriterion(baselineFp, exists, current), baselineFp, current));
         }
 
+        return Build(suite, test.Id, refs, criteria, unbaselinedRefs, unbaselinedCriteria, currentRefs, currentCriteria,
+            cosmeticAcked, noEntry: false);
+    }
+
+    /// <summary>
+    /// Spec 086 FR-012 (analysis H1/C6): a test with no baseline entry, evaluated for RELINK only. Null when none of
+    /// its refs is RELINK (it stays unbaselined); otherwise the same record as any triaged test — the RELINK refs with
+    /// no baseline, every other ref and criterion unbaselined, <c>current</c> filled — marked <see cref="TriagedTest.NoEntry"/>.
+    /// </summary>
+    public static async Task<TriagedTest?> TriageNoEntryTestAsync(
+        string suite, TestCase test, BaselineContext context, CancellationToken ct)
+    {
+        var refs = new List<TriagedRef>();
+        var unbaselinedRefs = new List<string>();
+        var currentRefs = new SortedDictionary<string, string?>(StringComparer.Ordinal);
+        foreach (var sourceRef in test.SourceRefs.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct(StringComparer.Ordinal))
+        {
+            var section = await context.GetSectionAsync(sourceRef, ct);
+            currentRefs[sourceRef] = section.Current.Fingerprint;
+            if (await context.RelinkCandidateAsync(sourceRef, context.Renames, ct) is { NewRef: not null } candidate)
+            {
+                refs.Add(Relink(sourceRef, null, candidate, section));
+            }
+            else
+            {
+                unbaselinedRefs.Add(sourceRef);
+            }
+        }
+
+        if (refs.Count == 0)
+        {
+            return null;
+        }
+
+        var currentCriteria = new SortedDictionary<string, string?>(StringComparer.Ordinal);
+        var unbaselinedCriteria = new List<string>();
+        foreach (var id in test.Criteria.Where(c => !string.IsNullOrWhiteSpace(c)).Distinct(StringComparer.Ordinal))
+        {
+            currentCriteria[id] = context.GetCriterion(id).Fingerprint;
+            unbaselinedCriteria.Add(id);
+        }
+
+        return Build(suite, test.Id, refs, [], unbaselinedRefs, unbaselinedCriteria, currentRefs, currentCriteria,
+            cosmeticAcked: false, noEntry: true);
+    }
+
+    private static TriagedRef Relink(string sourceRef, string? baseline, RelinkCandidate candidate, RefSection section) =>
+        new(new RefVerdict(sourceRef, RefState.Relink, baseline, null, [$"renamed to {candidate.Target}"], []), section, candidate.Target);
+
+    private static TriagedTest Build(
+        string suite, string id, List<TriagedRef> refs, List<TriagedCriterion> criteria, List<string> unbaselinedRefs,
+        List<string> unbaselinedCriteria, SortedDictionary<string, string?> currentRefs,
+        SortedDictionary<string, string?> currentCriteria, bool cosmeticAcked, bool noEntry)
+    {
         var bucket = BucketRules.Of(refs.Select(r => r.Verdict.State), criteria.Select(c => c.State));
         var items = new List<ChangedItem>();
         var why = new List<string>();
@@ -152,7 +239,7 @@ public static class TriageEngine
                 continue;
             }
 
-            items.Add(new ChangedItem(false, r.Verdict.Ref, r.Verdict.State.Wire()));
+            items.Add(new ChangedItem(false, r.Verdict.Ref, r.Verdict.State.Wire(), r.Target));
             why.AddRange(r.Verdict.Why);
         }
 
@@ -162,8 +249,9 @@ public static class TriageEngine
             why.Add(c.State == CriterionState.Removed ? $"criterion removed: {c.Id}" : $"criterion changed: {c.Id}");
         }
 
-        return new TriagedTest(suite, test.Id, bucket, refs, criteria, unbaselinedRefs, unbaselinedCriteria,
-            currentRefs, currentCriteria, new TestVerdict(suite, test.Id, bucket, items, why.Distinct(StringComparer.Ordinal).ToList()));
+        return new TriagedTest(suite, id, bucket, refs, criteria, unbaselinedRefs, unbaselinedCriteria,
+            currentRefs, currentCriteria, new TestVerdict(suite, id, bucket, items, why.Distinct(StringComparer.Ordinal).ToList()),
+            noEntry);
     }
 
     /// <summary>

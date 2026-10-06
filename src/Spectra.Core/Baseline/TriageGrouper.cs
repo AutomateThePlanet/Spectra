@@ -1,9 +1,13 @@
 namespace Spectra.Core.Baseline;
 
-/// <summary>A changed ref or criterion of a test, with its wire state (<c>LOAD</c>, <c>CRITERIA_CHANGED</c>, …).</summary>
-public sealed record ChangedItem(bool IsCriterion, string Key, string State)
+/// <summary>
+/// A changed ref or criterion of a test, with its wire state (<c>LOAD</c>, <c>CRITERIA_CHANGED</c>, …). Spec 086: a
+/// RELINK ref carries its <see cref="Target"/> (the repo-relative path it was renamed to), which is part of the
+/// signature, so RELINK groups split by target.
+/// </summary>
+public sealed record ChangedItem(bool IsCriterion, string Key, string State, string? Target = null)
 {
-    public string Signature => $"{(IsCriterion ? "criterion" : "ref")}:{Key}={State}";
+    public string Signature => $"{(IsCriterion ? "criterion" : "ref")}:{Key}={State}{(Target is null ? "" : $"→{Target}")}";
 }
 
 /// <summary>One test's triage result: its bucket, the items that are not unchanged, and why.</summary>

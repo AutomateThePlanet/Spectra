@@ -9,11 +9,13 @@ tools: [{{GENERATE_TOOLS}}]
 You help users update existing test cases when documentation or acceptance
 criteria have changed. The CLI records, for every test, a fingerprint of each doc
 section it references (`source_refs`) and each criterion it links (`criteria`), and
-`update-triage` reports exactly what changed since — deterministic, no model, no
-git. You then **edit the affected tests in this session** through the update seam:
+`update-triage` reports exactly what changed since — deterministic and model-free; git is
+only ever read, to find doc files that were renamed. You then **edit the affected tests in
+this session** through the update seam:
 
 ```
-update-triage (CLI)  →  you choose buckets with the user  →  compile-update-prompt (CLI)
+update-triage (CLI)  →  relink-sources for renamed docs (CLI, after the user's yes)
+  →  you choose buckets with the user  →  compile-update-prompt (CLI)
   →  you edit in-session  →  ingest-update (CLI, fail-loud)  →  update-ack for tests kept as they are
 ```
 
@@ -58,17 +60,49 @@ case only) were already acknowledged automatically (`auto_acked`).
 **Step 2** — Show the summary: per suite the bucket counts from `suites[].counts`, then each
 group from `groups` (`id`, `bucket`, the `refs` / `criteria`, how many tests, and `why`,
 e.g. `numbers: 30→45`). Show `notes` and `warnings`. If `unbaselined` is not empty, say
-those tests have no baseline yet and can't be triaged; offer
+those tests have no baseline yet and can't be triaged. If there is no `RELINK` group, offer
 `spectra ai source-baseline --init --suite <suite> --output-format json --verbosity quiet`
-(it adopts the current docs as the baseline — only after the user agrees). If `no_tests`
+here (it adopts the current docs as the baseline — only after the user agrees); if there is a
+`RELINK` group, don't offer it yet — Step 2a offers it after relinking. If `no_tests`
 is not empty, list them as sections of changed docs that no test covers (generation hints
 for the `spectra-generate` skill). If every count except `unchanged` is 0, say "Tests are up
 to date" and STOP.
 
+**Step 2a** — RELINK: doc files that were renamed or moved. Only when a group has the bucket
+`RELINK`; otherwise go on with Step 3. Each RELINK ref's file is missing, and git history
+names the file it was renamed to (`why`: `renamed to <path>`).
+
+1. Preview the relink with the Bash tool:
+   ```
+   spectra ai relink-sources --suite <suite> --dry-run --output-format json --verbosity quiet
+   ```
+2. Show, per test, each `relinked` ref as `from` → `to` (only the path changes; the `#anchor`
+   is kept), whether `orphan_cleared` is true, and every `not_relinked` ref with its `reason`.
+3. Ask the user whether to relink these tests. Relink only after the user says yes.
+4. On yes, run it without `--dry-run`:
+   ```
+   spectra ai relink-sources --suite <suite> --output-format json --verbosity quiet
+   ```
+   Then re-run triage (the Step 1 command) and show the summary again before Step 3. Each moved
+   baseline entry keeps its old fingerprint, so content the rename also changed now shows as
+   `LOAD` or `LIGHT` in the right section.
+5. On no, nothing is relinked: report the RELINK tests as left for later and go on with the
+   other buckets (Step 3).
+
+**First-time setup** — when the suite has unbaselined tests, offer the baseline only now,
+after the relink step (whether the user relinked or not):
+`spectra ai source-baseline --init --suite <suite> --from-date <YYYY-MM-DD> --output-format json --verbosity quiet`,
+with the date the tests were written or last reviewed. It reads each doc as it was on that
+date — following renames back to the old path — so doc changes made since then show at the
+next triage. If there is no git, or the user doesn't know a date, plain
+`spectra ai source-baseline --init --suite <suite> --output-format json --verbosity quiet`
+adopts the current docs instead. Run either only after the user agrees, then re-run triage.
+
 **Step 3** — REMOVED and CRITERIA_REMOVED (review only).
 
 List every entry of `removed`: the test, the ref or criterion that is gone, and its
-`reason` (`anchor not found`, `not found`, `not in any criteria file`). Do not compile an
+`reason` (`anchor not found`; `not found; <why>` for a missing file — e.g. `not found; no git`,
+`not found; ambiguous rename`; `not in any criteria file`). Do not compile an
 edit prompt for these tests, and never edit the `.md` file yourself — there is no current
 section to edit against. Tell the user how to clear each one:
 - the heading was renamed or the doc moved → fix the ref in the test's `source_refs`
@@ -79,6 +113,12 @@ section to edit against. Tell the user how to clear each one:
   ref from `source_refs`;
 - the feature itself was removed → the test can be deleted with the `spectra-delete`
   skill (`spectra delete <id> --dry-run`, then confirm). Never run the delete from this skill.
+
+When the reason is `not found; no rename found at 90% similarity`, the doc may have been
+renamed with heavier edits than triage looks for. Tell the user that
+`spectra ai relink-sources --suite <suite> --min-similarity <N> --dry-run --output-format json --verbosity quiet`
+(N between 50 and 100; lower finds heavier-edited renames) previews it; show the result, and
+relink without `--dry-run` only after the user says yes, as in Step 2a.
 
 These tests can't be acknowledged while the ref is still listed (`REF_REMOVED` /
 `CRITERION_REMOVED`).
@@ -91,7 +131,7 @@ These tests can't be acknowledged while the ref is still listed (`REF_REMOVED` /
 - **choose groups** — offer only groups in the `LOAD`, `CRITERIA_CHANGED` or `LIGHT` buckets;
 - **report only** — no edits; STOP after the report.
 
-`REMOVED` and `CRITERIA_REMOVED` groups never enter the edit loop, whichever option is chosen.
+`RELINK`, `REMOVED` and `CRITERIA_REMOVED` groups never enter the edit loop, whichever option is chosen.
 
 Update `.spectra/progress.json` — N = number of tests in the selected groups:
 ```json
@@ -155,11 +195,14 @@ When the user says "update all", run ONE triage over every suite:
 spectra ai update-triage --all-suites --output-format json --verbosity quiet
 ```
 Then follow Steps 2–7 with the groups of every suite (each group names its `suite`; pass
-that suite to `compile-update-prompt`, `ingest-update` and `update-ack`).
+that suite to `compile-update-prompt`, `ingest-update` and `update-ack`). In Step 2a, preview
+and relink every suite in one call each: `spectra ai relink-sources --all-suites --dry-run …`,
+then, after the user's yes, the same without `--dry-run`.
 
-## Exit codes (triage, ack, baseline)
+## Exit codes (triage, relink, ack, baseline)
 
-- Exit `0` → success; read the JSON on stdout. Triage exits 0 whatever it finds.
+- Exit `0` → success; read the JSON on stdout. Triage and `relink-sources` exit 0 whatever they
+  find (no git, or no rename, is a `reason`, not an error).
 - Exit `4` → refused; nothing was written. Show `errors[0]` and the `error_code`
   (`SUITE_NOT_FOUND`, `TEST_NOT_FOUND`, `REF_REMOVED`, `CRITERION_REMOVED`, `TRIAGE_MISSING`,
   `GROUP_NOT_FOUND`, `TRIAGE_STALE`, `INVALID_ARGUMENTS`) and stop for that suite.
@@ -173,6 +216,7 @@ that suite to `compile-update-prompt`, `ingest-update` and `update-ack`).
 ## Buckets
 
 When presenting results, explain the buckets (a test's bucket is its worst change):
+- **RELINK** — a referenced doc file was renamed or moved (found in git history); cleared by `relink-sources` after the user's yes
 - **REMOVED** — a referenced section (or its file) is gone; review only, cleared by fixing the ref
 - **CRITERIA_REMOVED** — a linked criterion no longer exists; review only
 - **LOAD** — a number, a modal word (must/should/may/cannot/required/only/not) or many words changed, or no diff was available

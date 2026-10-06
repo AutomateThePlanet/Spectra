@@ -1,9 +1,9 @@
 namespace Spectra.Core.Baseline;
 
 /// <summary>
-/// Spec 084 (FR-015): a test's bucket is its worst state. Numeric order is precedence: REMOVED > CRITERIA_REMOVED >
-/// LOAD > CRITERIA_CHANGED > LIGHT > COSMETIC > UNCHANGED. UNBASELINED is not a bucket (a test with no entry stands
-/// apart and is never reported as changed).
+/// Spec 084 (FR-015): a test's bucket is its worst state. Numeric order is precedence: RELINK (Spec 086) > REMOVED >
+/// CRITERIA_REMOVED > LOAD > CRITERIA_CHANGED > LIGHT > COSMETIC > UNCHANGED. UNBASELINED is not a bucket (a test with
+/// no entry stands apart and is never reported as changed, unless one of its refs is RELINK).
 /// </summary>
 public enum Bucket
 {
@@ -13,7 +13,10 @@ public enum Bucket
     CriteriaChanged,
     Load,
     CriteriaRemoved,
-    Removed
+    Removed,
+
+    /// <summary>Spec 086: a ref whose file is missing and was renamed in git history.</summary>
+    Relink
 }
 
 public static class BucketRules
@@ -36,6 +39,7 @@ public static class BucketRules
 
     public static Bucket Of(RefState state) => state switch
     {
+        RefState.Relink => Bucket.Relink,
         RefState.Removed => Bucket.Removed,
         RefState.Load => Bucket.Load,
         RefState.Light => Bucket.Light,
@@ -50,9 +54,10 @@ public static class BucketRules
         _ => Bucket.Unchanged
     };
 
-    /// <summary>The wire name: <c>REMOVED</c>, <c>CRITERIA_REMOVED</c>, <c>LOAD</c>, … .</summary>
+    /// <summary>The wire name: <c>RELINK</c>, <c>REMOVED</c>, <c>CRITERIA_REMOVED</c>, <c>LOAD</c>, … .</summary>
     public static string Wire(this Bucket bucket) => bucket switch
     {
+        Bucket.Relink => "RELINK",
         Bucket.Removed => "REMOVED",
         Bucket.CriteriaRemoved => "CRITERIA_REMOVED",
         Bucket.Load => "LOAD",

@@ -250,6 +250,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The console is left alone.** The 084 UTF-8 fix set the console's output encoding, which also switched the terminal
   window's code page for the rest of the session. Now only redirected stdout and stderr get a UTF-8 writer.
 
+### Added (Spec 086 — git-aware relinking, Phase 2b)
+
+- **Renamed docs are relinked, not lost.** Triage has a new bucket, **RELINK** (above REMOVED): a referenced file is
+  missing and git history names the file it was renamed or moved to (`why: renamed to <path>`; groups split by
+  target). It covers refs and tests without a baseline too, so a restructure made before the first baseline is found.
+- **`spectra ai relink-sources (--suite <s> | --all-suites) [--min-similarity N] [--dry-run]`** rewrites only the
+  ref's path (anchor and quoting kept, the rest of the file byte-identical), updates `_index.json`, moves the baseline
+  key with its **old** fingerprint (so content the rename also changed shows at the next triage), and clears orphan
+  status when every ref then resolves. One rename scan per repository; renames to two places, chains ending at a
+  missing file and targets outside the repo/source dir are never candidates.
+- **History bootstrap.** `source-baseline --init --from-date <ISO date>` (each repository's last commit at or before
+  the date) and `--from-ref <rev> --owner <path>` fill missing entries from the docs as they were, following renames
+  back. Existing fingerprints are never changed; refs that didn't exist then stay unbaselined with the reason.
+- **`spectra docs topology`** lists the repositories (submodules included) that own the referenced docs, and the docs
+  in none, with the reason.
+- **The update skill relinks first.** `spectra-update` previews `relink-sources --dry-run`, asks, relinks only on a
+  yes, re-triages, and offers `--init --from-date` after relinking for a first-time setup. Its REMOVED step points at
+  `--min-similarity` for heavier-edited renames.
+- **Read-only git, never required.** Only `rev-parse`, `log`, `show`, `ls-files` and `cat-file` run, with
+  `GIT_OPTIONAL_LOCKS=0` and `core.quotepath=false`; no `index.lock` is ever created and SPECTRA never writes to a
+  repository. Without git (or outside a repository) everything works as under 085 with a reason.
+
+### Changed (Spec 086)
+
+- A missing file's REMOVED reason now names the git reason: `not found; no git`, `not found; not in a git repository`,
+  `not found; no rename found at 90% similarity`, `not found; ambiguous rename`, … (was `not found`).
+- `update-ack` refuses a test with a RELINK ref (`REF_REMOVED`, naming `relink-sources`), on `--ids` and `--group`, and
+  never creates an entry for one. New refusal code `GIT_REF_UNAVAILABLE` (exit 4) for an unusable `--from-ref` /
+  `--owner`.
+
 ### Notes
 
 - **One-time `source_section` churn.** Because `source_section` is now read, the first re-extraction after

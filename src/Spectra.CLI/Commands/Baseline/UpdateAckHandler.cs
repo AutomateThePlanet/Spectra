@@ -10,7 +10,9 @@ namespace Spectra.CLI.Commands.Baseline;
 /// Spec 084: the logic of <c>spectra ai update-ack</c>. <c>--group</c> resolves through the last triage's detail file
 /// and is refused when the group's sections or criteria changed since (<c>TRIAGE_STALE</c>), so an ack never swallows a
 /// change triage didn't show. A test that still lists a REMOVED ref or criterion is refused (<c>REF_REMOVED</c> /
-/// <c>CRITERION_REMOVED</c>): it is cleared by fixing or dropping the ref, not by an ack.
+/// <c>CRITERION_REMOVED</c>): it is cleared by fixing or dropping the ref, not by an ack. Spec 086 (FR-014): so is a
+/// test with a RELINK ref — a missing file that git history renamed, baselined or not — with a message naming
+/// <c>relink-sources</c>; an ack never creates an entry for such a test.
 /// </summary>
 public static class UpdateAckHandler
 {
@@ -70,7 +72,7 @@ public static class UpdateAckHandler
                 targets = await ResolveGroupAsync(root, suite!, group, byId, context, ct);
             }
 
-            await RefuseRemovedAsync(targets, baseline, context, ct);
+            await RefuseRemovedAsync(targets, baseline, context, suite!, ct);
 
             var snapshots = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var test in targets.OrderBy(t => t.Id, StringComparer.Ordinal))
@@ -185,6 +187,13 @@ public static class UpdateAckHandler
         }
 
         var bucket = match.GetProperty("bucket").GetString();
+        if (bucket == "RELINK")
+        {
+            // Spec 086 FR-014 (analysis C5).
+            throw new BaselineStoreException(BaselineCommandIO.ErrorRefRemoved,
+                $"Group {group} is RELINK: its doc files were renamed. {RelinkHint(suite)}");
+        }
+
         if (bucket is "REMOVED" or "CRITERIA_REMOVED")
         {
             throw new BaselineStoreException(
@@ -243,24 +252,41 @@ public static class UpdateAckHandler
         return then.Count == now.Count && now.All(kv => then.TryGetValue(kv.Key, out var v) && v == kv.Value);
     }
 
+    /// <summary>The recovery for a RELINK refusal.</summary>
+    private static string RelinkHint(string suite) =>
+        $"Run 'spectra ai relink-sources --suite {suite} --dry-run' to review, then without --dry-run, then triage again.";
+
     private static async Task RefuseRemovedAsync(
-        IEnumerable<TestCase> targets, SourceBaseline baseline, BaselineContext context, CancellationToken ct)
+        IEnumerable<TestCase> targets, SourceBaseline baseline, BaselineContext context, string suite, CancellationToken ct)
     {
+        var relinkRefs = new List<string>();
         var removedRefs = new List<string>();
         var removedCriteria = new List<string>();
         foreach (var test in targets)
         {
-            if (!baseline.Tests.TryGetValue(test.Id, out var entry))
+            baseline.Tests.TryGetValue(test.Id, out var entry);
+            foreach (var sourceRef in test.SourceRefs.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct(StringComparer.Ordinal))
             {
-                continue; // unbaselined: nothing is REMOVED, the ack creates the entry
-            }
+                if (!(await context.GetSectionAsync(sourceRef, ct)).Current.Missing)
+                {
+                    continue;
+                }
 
-            foreach (var sourceRef in test.SourceRefs.Where(entry.Refs.ContainsKey).Distinct(StringComparer.Ordinal))
-            {
-                if ((await context.GetSectionAsync(sourceRef, ct)).Current.Missing)
+                // Spec 086 FR-014 (analysis U1): every missing file is asked about, with or without a baseline key, so
+                // a test with a RELINK ref never gets an entry from an ack.
+                if (await context.RelinkCandidateAsync(sourceRef, context.Renames, ct) is { NewRef: not null } candidate)
+                {
+                    relinkRefs.Add($"{test.Id}: {sourceRef} → {candidate.NewRef}");
+                }
+                else if (entry is not null && entry.Refs.ContainsKey(sourceRef))
                 {
                     removedRefs.Add($"{test.Id}: {sourceRef}");
                 }
+            }
+
+            if (entry is null)
+            {
+                continue; // unbaselined: no criterion is REMOVED, the ack creates the entry
             }
 
             foreach (var id in test.Criteria.Where(entry.Criteria.ContainsKey).Distinct(StringComparer.Ordinal))
@@ -270,6 +296,13 @@ public static class UpdateAckHandler
                     removedCriteria.Add($"{test.Id}: {id}");
                 }
             }
+        }
+
+        if (relinkRefs.Count > 0)
+        {
+            throw new BaselineStoreException(BaselineCommandIO.ErrorRefRemoved,
+                $"Can't acknowledge a renamed doc ref ({string.Join("; ", relinkRefs)}). {RelinkHint(suite)}"
+                + (removedRefs.Count > 0 ? $" Also REMOVED: {string.Join("; ", removedRefs)}." : ""));
         }
 
         if (removedRefs.Count > 0)

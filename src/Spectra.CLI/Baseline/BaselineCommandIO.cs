@@ -30,7 +30,7 @@ public static class BaselineCommandIO
     private static readonly HashSet<string> Refusals = new(StringComparer.Ordinal)
     {
         ErrorInvalidArguments, ErrorSuiteNotFound, ErrorTestNotFound, ErrorTriageMissing, ErrorGroupNotFound,
-        ErrorTriageStale, ErrorRefRemoved, ErrorCriterionRemoved
+        ErrorTriageStale, ErrorRefRemoved, ErrorCriterionRemoved, HistoryBootstrap.ErrorGitRefUnavailable
     };
 
     /// <summary>Compact JSON with relaxed escaping (so <c>#</c>, <c>→</c> and non-ASCII stay readable).</summary>
