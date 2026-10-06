@@ -5,7 +5,8 @@ using Spectra.CLI.Options;
 namespace Spectra.CLI.Commands.Baseline;
 
 /// <summary>
-/// Spec 084 (FR-026): <c>spectra ai source-baseline --init (--suite &lt;s&gt; | --all-suites) [--force] [--dry-run]</c>.
+/// Spec 084 (FR-026): <c>spectra ai source-baseline --init (--suite &lt;s&gt; | --all-suites) [--force] [--dry-run]</c>;
+/// Spec 086: <c>[--from-date &lt;ISO date&gt; | --from-ref &lt;rev&gt; --owner &lt;path&gt;]</c>.
 /// Adopts current content as the baseline for tests that have none (or completes partial entries); never changes an
 /// existing fingerprint without <c>--force</c>. Never touches test files. Model-free.
 /// </summary>
@@ -19,7 +20,14 @@ public sealed class SourceBaselineCommand : Command
         var allSuitesOption = new Option<bool>("--all-suites", "Baseline every suite");
         var forceOption = new Option<bool>("--force", "Recompute every entry in scope from current content");
         var dryRunOption = new Option<bool>("--dry-run", "Report what would be written, but write nothing");
+        var fromDateOption = new Option<string?>("--from-date",
+            "Fill missing entries from each repository's last commit at or before this ISO date (follows renames back)");
+        var fromRefOption = new Option<string?>("--from-ref", "Fill missing entries from this commit of the --owner repository");
+        var ownerOption = new Option<string?>("--owner", "The repository (a path inside it) that --from-ref names a commit in");
         AddOption(initOption);
+        AddOption(fromDateOption);
+        AddOption(fromRefOption);
+        AddOption(ownerOption);
         AddOption(suiteOption);
         AddOption(allSuitesOption);
         AddOption(forceOption);
@@ -36,6 +44,9 @@ public sealed class SourceBaselineCommand : Command
                 parse.GetValueForOption(allSuitesOption),
                 parse.GetValueForOption(forceOption),
                 parse.GetValueForOption(dryRunOption),
+                parse.GetValueForOption(fromDateOption),
+                parse.GetValueForOption(fromRefOption),
+                parse.GetValueForOption(ownerOption),
                 json,
                 context.GetCancellationToken());
         });

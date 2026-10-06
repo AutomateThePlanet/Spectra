@@ -29,12 +29,8 @@ public sealed class BaselineTestWorkspace : IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        try { Directory.Delete(Root, recursive: true); }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
-    }
+    // Spec 086: a workspace may hold a git repository, whose object files are read-only on Windows.
+    public void Dispose() => GitFixture.DeleteTree(Root);
 
     public string PathOf(string relative) => Path.Combine(Root, relative.Replace('/', Path.DirectorySeparatorChar));
 

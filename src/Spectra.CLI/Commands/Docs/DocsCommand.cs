@@ -16,5 +16,6 @@ public sealed class DocsCommand : Command
         AddCommand(new DocsMigrateCriteriaCommand());
         AddCommand(new DocsRetireCommand());
         AddCommand(new DocsApplyMoveCommand());
+        AddCommand(new DocsTopologyCommand());
     }
 }

@@ -6,7 +6,10 @@ public enum RefState
     Cosmetic,
     Light,
     Load,
-    Removed
+    Removed,
+
+    /// <summary>Spec 086: the file is missing and git history names the file it was renamed to.</summary>
+    Relink
 }
 
 public enum CriterionState
@@ -27,9 +30,12 @@ public sealed record CurrentSection(bool Missing, string? MissingReason, string?
     public static CurrentSection Of(string fingerprint, string normalised) => new(false, null, fingerprint, normalised);
 }
 
-/// <summary>A ref's state against its baseline, with the reasons (<see cref="Why"/>) and the word diff.</summary>
+/// <summary>
+/// A ref's state against its baseline, with the reasons (<see cref="Why"/>) and the word diff. <see cref="Baseline"/>
+/// is null only for a RELINK ref that was never baselined (Spec 086 FR-012).
+/// </summary>
 public sealed record RefVerdict(
-    string Ref, RefState State, string Baseline, string? Current, IReadOnlyList<string> Why, IReadOnlyList<DiffRun> Diff);
+    string Ref, RefState State, string? Baseline, string? Current, IReadOnlyList<string> Why, IReadOnlyList<DiffRun> Diff);
 
 /// <summary>
 /// Spec 084 (FR-012–FR-014, research R4): deterministic per-ref and per-criterion states. Checks, in order:

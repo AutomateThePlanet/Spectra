@@ -24,6 +24,10 @@ public sealed class BaselineContext
     private readonly Dictionary<string, string> _criteria;
     private readonly Dictionary<string, string?> _snapshots = new(StringComparer.Ordinal);
     private readonly SortedSet<string> _notes = new(StringComparer.Ordinal);
+    private RenameResolver? _renames;
+
+    /// <summary>The missing reason of a ref whose file doesn't exist (the only one rename detection applies to).</summary>
+    public const string NotFound = "not found";
 
     private BaselineContext(string repoRoot, SourceRefResolver resolver, Dictionary<string, string> criteria)
     {
@@ -33,6 +37,28 @@ public sealed class BaselineContext
     }
 
     public string RepoRoot => _repoRoot;
+
+    /// <summary>The source-ref resolver (repo root and source dir).</summary>
+    public SourceRefResolver Refs => _resolver;
+
+    /// <summary>Spec 086: the rename resolver at the default 90% threshold, created on first use (git runs only then).</summary>
+    public RenameResolver Renames => _renames ??= new RenameResolver(_resolver, RenameResolver.DefaultMinSimilarity);
+
+    /// <summary>Spec 086: a rename resolver at <paramref name="minSimilarity"/>% (<c>relink-sources --min-similarity</c>).</summary>
+    public RenameResolver CreateRenameResolver(int minSimilarity) =>
+        minSimilarity == RenameResolver.DefaultMinSimilarity ? Renames : new RenameResolver(_resolver, minSimilarity);
+
+    /// <summary>
+    /// Spec 086: the relink candidate of <paramref name="sourceRef"/> when its file is missing (reason
+    /// <see cref="NotFound"/>), else null — a resolving ref, or one missing for another reason, is never relinked.
+    /// </summary>
+    public async Task<RelinkCandidate?> RelinkCandidateAsync(string sourceRef, RenameResolver renames, CancellationToken ct)
+    {
+        var section = await GetSectionAsync(sourceRef, ct);
+        return section.Current.Missing && section.Current.MissingReason == NotFound
+            ? await renames.CandidateForAsync(sourceRef, ct)
+            : null;
+    }
 
     /// <summary>Ambiguous anchors and duplicate criterion IDs seen so far, ordered.</summary>
     public IReadOnlyCollection<string> Notes => _notes;
@@ -80,7 +106,7 @@ public sealed class BaselineContext
             {
                 MissingReason.OutsideAllowedRoots => "outside allowed roots",
                 MissingReason.Empty => "empty ref",
-                _ => "not found"
+                _ => NotFound
             };
             result = new RefSection(sourceRef, null, null, CurrentSection.Gone(reason), false);
         }
