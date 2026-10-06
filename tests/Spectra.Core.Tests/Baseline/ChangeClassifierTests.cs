@@ -87,4 +87,40 @@ public class ChangeClassifierTests
 
         Assert.Equal(state, ChangeClassifier.ClassifyCriterion(baseline, exists, currentFp));
     }
+
+    // ---- Spec 085 T6 (F4): changes that flip a rule's meaning are LOAD ----
+
+    public static TheoryData<string, string, string, RefState, string> MeaningFlips => new()
+    {
+        { "can → can't", "Users can delete items.\n", "Users can't delete items.\n", RefState.Load, "modal: ∅→can't" },
+        { "can → can’t (curly)", "Users can delete items.\n", "Users can\u2019t delete items.\n", RefState.Load, "modal: ∅→can't" },
+        { "add except", "Refunds apply to all items.\n", "Refunds apply to all items except gift cards.\n", RefState.Load, "modal: ∅→except" },
+        { "always → never", "Sessions always expire.\n", "Sessions never expire.\n", RefState.Load, "modal: always→never" },
+        { "never → always", "Sessions never expire.\n", "Sessions always expire.\n", RefState.Load, "modal: never→always" },
+        { "none", "Some fields are optional.\n", "None fields are optional.\n", RefState.Load, "modal: ∅→none" },
+        { "without", "Export with a password.\n", "Export without a password.\n", RefState.Load, "modal: ∅→without" },
+        { "unless", "Retry if offline.\n", "Retry unless offline.\n", RefState.Load, "modal: ∅→unless" },
+        { "any", "Admins edit one record.\n", "Admins edit any record.\n", RefState.Load, "modal: ∅→any" },
+        { "every", "Admins review one order.\n", "Admins review every order.\n", RefState.Load, "modal: ∅→every" },
+        { "ordinary word", "Click the button.\n", "Click the link.\n", RefState.Light, "words: 1" },
+    };
+
+    [Theory]
+    [MemberData(nameof(MeaningFlips))]
+    public void MeaningFlips_AreLoad(string name, string before, string after, RefState state, string why)
+    {
+        var verdict = ChangeClassifier.ClassifyRef(
+            "docs/a.md#A",
+            SourceFingerprint.OfSection(before),
+            CurrentSection.Of(SourceFingerprint.OfSection(after), TextNormalizer.Normalize(after)),
+            TextNormalizer.Normalize(before),
+            12);
+
+        Assert.True(state == verdict.State, $"{name}: expected {state}, got {verdict.State}");
+        Assert.Contains(why, verdict.Why);
+    }
+
+    [Fact]
+    public void Fold_TurnsCurlyApostrophesStraight() =>
+        Assert.Equal("can't", ChangeClassifier.Fold("can\u2019t").Replace('\u2018', '\''));
 }

@@ -37,10 +37,10 @@ Read the repair prompt. Rewrite ONLY the elements the critic flagged as unground
 ### Step 3 — Ingest the repair
 
 ```
-spectra ai ingest-update {suite} --test-id {id} --from .spectra/repaired.json --output-format json
+spectra ai ingest-update {suite} --test-id {id} --from .spectra/repaired.json --keep-baseline --output-format json
 ```
 
-- Exit 0 → patched test persisted.
+- Exit 0 → patched test persisted. `--keep-baseline` leaves its source-change baseline as it was: a repair fixes grounding, not doc drift.
 - Exit 5/6 → content/schema failure. Fix the JSON and retry within this step.
 
 ### Step 4 — Re-run the critic

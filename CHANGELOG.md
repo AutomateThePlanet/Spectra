@@ -227,6 +227,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   how the skills read every command — used the legacy console code page, so characters such as `→`, `—` or `Ü` in
   JSON results and compiled prompts arrived as `?` or a control character.
 
+### Fixed (review fixes, Spec 085)
+
+- **Anchors find headings with markup or explicit IDs.** A ref now matches a heading by its text with HTML, links and
+  a trailing `{#…}` block removed, then by an explicit ID (`id="…"`, `{#id}`), then by a GitHub duplicate suffix
+  (`#setup-1` = the second "Setup"). Under 084, refs to GitBook `<a id>` headings, `{#id}` headings and link headings
+  never resolved, so they were never baselined (partial for ever), and a plain heading that later gained such markup
+  turned REMOVED. Adding an anchor tag, a link or a custom ID to a heading is now COSMETIC. Refs to plain, emphasised
+  and inline-code headings resolve exactly as before, and no fingerprint changes. `no_tests` shows cleaned heading
+  text.
+- **An unparseable test file no longer loses its baseline.** No writer prunes a suite's baseline while any of its test
+  files fails to parse; each one warns, naming the files.
+- **A rebuild keeps dead refs.** `ingest-update`, `source-baseline --init --force` and `update-ack` keep the previous
+  fingerprint of a ref or criterion the test still lists but that is gone, so it keeps showing as REMOVED /
+  CRITERIA_REMOVED until the test drops it.
+- **Meaning flips are LOAD.** Negations, exceptions and quantifiers (no, never, none, can't, don't, without, unless,
+  except, always, all, any, every …) join the LOAD words; a curly apostrophe counts as a straight one.
+- **Repairs keep the baseline.** `spectra ai ingest-update --keep-baseline` (single and `--all`) leaves existing
+  fingerprints alone and only adds entries for new refs and criteria. The `spectra-generate` repair batch and
+  `spectra-review-flagged` pass it, so a repaired test no longer drops out of triage with a doc change pending.
+  `baseline.mode` and `warnings` are new in the ingest JSON.
+- **The console is left alone.** The 084 UTF-8 fix set the console's output encoding, which also switched the terminal
+  window's code page for the rest of the session. Now only redirected stdout and stderr get a UTF-8 writer.
+
 ### Notes
 
 - **One-time `source_section` churn.** Because `source_section` is now read, the first re-extraction after

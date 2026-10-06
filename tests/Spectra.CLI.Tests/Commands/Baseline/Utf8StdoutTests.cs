@@ -19,23 +19,66 @@ public sealed class Utf8StdoutTests : IDisposable
 
     private async Task<string> RunProcessAsync(params string[] args)
     {
+        var (exit, stdout, _) = await RunRawAsync(args);
+        Assert.True(exit == 0, Encoding.UTF8.GetString(stdout));
+        return Encoding.UTF8.GetString(stdout);
+    }
+
+    /// <summary>Runs the built CLI with both streams redirected, returning their raw bytes.</summary>
+    private async Task<(int Exit, byte[] Out, byte[] Err)> RunRawAsync(params string[] args)
+    {
         var info = new ProcessStartInfo("dotnet")
         {
             WorkingDirectory = _ws.Root,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.UTF8,
             UseShellExecute = false
         };
         info.ArgumentList.Add(typeof(Program).Assembly.Location);
         foreach (var arg in args) info.ArgumentList.Add(arg);
 
         using var process = Process.Start(info)!;
-        var stdout = await process.StandardOutput.ReadToEndAsync();
-        await process.StandardError.ReadToEndAsync();
+        using var stdout = new MemoryStream();
+        using var stderr = new MemoryStream();
+        await Task.WhenAll(
+            process.StandardOutput.BaseStream.CopyToAsync(stdout),
+            process.StandardError.BaseStream.CopyToAsync(stderr));
         await process.WaitForExitAsync();
-        Assert.True(process.ExitCode == 0, stdout);
-        return stdout;
+        return (process.ExitCode, stdout.ToArray(), stderr.ToArray());
+    }
+
+    private static bool HasBom(byte[] bytes) => bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
+
+    // Spec 085 F6 (T8): stderr is UTF-8 without a BOM too, independently of stdout.
+    [Fact]
+    public async Task RedirectedStderr_IsUtf8()
+    {
+        var (exit, _, stderr) = await RunRawAsync("ai", "update-triage", "--suite", "nöpe", "--output-format", "json");
+
+        Assert.Equal(4, exit);
+        Assert.False(HasBom(stderr));
+        var text = new UTF8Encoding(false, throwOnInvalidBytes: true).GetString(stderr);
+        Assert.Contains("nöpe", text);
+        Assert.Contains("SUITE_NOT_FOUND", text);
+    }
+
+    // Spec 085 F6 (T8): assigning Console.OutputEncoding also switches the user's terminal code page, which persists
+    // after the command exits — only redirected writers may be replaced (Infrastructure/ConsoleEncoding).
+    [Fact]
+    public void Program_DoesNotAssignConsoleOutputEncoding()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Spectra.slnx")))
+        {
+            dir = dir.Parent;
+        }
+
+        Assert.NotNull(dir);
+        var program = File.ReadAllText(Path.Combine(dir!.FullName, "src", "Spectra.CLI", "Program.cs"));
+        Assert.False(System.Text.RegularExpressions.Regex.IsMatch(program, @"Console\.OutputEncoding\s*="),
+            "Program.cs must not assign Console.OutputEncoding: it changes the user's terminal code page. "
+            + "Use ConsoleEncoding.UseUtf8ForRedirectedStreams().");
+        Assert.Contains("ConsoleEncoding.UseUtf8ForRedirectedStreams()", program);
     }
 
     [Fact]

@@ -102,6 +102,7 @@ public sealed class IngestTestsCommand : Command
         IngestResult result;
         BaselineWriteSummary? baselineSummary = null;
         BaselineStoreException? afterPersist = null;
+        var warnings = new List<string>();
         try
         {
             result = await BaselineStore.WithLockAsync(currentDir, async () =>
@@ -112,9 +113,8 @@ public sealed class IngestTestsCommand : Command
                 {
                     try
                     {
-                        var live = existingTests.Select(t => t.Id).Concat(ingested.PersistedTests.Select(t => t.Id));
                         baselineSummary = await BaselineRecorder.RecordPersistedAsync(
-                            currentDir, config, testsPath, suite, baseline, ingested.PersistedTests, live, ct);
+                            currentDir, config, testsPath, suite, baseline, ingested.PersistedTests, RecordMode.Rebuild, warnings, ct);
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or BaselineStoreException)
                     {
@@ -144,6 +144,7 @@ public sealed class IngestTestsCommand : Command
 
         if (result.IsSuccess)
         {
+            BaselineCommandIO.PrintWarnings(warnings);
             if (json)
             {
                 Console.Out.WriteLine(JsonSerializer.Serialize(new
@@ -151,7 +152,8 @@ public sealed class IngestTestsCommand : Command
                     success = true,
                     persisted = result.PersistedTests.Count,
                     ids = result.PersistedTests.Select(t => t.Id).ToArray(),
-                    baseline = baselineSummary!.ToJson()
+                    baseline = baselineSummary!.ToJson(),
+                    warnings
                 }));
             }
             else

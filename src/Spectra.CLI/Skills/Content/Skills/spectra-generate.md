@@ -65,7 +65,7 @@ The ONLY time you skip analysis is when the user describes a single concrete sce
 | `audit-grounding --suite {name}` | **Spec 072** Per-test grounding state: id, verdict, grounding_written, flagged, action_needed, summary counts. Use instead of `ls .spectra/verdicts/` improvisation. |
 | `ingest-grounding --suite {name} --all` | **Spec 073** Batch form: write grounding blocks for all eligible tests in one call. Without `--repaired`: writes grounded verdicts only (partial-pre-repair filter). With `--repaired --repair-attempts N`: writes all ungrounded tests after repair. Idempotent — skips already-written blocks. |
 | `ingest-verdict --suite {name} --all` | **Spec 077** Batch form: classify all verdict files for the suite in one call; emits summary `{grounded, partial, hallucinated, errors}`. Replaces per-test `--from` loops. Advisory-gate only — no file writes. |
-| `ingest-update {suite} --all` | **Spec 077** Batch form: ingest all staged update files from `.spectra/updates/{suite}/updated-{id}.json` in one call; emits `{written, skipped_no_original, errors}`. Replaces per-entry `--test-id` loops. |
+| `ingest-update {suite} --all --keep-baseline` | **Spec 077** Batch form: ingest all staged update files from `.spectra/updates/{suite}/updated-{id}.json` in one call; emits `{written, skipped_no_original, errors}`. Replaces per-entry `--test-id` loops. **Spec 085:** repairs always pass `--keep-baseline` — a repair fixes grounding, not doc drift, so the test's source-change baseline must not move (a pending doc change stays in `update-triage`). |
 
 **Shell improvisation is forbidden.** SPECTRA provides CLI verbs for all state reads. Never improvise with shell commands:
 - Grounding state: `spectra ai audit-grounding --suite {suite} --output-format json` — NOT `ls .spectra/verdicts/`, NOT `grep grounding`
@@ -280,9 +280,10 @@ The command reads all partial verdict JSONs, **skips tests whose grounding block
 
 **After all repairs staged — batch ingest (one call, no loop):**
 ```
-spectra ai ingest-update {suite} --all --output-format json
+spectra ai ingest-update {suite} --all --keep-baseline --output-format json
 ```
 Ingests all staged updates from `.spectra/updates/{suite}/` in one pass; emits `{written, skipped_no_original, errors}`.
+`--keep-baseline` keeps each repaired test's source-change baseline as it was (a repair is not a doc update).
 
 **Re-critic phase — For EACH repaired test (critic subagents, irreducibly per-test):**
 
