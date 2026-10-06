@@ -48,7 +48,7 @@ public static class UpdateTriageHandler
             run = await TriageEngine.RunAsync(root, config, testsPath, suites, autoAck, dryRun, warnings, ct);
             if (writesBaseline && run.AutoAcks.Count > 0)
             {
-                autoAcked = await ApplyAutoAcksAsync(root, testsPath, run, ct);
+                autoAcked = await ApplyAutoAcksAsync(root, testsPath, run, warnings, ct);
             }
 
             return 0;
@@ -70,13 +70,15 @@ public static class UpdateTriageHandler
                 JsonSerializer.Serialize(DetailDocument(run!, allSuites ? null : suite), BaselineCommandIO.Json), ct);
         }
 
+        BaselineCommandIO.PrintLateWarnings(warnings, loaded.Warnings.Count);
         BaselineCommandIO.Emit(json, StdoutDocument(run!, allSuites ? null : suite, dryRun, autoAck, autoAcked, warnings),
             writer => TriagePresenter.Write(writer, run!, autoAck, dryRun, autoAcked));
         return ExitCodes.Success;
     }
 
     /// <summary>Refreshes only the COSMETIC refs' fingerprints (every other key is kept, FR-018 / FR-026a).</summary>
-    private static async Task<int> ApplyAutoAcksAsync(string root, string testsPath, TriageRun run, CancellationToken ct)
+    private static async Task<int> ApplyAutoAcksAsync(
+        string root, string testsPath, TriageRun run, List<string> warnings, CancellationToken ct)
     {
         var applied = 0;
         foreach (var bySuite in run.AutoAcks.GroupBy(a => a.Suite))
@@ -93,8 +95,7 @@ public static class UpdateTriageHandler
                 }
             }
 
-            var live = suiteRun.Tests.Select(t => t.Id).Concat(suiteRun.UnbaselinedIds).ToHashSet(StringComparer.Ordinal);
-            await BaselineStore.SaveSuiteAsync(testsPath, bySuite.Key, baseline, live, ct);
+            await BaselineStore.SaveSuiteAsync(testsPath, bySuite.Key, baseline, suiteRun.Scan, warnings, ct);
         }
 
         return applied;

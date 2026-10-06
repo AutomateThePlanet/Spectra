@@ -1,6 +1,8 @@
 using System.Text;
 using Spectra.Core.Baseline;
 using Spectra.Core.IdAllocation;
+using Spectra.Core.Models;
+using Spectra.Core.Parsing;
 
 namespace Spectra.CLI.Baseline;
 
@@ -85,15 +87,62 @@ public static class BaselineStore
     }
 
     /// <summary>
-    /// Saves a suite's baseline, first dropping entries for tests not in <paramref name="liveIds"/>. Returns false when
-    /// nothing was written (identical content, or an empty baseline and no file yet).
+    /// Spec 085 FR-007: the suite's test files as they are on disk — every <c>*.md</c> not starting with <c>_</c>,
+    /// parsed in ordinal order — with the repo-relative paths of the files that failed to parse.
+    /// </summary>
+    public static async Task<SuiteScan> ScanSuiteAsync(string repoRoot, string testsPath, string suite, CancellationToken ct)
+    {
+        var suitePath = Path.Combine(testsPath, suite);
+        var tests = new List<TestCase>();
+        var unparseable = new List<string>();
+        if (Directory.Exists(suitePath))
+        {
+            var parser = new TestCaseParser();
+            foreach (var file in Directory.GetFiles(suitePath, "*.md")
+                         .Where(f => !Path.GetFileName(f).StartsWith('_'))
+                         .OrderBy(f => f, StringComparer.Ordinal))
+            {
+                var parsed = parser.Parse(await File.ReadAllTextAsync(file, ct), Path.GetRelativePath(suitePath, file));
+                if (parsed.IsSuccess)
+                {
+                    tests.Add(parsed.Value!);
+                }
+                else
+                {
+                    unparseable.Add(Relative(repoRoot, file));
+                }
+            }
+        }
+
+        var ordered = tests.OrderBy(t => t.Id, StringComparer.Ordinal).ToList();
+        return new SuiteScan(ordered, ordered.Select(t => t.Id).ToHashSet(StringComparer.Ordinal), unparseable);
+    }
+
+    /// <summary>
+    /// Saves a suite's baseline. Spec 085 FR-007/FR-008: entries for tests that no longer exist are dropped only when
+    /// every test file in <paramref name="scan"/> parsed; otherwise nothing is pruned and a warning naming the files is
+    /// added to <paramref name="warnings"/>. Returns false when nothing was written (identical content, or an empty
+    /// baseline and no file yet).
     /// </summary>
     public static async Task<bool> SaveSuiteAsync(
-        string testsPath, string suite, SourceBaseline baseline, IReadOnlySet<string> liveIds, CancellationToken ct)
+        string testsPath, string suite, SourceBaseline baseline, SuiteScan scan, List<string> warnings, CancellationToken ct)
     {
-        foreach (var stale in baseline.Tests.Keys.Where(id => !liveIds.Contains(id)).ToList())
+        ArgumentNullException.ThrowIfNull(scan);
+        if (scan.AllParsed)
         {
-            baseline.Tests.Remove(stale);
+            foreach (var stale in baseline.Tests.Keys.Where(id => !scan.Ids.Contains(id)).ToList())
+            {
+                baseline.Tests.Remove(stale);
+            }
+        }
+        else
+        {
+            var warning = $"{string.Join(", ", scan.UnparseableFiles)} could not be parsed; "
+                + $"no baseline entries were pruned in suite '{suite}'.";
+            if (!warnings.Contains(warning))
+            {
+                warnings.Add(warning);
+            }
         }
 
         var path = SuiteFile(testsPath, suite);
@@ -164,6 +213,12 @@ public static class BaselineStore
 
     internal static string Relative(string repoRoot, string path) =>
         Path.GetRelativePath(repoRoot, path).Replace('\\', '/');
+}
+
+/// <summary>Spec 085: a suite's parsed tests, their IDs, and the test files that could not be parsed.</summary>
+public sealed record SuiteScan(IReadOnlyList<TestCase> Tests, IReadOnlySet<string> Ids, IReadOnlyList<string> UnparseableFiles)
+{
+    public bool AllParsed => UnparseableFiles.Count == 0;
 }
 
 /// <summary>A baseline operation failed with a machine-readable error code.</summary>

@@ -17,17 +17,39 @@ public sealed class BaselineWriteSummary
     public int AutoAcked { get; set; }
     public int SnapshotsWritten { get; set; }
 
+    /// <summary>Spec 085: how an ingest recorded its entries; emitted as <c>mode</c> when set.</summary>
+    public RecordMode? Mode { get; set; }
+
     /// <summary>The <c>baseline</c> object in a writer's JSON output.</summary>
-    public object ToJson() => new Dictionary<string, object?>
+    public object ToJson()
     {
-        ["created"] = Created,
-        ["updated"] = Updated,
-        ["unchanged"] = Unchanged,
-        ["snapshots_written"] = SnapshotsWritten
-    };
+        var json = new Dictionary<string, object?>
+        {
+            ["created"] = Created,
+            ["updated"] = Updated,
+            ["unchanged"] = Unchanged,
+            ["snapshots_written"] = SnapshotsWritten
+        };
+        if (Mode is { } mode)
+        {
+            json["mode"] = mode == RecordMode.KeepBaseline ? "keep" : "rebuild";
+        }
+
+        return json;
+    }
 
     public string ToHuman() =>
         $"Baseline: created {Created}, updated {Updated}, unchanged {Unchanged}, snapshots written {SnapshotsWritten}";
+}
+
+/// <summary>
+/// Spec 085 F5: <see cref="Rebuild"/> recomputes an ingested test's entry (keeping dead refs, F3);
+/// <see cref="KeepBaseline"/> (critic repairs) never changes an existing fingerprint and only adds missing keys.
+/// </summary>
+public enum RecordMode
+{
+    Rebuild,
+    KeepBaseline
 }
 
 /// <summary>
@@ -67,26 +89,42 @@ public static class BaselineRecorder
     }
 
     /// <summary>
-    /// Replaces <paramref name="id"/>'s entry with <paramref name="computed"/> (a full recompute: stale keys go) and
-    /// counts it as created, updated or unchanged. Returns the snapshots the new entry needs.
+    /// Replaces <paramref name="test"/>'s entry with <paramref name="computed"/> (a full recompute: keys the test no
+    /// longer lists go) and counts it as created, updated or unchanged. Spec 085 F3: a ref the test still lists that
+    /// doesn't resolve now, and a criterion it still links that no longer exists, keep their previous fingerprint, so
+    /// they keep reporting REMOVED / CRITERIA_REMOVED. Returns the snapshots the new entry needs.
     /// </summary>
     public static IReadOnlyDictionary<string, string> Replace(
-        SourceBaseline baseline, string id, ComputedEntry computed, BaselineWriteSummary summary)
+        SourceBaseline baseline, TestCase test, ComputedEntry computed, BaselineWriteSummary summary)
     {
-        if (!baseline.Tests.TryGetValue(id, out var existing))
+        var entry = computed.Entry;
+        if (baseline.Tests.TryGetValue(test.Id, out var existing))
         {
-            summary.Created++;
-        }
-        else if (existing.ContentEquals(computed.Entry))
-        {
-            summary.Unchanged++;
+            foreach (var sourceRef in test.SourceRefs.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct(StringComparer.Ordinal))
+            {
+                if (!entry.Refs.ContainsKey(sourceRef) && existing.Refs.TryGetValue(sourceRef, out var fingerprint))
+                {
+                    entry.Refs[sourceRef] = fingerprint;
+                }
+            }
+
+            foreach (var id in test.Criteria.Where(c => !string.IsNullOrWhiteSpace(c)).Distinct(StringComparer.Ordinal))
+            {
+                if (!entry.Criteria.ContainsKey(id) && existing.Criteria.TryGetValue(id, out var fingerprint))
+                {
+                    entry.Criteria[id] = fingerprint;
+                }
+            }
+
+            if (existing.ContentEquals(entry)) summary.Unchanged++;
+            else summary.Updated++;
         }
         else
         {
-            summary.Updated++;
+            summary.Created++;
         }
 
-        baseline.Tests[id] = computed.Entry;
+        baseline.Tests[test.Id] = entry;
         return computed.Snapshots;
     }
 
@@ -126,27 +164,33 @@ public static class BaselineRecorder
     }
 
     /// <summary>
-    /// Spec 084 FR-027: records full entries for tests an ingest just persisted, writes their snapshots, and saves the
-    /// suite baseline (pruned to <paramref name="liveIds"/>). Runs inside the caller's baseline lock.
+    /// Spec 084 FR-027 / Spec 085: records entries for tests an ingest just persisted (<paramref name="mode"/>: a full
+    /// rebuild, or keep-baseline for critic repairs), writes their snapshots, and saves the suite baseline. The suite
+    /// is scanned after persisting, so pruning sees the new files and is skipped when any test file fails to parse
+    /// (the warning goes to <paramref name="warnings"/>). Runs inside the caller's baseline lock.
     /// </summary>
     public static async Task<BaselineWriteSummary> RecordPersistedAsync(
         string root, Spectra.Core.Models.Config.SpectraConfig config, string testsPath, string suite,
-        SourceBaseline baseline, IEnumerable<TestCase> persisted, IEnumerable<string> liveIds, CancellationToken ct)
+        SourceBaseline baseline, IEnumerable<TestCase> persisted, RecordMode mode, List<string> warnings, CancellationToken ct)
     {
-        var summary = new BaselineWriteSummary();
+        var summary = new BaselineWriteSummary { Mode = mode };
         var context = await BaselineContext.CreateAsync(root, config, ct);
         var snapshots = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var test in persisted)
         {
             var computed = await ComputeAsync(test, context, ct);
-            foreach (var (fingerprint, text) in Replace(baseline, test.Id, computed, summary))
+            var needed = mode == RecordMode.KeepBaseline
+                ? Complete(baseline, test.Id, computed, summary)
+                : Replace(baseline, test, computed, summary);
+            foreach (var (fingerprint, text) in needed)
             {
                 snapshots[fingerprint] = text;
             }
         }
 
         await WriteSnapshotsAsync(root, snapshots, summary, ct);
-        await BaselineStore.SaveSuiteAsync(testsPath, suite, baseline, liveIds.ToHashSet(StringComparer.Ordinal), ct);
+        var scan = await BaselineStore.ScanSuiteAsync(root, testsPath, suite, ct);
+        await BaselineStore.SaveSuiteAsync(testsPath, suite, baseline, scan, warnings, ct);
         return summary;
     }
 

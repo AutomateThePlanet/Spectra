@@ -657,8 +657,22 @@ through to the next heading of the same or a higher level (or the end of the fil
 ref without an anchor (or `file#`) is the whole file. The file is resolved as for every other command (repo root,
 then `source.local_dir`). The key is lowercase letters and digits only (percent-escapes decoded), so GitBook
 (`#Create-customer-records`), GitHub (`#create-customer-records`) and generator-style anchors all match the heading
-"Create customer records"; when two headings share a key, the first wins and `notes` says so. Headings inside fenced
-code (```` ``` ```` / `~~~`) are ignored.
+"Create customer records". Headings inside fenced code (```` ``` ```` / `~~~`) are ignored.
+
+**Anchor matching (Spec 085).** An anchor resolves to a heading by the first rule that matches:
+
+1. **Text key**: the key of the heading text with markup removed: HTML tags such as GitBook's
+   `<a href="#x" id="x"></a>`, links (`[Payments](payments.md)` → "Payments") and a trailing attribute block
+   (`{#custom-id}`, `{: #id}`, `{.cls}`). The first heading wins; when several share the key, `notes` says so.
+2. **Explicit ID**: any `id="…"` / `id='…'` inside the heading, or the ID of a trailing `{#id}` block.
+3. **GitHub duplicate suffix**: `#setup-1` is the second "Setup" heading, `#setup-2` the third, and so on (only
+   when that many exist; a heading whose text really is "Step-2" is found by rule 1 first).
+
+Extraction and the `no_tests` list use the same matcher, and `no_tests` shows the cleaned heading text. A heading's
+attribute block is also left out of the comparison text, so adding an anchor tag, a link or a custom ID to an existing
+heading is COSMETIC, not REMOVED. Refs to plain, emphasised and inline-code headings resolve exactly as in 084 (no
+fingerprint changes). Residuals: an anchor written from a heading's raw HTML entity (`#qampa` for `Q&amp;A`) or from
+HTML-like text inside inline code (`` `<br>` ``) no longer matches; no supported slug style produces either.
 
 **States per ref**
 
@@ -666,7 +680,7 @@ code (```` ``` ```` / `~~~`) are ignored.
 |---|---|
 | UNCHANGED | The section's fingerprint equals the baseline's |
 | COSMETIC | It differs, but its normalised text equals the baseline snapshot: only markup, whitespace or case changed. Acknowledged automatically unless `--no-auto-ack` / `--dry-run` |
-| LOAD | The normalised text changed and a number changed, a modal word changed (`must`, `should`, `may`, `cannot`, `required`, `only`, `not`), more than `update.light_threshold_words` words changed, or no diff could be computed (snapshot missing, or a side over 5,000 words) |
+| LOAD | The normalised text changed and a number changed, a word that flips a rule's meaning changed (`must`, `should`, `may`, `required`, `no`, `not`, `never`, `none`, `nothing`, `cannot`, `can't`, `don't`, `doesn't`, `won't`, `isn't`, `aren't`, `shouldn't`, `mustn't`, `without`, `unless`, `except`, `only`, `always`, `all`, `any`, `every`; a curly apostrophe counts as a straight one), more than `update.light_threshold_words` words changed, or no diff could be computed (snapshot missing, or a side over 5,000 words) |
 | LIGHT | Any other change of the normalised text |
 | REMOVED | The file no longer resolves, or the anchor matches no heading |
 
@@ -736,7 +750,12 @@ unbaselined). Never writes a test file.
 | `.spectra/baseline.lock` | no (gitignored) | The cross-process lock every baseline writer takes |
 
 Writers: `update-ack`, `source-baseline --init`, triage's COSMETIC auto-ack, `ingest-tests` (new tests) and
-`ingest-update` (the edited test). A write also drops entries for tests that no longer exist in the suite.
+`ingest-update` (the edited test). A write also drops entries for tests that no longer exist in the suite, **but only
+when every test file in the suite parsed** (Spec 085): if any `*.md` test file fails to parse, nothing is pruned in that
+suite and the command warns `<files> could not be parsed; no baseline entries were pruned in suite '<s>'.` (in the
+JSON `warnings` and as a `Warning:` line on stderr). A full rebuild (`ingest-update`, `source-baseline --init --force`,
+`update-ack`) keeps the previous fingerprint of a ref or criterion the test still lists but that is gone, so it keeps
+reporting REMOVED / CRITERIA_REMOVED until the test drops or fixes it.
 
 **Config** (optional, in the existing `update` section; missing or `null` → the defaults, silently; not in the init
 template):
@@ -766,7 +785,8 @@ warnings}` — and human mode ends with `[CODE]`.
 Option-parsing errors from the command-line framework itself (an unknown option, a missing value) keep the
 framework's own output.
 
-All `spectra` output is UTF-8 without a BOM (Spec 084), also when redirected on Windows.
+Redirected `spectra` output (stdout and stderr, each on its own) is UTF-8 without a BOM, also on Windows. An
+interactive console is left as it is: the terminal's code page is never changed (Spec 085).
 
 ### `spectra ai update` (legacy)
 
@@ -855,7 +875,13 @@ Exit code is `0` when persisted (id unchanged), `5` when the content is invalid 
 
 Spec 084: like `ingest-tests`, it locks and strictly loads the suite baseline before persisting and then replaces the
 edited test's entry (the single form and `--all`, which takes one lock for the batch); both JSON outputs gain
-`baseline`. Baseline failures use the shared failure shape; the content, drift and schema failures (exit 5/6) keep
+`baseline` (with `mode`) and `warnings`.
+
+**`--keep-baseline` (Spec 085)**, for both forms: the edited test's existing source-change fingerprints are not
+changed; refs and criteria the edit added get entries (a test with no entry gets one). Critic repairs
+(`spectra-generate`'s repair batch, `spectra-review-flagged`) pass it, because a repair fixes grounding, not doc drift:
+a doc change the test was never updated for stays in `update-triage`. `baseline.mode` is `"keep"` with the flag and
+`"rebuild"` without it. Baseline failures use the shared failure shape; the content, drift and schema failures (exit 5/6) keep
 their `{success, error_code, errors}` shape.
 
 ### `spectra ai analyze --coverage`

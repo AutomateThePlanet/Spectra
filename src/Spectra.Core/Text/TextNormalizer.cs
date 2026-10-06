@@ -11,7 +11,13 @@ namespace Spectra.Core.Text;
 public static partial class TextNormalizer
 {
     /// <summary>Returns the comparison key for <paramref name="text"/> (empty for null or blank input).</summary>
-    public static string Normalize(string? text)
+    public static string Normalize(string? text) => Clean(text).ToLowerInvariant();
+
+    /// <summary>
+    /// Spec 085: <see cref="Normalize"/> without the final lowercasing — the same markup, link and whitespace
+    /// stripping, in the text's own case (used for display text such as cleaned heading titles).
+    /// </summary>
+    public static string Clean(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -42,7 +48,7 @@ public static partial class TextNormalizer
         s = EmUnderscoreRegex().Replace(s, "$1");
 
         s = WhitespaceRegex().Replace(s, " ").Trim();
-        return s.ToLowerInvariant();
+        return s;
     }
 
     [GeneratedRegex(@"<((?:https?|mailto):[^>\s]+)>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]

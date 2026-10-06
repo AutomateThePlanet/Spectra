@@ -76,7 +76,7 @@ public static class UpdateAckHandler
             foreach (var test in targets.OrderBy(t => t.Id, StringComparer.Ordinal))
             {
                 var computed = await BaselineRecorder.ComputeAsync(test, context, ct);
-                foreach (var (fingerprint, text) in BaselineRecorder.Replace(baseline, test.Id, computed, summary))
+                foreach (var (fingerprint, text) in BaselineRecorder.Replace(baseline, test, computed, summary))
                 {
                     snapshots[fingerprint] = text;
                 }
@@ -91,8 +91,7 @@ public static class UpdateAckHandler
             else
             {
                 await BaselineRecorder.WriteSnapshotsAsync(root, snapshots, summary, ct);
-                await BaselineStore.SaveSuiteAsync(testsPath, suite!, baseline,
-                    tests.Tests.Select(t => t.Id).ToHashSet(StringComparer.Ordinal), ct);
+                await BaselineStore.SaveSuiteAsync(testsPath, suite!, baseline, tests.Scan, warnings, ct);
             }
 
             return 0;
@@ -107,6 +106,8 @@ public static class UpdateAckHandler
         {
             return BaselineCommandIO.Fail(json, Command, ex.ErrorCode, ex.Message, warnings);
         }
+
+        BaselineCommandIO.PrintLateWarnings(warnings, loaded.Warnings.Count);
 
         var document = new Dictionary<string, object?>
         {

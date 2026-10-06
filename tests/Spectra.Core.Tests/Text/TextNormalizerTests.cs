@@ -240,4 +240,18 @@ public class TextNormalizerTests
     {
         Assert.Equal(expected, TextNormalizer.Normalize(input));
     }
+
+    // ---- Spec 085: Clean is Normalize without the lowercasing ----
+
+    [Theory]
+    [InlineData("## **Bold** <b>x</b> and [Link](a.md)")]
+    [InlineData("Users **MUST** see `A` &amp; B")]
+    [InlineData("  <p>Para</p>  <Summary> text ")]
+    [InlineData("")]
+    public void Clean_IsNormalizeWithoutLowercasing(string text) =>
+        Assert.Equal(TextNormalizer.Normalize(text), TextNormalizer.Clean(text).ToLowerInvariant());
+
+    [Fact]
+    public void Clean_KeepsTheTextsCase() =>
+        Assert.Equal("## Bold x", TextNormalizer.Clean("## **Bold** <b>x</b>"));
 }

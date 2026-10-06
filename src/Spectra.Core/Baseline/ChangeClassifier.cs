@@ -41,9 +41,20 @@ public static class ChangeClassifier
 {
     public const string SnapshotMissing = "no diff: snapshot missing";
 
-    /// <summary>A changed word from this set makes the change load-bearing ("must not" is covered by must and not).</summary>
-    public static readonly IReadOnlySet<string> ModalWords =
-        new HashSet<string>(StringComparer.Ordinal) { "must", "should", "may", "cannot", "required", "only", "not" };
+    /// <summary>
+    /// A changed word from this set makes the change load-bearing: modal words, negations, exceptions and quantifiers
+    /// (Spec 085 F4; "must not" is covered by must and not). Compared after <see cref="Fold"/>.
+    /// </summary>
+    public static readonly IReadOnlySet<string> ModalWords = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "must", "should", "may", "required",
+        "no", "not", "never", "none", "nothing", "cannot", "can't", "don't", "doesn't", "won't", "isn't", "aren't",
+        "shouldn't", "mustn't", "without", "unless", "except",
+        "only", "always", "all", "any", "every"
+    };
+
+    /// <summary>Spec 085 FR-013: a curly apostrophe (’ or ‘) counts as a straight one, for the LOAD word check only.</summary>
+    public static string Fold(string word) => word.Replace('\u2019', '\'').Replace('\u2018', '\'');
 
     private const int MaxListed = 4;
 
@@ -85,8 +96,8 @@ public static class ChangeClassifier
             why.Add($"numbers: {Listed(removedNumbers)}→{Listed(addedNumbers)}");
         }
 
-        var removedModals = diff.RemovedWords.Where(ModalWords.Contains).ToList();
-        var addedModals = diff.AddedWords.Where(ModalWords.Contains).ToList();
+        var removedModals = diff.RemovedWords.Select(Fold).Where(ModalWords.Contains).ToList();
+        var addedModals = diff.AddedWords.Select(Fold).Where(ModalWords.Contains).ToList();
         if (removedModals.Count > 0 || addedModals.Count > 0)
         {
             why.Add($"modal: {Listed(removedModals)}→{Listed(addedModals)}");

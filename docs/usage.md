@@ -160,6 +160,10 @@ SPECTRA keeps, for every test, a fingerprint of each doc section it references (
 **Existing workspaces.** A workspace from before this feature has no baselines, so every test shows as UNBASELINED.
 Run `spectra ai source-baseline --init --all-suites` once: it adopts the current docs as the baseline.
 
+**Repairs and broken files.** Critic repairs during generation or flagged-test review keep the test's baseline
+(`ingest-update --keep-baseline`), so a pending doc change is still in triage afterwards. A test file that fails to
+parse keeps its baseline entry: no command prunes a suite while any of its test files can't be read, and each says so.
+
 **Commit the baseline.** Commit `test-cases/*/_source-baseline.json` and `.spectra/source-snapshots/` (the snapshots
 let triage show word diffs); `.spectra/update-triage.json` and `.spectra/baseline.lock` are gitignored by
 `spectra init`. Git is the undo for a wrong acknowledgement.

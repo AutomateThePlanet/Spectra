@@ -61,7 +61,7 @@ public static class SourceBaselineHandler
                 {
                     var computed = await BaselineRecorder.ComputeAsync(test, context, ct);
                     var needed = force
-                        ? BaselineRecorder.Replace(baseline, test.Id, computed, summary)
+                        ? BaselineRecorder.Replace(baseline, test, computed, summary)
                         : BaselineRecorder.Complete(baseline, test.Id, computed, summary);
                     foreach (var (fingerprint, text) in needed) snapshots[fingerprint] = text;
                 }
@@ -79,8 +79,7 @@ public static class SourceBaselineHandler
                 {
                     // Snapshots first: a crash in between leaves a ref whose snapshot exists, never the reverse.
                     await BaselineRecorder.WriteSnapshotsAsync(root, snapshots, total, ct);
-                    var live = tests.Tests.Select(t => t.Id).ToHashSet(StringComparer.Ordinal);
-                    await BaselineStore.SaveSuiteAsync(testsPath, name, baseline, live, ct);
+                    await BaselineStore.SaveSuiteAsync(testsPath, name, baseline, tests.Scan, warnings, ct);
                 }
 
                 results.Add(new SuiteResult(name, summary));
@@ -99,6 +98,8 @@ public static class SourceBaselineHandler
         {
             return BaselineCommandIO.Fail(json, Command, ex.ErrorCode, ex.Message, warnings);
         }
+
+        BaselineCommandIO.PrintLateWarnings(warnings, loaded.Warnings.Count);
 
         var document = new Dictionary<string, object?>
         {

@@ -456,6 +456,23 @@ public class SkillsManifestTests : IDisposable
         Assert.Contains("never enter the edit loop", step);
     }
 
+    // ---- Spec 085 F5: critic repairs keep the source-change baseline ----
+
+    [Theory]
+    [InlineData("spectra-generate")]
+    [InlineData("spectra-review-flagged")]
+    public void RepairIngests_KeepTheBaseline(string skill)
+    {
+        var lines = SkillContent.All[skill].Split('\n').Where(l => l.Contains("spectra ai ingest-update")).ToList();
+
+        Assert.NotEmpty(lines);
+        Assert.All(lines, l => Assert.Contains("--keep-baseline", l));
+    }
+
+    [Fact]
+    public void UpdateSkill_DoesNotKeepTheBaseline() =>
+        Assert.DoesNotContain("--keep-baseline", SkillContent.Update);
+
     [Fact]
     public void UpdateSkill_AllSuitesIsOneTriageCall() =>
         Assert.Contains("update-triage --all-suites", SkillContent.Update);

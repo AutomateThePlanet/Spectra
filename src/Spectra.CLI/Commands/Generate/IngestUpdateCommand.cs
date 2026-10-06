@@ -37,11 +37,14 @@ public sealed class IngestUpdateCommand : Command
         var testIdOption = new Option<string?>("--test-id", "Id of the original test being edited (required without --all)");
         var fromOption = new Option<string?>("--from", "File containing the model's edited-test JSON (omit to read stdin)");
         var allFlag = new Option<bool>("--all", "Batch mode: ingest all staged updates from .spectra/updates/{suite}/ (Spec 077)");
+        var keepBaselineFlag = new Option<bool>("--keep-baseline",
+            "Keep the existing source-change baseline (critic repairs); only add entries for new refs and criteria (Spec 085)");
 
         AddArgument(suiteArgument);
         AddOption(testIdOption);
         AddOption(fromOption);
         AddOption(allFlag);
+        AddOption(keepBaselineFlag);
 
         this.SetHandler(async (context) =>
         {
@@ -49,6 +52,7 @@ public sealed class IngestUpdateCommand : Command
             var testId = context.ParseResult.GetValueForOption(testIdOption);
             var from = context.ParseResult.GetValueForOption(fromOption);
             var all = context.ParseResult.GetValueForOption(allFlag);
+            var mode = context.ParseResult.GetValueForOption(keepBaselineFlag) ? RecordMode.KeepBaseline : RecordMode.Rebuild;
             var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
             var json = outputFormat == OutputFormat.Json;
 
@@ -60,7 +64,7 @@ public sealed class IngestUpdateCommand : Command
                     context.ExitCode = ExitError;
                     return;
                 }
-                context.ExitCode = await RunBatchAsync(suite, json, context.GetCancellationToken());
+                context.ExitCode = await RunBatchAsync(suite, json, mode, context.GetCancellationToken());
             }
             else
             {
@@ -70,12 +74,12 @@ public sealed class IngestUpdateCommand : Command
                     context.ExitCode = ExitError;
                     return;
                 }
-                context.ExitCode = await RunAsync(suite, testId, from, json, context.GetCancellationToken());
+                context.ExitCode = await RunAsync(suite, testId, from, json, mode, context.GetCancellationToken());
             }
         });
     }
 
-    private static async Task<int> RunAsync(string suite, string testId, string? from, bool json, CancellationToken ct)
+    private static async Task<int> RunAsync(string suite, string testId, string? from, bool json, RecordMode mode, CancellationToken ct)
     {
         var currentDir = Directory.GetCurrentDirectory();
         var configPath = Path.Combine(currentDir, "spectra.config.json");
@@ -141,6 +145,7 @@ public sealed class IngestUpdateCommand : Command
         IngestResult result;
         BaselineWriteSummary? baselineSummary = null;
         BaselineStoreException? afterPersist = null;
+        var warnings = new List<string>();
         try
         {
             result = await BaselineStore.WithLockAsync(currentDir, async () =>
@@ -150,7 +155,7 @@ public sealed class IngestUpdateCommand : Command
                 if (ingested.IsSuccess)
                 {
                     (baselineSummary, afterPersist) = await RecordAsync(
-                        currentDir, config, testsPath, suite, baseline, ingested.PersistedTests, existingTests, ct);
+                        currentDir, config, testsPath, suite, baseline, ingested.PersistedTests, mode, warnings, ct);
                 }
 
                 return ingested;
@@ -170,6 +175,7 @@ public sealed class IngestUpdateCommand : Command
         if (result.IsSuccess)
         {
             var id = result.PersistedTests.Count > 0 ? result.PersistedTests[0].Id : original.Id;
+            BaselineCommandIO.PrintWarnings(warnings);
             if (json)
             {
                 Console.Out.WriteLine(JsonSerializer.Serialize(new
@@ -177,7 +183,8 @@ public sealed class IngestUpdateCommand : Command
                     success = true,
                     persisted = result.PersistedTests.Count,
                     id,
-                    baseline = baselineSummary!.ToJson()
+                    baseline = baselineSummary!.ToJson(),
+                    warnings
                 }));
             }
             else
@@ -208,7 +215,7 @@ public sealed class IngestUpdateCommand : Command
         return result.ErrorCode == IngestErrorCode.SchemaInvalid ? ExitSchemaInvalid : ExitContentInvalid;
     }
 
-    private static async Task<int> RunBatchAsync(string suite, bool json, CancellationToken ct)
+    private static async Task<int> RunBatchAsync(string suite, bool json, RecordMode mode, CancellationToken ct)
     {
         var currentDir = Directory.GetCurrentDirectory();
         var configPath = Path.Combine(currentDir, "spectra.config.json");
@@ -256,6 +263,7 @@ public sealed class IngestUpdateCommand : Command
         var persisted = new List<TestCase>();
         BaselineWriteSummary? baselineSummary = null;
         BaselineStoreException? afterPersist = null;
+        var warnings = new List<string>();
 
         // Spec 084 FR-027: one baseline lock for the batch; strict load before the first persist.
         try
@@ -267,7 +275,7 @@ public sealed class IngestUpdateCommand : Command
                 if (persisted.Count > 0)
                 {
                     (baselineSummary, afterPersist) = await RecordAsync(
-                        currentDir, config, testsPath, suite, baseline, persisted, existingTests, ct);
+                        currentDir, config, testsPath, suite, baseline, persisted, mode, warnings, ct);
                 }
 
                 return 0;
@@ -284,7 +292,8 @@ public sealed class IngestUpdateCommand : Command
             return WriteAfterPersistFailure(json, suite, persisted.Select(t => t.Id).ToList(), afterPersist);
         }
 
-        EmitBatchResult(json, suite, written, skippedNoOriginal, errors, baselineSummary);
+        BaselineCommandIO.PrintWarnings(warnings);
+        EmitBatchResult(json, suite, written, skippedNoOriginal, errors, baselineSummary ?? new BaselineWriteSummary { Mode = mode }, warnings);
         return ExitSuccess;
 
         async Task IngestStagedAsync()
@@ -329,12 +338,11 @@ public sealed class IngestUpdateCommand : Command
     /// <summary>Spec 084: records the persisted tests' entries; an I/O failure here is reported, not thrown.</summary>
     private static async Task<(BaselineWriteSummary?, BaselineStoreException?)> RecordAsync(
         string root, SpectraConfig config, string testsPath, string suite, Spectra.Core.Baseline.SourceBaseline baseline,
-        IReadOnlyList<TestCase> persisted, IReadOnlyList<TestCase> existingTests, CancellationToken ct)
+        IReadOnlyList<TestCase> persisted, RecordMode mode, List<string> warnings, CancellationToken ct)
     {
         try
         {
-            var live = existingTests.Select(t => t.Id).Concat(persisted.Select(t => t.Id));
-            return (await BaselineRecorder.RecordPersistedAsync(root, config, testsPath, suite, baseline, persisted, live, ct), null);
+            return (await BaselineRecorder.RecordPersistedAsync(root, config, testsPath, suite, baseline, persisted, mode, warnings, ct), null);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or BaselineStoreException)
         {
@@ -352,7 +360,8 @@ public sealed class IngestUpdateCommand : Command
     }
 
     private static void EmitBatchResult(
-        bool json, string suite, int written, int skippedNoOriginal, int errors, BaselineWriteSummary? baseline = null)
+        bool json, string suite, int written, int skippedNoOriginal, int errors, BaselineWriteSummary? baseline = null,
+        IReadOnlyList<string>? warnings = null)
     {
         if (json)
         {
@@ -364,7 +373,8 @@ public sealed class IngestUpdateCommand : Command
                 written,
                 skipped_no_original = skippedNoOriginal,
                 errors,
-                baseline = (baseline ?? new BaselineWriteSummary()).ToJson()
+                baseline = (baseline ?? new BaselineWriteSummary()).ToJson(),
+                warnings = warnings ?? []
             }));
         }
         else

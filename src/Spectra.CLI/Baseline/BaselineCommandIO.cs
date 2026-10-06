@@ -8,8 +8,8 @@ using Spectra.Core.Parsing;
 
 namespace Spectra.CLI.Baseline;
 
-/// <summary>A suite's tests as parsed now, with the warnings for files that couldn't be parsed.</summary>
-public sealed record SuiteTests(string Suite, IReadOnlyList<TestCase> Tests);
+/// <summary>A suite's tests as parsed now, and the scan they came from (Spec 085: it decides pruning).</summary>
+public sealed record SuiteTests(string Suite, IReadOnlyList<TestCase> Tests, SuiteScan Scan);
 
 /// <summary>
 /// Spec 084: shared plumbing for <c>update-triage</c>, <c>update-ack</c> and <c>source-baseline</c> — config loading
@@ -102,29 +102,22 @@ public static class BaselineCommandIO
     public static async Task<SuiteTests> LoadSuiteTestsAsync(
         string repoRoot, string testsPath, string suite, List<string> warnings, CancellationToken ct)
     {
-        var suitePath = Path.Combine(testsPath, suite);
-        var tests = new List<TestCase>();
-        if (Directory.Exists(suitePath))
+        var scan = await BaselineStore.ScanSuiteAsync(repoRoot, testsPath, suite, ct);
+        foreach (var file in scan.UnparseableFiles)
         {
-            var parser = new TestCaseParser();
-            foreach (var file in Directory.GetFiles(suitePath, "*.md")
-                         .Where(f => !Path.GetFileName(f).StartsWith('_'))
-                         .OrderBy(f => f, StringComparer.Ordinal))
-            {
-                var parsed = parser.Parse(await File.ReadAllTextAsync(file, ct), Path.GetRelativePath(suitePath, file));
-                if (parsed.IsSuccess)
-                {
-                    tests.Add(parsed.Value!);
-                }
-                else
-                {
-                    warnings.Add($"{BaselineStore.Relative(repoRoot, file)} could not be parsed and was skipped.");
-                }
-            }
+            warnings.Add($"{file} could not be parsed and was skipped.");
         }
 
-        return new SuiteTests(suite, tests.OrderBy(t => t.Id, StringComparer.Ordinal).ToList());
+        return new SuiteTests(suite, scan.Tests, scan);
     }
+
+    /// <summary>
+    /// Spec 085 FR-008: prints the warnings raised after config loading (parse and prune warnings) as <c>Warning:</c>
+    /// lines on stderr, as config warnings already are; the first <paramref name="alreadyPrinted"/> were printed then.
+    /// They stay in the JSON <c>warnings</c> too.
+    /// </summary>
+    public static void PrintLateWarnings(IReadOnlyList<string> warnings, int alreadyPrinted) =>
+        PrintWarnings(warnings.Skip(alreadyPrinted));
 
     /// <summary>
     /// Success output: in JSON mode the document on stdout (one compact line) and the human summary on stderr;

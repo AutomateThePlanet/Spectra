@@ -31,7 +31,8 @@ public sealed record AutoAck(string Suite, string Id, string Ref, string Fingerp
 
 /// <summary>Per-suite results of a triage run.</summary>
 public sealed record TriagedSuite(
-    string Suite, int TestCount, IReadOnlyList<TriagedTest> Tests, IReadOnlyList<string> UnbaselinedIds, IReadOnlyList<string> PartialIds);
+    string Suite, int TestCount, IReadOnlyList<TriagedTest> Tests, IReadOnlyList<string> UnbaselinedIds, IReadOnlyList<string> PartialIds,
+    SuiteScan Scan);
 
 /// <summary>A heading of a changed document that no triaged test references (a generation hint).</summary>
 public sealed record NoTestsEntry(string Doc, string Heading);
@@ -92,7 +93,8 @@ public static class TriageEngine
             }
 
             triagedSuites.Add(new TriagedSuite(
-                suite, loaded.Tests.Count, triaged, unbaselined, triaged.Where(t => t.Partial).Select(t => t.Id).ToList()));
+                suite, loaded.Tests.Count, triaged, unbaselined, triaged.Where(t => t.Partial).Select(t => t.Id).ToList(),
+                loaded.Scan));
         }
 
         var groups = TriageGrouper.Group(triagedSuites.SelectMany(s => s.Tests).Select(t => t.Verdict), groupSize);
@@ -224,7 +226,7 @@ public static class TriageEngine
                 }
             }
 
-            entries.AddRange(headings.Select((h, i) => (h, i)).Where(x => !covered.Contains(x.i)).Select(x => new NoTestsEntry(relative, x.h.Text)));
+            entries.AddRange(headings.Select((h, i) => (h, i)).Where(x => !covered.Contains(x.i)).Select(x => new NoTestsEntry(relative, x.h.CleanText)));
         }
 
         return entries;
