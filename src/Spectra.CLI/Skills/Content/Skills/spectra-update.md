@@ -15,18 +15,21 @@ this session** through the update seam:
 
 ```
 update-triage (CLI)  →  relink-sources for renamed docs (CLI, after the user's yes)
-  →  you choose buckets with the user  →  compile-update-prompt (CLI)
-  →  you edit in-session  →  ingest-update (CLI, fail-loud)  →  update-ack for tests kept as they are
+  →  you choose buckets with the user  →  compile-update-prompt --group (CLI, one prompt per group)
+  →  you edit in-session  →  one staging file per test  →  ingest-update --all (CLI, fail-loud per test)
+  →  update-ack for tests reviewed without an edit prompt
 ```
 
-`ingest-update` keeps the **original id**, re-asserts any **manual verdict / notes**,
-**fails loud on drift** (an out-of-scope change to priority, component or tags), and
-records the edited test's new baseline. The CLI never rewrites a test for you.
+The edit prompt carries each test's doc sections (as they are now, the previous version and
+what changed) and only the criteria the tests link. `ingest-update` keeps the **original id**,
+re-asserts any **manual verdict / notes**, **fails loud on drift** (an out-of-scope change to
+priority, component or tags), and records the edited test's new baseline; a test you return
+unchanged is recorded as reviewed. The CLI never rewrites a test for you.
 
 ## NON-STOP CONTRACT
 
 Every step below is a single `Bash(spectra *)` call, a `Read`, or a `Write` to
-`.spectra/updated.json` / `.spectra/progress.json`. If no single `spectra` call covers
+`.spectra/updates/<suite>/updated-<id>.json` / `.spectra/progress.json`. If no single `spectra` call covers
 a step, **STOP and report a missing affordance** — never work around it. Prohibited:
 shell loops over per-test verbs, piping spectra output to `python` / `jq` / any
 interpreter, editing a test's `.md` file yourself, and rewriting a baseline file
@@ -145,45 +148,69 @@ These tests can't be acknowledged while the ref is still listed (`REF_REMOVED` /
 
 `RELINK`, `REMOVED` and `CRITERIA_REMOVED` groups never enter the edit loop, whichever option is chosen.
 
-Update `.spectra/progress.json` — N = number of tests in the selected groups:
+Update `.spectra/progress.json` — G = number of selected groups:
 ```json
-{"phases":["Step 1 — Triage","Step 2 — Review","Step 5 — Edit tests","Step 7 — Report"],"active":2,"loop":{"current":0,"total":N,"label":"starting"}}
+{"phases":["Step 1 — Triage","Step 2 — Review","Step 5 — Edit tests","Step 7 — Report"],"active":2,"loop":{"current":0,"total":G,"label":"starting"}}
 ```
 
-**Step 5** — For each selected group, and each test in it (i = 1..N), update progress.json:
+**Step 5** — For each selected group (g = 1..G), update progress.json:
 ```json
-{"phases":["Step 1 — Triage","Step 2 — Review","Step 5 — Edit tests","Step 7 — Report"],"active":2,"loop":{"current":i,"total":N,"label":"test i/N: <id>"}}
+{"phases":["Step 1 — Triage","Step 2 — Review","Step 5 — Edit tests","Step 7 — Report"],"active":2,"loop":{"current":g,"total":G,"label":"group g/G: <group>"}}
 ```
 
-Compile the edit prompt with the Bash tool:
+Compile the group's edit prompt with the Bash tool:
+```
+spectra ai compile-update-prompt --suite <suite> --group <group>
+```
+- Exit `0` → the edit prompt is on stdout: each doc section the group's tests reference, once
+  (the current text, the previous version and what changed, or why it no longer resolves),
+  the criteria they link, once, and then every test under `### TEST <id>`.
+- Exit `4` → refused; nothing was written. Read `error_code`:
+  - `PROMPT_TOO_LARGE` → the group doesn't fit in one prompt. Process its tests one by one
+    with the `--test-id` form below (compile → edit → stage → ingest), then go on.
+  - `TEMPLATE_OUTDATED` → the project's `.spectra/prompts/test-update.md` predates group
+    prompts. Tell the user to run `spectra update-skills` (it refreshes a copy they never
+    edited) or, for a customised copy, `spectra prompts reset test-update` (it replaces their
+    changes); use the `--test-id` form for this group's tests until they do.
+  - `NOTHING_TO_RECONCILE` → no ref resolves and no linked criterion exists; there is nothing
+    to edit against. Tell the user, and go on.
+  - `TRIAGE_STALE` → a doc or test changed after the triage. Re-run Step 1, then continue.
+  - otherwise (`TRIAGE_MISSING`, `GROUP_NOT_FOUND`, …) → show `errors[0]` and stop for this suite.
+
+Read the prompt. Edit **only** what the change requires in each test. Keep the ids, the
+structure, the priority, component, tags, and any manual notes. A test that is still correct
+as it is goes back **unchanged** — the CLI records it as reviewed.
+
+Then, for each test in the group, write that test (edited or unchanged) as a JSON array with
+a single element to `.spectra/updates/<suite>/updated-<id>.json` with the Write tool — one
+file per test, the `<id>` in the file name being the test's id. When every test of the group
+is staged, ingest them all in one call with the Bash tool:
+```
+spectra ai ingest-update <suite> --all --output-format json --verbosity quiet
+```
+Exit `0` → read `results` (one entry per staged file) and report each test:
+- `written` → updated; the id is unchanged, the index was regenerated and the test's baseline
+  was recorded (it leaves triage);
+- `unchanged` → acknowledged: reviewed, no edit needed; its baseline was recorded;
+- `failed` → nothing was written for that test and its staging file is kept; `error_code` says
+  why: `DRIFT_DETECTED` (you changed an out-of-scope field — redo the edit touching ONLY what
+  the doc change requires), `MALFORMED_JSON` / `TRUNCATED` / `NO_TESTS` / `EMPTY_CONTENT`
+  (fix the JSON), `SCHEMA_INVALID` (fix the offending field), `ID_MISMATCH` (the id inside the
+  file differs from the file name), `NO_ORIGINAL` (no test with that id in the suite).
+
+The staging files of `written` and `unchanged` tests are deleted by the CLI. Exit `1` → an
+error; see "Exit codes" below.
+
+**Bounded retry:** retry a `failed` test **at most twice** (3 attempts in all), on its own:
 ```
 spectra ai compile-update-prompt --suite <suite> --test-id <id>
 ```
-- Exit `0` → the edit prompt is on stdout (the existing test + the source/criteria + edit instructions).
-- Exit `4` → a required input is missing. Skip this test and tell the user why.
+edit it, write `.spectra/updates/<suite>/updated-<id>.json` again (it replaces the kept file),
+and run the same `ingest-update <suite> --all` call. If it still fails, report it and continue
+with the next group — do not loop.
 
-Read the prompt. The group's `why` says what changed. Edit **only** the parts that change
-requires. Keep the id, the structure, the priority, component, tags, and any manual notes.
-If, after reading, the test is still correct as it is, don't ingest it — note it for Step 6.
-Otherwise write the whole edited test as a JSON array with a single element to
-`.spectra/updated.json`, and ingest it (fail-loud) with the Bash tool:
-```
-spectra ai ingest-update <suite> --test-id <id> --from .spectra/updated.json --output-format json --verbosity quiet
-```
-- Exit `0` → persisted; the id is unchanged, the index was regenerated and the test's
-  baseline was recorded (so it leaves triage).
-- Exit `5` → content invalid **or** `DRIFT_DETECTED`. Read the specific error.
-  - `DRIFT_DETECTED` → you changed an out-of-scope field; redo the edit touching ONLY what the doc change requires.
-  - otherwise → fix the malformed/truncated JSON.
-- Exit `6` → schema invalid. Read the error and fix the offending field.
-- Exit `1` → an error; nothing was persisted (see "Exit codes" below).
-
-**Bounded retry:** on exit `5`/`6`, re-edit and re-ingest **at most twice** (3 attempts
-total) for the same test. If it still fails, stop and report the specific error — do not
-loop. On any non-zero exit, nothing was persisted; the original test and indexes are untouched.
-
-**Step 6** — Acknowledge the tests the user reviewed and kept as they are (no edit needed),
-in one call:
+**Step 6** — Acknowledge the tests the user reviewed and kept as they are without an edit
+prompt (a test returned unchanged in Step 5 is already acknowledged), in one call:
 ```
 spectra ai update-ack --suite <suite> --ids <id1>,<id2> --output-format json --verbosity quiet
 ```
@@ -195,8 +222,8 @@ in triage and is reported again next time — nothing is deferred silently.
 {"phases":["Step 1 — Triage","Step 2 — Review","Step 5 — Edit tests","Step 7 — Report"],"active":3}
 ```
 For the suite, summarize: the bucket counts, COSMETIC auto-acknowledged, tests edited (with
-ids), tests acknowledged (with ids), REMOVED / CRITERIA_REMOVED left for the user, tests
-skipped or failed after retries, and any unbaselined tests.
+ids), tests returned unchanged and tests acknowledged (with ids), REMOVED / CRITERIA_REMOVED
+left for the user, tests skipped or failed after retries, and any unbaselined tests.
 
 Write `.spectra/progress.json`: `{"active":4}` (terminal — seam-progress page renders Complete).
 
@@ -265,7 +292,7 @@ After updating:
 
 ## Stop
 
-If the user says "stop", "cancel" or "stop updating": finish or abandon the current test
-(each `ingest-update` either persists the whole edit or nothing), don't start the next one,
+If the user says "stop", "cancel" or "stop updating": finish or abandon the current group
+(`ingest-update` persists each staged test whole or not at all), don't start the next one,
 and report what was edited, acknowledged and left so far. Tests not yet processed stay in
 triage and are reported again next time.

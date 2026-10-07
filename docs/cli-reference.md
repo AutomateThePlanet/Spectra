@@ -628,7 +628,7 @@ supporting `--output-format json`) are:
 | `spectra ai ingest-grounding --suite <s> --test <id> [--repaired] [--repair-attempts <n>]` | Write the durable condensed verdict block into the test `.md` frontmatter. |
 | `spectra ai ingest-grounding --suite <s> --all [--repaired] [--repair-attempts <n>]` | In batch form, writes grounding blocks for all eligible tests in one pass; without `--repaired` only grounded tests are written, and with `--repaired` all ungrounded tests (grounded plus partial re-verdicts) are written. Idempotent. |
 | `spectra ai ingest-verdict --suite <s> --all` | In batch form, classifies all `.spectra/verdicts/critic-verdict-*.json` files for the suite in one call, emitting a `{grounded, partial, hallucinated, errors}` summary. Advisory-gate only, so no files are written; replaces per-test `--from` loops. |
-| `spectra ai ingest-update <suite> --all` | In batch form, ingests all staged update files from `.spectra/updates/<suite>/updated-<id>.json` in one call, emitting `{written, skipped_no_original, errors}`. Per-entry `--test-id --from` mode unchanged. |
+| `spectra ai ingest-update <suite> --all` | In batch form, ingests all staged update files from `.spectra/updates/<suite>/updated-<id>.json` in one call, emitting `{written, unchanged, skipped_no_original, errors, results}`; consumed staging files are deleted, failed ones kept (Spec 088). Per-entry `--test-id --from` mode unchanged. |
 | `spectra ai compile-repair-prompt --suite <s> --test <id>` | Emit a repair prompt for a partial test (critic findings + source docs); plain text to stdout. |
 | `spectra ai record-drop --suite <s> --test <id> [--reason user_decided]` | Append a drop-trail entry before deleting a hallucinated or user-decided-to-drop test. |
 | `spectra ai review-flagged [--suite <s>]` | List and disposition flagged (still-partial) tests: accept, delete, or (via skill) retry repair. |
@@ -995,34 +995,101 @@ source directory: …`.
 
 ### `spectra ai compile-update-prompt`
 
-Compile a deterministic, model-free **edit** prompt for one OUTDATED test (the existing test + the changed source/criteria + "edit, don't regenerate; preserve id/structure/manual fields"). Emits to stdout; writes nothing.
+Compile a deterministic, model-free **edit** prompt for one test (`--test-id`) or for every test of a triage group
+(`--group`). Emits the prompt to stdout; writes nothing. Spec 088: the prompt carries the tests' doc sections and only
+the criteria they link.
 
 ```bash
 spectra ai compile-update-prompt --suite checkout --test-id TC-104
+spectra ai compile-update-prompt --suite checkout --group G2
 ```
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--suite` | `-s` | Suite containing the test to update (required) |
-| `--test-id` | | Id of the OUTDATED test to compile an edit prompt for (required) |
+| `--suite` | `-s` | Suite containing the tests (required) |
+| `--test-id` | | One test to compile an edit prompt for |
+| `--group` | | A group id from the last `update-triage` (`.spectra/update-triage.json`); any bucket |
 
-Exit code is `0` when the prompt is emitted, `4` when refused (missing suite/test-id, test not found, or no changed source/criteria), and `1` on a config/I/O error.
+Exactly one of `--test-id` and `--group` is required.
+
+**Layout.** One prompt, in this order: the edit rules; `SOURCE SECTIONS` — each distinct section the tests reference,
+once, labelled `S1`, `S2`, … in order of first appearance, naming the tests that reference it; `ACCEPTANCE CRITERIA`
+— the union of the criteria the tests link, once, sorted by id; `TESTS TO REVIEW` — each test once, sorted by id,
+under `### TEST <id>` with its section labels, its criteria and its current JSON; the output format (one JSON array,
+one object per test). Identical inputs give byte-identical prompts.
+
+A section is one block per distinct ref and baseline fingerprint (two tests on the same ref with different baselines
+get two blocks). Its state:
+
+| State | What the block shows |
+|---|---|
+| `changed (LOAD)` / `changed (LIGHT)` / `changed (COSMETIC)` | The bucket and triage's reasons; the current section (raw); the previous version (the baseline snapshot, normalised: lowercased, markup removed); `What changed:` the removed / added word runs. Without a snapshot: `Previous version: unavailable (no snapshot)`. |
+| `unchanged` | The current section only. |
+| `not baselined` | The current section; `previous version unavailable`. |
+| `REMOVED` | Triage's reason (`anchor not found`, `not found; <git reason>`, `submodule not checked out: …`); no text. |
+| `RELINK` | `renamed to <path>`; no text. |
+
+The current section is the 085 heading matcher's section, or the whole file for a ref without an anchor. The bucket
+uses `update.light_threshold_words`, as triage does. A criterion line is `- AC-1: text`, `- AC-1 (changed since
+baseline): text` or `- AC-1 (removed)`. Only criteria the tests link appear — never a suite-wide or repo-wide set.
+
+**Refusals (exit 4, one JSON document on stderr in JSON mode, the shared failure shape):**
+
+| `error_code` | When |
+|---|---|
+| `INVALID_ARGUMENTS` | Neither or both of `--test-id` / `--group`, or no `--suite` |
+| `SUITE_NOT_FOUND` / `TEST_NOT_FOUND` | Unknown suite or test |
+| `TRIAGE_MISSING` / `GROUP_NOT_FOUND` / `TRIAGE_STALE` | As for `update-ack --group` |
+| `NOTHING_TO_RECONCILE` | A test with no resolvable ref and no existing linked criterion (names the tests) |
+| `PROMPT_TOO_LARGE` | The prompt's estimated tokens exceed `analysis.max_prompt_tokens` (default 96,000); names the size; compile the tests one by one with `--test-id`, or lower `update.group_size` and triage again |
+| `TEMPLATE_OUTDATED` | `--group` (or more than one test) with a customised `.spectra/prompts/test-update.md` that lacks `{{tests}}` or `{{source_diff}}`; run `spectra update-skills` (refreshes a copy never edited) or `spectra prompts reset test-update` (replaces a customised one) |
+
+With such an outdated custom template, `--test-id` still works: the template gets the test through `test_case` and the
+sections through `current_source`, and a warning names `spectra prompts reset test-update`. `compile-update-prompt`
+follows the 083 read rule: without `spectra.config.json` it runs on defaults. Exit `1` on a baseline or I/O error.
 
 ### `spectra ai ingest-update`
 
 Validate the edited test and persist it through the single write+index path, without allocating a new id. It deterministically protects invariants: id from the original, pre-existing `Manual` verdict/notes re-asserted, and a drift guard that fails loud on out-of-scope field changes.
 
 ```bash
-spectra ai ingest-update checkout --test-id TC-104 --from .spectra/updated.json
+spectra ai ingest-update checkout --test-id TC-104 --from edited.json
+spectra ai ingest-update checkout --all
 ```
 
 | Option | Description |
 |--------|-------------|
 | `suite` (positional) | Suite the edited test belongs to (required) |
-| `--test-id` | Id of the original test being edited (required) |
+| `--test-id` | Id of the original test being edited (required without `--all`) |
 | `--from` | File with the edited-test JSON (omit to read stdin) |
+| `--all` | Ingest every staged `.spectra/updates/<suite>/updated-<id>.json` |
+| `--keep-baseline` | Keep the source-change baseline (critic repairs; see below) |
 
 Exit code is `0` when persisted (id unchanged), `5` when the content is invalid or `DRIFT_DETECTED`, `6` when the schema is invalid, and `1` on a config/I/O error or when the original is not found; on any non-zero exit nothing is persisted.
+
+**Unchanged edits (Spec 088).** An edit identical to the original in every editable field (title, preconditions,
+steps, expected result, test data, scenario, `source_refs`, `criteria`) is not written. It counts as reviewed: the
+test's baseline entry is rebuilt from its current content, as `update-ack` would (with `--keep-baseline`, nothing is
+recorded). For the comparison only, CRLF / CR count as LF, trailing whitespace of each line and field is ignored and
+null equals empty; whitespace inside a line counts. The drift guard runs first. Single form: exit 0,
+`{"success":true,"persisted":0,"unchanged":true,"id":"TC-104",…}`, human `Test 'TC-104' needs no change; its baseline
+was refreshed.`
+
+**`--all` (Spec 077, 088).** Each staging file, in ordinal order, gets one outcome:
+
+| Outcome | Written | Baseline | Staging file |
+|---|---|---|---|
+| `written` | the test + index | rebuilt (kept with `--keep-baseline`) | deleted |
+| `unchanged` | nothing | rebuilt (none with `--keep-baseline`) | deleted |
+| `failed` | nothing | — | kept |
+
+`failed` codes: the ingest codes (`EMPTY_CONTENT`, `MALFORMED_JSON`, `TRUNCATED`, `NO_TESTS`, `SCHEMA_INVALID`,
+`DRIFT_DETECTED`), `NO_ORIGINAL` (no test with that id), `ID_MISMATCH` (the staged test's `id` differs from the file
+name), `UNREADABLE`, `PERSIST_FAILED`. Staging files are deleted only after the batch recorded its baseline; on a
+baseline write failure none is deleted, so a re-run picks them up. The JSON keeps `written`, `skipped_no_original`
+(`NO_ORIGINAL` outcomes) and `errors` (the other failures) and adds `unchanged` and `results`
+(`[{test, file, outcome[, error_code, errors]}]`). The per-test summary is printed in every mode (stderr in JSON mode).
+A completed batch exits 0; failures are per file.
 
 Spec 084: like `ingest-tests`, it locks and strictly loads the suite baseline before persisting and then replaces the
 edited test's entry (the single form and `--all`, which takes one lock for the batch); both JSON outputs gain

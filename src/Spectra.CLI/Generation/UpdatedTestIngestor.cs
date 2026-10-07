@@ -81,6 +81,10 @@ public sealed class UpdatedTestIngestor
         //    original — invariants are enforced here, not trusted to the model.
         var edited = ApplyEdit(originalTest, candidate);
 
+        // Spec 088 FR-015: an edit that changes nothing is not written (the caller records it as reviewed).
+        if (IsUnchanged(originalTest, edited))
+            return IngestResult.NoChange(originalTest);
+
         // 4. Persist through the single write+index path. allForIndex = existing with the original
         //    replaced by the edited test (same id ⇒ replace in place).
         var allForIndex = ReplaceById(existingTests, edited);
@@ -135,6 +139,39 @@ public sealed class UpdatedTestIngestor
             SourceRefs = candidate.SourceRefs,
             Criteria = candidate.Criteria
         };
+    }
+
+    /// <summary>
+    /// Spec 088 FR-015: true when <paramref name="candidate"/> equals <paramref name="original"/> in every editable
+    /// field (the <see cref="ApplyEdit"/> fields). For the comparison only, CRLF / CR count as LF, trailing whitespace
+    /// of each line and of each field is ignored, and null equals empty; whitespace inside a line counts. Lists
+    /// compare by sequence. Pure; nothing is altered.
+    /// </summary>
+    public static bool IsUnchanged(TestCase original, TestCase candidate)
+    {
+        ArgumentNullException.ThrowIfNull(original);
+        ArgumentNullException.ThrowIfNull(candidate);
+
+        return Same(original.Title, candidate.Title)
+            && Same(original.Preconditions, candidate.Preconditions)
+            && SameList(original.Steps, candidate.Steps)
+            && Same(original.ExpectedResult, candidate.ExpectedResult)
+            && Same(original.TestData, candidate.TestData)
+            && Same(original.ScenarioFromDoc, candidate.ScenarioFromDoc)
+            && SameList(original.SourceRefs, candidate.SourceRefs)
+            && SameList(original.Criteria, candidate.Criteria);
+
+        static bool SameList(IReadOnlyList<string> a, IReadOnlyList<string> b) =>
+            a.Count == b.Count && a.Zip(b).All(p => Same(p.First, p.Second));
+
+        static bool Same(string? a, string? b) => string.Equals(Comparable(a), Comparable(b), StringComparison.Ordinal);
+
+        static string Comparable(string? value)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+            var lines = value.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            return string.Join('\n', lines.Select(l => l.TrimEnd())).TrimEnd();
+        }
     }
 
     private static IReadOnlyList<TestCase> ReplaceById(IReadOnlyList<TestCase> existing, TestCase edited)

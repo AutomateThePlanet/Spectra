@@ -282,7 +282,8 @@ The command reads all partial verdict JSONs, **skips tests whose grounding block
 ```
 spectra ai ingest-update {suite} --all --keep-baseline --output-format json
 ```
-Ingests all staged updates from `.spectra/updates/{suite}/` in one pass; emits `{written, skipped_no_original, errors}`.
+Ingests all staged updates from `.spectra/updates/{suite}/` in one pass; emits `{written, skipped_no_original, errors}`
+plus `unchanged` and per-file `results`. Consumed staging files are deleted; a failed one is kept (Spec 088).
 `--keep-baseline` keeps each repaired test's source-change baseline as it was (a repair is not a doc update).
 
 **Re-critic phase — For EACH repaired test (critic subagents, irreducibly per-test):**

@@ -469,6 +469,81 @@ public class SkillsManifestTests : IDisposable
         Assert.All(lines, l => Assert.Contains("--keep-baseline", l));
     }
 
+    // ---- Spec 088 FR-018: the edit loop runs per group ----
+
+    private static string UpdateStep(string from, string to)
+    {
+        var content = SkillContent.Update.Replace("\r\n", "\n");
+        var start = content.IndexOf(from, StringComparison.Ordinal);
+        var end = content.IndexOf(to, start + 1, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start, $"{from} … {to}");
+        return content[start..end];
+    }
+
+    [Fact]
+    public void UpdateSkill_EditLoop_CompilesPerGroup_StagesPerTest_IngestsAll()
+    {
+        var step = UpdateStep("**Step 5**", "**Step 6**");
+
+        Assert.Contains("spectra ai compile-update-prompt --suite <suite> --group <group>", step);
+        Assert.Contains("`.spectra/updates/<suite>/updated-<id>.json`", step);
+        Assert.Contains("Write tool", step);
+        Assert.Contains("spectra ai ingest-update <suite> --all --output-format json --verbosity quiet", step);
+        Assert.True(step.IndexOf("--group <group>", StringComparison.Ordinal)
+            < step.IndexOf("--all --output-format", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void UpdateSkill_EditLoop_ReportsEachResult_UnchangedIsAcknowledged()
+    {
+        var step = UpdateStep("**Step 5**", "**Step 6**");
+
+        Assert.Contains("`results`", step);
+        Assert.Contains("`written`", step);
+        Assert.Contains("`unchanged`", step);
+        Assert.Contains("`failed`", step);
+        Assert.Contains("acknowledged", step);
+    }
+
+    [Fact]
+    public void UpdateSkill_EditLoop_RetriesAFailedTestAtMostTwice_WithTestId()
+    {
+        var step = UpdateStep("**Step 5**", "**Step 6**");
+
+        Assert.Contains("at most twice", step);
+        Assert.Contains("spectra ai compile-update-prompt --suite <suite> --test-id <id>", step);
+        Assert.Contains("report it and continue", step);
+    }
+
+    [Fact]
+    public void UpdateSkill_EditLoop_HandlesTheCompileRefusals()
+    {
+        var step = UpdateStep("**Step 5**", "**Step 6**");
+
+        foreach (var code in new[] { "PROMPT_TOO_LARGE", "TEMPLATE_OUTDATED", "NOTHING_TO_RECONCILE", "TRIAGE_STALE" })
+        {
+            Assert.Contains(code, step);
+        }
+
+        Assert.Contains("spectra prompts reset test-update", step);
+    }
+
+    [Fact]
+    public void UpdateSkill_NoLongerUsesTheSingleStagingFile()
+    {
+        Assert.DoesNotContain(".spectra/updated.json", SkillContent.Update);
+        Assert.DoesNotMatch(@"ingest-update[^\n]*--from", SkillContent.Update);
+    }
+
+    [Fact]
+    public void UpdateSkill_NonStop_AllowsWritesToTheStagingFiles()
+    {
+        var contract = UpdateStep("## NON-STOP CONTRACT", "## Update test cases for a suite");
+
+        Assert.Contains("`.spectra/updates/<suite>/updated-<id>.json`", contract);
+        Assert.Contains("`.spectra/progress.json`", contract);
+    }
+
     [Fact]
     public void UpdateSkill_DoesNotKeepTheBaseline() =>
         Assert.DoesNotContain("--keep-baseline", SkillContent.Update);

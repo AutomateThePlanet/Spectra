@@ -303,6 +303,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   accepts `--min-similarity` (50–100, as for `relink-sources`; also in the JSON `from`), and a failed "renames since"
   read leaves the refs unbaselined with `git history unavailable: …` instead of reading them from the wrong path.
 
+### Added (Spec 088 — update prompt context, Phase 3)
+
+- **The edit prompt shows the doc.** `compile-update-prompt` now carries each referenced section as it is now (raw),
+  the previous version (the baseline snapshot, labelled normalised: lowercased, markup removed), triage's reasons and
+  the words that changed. Unchanged sections are shown as they are; unbaselined ones say the previous version is
+  unavailable; refs that no longer resolve give triage's reason (REMOVED, RELINK, submodule) and no text.
+- **Only linked criteria.** The criteria block lists exactly the criteria the tests link, marked `changed since
+  baseline` or `removed`; the suite-wide and repo-wide fallbacks are gone.
+- **One prompt per group.** `compile-update-prompt --suite <s> --group <G>` (validated like `update-ack --group`:
+  `TRIAGE_MISSING` / `GROUP_NOT_FOUND` / `TRIAGE_STALE`) lists each shared section and criterion once and each test
+  once under `### TEST <id>`. Identical inputs give byte-identical prompts.
+- **Unchanged = reviewed.** An edit identical to the original (line endings and trailing whitespace aside) is not
+  written; `ingest-update` reports `unchanged` and rebuilds the test's baseline, as `update-ack` would (not with
+  `--keep-baseline`).
+- **`ingest-update --all` cleans up and reports per test.** `results` gives each staging file's outcome (`written` /
+  `unchanged` / `failed` with a code, including the new `NO_ORIGINAL`, `ID_MISMATCH`, `UNREADABLE`); consumed files
+  are deleted after the baseline is recorded, failed ones are kept, so a second `--all` no longer re-ingests leftovers.
+- **The update skill edits per group**: compile `--group`, stage one file per test, one `ingest-update --all`, report
+  updated / unchanged / failed, retry a failure at most twice with `--test-id`.
+
+### Changed (Spec 088)
+
+- `compile-update-prompt` refuses (exit 4) only when a test has nothing to reconcile against (`NOTHING_TO_RECONCILE`:
+  no resolvable ref and no existing linked criterion), when the prompt exceeds `analysis.max_prompt_tokens`
+  (`PROMPT_TOO_LARGE`), or for a group with a customised template from before 088 (`TEMPLATE_OUTDATED`); it follows
+  the 083 read rule (defaults without a config). Refusals use the shared failure shape.
+- The built-in `test-update` template uses `source_diff`, `acceptance_criteria`, `tests` and `profile_format`. A custom
+  template without `{{tests}}` / `{{source_diff}}` still works for `--test-id` (sections through `current_source`)
+  with a warning to run `spectra prompts reset test-update`.
+- `ingest-update` single form: JSON gains `unchanged`. The `--all` JSON gains `unchanged` and `results`; the human
+  summary lists each test and is printed in JSON mode too (stderr).
+
 ### Notes
 
 - **One-time `source_section` churn.** Because `source_section` is now read, the first re-extraction after

@@ -156,11 +156,22 @@ SPECTRA keeps, for every test, a fingerprint of each doc section it references (
    similarity` reason may still be a rename with heavier edits: `relink-sources --min-similarity 60 --dry-run` looks
    further.
 4. **Choose** — LOAD only (recommended; includes CRITERIA_CHANGED), LOAD + LIGHT, chosen groups, or report only.
-5. **Edit** — for each selected test the assistant edits it in-session through `compile-update-prompt` →
-   `ingest-update`, which keeps the test's id and manual notes, fails loud on out-of-scope drift, and records the
-   new baseline.
-6. **Acknowledge** — tests you reviewed and kept as they are get `spectra ai update-ack --suite checkout --ids …`,
-   so they leave triage. A change you neither edit nor acknowledge is reported again next time.
+5. **Edit** — group by group. `spectra ai compile-update-prompt --suite checkout --group G2` gives the assistant one
+   prompt for all the group's tests: each doc section they reference once — as it is now, the previous version
+   (normalised: lowercased, markup removed) and the words that changed — or why it no longer resolves; only the
+   criteria the tests link, marked when changed since the baseline or removed; then each test. The assistant edits
+   in-session, stages one file per test (`.spectra/updates/checkout/updated-<id>.json`) and runs
+   `spectra ai ingest-update checkout --all`. That keeps each test's id and manual notes, fails loud on out-of-scope
+   drift and records the new baseline. A test returned **unchanged** is not written but counts as reviewed (its
+   baseline is rebuilt, as with `update-ack`). Each test is reported as updated, unchanged or failed; the staging
+   files of updated and unchanged tests are deleted, a failed one is kept and retried at most twice on its own
+   (`--test-id`). A group too big for one prompt (`PROMPT_TOO_LARGE`, over `analysis.max_prompt_tokens`) is edited
+   test by test. A customised `.spectra/prompts/test-update.md` from before this version still works per test, with
+   a warning; `spectra update-skills` (for a copy you never edited) or `spectra prompts reset test-update` brings the
+   group layout.
+6. **Acknowledge** — tests you reviewed and kept as they are without an edit prompt get
+   `spectra ai update-ack --suite checkout --ids …`, so they leave triage. A change you neither edit nor acknowledge
+   is reported again next time.
 
 "Update all" is one `spectra ai update-triage --all-suites`.
 

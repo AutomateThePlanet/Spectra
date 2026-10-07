@@ -152,10 +152,15 @@ public sealed class IngestUpdateCommand : Command
             {
                 var baseline = await BaselineStore.LoadSuiteAsync(currentDir, testsPath, suite, ct);
                 var ingested = await ingestor.IngestAsync(content, testsPath, suite, original, existingTests, ct);
-                if (ingested.IsSuccess)
+
+                // Spec 088 FR-015: an unchanged edit is a review — its baseline is rebuilt (kept with --keep-baseline).
+                IReadOnlyList<TestCase> record = ingested.Unchanged
+                    ? (mode == RecordMode.Rebuild ? [ingested.Original!] : [])
+                    : ingested.PersistedTests;
+                if (ingested.IsSuccess && record.Count > 0)
                 {
                     (baselineSummary, afterPersist) = await RecordAsync(
-                        currentDir, config, testsPath, suite, baseline, ingested.PersistedTests, mode, warnings, ct);
+                        currentDir, config, testsPath, suite, baseline, record, mode, warnings, ct);
                 }
 
                 return ingested;
@@ -169,7 +174,35 @@ public sealed class IngestUpdateCommand : Command
 
         if (result.IsSuccess && afterPersist is not null)
         {
-            return WriteAfterPersistFailure(json, suite, result.PersistedTests.Select(t => t.Id).ToList(), afterPersist);
+            var ids = result.Unchanged ? [original.Id] : result.PersistedTests.Select(t => t.Id).ToList();
+            return WriteAfterPersistFailure(json, suite, ids, afterPersist);
+        }
+
+        if (result is { IsSuccess: true, Unchanged: true })
+        {
+            // Spec 088 FR-015: reviewed, no edit needed — nothing written, the baseline rebuilt (kept with --keep-baseline).
+            BaselineCommandIO.PrintWarnings(warnings);
+            var summary = baselineSummary ?? new BaselineWriteSummary { Mode = mode };
+            if (json)
+            {
+                Console.Out.WriteLine(JsonSerializer.Serialize(new
+                {
+                    success = true,
+                    persisted = 0,
+                    unchanged = true,
+                    id = original.Id,
+                    baseline = summary.ToJson(),
+                    warnings
+                }));
+            }
+            else
+            {
+                Console.Out.WriteLine(mode == RecordMode.Rebuild
+                    ? $"Test '{original.Id}' needs no change; its baseline was refreshed."
+                    : $"Test '{original.Id}' needs no change; its baseline was kept (--keep-baseline).");
+                Console.Out.WriteLine(summary.ToHuman());
+            }
+            return ExitSuccess;
         }
 
         if (result.IsSuccess)
@@ -182,6 +215,7 @@ public sealed class IngestUpdateCommand : Command
                 {
                     success = true,
                     persisted = result.PersistedTests.Count,
+                    unchanged = false,
                     id,
                     baseline = baselineSummary!.ToJson(),
                     warnings
@@ -246,7 +280,7 @@ public sealed class IngestUpdateCommand : Command
         var stagingDir = Path.Combine(currentDir, ".spectra", "updates", suite);
         if (!Directory.Exists(stagingDir))
         {
-            EmitBatchResult(json, suite, 0, 0, 0);
+            EmitBatchResult(json, suite, []);
             return ExitSuccess;
         }
 
@@ -259,8 +293,7 @@ public sealed class IngestUpdateCommand : Command
             new TestFileWriter(), new IndexGenerator(), new IndexWriter());
         var ingestor = new UpdatedTestIngestor(persistence);
 
-        int written = 0, skippedNoOriginal = 0, errors = 0;
-        var persisted = new List<TestCase>();
+        var outcomes = new List<StagedOutcome>();
         BaselineWriteSummary? baselineSummary = null;
         BaselineStoreException? afterPersist = null;
         var warnings = new List<string>();
@@ -272,10 +305,17 @@ public sealed class IngestUpdateCommand : Command
             {
                 var baseline = await BaselineStore.LoadSuiteAsync(currentDir, testsPath, suite, ct);
                 await IngestStagedAsync();
-                if (persisted.Count > 0)
+
+                // Spec 088 FR-015: an unchanged edit is a review — its baseline is rebuilt like a written one's.
+                var record = outcomes
+                    .Where(o => o.Outcome == StagedOutcome.Written
+                        || (o.Outcome == StagedOutcome.Unchanged && mode == RecordMode.Rebuild))
+                    .Select(o => o.Test!)
+                    .ToList();
+                if (record.Count > 0)
                 {
                     (baselineSummary, afterPersist) = await RecordAsync(
-                        currentDir, config, testsPath, suite, baseline, persisted, mode, warnings, ct);
+                        currentDir, config, testsPath, suite, baseline, record, mode, warnings, ct);
                 }
 
                 return 0;
@@ -289,49 +329,115 @@ public sealed class IngestUpdateCommand : Command
 
         if (afterPersist is not null)
         {
-            return WriteAfterPersistFailure(json, suite, persisted.Select(t => t.Id).ToList(), afterPersist);
+            // Spec 088 FR-016: no staging file is deleted when the baseline was not recorded.
+            var ids = outcomes.Where(o => o.Outcome != StagedOutcome.Failed).Select(o => o.TestId).ToList();
+            return WriteAfterPersistFailure(json, suite, ids, afterPersist);
+        }
+
+        // Spec 088 FR-016: the staging files of consumed edits (written or unchanged) are deleted; failed ones stay.
+        foreach (var consumed in outcomes.Where(o => o.Outcome != StagedOutcome.Failed))
+        {
+            try
+            {
+                File.Delete(consumed.Path);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                warnings.Add($"Could not delete the staging file {consumed.File}: {ex.Message}");
+            }
         }
 
         BaselineCommandIO.PrintWarnings(warnings);
-        EmitBatchResult(json, suite, written, skippedNoOriginal, errors, baselineSummary ?? new BaselineWriteSummary { Mode = mode }, warnings);
+        EmitBatchResult(json, suite, outcomes, baselineSummary ?? new BaselineWriteSummary { Mode = mode }, warnings);
         return ExitSuccess;
 
         async Task IngestStagedAsync()
         {
-        var stagingFiles = Directory.GetFiles(stagingDir, "updated-*.json").OrderBy(f => f);
-        foreach (var sf in stagingFiles)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            var fileName = Path.GetFileNameWithoutExtension(sf);
-            var testId = fileName.StartsWith("updated-", StringComparison.OrdinalIgnoreCase)
-                ? fileName["updated-".Length..] : null;
-            if (string.IsNullOrEmpty(testId)) continue;
-
-            var original = existingTests.FirstOrDefault(t =>
-                string.Equals(t.Id, testId, StringComparison.OrdinalIgnoreCase));
-            if (original is null)
+            var stagingFiles = Directory.GetFiles(stagingDir, "updated-*.json").OrderBy(f => f, StringComparer.Ordinal);
+            foreach (var sf in stagingFiles)
             {
-                skippedNoOriginal++;
-                continue;
+                ct.ThrowIfCancellationRequested();
+
+                var fileName = Path.GetFileNameWithoutExtension(sf);
+                var testId = fileName.StartsWith("updated-", StringComparison.OrdinalIgnoreCase)
+                    ? fileName["updated-".Length..] : null;
+                if (string.IsNullOrEmpty(testId)) continue;
+
+                var file = Path.GetRelativePath(currentDir, sf).Replace(Path.DirectorySeparatorChar, '/');
+                var original = existingTests.FirstOrDefault(t =>
+                    string.Equals(t.Id, testId, StringComparison.OrdinalIgnoreCase));
+                if (original is null)
+                {
+                    outcomes.Add(StagedOutcome.Fail(testId, sf, file, StagedOutcome.NoOriginal,
+                        $"No test '{testId}' in suite '{suite}'; ingest-update edits an existing test."));
+                    continue;
+                }
+
+                string content;
+                try
+                {
+                    content = await File.ReadAllTextAsync(sf, ct);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    outcomes.Add(StagedOutcome.Fail(original.Id, sf, file, StagedOutcome.Unreadable, ex.Message));
+                    continue;
+                }
+
+                var stagedId = StagedId(content);
+                if (stagedId is not null && !string.Equals(stagedId, original.Id, StringComparison.OrdinalIgnoreCase))
+                {
+                    outcomes.Add(StagedOutcome.Fail(original.Id, sf, file, StagedOutcome.IdMismatch,
+                        $"The staged test's id '{stagedId}' differs from the file name's '{original.Id}'."));
+                    continue;
+                }
+
+                IngestResult result;
+                try
+                {
+                    result = await ingestor.IngestAsync(content, testsPath, suite, original, existingTests, ct);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    outcomes.Add(StagedOutcome.Fail(original.Id, sf, file, StagedOutcome.PersistFailed, ex.Message));
+                    continue;
+                }
+
+                if (!result.IsSuccess)
+                {
+                    outcomes.Add(StagedOutcome.Fail(original.Id, sf, file, result.ErrorCode!, [.. result.Errors]));
+                }
+                else if (result.Unchanged)
+                {
+                    outcomes.Add(new StagedOutcome(original.Id, sf, file, StagedOutcome.Unchanged, result.Original));
+                }
+                else
+                {
+                    // Later edits in the batch regenerate the index from the already-edited tests.
+                    var edited = result.PersistedTests[0];
+                    outcomes.Add(new StagedOutcome(original.Id, sf, file, StagedOutcome.Written, edited));
+                    existingTests = existingTests.Select(t => ReferenceEquals(t, original) ? edited : t).ToList();
+                }
             }
-
-            string content;
-            try { content = await File.ReadAllTextAsync(sf, ct); }
-            catch { errors++; continue; }
-
-            IngestResult result;
-            try { result = await ingestor.IngestAsync(content, testsPath, suite, original, existingTests, ct); }
-            catch { errors++; continue; }
-
-            if (result.IsSuccess)
-            {
-                written++;
-                persisted.AddRange(result.PersistedTests);
-            }
-            else
-                errors++;
         }
+    }
+
+    /// <summary>Spec 088: the <c>id</c> of the staged array's first object, or null when it can't be read.</summary>
+    private static string? StagedId(string content)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(content);
+            var root = doc.RootElement;
+            var first = root.ValueKind == JsonValueKind.Array && root.GetArrayLength() > 0 ? root[0] : root;
+            return first.ValueKind == JsonValueKind.Object
+                && first.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String
+                ? id.GetString()
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null; // the ingestor reports malformed content
         }
     }
 
@@ -360,9 +466,29 @@ public sealed class IngestUpdateCommand : Command
     }
 
     private static void EmitBatchResult(
-        bool json, string suite, int written, int skippedNoOriginal, int errors, BaselineWriteSummary? baseline = null,
+        bool json, string suite, IReadOnlyList<StagedOutcome> outcomes, BaselineWriteSummary? baseline = null,
         IReadOnlyList<string>? warnings = null)
     {
+        var written = outcomes.Count(o => o.Outcome == StagedOutcome.Written);
+        var unchanged = outcomes.Count(o => o.Outcome == StagedOutcome.Unchanged);
+        var skippedNoOriginal = outcomes.Count(o => o.ErrorCode == StagedOutcome.NoOriginal);
+        var errors = outcomes.Count(o => o.Outcome == StagedOutcome.Failed && o.ErrorCode != StagedOutcome.NoOriginal);
+
+        // Spec 088: the per-test summary is never suppressed — stdout in human mode, stderr in JSON mode.
+        var human = json ? Console.Error : Console.Out;
+        human.WriteLine(
+            $"Batch update-ingest for suite '{suite}': " +
+            $"written={written} unchanged={unchanged} skipped_no_original={skippedNoOriginal} errors={errors}");
+        foreach (var o in outcomes)
+        {
+            human.WriteLine(o.Outcome switch
+            {
+                StagedOutcome.Written => $"  {o.TestId}: updated",
+                StagedOutcome.Unchanged => $"  {o.TestId}: unchanged (reviewed, no edit needed)",
+                _ => $"  {o.TestId}: failed [{o.ErrorCode}] {string.Join(" ", o.Errors)} (kept {o.File})"
+            });
+        }
+
         if (json)
         {
             Console.Out.WriteLine(JsonSerializer.Serialize(new
@@ -371,17 +497,13 @@ public sealed class IngestUpdateCommand : Command
                 mode = "batch",
                 suite,
                 written,
+                unchanged,
                 skipped_no_original = skippedNoOriginal,
                 errors,
+                results = outcomes.Select(o => o.ToJson()).ToList(),
                 baseline = (baseline ?? new BaselineWriteSummary()).ToJson(),
                 warnings = warnings ?? []
             }));
-        }
-        else
-        {
-            Console.Out.WriteLine(
-                $"Batch update-ingest for suite '{suite}': " +
-                $"written={written} skipped_no_original={skippedNoOriginal} errors={errors}");
         }
     }
 
@@ -407,4 +529,28 @@ public sealed class IngestUpdateCommand : Command
 
         return tests;
     }
+}
+
+/// <summary>Spec 088 FR-016: what <c>ingest-update --all</c> did with one staging file.</summary>
+internal sealed record StagedOutcome(string TestId, string Path, string File, string Outcome, TestCase? Test = null)
+{
+    public const string Written = "written";
+    public const string Unchanged = "unchanged";
+    public const string Failed = "failed";
+
+    public const string NoOriginal = "NO_ORIGINAL";
+    public const string Unreadable = "UNREADABLE";
+    public const string IdMismatch = "ID_MISMATCH";
+    public const string PersistFailed = "PERSIST_FAILED";
+
+    public string? ErrorCode { get; init; }
+
+    public IReadOnlyList<string> Errors { get; init; } = [];
+
+    public static StagedOutcome Fail(string testId, string path, string file, string code, params string[] errors) =>
+        new(testId, path, file, Failed) { ErrorCode = code, Errors = errors };
+
+    public object ToJson() => Outcome == Failed
+        ? new { test = TestId, file = File, outcome = Outcome, error_code = ErrorCode, errors = Errors }
+        : new { test = TestId, file = File, outcome = Outcome };
 }
