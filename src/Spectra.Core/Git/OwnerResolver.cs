@@ -17,6 +17,7 @@ public sealed class OwnerResolver
     private readonly Dictionary<string, (GitOwner? Owner, string? Reason)> _byDirectory = new(PathComparer);
     private readonly Dictionary<string, GitOwner> _byRoot = new(PathComparer);
     private readonly Dictionary<(string Root, int Threshold), (RenameHistory? History, string? Reason)> _histories = new();
+    private readonly Dictionary<string, IReadOnlySet<string>> _gitlinks = new(PathComparer);
 
     public OwnerResolver(GitReader reader)
     {
@@ -53,6 +54,64 @@ public sealed class OwnerResolver
 
         _byDirectory[directory] = outcome;
         return outcome;
+    }
+
+    /// <summary>
+    /// Spec 087 (F1): the owner-relative paths of the submodules <paramref name="owner"/> records (gitlinks, mode
+    /// 160000): one <c>ls-files -s -z</c> per owner, cached. A failed call is no gitlinks.
+    /// </summary>
+    public async Task<IReadOnlySet<string>> GitlinksAsync(GitOwner owner, CancellationToken ct)
+    {
+        if (!_gitlinks.TryGetValue(owner.Root, out var gitlinks))
+        {
+            var result = await _reader.RunAsync(owner.Root, "ls-files", ["-s", "-z"], null, ct);
+            gitlinks = result.Ok ? ParseGitlinks(result.Stdout, GitPathComparer.Platform) : new HashSet<string>();
+            _gitlinks[owner.Root] = gitlinks;
+        }
+
+        return gitlinks;
+    }
+
+    /// <summary>
+    /// Spec 087 (F1): the owner-relative path of the submodule <paramref name="fullPath"/> lies in when that submodule
+    /// has no checkout (its folder is missing or has no <c>.git</c> entry): the nearest gitlink among the path's
+    /// folder and its parents. Null when there is none, or when the nearest gitlink is checked out.
+    /// </summary>
+    public async Task<string?> UncheckedSubmoduleOfAsync(GitOwner owner, string fullPath, CancellationToken ct)
+    {
+        if (await GitlinksAsync(owner, ct) is not HashSet<string> { Count: > 0 } gitlinks)
+        {
+            return null;
+        }
+
+        var relative = RelativePath(owner, fullPath);
+        for (var cut = relative.LastIndexOf('/'); cut > 0; cut = relative.LastIndexOf('/', cut - 1))
+        {
+            if (gitlinks.TryGetValue(relative[..cut], out var recorded))
+            {
+                var onDisk = Path.Combine(owner.Root, recorded);
+                var checkedOut = Directory.Exists(Path.Combine(onDisk, ".git")) || File.Exists(Path.Combine(onDisk, ".git"));
+                return checkedOut ? null : recorded;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>The gitlink paths in <c>ls-files -s -z</c> output (<c>&lt;mode&gt; &lt;sha&gt; &lt;stage&gt;\t&lt;path&gt;\0</c>).</summary>
+    public static HashSet<string> ParseGitlinks(byte[] stdout, StringComparer comparer)
+    {
+        var gitlinks = new HashSet<string>(comparer);
+        foreach (var record in System.Text.Encoding.UTF8.GetString(stdout).Split('\0', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var tab = record.IndexOf('\t');
+            if (tab > 0 && record.StartsWith("160000 ", StringComparison.Ordinal))
+            {
+                gitlinks.Add(record[(tab + 1)..]);
+            }
+        }
+
+        return gitlinks;
     }
 
     /// <summary>A full path as git names it inside <paramref name="owner"/>: relative, with <c>/</c>.</summary>

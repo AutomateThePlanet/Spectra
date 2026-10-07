@@ -706,7 +706,7 @@ HTML-like text inside inline code (`` `<br>` ``) no longer matches; no supported
 | LOAD | The normalised text changed and a number changed, a word that flips a rule's meaning changed (`must`, `should`, `may`, `required`, `no`, `not`, `never`, `none`, `nothing`, `cannot`, `can't`, `don't`, `doesn't`, `won't`, `isn't`, `aren't`, `shouldn't`, `mustn't`, `without`, `unless`, `except`, `only`, `always`, `all`, `any`, `every`; a curly apostrophe counts as a straight one), more than `update.light_threshold_words` words changed, or no diff could be computed (snapshot missing, or a side over 5,000 words) |
 | LIGHT | Any other change of the normalised text |
 | RELINK | Spec 086: the file is missing, and git history names the file it was renamed or moved to (`why`: `renamed to <path>`; the group's ref item carries `target`). Cleared by `relink-sources` |
-| REMOVED | The file no longer resolves (and history names no rename), or the anchor matches no heading. A missing file's reason is `not found; <why>`: `not found; no git`, `not found; not in a git repository`, `not found; no rename found at 90% similarity` (`(shallow history)` appended for a shallow clone), `not found; ambiguous rename`, `not found; rename chain ends at a missing file`, `not found; renamed outside the allowed roots` |
+| REMOVED | The file no longer resolves (and history names no rename), or the anchor matches no heading. A missing file's reason is `not found; <why>`: `not found; no git`, `not found; not in a git repository`, `not found; no rename found at 90% similarity` (`(shallow history)` appended for a shallow clone), `not found; ambiguous rename`, `not found; rename chain ends at a missing file`, `not found; renamed outside the allowed roots`, and (Spec 087) `not found; submodule not checked out: <submodule path> (run git submodule update --init)` — a setup problem, not a removal: the file is in a submodule this clone hasn't checked out, so no history is consulted and it is never RELINK |
 
 Per linked criterion: CRITERIA_CHANGED (its normalised text changed) or CRITERIA_REMOVED (the ID is in no criteria
 file). A test's **bucket** is its worst state: RELINK > REMOVED > CRITERIA_REMOVED > LOAD > CRITERIA_CHANGED > LIGHT >
@@ -729,6 +729,13 @@ larger of the words removed and the words added (a one-word replacement counts a
 **Groups.** Tests in the same suite and bucket with the same set of changed refs and criteria form a group, chunked at
 `update.group_size` (default 10) in test-ID order and numbered `G1`, `G2`, … across the run (suite, then bucket worst
 first). COSMETIC and UNCHANGED tests form no groups.
+
+**Submodules that aren't checked out (Spec 087).** All of a test's refs into one such submodule fold into a single ref
+item `{"ref": "<submodule path>", "state": "REMOVED", "submodule": true}`, so a suite's tests form **one** group per
+submodule, never chunked by `update.group_size`; `removed` still lists every ref. `notes` adds one line per submodule,
+counting every ref into it — baselined or not, including tests with no baseline entry: `N reference(s) from M test(s)
+point into submodule <path>, which isn't checked out (run git submodule update --init)` (N counts (test, ref) pairs, M
+distinct tests). The fix is `git submodule update --init` in the repository, then triage again; SPECTRA never runs it.
 
 **Output.** stdout (JSON mode) is one compact line — `suites[].counts` (non-zero buckets only, plus `unbaselined` /
 `partial`; a missing bucket is 0), `groups` (`id`, `suite`, `bucket`, `refs`, `criteria`, `tests`, `why` such as
@@ -780,22 +787,31 @@ show up at the next triage:
 ```bash
 spectra ai source-baseline --init --all-suites --from-date 2026-03-01           # each repo's last commit at or before the date
 spectra ai source-baseline --init --all-suites --from-ref v2.4 --owner docs/requirements/gitbook-repo
+spectra ai source-baseline --init --all-suites --from-date 2026-03-01 --min-similarity 60   # also follow heavier-edited renames back
 ```
 
 - **The point.** `--from-date <ISO date>`: per owner repository, the last commit at or before the date (a date without
   a time means the end of that day, UTC). `--from-ref <rev> --owner <path>`: the repository containing `<path>` uses
   that commit; docs of other repositories use current content, with one warning naming them.
-- **Per ref** without a baseline key: the file at the point, following the renames made since back to its old path;
-  the section by the 085 matcher; fingerprint and snapshot as usual. Criteria always use current content.
+- **Per ref** without a baseline key: the file at the point, following the renames made since back to its old path
+  (`--min-similarity <N>`, 50–100, default 90, the same option and validation as `relink-sources`; on Windows and macOS
+  paths match ignoring case, Spec 087); the section by the 085 matcher; fingerprint and snapshot as usual. Criteria
+  always use current content.
 - **Fills missing keys only**: an existing fingerprint is never changed (a partial entry gets only its missing refs).
 - **Left unbaselined, with a reason** (`suites[].unbaselined: [{test, ref, reason}]`): `file did not exist at <hash>`,
-  `anchor did not exist at <hash>`, `no commit at or before <date>`, or the ref's current missing reason.
+  `anchor did not exist at <hash>`, `no commit at or before <date>`, `git history unavailable: <git reason>` (the
+  "renames since" read failed — never treated as "no renames", Spec 087), `submodule not checked out: <path> (run git
+  submodule update --init)`, `ambiguous rename`, or the ref's current missing reason.
+- **Submodules not checked out** (Spec 087): every mode of `--init` — plain, `--from-date`, `--from-ref` — adds one
+  warning per such submodule (the same line as triage's note) and leaves those refs unbaselined.
 - **No git / no repository**: current content, with a warning listing the docs. Never an error.
 - **Refused** with `INVALID_ARGUMENTS`: `--force` with `--from-*`; `--from-ref` without `--owner`; `--owner` without
-  `--from-ref`; `--from-date` or `--from-ref` without `--init`; both `--from-date` and `--from-ref`; an unparseable date.
+  `--from-ref`; `--from-date` or `--from-ref` without `--init`; both `--from-date` and `--from-ref`; an unparseable date;
+  `--min-similarity` outside 50–100 (same message as `relink-sources`) or without `--from-*`.
   With `GIT_REF_UNAVAILABLE` (exit 4): an `--owner` that isn't a readable repository, or a `--from-ref` that doesn't
   name a commit in it. Nothing is written.
-- The JSON gains `"from": {"date": "…"}` or `{"ref": "…", "owner": "…"}` (only with `--from-*`).
+- The JSON gains `"from": {"date": "…", "min_similarity": N}` or `{"ref": "…", "owner": "…", "min_similarity": N}` (only
+  with `--from-*`).
 
 ### `spectra ai relink-sources` (Spec 086)
 
@@ -830,7 +846,9 @@ ambiguous and never a candidate; otherwise the chain (`a → b → c`) is follow
 must be under the repo root or `source.local_dir`. A bare legacy ref (`checkout.md`) is checked at the same places the
 resolver looks, in the same order. The new ref keeps the original's base when the target is under it
 (source-dir-relative stays source-dir-relative), otherwise it is repo-root-relative. Heading renames inside a file
-(`anchor not found`) are not relinked.
+(`anchor not found`) are not relinked. Spec 087: a ref into a submodule that isn't checked out is never a candidate
+(`submodule not checked out: …`); on Windows and macOS a path is matched against git's history ignoring case (one
+match → git's casing in the new ref; two paths differing only in case → `ambiguous rename`).
 
 **Output.** `{command, success, scope, dry_run, min_similarity, relinked: [{suite, test, refs: [{from, to}],
 orphan_cleared}], not_relinked: [{suite, test, ref, reason}], counts: {tests_relinked, refs_relinked,
@@ -889,6 +907,15 @@ The four baseline commands (`update-triage`, `update-ack`, `source-baseline`, `r
 `update-triage`, `update-ack`, `relink-sources`, `source-baseline --from-*` and `docs topology` read git; nothing else
 does, and **no SPECTRA command ever writes to a git repository**.
 
+- **Which git runs (Spec 087).** Git is started by the absolute path of the first `git.exe` (Windows) / `git` found in
+  an **absolute** PATH entry — empty, `.`, relative and current-folder entries are skipped, and `.cmd`/`.bat` are never
+  used — so a `git.exe` inside a reviewed repository never runs. Arguments are passed one by one, with no shell. The
+  same lookup starts `git config user.name` for the execution identity. No git found → `no git`.
+- **A clean environment (Spec 087).** Every git process gets the environment without `GIT_DIR`, `GIT_WORK_TREE`,
+  `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_COMMON_DIR`, `GIT_NAMESPACE`,
+  `GIT_CEILING_DIRECTORIES`, `GIT_DISCOVERY_ACROSS_FILESYSTEM`, `GIT_CONFIG`, `GIT_CONFIG_PARAMETERS`,
+  `GIT_CONFIG_COUNT` and `GIT_CONFIG_KEY_*`/`GIT_CONFIG_VALUE_*`, so running SPECTRA from a git hook (or a shell with
+  those set) still reads the repository each call names.
 - **Read-only subcommands only**: `rev-parse`, `log`, `show`, `ls-files`, `cat-file`. Every call is
   `git -C <repo> -c core.quotepath=false …` with `GIT_OPTIONAL_LOCKS=0` (no `index.lock`, no contention with a
   concurrent `git`) and `GIT_TERMINAL_PROMPT=0`; output is NUL-separated where possible and read as UTF-8, so
@@ -900,7 +927,11 @@ does, and **no SPECTRA command ever writes to a git repository**.
   or a call fails, git features are skipped for that path with a reason — `no git`, `not in a git repository`,
   `repository not readable (dubious ownership)`, `git failed: <message>` — and the command carries on. Without git
   every command behaves as under 085, except that a missing file's REMOVED reason says `not found; no git`.
-- Triage runs git only when a referenced file is missing; each repository's history is scanned once per command.
+- Triage runs git only when a referenced file is missing; each repository's history is scanned once per command, and
+  its submodules (`ls-files -s -z`) read once.
+- **Casing (Spec 087).** On Windows and macOS rename lookups ignore case, as the file system does; Linux matches
+  exactly. Residual: a bootstrap ref whose casing differs from git's, for a file not renamed since the point, is still
+  read under the ref's casing and reported as `file did not exist at <hash>`.
 
 Option-parsing errors from the command-line framework itself (an unknown option, a missing value) keep the
 framework's own output.

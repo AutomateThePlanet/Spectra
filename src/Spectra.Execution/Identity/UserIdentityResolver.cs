@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Spectra.Core.Git;
 
 namespace Spectra.MCP.Identity;
 
@@ -66,22 +67,41 @@ public sealed class UserIdentityResolver : IUserIdentityResolver
         }
     }
 
+    /// <summary>
+    /// Spec 087 (F2/F3): <c>git config user.name</c> started by git's absolute path (never the bare name), arguments one
+    /// by one, and an environment without variables that redirect git's configuration or repository. Null when git
+    /// isn't found.
+    /// </summary>
+    internal static ProcessStartInfo? CreateGitStartInfo()
+    {
+        if (GitExecutable.Path is not { } git)
+        {
+            return null;
+        }
+
+        var info = new ProcessStartInfo(git)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        info.ArgumentList.Add("config");
+        info.ArgumentList.Add("user.name");
+        GitEnvironment.Apply(info.Environment);
+        return info;
+    }
+
     private static string? GetGitUserName()
     {
         try
         {
-            using var process = new Process
+            if (CreateGitStartInfo() is not { } info)
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "git",
-                    Arguments = "config user.name",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
-            };
+                return null; // no git: the OS user name is used
+            }
+
+            using var process = new Process { StartInfo = info };
 
             process.Start();
             var output = process.StandardOutput.ReadToEnd().Trim();

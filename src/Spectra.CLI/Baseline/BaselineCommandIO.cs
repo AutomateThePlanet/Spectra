@@ -36,6 +36,13 @@ public static class BaselineCommandIO
     /// <summary>Compact JSON with relaxed escaping (so <c>#</c>, <c>→</c> and non-ASCII stay readable).</summary>
     public static readonly JsonSerializerOptions Json = CriteriaCommandIO.Json;
 
+    /// <summary>
+    /// Spec 087 (F5): the one validation of <c>--min-similarity</c> (relink-sources, source-baseline --from-*): the
+    /// refusal message, or null when the value is in 50–100.
+    /// </summary>
+    public static string? ValidateMinSimilarity(int value) =>
+        value is < 50 or > 100 ? $"--min-similarity must be between 50 and 100 (got {value})." : null;
+
     public static int ExitCodeOf(string errorCode) => Refusals.Contains(errorCode) ? ExitCodes.NotFound : ExitCodes.Error;
 
     /// <summary>Writes the failure (one JSON document on stderr in JSON mode) and returns its exit code.</summary>

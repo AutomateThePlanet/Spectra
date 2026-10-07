@@ -19,11 +19,11 @@ public static class SourceBaselineHandler
 
     public static Task<int> RunAsync(
         string root, bool init, string? suite, bool allSuites, bool force, bool dryRun, bool json, CancellationToken ct) =>
-        RunAsync(root, init, suite, allSuites, force, dryRun, fromDate: null, fromRef: null, owner: null, json, ct);
+        RunAsync(root, init, suite, allSuites, force, dryRun, fromDate: null, fromRef: null, owner: null, minSimilarity: null, json, ct);
 
     public static async Task<int> RunAsync(
         string root, bool init, string? suite, bool allSuites, bool force, bool dryRun, string? fromDate, string? fromRef,
-        string? owner, bool json, CancellationToken ct)
+        string? owner, int? minSimilarity, bool json, CancellationToken ct)
     {
         // Spec 086 FR-018: the history-bootstrap refusals, before anything is read.
         var refusal = (fromDate, fromRef, owner) switch
@@ -37,10 +37,19 @@ public static class SourceBaselineHandler
             (_, null, not null) => "--owner is only used with --from-ref.",
             _ => null
         };
+        // Spec 087 (F5, FR-015): --min-similarity only applies to the history scan, validated like relink-sources.
+        refusal ??= minSimilarity switch
+        {
+            { } when fromDate is null && fromRef is null => "--min-similarity is only used with --from-date or --from-ref.",
+            { } value => BaselineCommandIO.ValidateMinSimilarity(value),
+            null => null
+        };
         if (refusal is not null)
         {
             return BaselineCommandIO.Fail(json, Command, BaselineCommandIO.ErrorInvalidArguments, refusal);
         }
+
+        var threshold = minSimilarity ?? RenameResolver.DefaultMinSimilarity;
 
         DateTimeOffset date = default;
         if (fromDate is not null && !HistoryBootstrap.TryParseDate(fromDate, out date))
@@ -89,11 +98,11 @@ public static class SourceBaselineHandler
             var context = await BaselineContext.CreateAsync(root, config, ct);
             if (fromDate is not null)
             {
-                bootstrap = HistoryBootstrap.FromDate(context, context.Refs, date);
+                bootstrap = HistoryBootstrap.FromDate(context, context.Refs, date, threshold);
             }
             else if (fromRef is not null)
             {
-                bootstrap = await HistoryBootstrap.FromRefAsync(context, context.Refs, owner!, fromRef, ct);
+                bootstrap = await HistoryBootstrap.FromRefAsync(context, context.Refs, owner!, fromRef, threshold, ct);
             }
 
             foreach (var name in suites)
@@ -143,6 +152,15 @@ public static class SourceBaselineHandler
             }
 
             notes = context.Notes;
+
+            // Spec 087 (F1, FR-004a): refs into a submodule that isn't checked out stay unbaselined; say so once per submodule.
+            var scoped = new List<Spectra.Core.Models.TestCase>();
+            foreach (var name in suites)
+            {
+                scoped.AddRange((await BaselineStore.ScanSuiteAsync(root, testsPath, name, ct)).Tests);
+            }
+
+            warnings.AddRange(await context.SubmoduleNotesAsync(scoped, ct));
             if (bootstrap is { CurrentContentDocs.Count: > 0 })
             {
                 warnings.Add((fromRef is not null
@@ -201,8 +219,8 @@ public static class SourceBaselineHandler
         {
             // Spec 086: only with a history bootstrap, so a plain --init's output is unchanged.
             document["from"] = fromDate is not null
-                ? new Dictionary<string, object?> { ["date"] = fromDate }
-                : new Dictionary<string, object?> { ["ref"] = fromRef, ["owner"] = owner };
+                ? new Dictionary<string, object?> { ["date"] = fromDate, ["min_similarity"] = threshold }
+                : new Dictionary<string, object?> { ["ref"] = fromRef, ["owner"] = owner, ["min_similarity"] = threshold };
         }
 
         BaselineCommandIO.Emit(json, document, writer =>

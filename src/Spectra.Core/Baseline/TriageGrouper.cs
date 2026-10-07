@@ -5,9 +5,12 @@ namespace Spectra.Core.Baseline;
 /// RELINK ref carries its <see cref="Target"/> (the repo-relative path it was renamed to), which is part of the
 /// signature, so RELINK groups split by target.
 /// </summary>
-public sealed record ChangedItem(bool IsCriterion, string Key, string State, string? Target = null)
+public sealed record ChangedItem(bool IsCriterion, string Key, string State, string? Target = null, bool Submodule = false)
 {
-    public string Signature => $"{(IsCriterion ? "criterion" : "ref")}:{Key}={State}{(Target is null ? "" : $"→{Target}")}";
+    /// <summary>Spec 087 (F1): a submodule item stands for every ref of the test into that submodule (Key = its path).</summary>
+    public string Signature => Submodule
+        ? $"submodule:{Key}={State}"
+        : $"{(IsCriterion ? "criterion" : "ref")}:{Key}={State}{(Target is null ? "" : $"→{Target}")}";
 }
 
 /// <summary>One test's triage result: its bucket, the items that are not unchanged, and why.</summary>
@@ -41,7 +44,10 @@ public static class TriageGrouper
         {
             var members = group.OrderBy(x => x.Verdict.Id, StringComparer.Ordinal).ToList();
             var items = members[0].Items;
-            foreach (var chunk in members.Chunk(groupSize))
+
+            // Spec 087 (F1): a group of submodule items only (a setup problem) is never chunked: one per suite and submodule.
+            var size = items.Count > 0 && items.All(i => i.Submodule) ? members.Count : groupSize;
+            foreach (var chunk in members.Chunk(size))
             {
                 var why = chunk.SelectMany(x => x.Verdict.Why).Distinct(StringComparer.Ordinal).ToList();
                 groups.Add(new TriageGroup(

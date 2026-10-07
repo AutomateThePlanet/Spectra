@@ -177,11 +177,20 @@ spectra ai source-baseline --init --all-suites --from-date 2026-03-01
 spectra ai update-triage --all-suites                  # changes since 2026-03-01 show as LOAD / LIGHT
 ```
 
-Relink first, so the bootstrap follows each doc back through its renames to the old content. `--from-date` uses each
+Relink first, so the bootstrap follows each doc back through its renames to the old content. Add
+`--min-similarity 60` (50–100) to follow renames that came with heavier edits; if git's history can't be read, the
+affected refs stay unbaselined with `git history unavailable: …` instead of being read from the wrong path. `--from-date` uses each
 repository's (and submodule's) last commit at or before the date; `--from-ref <rev> --owner <path>` pins one
 repository to a commit instead. It only fills missing entries; refs whose file or section didn't exist then stay
 unbaselined, with the reason. RELINK shows up for tests without a baseline too, so a restructure made before the first
 baseline is still relinkable.
+
+**Docs in a submodule.** If the docs live in a git submodule and the clone was made without
+`--recurse-submodules`, the submodule folder is empty. Triage then reports those refs as REMOVED with `not found;
+submodule not checked out: <path> (run git submodule update --init)`, in one group per submodule, and adds a note
+counting them; `source-baseline --init` warns the same way and leaves them out. It is a setup problem, not a doc
+change: run `git submodule update --init` in the repository yourself, then triage again (the assistant won't offer a
+baseline or a delete for them). SPECTRA never runs the command for you.
 
 **Where are my docs?** `spectra docs topology` lists the repositories (including submodules) that own the referenced
 docs, and the docs in none — the reason relinking or a history bootstrap isn't available for them. SPECTRA only ever

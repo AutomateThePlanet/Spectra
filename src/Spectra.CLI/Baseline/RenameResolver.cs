@@ -5,9 +5,10 @@ namespace Spectra.CLI.Baseline;
 
 /// <summary>
 /// A missing ref's relink candidate: the new ref (same anchor, same style) and its target (repo-relative), or the
-/// reason there is none (the bare FR-003 / FR-006 reason).
+/// reason there is none (the bare FR-003 / FR-006 reason). Spec 087: <see cref="Submodule"/> is the repo-relative path
+/// of the submodule that isn't checked out, when that is the reason.
 /// </summary>
-public sealed record RelinkCandidate(string Ref, string? NewRef, string? Target, string? Reason);
+public sealed record RelinkCandidate(string Ref, string? NewRef, string? Target, string? Reason, string? Submodule = null);
 
 /// <summary>
 /// Spec 086 (D3, FR-005–FR-007, research R3): finds where a missing ref's file was renamed to. The ref is looked up
@@ -17,6 +18,16 @@ public sealed record RelinkCandidate(string Ref, string? NewRef, string? Target,
 public sealed class RenameResolver
 {
     public const int DefaultMinSimilarity = 90;
+
+    /// <summary>Spec 087 (F1): the reason of a ref into a submodule that isn't checked out (bare; triage prefixes it).</summary>
+    public static string SubmoduleReason(string path) => $"submodule not checked out: {path} (run git submodule update --init)";
+
+    /// <summary>
+    /// Spec 087 (F1, FR-004a): the triage note and <c>source-baseline --init</c> warning for one submodule.
+    /// <paramref name="references"/> counts (test, ref) pairs; <paramref name="tests"/> distinct tests.
+    /// </summary>
+    public static string SubmoduleNote(string path, int references, int tests) =>
+        $"{references} reference(s) from {tests} test(s) point into submodule {path}, which isn't checked out (run git submodule update --init)";
 
     private readonly SourceRefResolver _refs;
     private readonly Dictionary<string, RelinkCandidate> _cache = new(StringComparer.Ordinal);
@@ -61,6 +72,14 @@ public sealed class RenameResolver
             {
                 firstReason ??= why;
                 continue;
+            }
+
+            // Spec 087 (F1): a ref into a submodule that isn't checked out is a setup problem; history isn't consulted.
+            if (await Owners.UncheckedSubmoduleOfAsync(owner, location.FullPath, ct) is { } submodule)
+            {
+                var path = Path.GetRelativePath(_refs.RepoRoot, Path.Combine(owner.Root, submodule)).Replace('\\', '/');
+                found = new RelinkCandidate(sourceRef, null, null, SubmoduleReason(path), path);
+                break;
             }
 
             var (history, historyWhy) = await Owners.RenameHistoryAsync(owner, MinSimilarity, ct);

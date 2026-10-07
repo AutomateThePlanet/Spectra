@@ -89,6 +89,13 @@ names the file it was renamed to (`why`: `renamed to <path>`).
 5. On no, nothing is relinked: report the RELINK tests as left for later and go on with the
    other buckets (Step 3).
 
+**Submodule not checked out** — when triage's `notes` contain a line like `N reference(s)
+from M test(s) point into submodule <path>, which isn't checked out (run git submodule update
+--init)`, that submodule's docs are missing in this clone: it is a setup problem, not a doc
+change. Tell the user to run git submodule update --init in the repository themselves (never
+run it from this skill), then re-run triage. While that note is present, don't offer
+`source-baseline --init` — a baseline taken now would leave every ref into the submodule out.
+
 **First-time setup** — when the suite has unbaselined tests, offer the baseline only now,
 after the relink step (whether the user relinked or not):
 `spectra ai source-baseline --init --suite <suite> --from-date <YYYY-MM-DD> --output-format json --verbosity quiet`,
@@ -100,7 +107,12 @@ adopts the current docs instead. Run either only after the user agrees, then re-
 
 **Step 3** — REMOVED and CRITERIA_REMOVED (review only).
 
-List every entry of `removed`: the test, the ref or criterion that is gone, and its
+First, set aside every entry whose reason starts with `not found; submodule not checked out`:
+the doc isn't gone, its submodule isn't checked out in this clone. Name each submodule once
+(the triage group lists it), tell the user to run git submodule update --init themselves
+and re-run triage, and do not list those tests for review — no fix, no ack, no delete.
+
+List every other entry of `removed`: the test, the ref or criterion that is gone, and its
 `reason` (`anchor not found`; `not found; <why>` for a missing file — e.g. `not found; no git`,
 `not found; ambiguous rename`; `not in any criteria file`). Do not compile an
 edit prompt for these tests, and never edit the `.md` file yourself — there is no current
@@ -218,6 +230,7 @@ then, after the user's yes, the same without `--dry-run`.
 When presenting results, explain the buckets (a test's bucket is its worst change):
 - **RELINK** — a referenced doc file was renamed or moved (found in git history); cleared by `relink-sources` after the user's yes
 - **REMOVED** — a referenced section (or its file) is gone; review only, cleared by fixing the ref
+  (`not found; submodule not checked out` is not a removal: initialise the submodule and re-run triage)
 - **CRITERIA_REMOVED** — a linked criterion no longer exists; review only
 - **LOAD** — a number, a modal word (must/should/may/cannot/required/only/not) or many words changed, or no diff was available
 - **CRITERIA_CHANGED** — a linked criterion's text changed

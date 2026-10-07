@@ -22,6 +22,23 @@ public static class GitWorkspace
         }
     }
 
+    /// <summary>
+    /// Spec 087: <c>git clone</c> of <paramref name="source"/>'s repository into <paramref name="target"/>'s root, without
+    /// its submodules (their folders stay empty). The target root is emptied first. A fixture command.
+    /// </summary>
+    public static void CloneInto(this BaselineTestWorkspace source, BaselineTestWorkspace target)
+    {
+        GitFixture.DeleteTree(target.Root);
+        GitFixture.Git(Path.GetDirectoryName(target.Root)!, "clone", "-q", source.Root, target.Root);
+        GitFixture.Git(target.Root, "config", "user.name", "Spectra Test");
+        GitFixture.Git(target.Root, "config", "user.email", "test@example.com");
+        GitFixture.Git(target.Root, "config", "core.autocrlf", "false");
+    }
+
+    /// <summary>Checks out the submodules of <paramref name="ws"/> (not recursive). A fixture command.</summary>
+    public static void InitSubmodules(this BaselineTestWorkspace ws) =>
+        GitFixture.Git(ws.Root, "-c", "protocol.file.allow=always", "submodule", "update", "--init", "-q");
+
     public static void Edit(this BaselineTestWorkspace ws, string relative, string from, string to) =>
         File.WriteAllText(ws.PathOf(relative), File.ReadAllText(ws.PathOf(relative)).Replace(from, to));
 

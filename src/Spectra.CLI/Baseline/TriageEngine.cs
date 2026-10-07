@@ -5,7 +5,7 @@ using Spectra.Core.Models.Config;
 namespace Spectra.CLI.Baseline;
 
 /// <summary>One ref of a triaged test: its verdict, where it resolved, and (RELINK only) the rename target.</summary>
-public sealed record TriagedRef(RefVerdict Verdict, RefSection Section, string? Target = null);
+public sealed record TriagedRef(RefVerdict Verdict, RefSection Section, string? Target = null, string? Submodule = null);
 
 /// <summary>One criterion of a triaged test.</summary>
 public sealed record TriagedCriterion(string Id, CriterionState State, string Baseline, string? Current);
@@ -110,6 +110,12 @@ public static class TriageEngine
                 loaded.Scan));
         }
 
+        // Spec 087 (F1, FR-004a): one note per submodule that isn't checked out, counting every ref into it.
+        foreach (var note in await context.SubmoduleNotesAsync(allTests, ct))
+        {
+            context.AddNote(note);
+        }
+
         var groups = TriageGrouper.Group(triagedSuites.SelectMany(s => s.Tests).Select(t => t.Verdict), groupSize);
         var noTests = await NoTestsAsync(triagedSuites, allTests, context, ct);
         return new TriageRun(triagedSuites, groups, noTests, acks, context.Notes, groupSize, threshold);
@@ -149,7 +155,7 @@ public static class TriageEngine
                 refs.Add(candidate.NewRef is not null
                     ? Relink(sourceRef, baselineFp, candidate, section)
                     : new TriagedRef(new RefVerdict(sourceRef, RefState.Removed, baselineFp, null,
-                        [$"{BaselineContext.NotFound}; {candidate.Reason}"], []), section));
+                        [$"{BaselineContext.NotFound}; {candidate.Reason}"], []), section, Submodule: candidate.Submodule));
                 continue;
             }
 
@@ -232,6 +238,7 @@ public static class TriageEngine
         var bucket = BucketRules.Of(refs.Select(r => r.Verdict.State), criteria.Select(c => c.State));
         var items = new List<ChangedItem>();
         var why = new List<string>();
+        var submodules = new HashSet<string>(StringComparer.Ordinal);
         foreach (var r in refs.Where(r => r.Verdict.State != RefState.Unchanged))
         {
             if (r.Verdict.State == RefState.Cosmetic && cosmeticAcked)
@@ -239,7 +246,19 @@ public static class TriageEngine
                 continue;
             }
 
-            items.Add(new ChangedItem(false, r.Verdict.Ref, r.Verdict.State.Wire(), r.Target));
+            // Spec 087 (F1): every ref into one unchecked-out submodule folds into a single item keyed on the submodule.
+            if (r.Submodule is { } submodule)
+            {
+                if (submodules.Add(submodule))
+                {
+                    items.Add(new ChangedItem(false, submodule, r.Verdict.State.Wire(), Submodule: true));
+                }
+            }
+            else
+            {
+                items.Add(new ChangedItem(false, r.Verdict.Ref, r.Verdict.State.Wire(), r.Target));
+            }
+
             why.AddRange(r.Verdict.Why);
         }
 

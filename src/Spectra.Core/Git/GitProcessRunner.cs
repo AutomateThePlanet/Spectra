@@ -27,11 +27,19 @@ public sealed class ProcessGitRunner : IGitProcessRunner
 {
     public static readonly TimeSpan Timeout = TimeSpan.FromSeconds(60);
 
-    public async Task<GitProcessResult> RunAsync(
-        string workingDir, IReadOnlyList<string> args, IReadOnlyDictionary<string, string> env, byte[]? stdin,
-        CancellationToken ct)
+    /// <summary>
+    /// Spec 087 (F2/F3): how a git call is started — the absolute path from <see cref="GitExecutable"/> (never the bare
+    /// name), arguments one by one, no shell, and the inherited environment cleaned by <see cref="GitEnvironment"/> plus
+    /// <paramref name="env"/>. Null when git isn't found.
+    /// </summary>
+    public ProcessStartInfo? CreateStartInfo(string workingDir, IReadOnlyList<string> args, IReadOnlyDictionary<string, string> env)
     {
-        var info = new ProcessStartInfo("git")
+        if (GitExecutable.Path is not { } git)
+        {
+            return null;
+        }
+
+        var info = new ProcessStartInfo(git)
         {
             WorkingDirectory = workingDir,
             UseShellExecute = false,
@@ -46,9 +54,17 @@ public sealed class ProcessGitRunner : IGitProcessRunner
             info.ArgumentList.Add(arg);
         }
 
-        foreach (var (key, value) in env)
+        GitEnvironment.Apply(info.Environment, env);
+        return info;
+    }
+
+    public async Task<GitProcessResult> RunAsync(
+        string workingDir, IReadOnlyList<string> args, IReadOnlyDictionary<string, string> env, byte[]? stdin,
+        CancellationToken ct)
+    {
+        if (CreateStartInfo(workingDir, args, env) is not { } info)
         {
-            info.Environment[key] = value;
+            return new GitProcessResult(-1, [], string.Empty, NotInstalled: true);
         }
 
         Process process;

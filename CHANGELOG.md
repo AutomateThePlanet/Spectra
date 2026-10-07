@@ -280,6 +280,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never creates an entry for one. New refusal code `GIT_REF_UNAVAILABLE` (exit 4) for an unusable `--from-ref` /
   `--owner`.
 
+### Fixed (review fixes, Spec 087)
+
+- **A submodule that isn't checked out is a setup problem, not deleted docs.** In a clone made without
+  `--recurse-submodules`, refs into the empty submodule were REMOVED as "no rename found" and the update skill offered
+  to delete the tests. Now they are REMOVED with `not found; submodule not checked out: <path> (run git submodule update
+  --init)` — never RELINK — in one unchunked group per submodule; triage notes and every `source-baseline --init` warn
+  `N reference(s) from M test(s) point into submodule <path>, which isn't checked out …`, even when nothing is baselined
+  yet; `relink-sources` and the bootstrap report the reason; and the skill tells the user to initialise the submodule
+  and re-run triage instead of offering a review, a delete or a baseline.
+- **SPECTRA never runs a `git.exe` from the workspace.** Git was started by its bare name, which Windows also looks up
+  in the current folder. Now git is the first `git.exe` / `git` in an absolute PATH entry, started by that path with
+  arguments passed one by one — for every git call and for the execution identity (`git config user.name`).
+- **An inherited git environment no longer redirects a call.** Inside a git hook (or a shell with `GIT_DIR`,
+  `GIT_INDEX_FILE`, `GIT_CONFIG_PARAMETERS` …) SPECTRA's calls read the outer repository, so renames in submodules
+  vanished, and injected config could become the execution identity. Every git process now gets the environment
+  without those variables.
+- **Renames are found when only the casing differs.** On Windows and macOS a ref like `docs/Store-Manager/Setup.md`
+  for a file git records as `docs/store-manager/setup.md` is now matched ignoring case (git's casing in the new ref;
+  two paths differing only in case are `ambiguous rename`), in relinking and in the bootstrap. Linux stays exact.
+- **The bootstrap uses the chosen threshold and reports a failed history read.** `source-baseline --init --from-*`
+  accepts `--min-similarity` (50–100, as for `relink-sources`; also in the JSON `from`), and a failed "renames since"
+  read leaves the refs unbaselined with `git history unavailable: …` instead of reading them from the wrong path.
+
 ### Notes
 
 - **One-time `source_section` churn.** Because `source_section` is now read, the first re-extraction after

@@ -24,10 +24,13 @@ public sealed class SourceBaselineCommand : Command
             "Fill missing entries from each repository's last commit at or before this ISO date (follows renames back)");
         var fromRefOption = new Option<string?>("--from-ref", "Fill missing entries from this commit of the --owner repository");
         var ownerOption = new Option<string?>("--owner", "The repository (a path inside it) that --from-ref names a commit in");
+        var minSimilarityOption = new Option<int?>("--min-similarity",
+            "With --from-*: rename similarity threshold in percent for following renames back (50–100, default 90)");
         AddOption(initOption);
         AddOption(fromDateOption);
         AddOption(fromRefOption);
         AddOption(ownerOption);
+        AddOption(minSimilarityOption);
         AddOption(suiteOption);
         AddOption(allSuitesOption);
         AddOption(forceOption);
@@ -47,6 +50,7 @@ public sealed class SourceBaselineCommand : Command
                 parse.GetValueForOption(fromDateOption),
                 parse.GetValueForOption(fromRefOption),
                 parse.GetValueForOption(ownerOption),
+                parse.GetValueForOption(minSimilarityOption),
                 json,
                 context.GetCancellationToken());
         });
