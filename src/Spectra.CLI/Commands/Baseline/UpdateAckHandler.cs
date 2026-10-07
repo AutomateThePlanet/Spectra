@@ -135,124 +135,25 @@ public static class UpdateAckHandler
     private static async Task<List<TestCase>> ResolveGroupAsync(
         string root, string suite, string group, Dictionary<string, TestCase> byId, BaselineContext context, CancellationToken ct)
     {
-        var path = Path.Combine(root, ".spectra", "update-triage.json");
-        if (!File.Exists(path))
+        var (_, tests) = await TriageGroupResolver.ResolveAsync(root, suite, group, byId, context, bucket =>
         {
-            throw new BaselineStoreException(BaselineCommandIO.ErrorTriageMissing,
-                $"No triage to resolve group {group} from: run 'spectra ai update-triage --suite {suite}' first.");
-        }
-
-        JsonElement detail;
-        try
-        {
-            using var document = JsonDocument.Parse(await File.ReadAllTextAsync(path, ct));
-            detail = document.RootElement.Clone();
-        }
-        catch (JsonException)
-        {
-            throw new BaselineStoreException(BaselineCommandIO.ErrorTriageMissing,
-                $"{UpdateTriageHandler.DetailFile} is not a triage result: run 'spectra ai update-triage --suite {suite}' again.");
-        }
-
-        if (detail.ValueKind != JsonValueKind.Object
-            || !detail.TryGetProperty("groups", out var groupsElement) || groupsElement.ValueKind != JsonValueKind.Array
-            || !detail.TryGetProperty("tests", out var testsElement) || testsElement.ValueKind != JsonValueKind.Array)
-        {
-            throw new BaselineStoreException(BaselineCommandIO.ErrorTriageMissing,
-                $"{UpdateTriageHandler.DetailFile} is not a triage result: run 'spectra ai update-triage --suite {suite}' again.");
-        }
-
-        var scope = detail.TryGetProperty("scope", out var s) ? s : default;
-        var covers = scope.ValueKind == JsonValueKind.Object
-            && ((scope.TryGetProperty("all_suites", out var all) && all.ValueKind == JsonValueKind.True)
-                || (scope.TryGetProperty("suite", out var only) && only.GetString() == suite));
-        if (!covers)
-        {
-            throw new BaselineStoreException(BaselineCommandIO.ErrorTriageMissing,
-                $"The last triage did not cover suite '{suite}': run 'spectra ai update-triage --suite {suite}' first.");
-        }
-
-        var match = groupsElement.EnumerateArray()
-            .FirstOrDefault(g => string.Equals(g.GetProperty("id").GetString(), group, StringComparison.OrdinalIgnoreCase));
-        if (match.ValueKind != JsonValueKind.Object)
-        {
-            throw new BaselineStoreException(BaselineCommandIO.ErrorGroupNotFound, $"Group {group} is not in the last triage.");
-        }
-
-        var groupSuite = match.GetProperty("suite").GetString();
-        if (groupSuite != suite)
-        {
-            throw new BaselineStoreException(BaselineCommandIO.ErrorGroupNotFound,
-                $"Group {group} is in suite '{groupSuite}', not '{suite}'.");
-        }
-
-        var bucket = match.GetProperty("bucket").GetString();
-        if (bucket == "RELINK")
-        {
-            // Spec 086 FR-014 (analysis C5).
-            throw new BaselineStoreException(BaselineCommandIO.ErrorRefRemoved,
-                $"Group {group} is RELINK: its doc files were renamed. {RelinkHint(suite)}");
-        }
-
-        if (bucket is "REMOVED" or "CRITERIA_REMOVED")
-        {
-            throw new BaselineStoreException(
-                bucket == "REMOVED" ? BaselineCommandIO.ErrorRefRemoved : BaselineCommandIO.ErrorCriterionRemoved,
-                $"Group {group} is {bucket}: fix or drop the removed ref/criterion in each test, then ack with --ids.");
-        }
-
-        var recorded = testsElement.EnumerateArray()
-            .Where(t => t.GetProperty("suite").GetString() == suite)
-            .ToDictionary(t => t.GetProperty("id").GetString()!, t => t.GetProperty("current"), StringComparer.Ordinal);
-
-        var targets = new List<TestCase>();
-        var stale = new List<string>();
-        foreach (var id in match.GetProperty("tests").EnumerateArray().Select(t => t.GetString()!))
-        {
-            if (!byId.TryGetValue(id, out var test) || !recorded.TryGetValue(id, out var current)
-                || !await MatchesAsync(test, current, context, ct))
+            if (bucket == "RELINK")
             {
-                stale.Add(id);
-                continue;
+                // Spec 086 FR-014 (analysis C5).
+                throw new BaselineStoreException(BaselineCommandIO.ErrorRefRemoved,
+                    $"Group {group} is RELINK: its doc files were renamed. {RelinkHint(suite)}");
             }
 
-            targets.Add(test);
-        }
-
-        if (stale.Count > 0)
-        {
-            throw new BaselineStoreException(BaselineCommandIO.ErrorTriageStale,
-                $"Group {group} changed since the last triage ({string.Join(", ", stale)}): run 'spectra ai update-triage --suite {suite}' again and review.");
-        }
-
-        return targets;
+            if (bucket is "REMOVED" or "CRITERIA_REMOVED")
+            {
+                throw new BaselineStoreException(
+                    bucket == "REMOVED" ? BaselineCommandIO.ErrorRefRemoved : BaselineCommandIO.ErrorCriterionRemoved,
+                    $"Group {group} is {bucket}: fix or drop the removed ref/criterion in each test, then ack with --ids.");
+            }
+        }, ct);
+        return tests;
     }
 
-    /// <summary>Whether the test's current refs and criteria (and their fingerprints) are what triage recorded.</summary>
-    private static async Task<bool> MatchesAsync(TestCase test, JsonElement recorded, BaselineContext context, CancellationToken ct)
-    {
-        var refs = new SortedDictionary<string, string?>(StringComparer.Ordinal);
-        foreach (var sourceRef in test.SourceRefs.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct(StringComparer.Ordinal))
-        {
-            refs[sourceRef] = (await context.GetSectionAsync(sourceRef, ct)).Current.Fingerprint;
-        }
-
-        var criteria = new SortedDictionary<string, string?>(StringComparer.Ordinal);
-        foreach (var id in test.Criteria.Where(c => !string.IsNullOrWhiteSpace(c)).Distinct(StringComparer.Ordinal))
-        {
-            criteria[id] = context.GetCriterion(id).Fingerprint;
-        }
-
-        return SameMap(refs, recorded.GetProperty("refs")) && SameMap(criteria, recorded.GetProperty("criteria"));
-    }
-
-    private static bool SameMap(SortedDictionary<string, string?> now, JsonElement recorded)
-    {
-        var then = recorded.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.ValueKind == JsonValueKind.Null ? null : p.Value.GetString());
-        return then.Count == now.Count && now.All(kv => then.TryGetValue(kv.Key, out var v) && v == kv.Value);
-    }
-
-    /// <summary>The recovery for a RELINK refusal.</summary>
     private static string RelinkHint(string suite) =>
         $"Run 'spectra ai relink-sources --suite {suite} --dry-run' to review, then without --dry-run, then triage again.";
 

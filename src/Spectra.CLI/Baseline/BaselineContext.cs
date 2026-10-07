@@ -22,6 +22,7 @@ public sealed class BaselineContext
     private readonly Dictionary<string, string?> _files = new(StringComparer.Ordinal);
     private readonly Dictionary<string, RefSection> _sections = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _criteria;
+    private readonly Dictionary<string, string> _criteriaText;
     private readonly Dictionary<string, string?> _snapshots = new(StringComparer.Ordinal);
     private readonly SortedSet<string> _notes = new(StringComparer.Ordinal);
     private RenameResolver? _renames;
@@ -29,11 +30,13 @@ public sealed class BaselineContext
     /// <summary>The missing reason of a ref whose file doesn't exist (the only one rename detection applies to).</summary>
     public const string NotFound = "not found";
 
-    private BaselineContext(string repoRoot, SourceRefResolver resolver, Dictionary<string, string> criteria)
+    private BaselineContext(
+        string repoRoot, SourceRefResolver resolver, Dictionary<string, string> criteria, Dictionary<string, string> criteriaText)
     {
         _repoRoot = repoRoot;
         _resolver = resolver;
         _criteria = criteria;
+        _criteriaText = criteriaText;
     }
 
     public string RepoRoot => _repoRoot;
@@ -48,10 +51,6 @@ public sealed class BaselineContext
     public RenameResolver CreateRenameResolver(int minSimilarity) =>
         minSimilarity == RenameResolver.DefaultMinSimilarity ? Renames : new RenameResolver(_resolver, minSimilarity);
 
-    /// <summary>
-    /// Spec 086: the relink candidate of <paramref name="sourceRef"/> when its file is missing (reason
-    /// <see cref="NotFound"/>), else null — a resolving ref, or one missing for another reason, is never relinked.
-    /// </summary>
     /// <summary>Adds a note to the run's notes (ordered, de-duplicated).</summary>
     public void AddNote(string note) => _notes.Add(note);
 
@@ -80,6 +79,10 @@ public sealed class BaselineContext
         return references.Select(r => RenameResolver.SubmoduleNote(r.Key, r.Value, testIds[r.Key].Count)).ToList();
     }
 
+    /// <summary>
+    /// Spec 086: the relink candidate of <paramref name="sourceRef"/> when its file is missing (reason
+    /// <see cref="NotFound"/>), else null — a resolving ref, or one missing for another reason, is never relinked.
+    /// </summary>
     public async Task<RelinkCandidate?> RelinkCandidateAsync(string sourceRef, RenameResolver renames, CancellationToken ct)
     {
         var section = await GetSectionAsync(sourceRef, ct);
@@ -101,15 +104,19 @@ public sealed class BaselineContext
             Path.GetFullPath(Path.Combine(repoRoot, string.IsNullOrWhiteSpace(criteriaDir) ? "docs/criteria" : criteriaDir)), ct);
 
         var criteria = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var criteriaText = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (_, list) in files)
         {
             foreach (var criterion in list.Where(c => !string.IsNullOrWhiteSpace(c.Id)))
             {
-                criteria.TryAdd(criterion.Id.Trim(), SourceFingerprint.OfCriterion(criterion.Text));
+                if (criteria.TryAdd(criterion.Id.Trim(), SourceFingerprint.OfCriterion(criterion.Text)))
+                {
+                    criteriaText[criterion.Id.Trim()] = criterion.Text;
+                }
             }
         }
 
-        var context = new BaselineContext(repoRoot, resolver, criteria);
+        var context = new BaselineContext(repoRoot, resolver, criteria, criteriaText);
         foreach (var duplicate in CriteriaDuplicateScanner.Scan(files))
         {
             context._notes.Add($"criterion {duplicate.Id} is defined more than once; the first was used");
@@ -169,6 +176,32 @@ public sealed class BaselineContext
         _sections[sourceRef] = result;
         return result;
     }
+
+    /// <summary>
+    /// Spec 088 (FR-001): the raw text of <paramref name="sourceRef"/>'s section as it is now — the 085 matcher over the
+    /// file; the whole file for an anchor-less ref — or null when the ref doesn't resolve or its anchor matches no
+    /// heading. Uses the same resolution and file cache as <see cref="GetSectionAsync"/>.
+    /// </summary>
+    public async Task<string?> GetRawSectionAsync(string sourceRef, CancellationToken ct)
+    {
+        var section = await GetSectionAsync(sourceRef, ct);
+        if (section.Current.Missing || section.FullPath is null)
+        {
+            return null;
+        }
+
+        var text = await ReadFileAsync(section.FullPath, ct);
+        if (text is null)
+        {
+            return null;
+        }
+
+        var lookup = SectionExtractor.Extract(text, SectionExtractor.AnchorOf(sourceRef));
+        return lookup.Outcome == SectionOutcome.AnchorNotFound ? null : lookup.RawText;
+    }
+
+    /// <summary>Spec 088 (FR-005): a criterion's current text (the first definition of the ID), or null when it doesn't exist.</summary>
+    public string? GetCriterionText(string id) => _criteriaText.TryGetValue(id.Trim(), out var text) ? text : null;
 
     /// <summary>The headings of a resolved document (empty when unreadable).</summary>
     public async Task<IReadOnlyList<MarkdownHeading>> GetHeadingsAsync(string fullPath, CancellationToken ct)

@@ -46,6 +46,15 @@ public sealed record IngestResult
     /// <summary>Specific, actionable messages. The retry payload for a skill.</summary>
     public IReadOnlyList<string> Errors { get; private init; } = [];
 
+    /// <summary>
+    /// Spec 088: the edit was identical to the original in every editable field, so nothing was written.
+    /// <see cref="IsSuccess"/> is true and <see cref="PersistedTests"/> is empty; <see cref="Original"/> is the test.
+    /// </summary>
+    public bool Unchanged { get; private init; }
+
+    /// <summary>Spec 088: the on-disk test an <see cref="Unchanged"/> edit left as it was.</summary>
+    public TestCase? Original { get; private init; }
+
     private IngestResult() { }
 
     /// <summary>Creates a successful result listing the persisted tests.</summary>
@@ -53,6 +62,14 @@ public sealed record IngestResult
     {
         IsSuccess = true,
         PersistedTests = persisted ?? []
+    };
+
+    /// <summary>Spec 088: the edit changed nothing; nothing was written.</summary>
+    public static IngestResult NoChange(TestCase original) => new()
+    {
+        IsSuccess = true,
+        Unchanged = true,
+        Original = original
     };
 
     /// <summary>Creates a fail-loud result. Persists nothing.</summary>

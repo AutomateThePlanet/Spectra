@@ -5,6 +5,12 @@ using Spectra.Core.Models;
 
 namespace Spectra.CLI.Generation;
 
+/// <summary>Spec 088: a compiled update prompt, or the refusal; <see cref="Warning"/> for an outdated custom template.</summary>
+public sealed record UpdatePromptResult(string? Prompt, string? Warning, string? RefusalCode, string? Message)
+{
+    public bool IsSuccess => Prompt is not null;
+}
+
 /// <summary>
 /// Spec 063: deterministic, model-free compiler for the inverted <b>update</b> seam. Mirrors
 /// <see cref="PromptCompiler"/> but assembles an <i>edit</i> prompt for ONE OUTDATED test rather
@@ -17,6 +23,59 @@ namespace Spectra.CLI.Generation;
 /// </summary>
 public static class UpdatePromptCompiler
 {
+    public const string ErrorTemplateOutdated = "TEMPLATE_OUTDATED";
+
+    /// <summary>The hint for a custom template written before Spec 088.</summary>
+    public const string ResetHint =
+        "The template .spectra/prompts/test-update.md has no {{tests}} / {{source_diff}} placeholders. "
+        + "Run 'spectra update-skills' (it refreshes a copy you never edited) or, for a customised copy, "
+        + "'spectra prompts reset test-update' (it replaces your changes).";
+
+    /// <summary>Spec 088 (FR-012): a user-customized template without both new placeholders.</summary>
+    public static bool IsOutdated(PromptTemplate template) =>
+        template.IsUserCustomized
+        && (!template.Body.Contains("{{tests}}", StringComparison.Ordinal)
+            || !template.Body.Contains("{{source_diff}}", StringComparison.Ordinal));
+
+    /// <summary>
+    /// Spec 088 (FR-008–FR-012): fills the <c>test-update</c> template from an <see cref="UpdateContext"/> — the
+    /// sections, the linked criteria and the tests. An outdated custom template still works for one test, through its
+    /// legacy placeholders (<c>test_case</c>, <c>current_source</c> = the rendered sections, <c>acceptance_criteria</c>),
+    /// with a warning; for a group it is refused (<see cref="ErrorTemplateOutdated"/>).
+    /// </summary>
+    public static UpdatePromptResult CompileContext(UpdateContext context, PromptTemplate template, string profileFormat, bool group)
+    {
+        var sourceDiff = UpdatePromptRenderer.SourceDiff(context).TrimEnd('\n');
+        var criteria = UpdatePromptRenderer.Criteria(context).TrimEnd('\n');
+        if (IsOutdated(template))
+        {
+            if (group || context.Tests.Count != 1)
+            {
+                return new UpdatePromptResult(null, null, ErrorTemplateOutdated, $"{ResetHint} A group prompt needs them.");
+            }
+
+            var legacy = new Dictionary<string, string>
+            {
+                ["test_case"] = SerializeTest(context.Tests[0].Test),
+                ["current_source"] = sourceDiff,
+                ["acceptance_criteria"] = criteria,
+                ["profile_format"] = profileFormat
+            };
+            return new UpdatePromptResult(PromptTemplateLoader.Resolve(template, legacy), ResetHint, null, null);
+        }
+
+        var values = new Dictionary<string, string>
+        {
+            ["source_diff"] = sourceDiff,
+            ["acceptance_criteria"] = criteria,
+            ["tests"] = UpdatePromptRenderer.Tests(context).TrimEnd('\n'),
+            ["profile_format"] = profileFormat,
+            ["test_case"] = "",
+            ["current_source"] = ""
+        };
+        return new UpdatePromptResult(PromptTemplateLoader.Resolve(template, values), null, null, null);
+    }
+
     /// <summary>
     /// Validated compilation. Returns <see cref="PromptCompileResult.MissingRequired"/> when a
     /// required input is missing: the original test, or any changed source/criteria context to
@@ -67,9 +126,12 @@ public static class UpdatePromptCompiler
         var jsonExample = profileFormat ?? ProfileFormatLoader.LoadFormat(Directory.GetCurrentDirectory());
         var serializedTest = SerializeTest(originalTest);
 
-        if (templateLoader is not null)
+        // Spec 088: the built-in template no longer has {{test_case}}; this legacy single-test path then uses the
+        // inline layout below.
+        var loaded = templateLoader?.LoadTemplate("test-update");
+        if (loaded is not null && loaded.Body.Contains("{{test_case}}", StringComparison.Ordinal))
         {
-            var template = templateLoader.LoadTemplate("test-update");
+            var template = loaded;
             var values = new Dictionary<string, string>
             {
                 ["test_case"] = serializedTest,

@@ -44,9 +44,11 @@ public class TestUpdateTemplateTests
     [Fact]
     public void Template_ReconcilesAgainstChangedSourceAndCriteria()
     {
+        // Spec 088: the sections (current, previous, what changed) and the tests come through source_diff / tests;
+        // test_case / current_source remain only as declared legacy placeholders for pre-088 custom templates.
         var body = Body();
-        Assert.Contains("{{test_case}}", body);
-        Assert.Contains("{{current_source}}", body);
+        Assert.Contains("{{source_diff}}", body);
+        Assert.Contains("{{tests}}", body);
         Assert.Contains("{{acceptance_criteria}}", body);
     }
 

@@ -223,6 +223,78 @@ public sealed class UpdatedTestIngestorTests : IDisposable
         Assert.Empty(result.PersistedTests);
     }
 
+    // ---------- Spec 088 FR-015: an edit that changes nothing ----------
+
+    [Fact]
+    public async Task Ingest_IdenticalEdit_IsUnchanged_NothingWritten()
+    {
+        var original = Original();
+        var content = EditJson(title: "Original title", steps: "original step", expected: "original result");
+
+        var result = await NewIngestor().IngestAsync(content, _testsPath, Suite, original, [original], default);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Unchanged);
+        Assert.Empty(result.PersistedTests);
+        Assert.Same(original, result.Original);
+        Assert.False(Directory.Exists(Path.Combine(_testsPath, Suite)), "nothing written");
+    }
+
+    [Fact]
+    public async Task Ingest_IdenticalEditWithReorderedTags_IsUnchanged()
+    {
+        var original = Original(tags: ["a", "b"]);
+        var content = EditJson(title: "Original title", tags: ["b", "a"], steps: "original step", expected: "original result");
+
+        var result = await NewIngestor().IngestAsync(content, _testsPath, Suite, original, [original], default);
+
+        Assert.True(result.Unchanged);
+    }
+
+    [Fact]
+    public async Task Ingest_DriftFailsBeforeTheUnchangedCheck()
+    {
+        var original = Original();
+        var content = EditJson(title: "Original title", priority: "low", steps: "original step", expected: "original result");
+
+        var result = await NewIngestor().IngestAsync(content, _testsPath, Suite, original, [original], default);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(UpdatedTestIngestor.DriftDetected, result.ErrorCode);
+    }
+
+    public static TheoryData<string, Func<TestCase, TestCase>, bool> UnchangedRows => new()
+    {
+        { "identical", t => t with { }, true },
+        { "trailing space in a step", t => t with { Steps = ["step one ", "step two"] }, true },
+        { "CRLF and a final newline", t => t with { ExpectedResult = "original result\r\n" }, true },
+        { "null vs empty preconditions", t => t with { Preconditions = "" }, true },
+        { "inner whitespace", t => t with { Steps = ["step  one", "step two"] }, false },
+        { "a word", t => t with { ExpectedResult = "original results" }, false },
+        { "a step added", t => t with { Steps = ["step one", "step two", "step three"] }, false },
+        { "steps reordered", t => t with { Steps = ["step two", "step one"] }, false },
+        { "a criterion added", t => t with { Criteria = ["AC-1"] }, false },
+        { "a source ref changed", t => t with { SourceRefs = ["docs/a.md"] }, false },
+    };
+
+    [Theory]
+    [MemberData(nameof(UnchangedRows))]
+    public void IsUnchanged_ComparesNormalisedEditableFields(string row, Func<TestCase, TestCase> edit, bool unchanged)
+    {
+        var original = Original() with { Steps = ["step one", "step two"] };
+
+        Assert.True(unchanged == UpdatedTestIngestor.IsUnchanged(original, edit(original)), row);
+    }
+
+    [Fact]
+    public void IsUnchanged_CrLineEndings_EqualLf()
+    {
+        var original = Original() with { Preconditions = "line one\nline two" };
+
+        Assert.True(UpdatedTestIngestor.IsUnchanged(original, original with { Preconditions = "line one\rline two" }));
+        Assert.True(UpdatedTestIngestor.IsUnchanged(original, original with { Preconditions = "line one  \r\nline two\n\n" }));
+    }
+
     [Fact]
     public async Task Ingest_SchemaInvalidEdit_FailsLoud()
     {
