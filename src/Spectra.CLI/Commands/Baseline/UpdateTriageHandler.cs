@@ -165,6 +165,7 @@ public static class UpdateTriageHandler
     {
         var json = new Dictionary<string, object?> { ["ref"] = item.Key, ["state"] = item.State };
         if (item.Target is not null) json["target"] = item.Target;
+        if (item.Submodule) json["submodule"] = true;
         return json;
     }
 

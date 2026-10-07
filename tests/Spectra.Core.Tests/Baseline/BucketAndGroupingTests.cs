@@ -143,6 +143,20 @@ public class BucketAndGroupingTests
     }
 
     [Fact]
+    public void SubmoduleGroups_AreNotChunked_OtherGroupsAre()
+    {
+        // Spec 087 F1 (FR-003): one group per suite and submodule that isn't checked out, whatever the group size.
+        var submodule = new ChangedItem(false, "docs/sub", "REMOVED", Submodule: true);
+        var verdicts = Enumerable.Range(1, 5).Select(i => V("s", $"TC-{i}", Bucket.Removed, "not found; submodule not checked out", submodule))
+            .Concat(Enumerable.Range(6, 5).Select(i => V("s", $"TC-{i}", Bucket.Load, "w", QuotasLoad)));
+
+        var groups = TriageGrouper.Group(verdicts, 2);
+
+        Assert.Equal([5, 2, 2, 1], groups.Select(g => g.Tests.Count));
+        Assert.Equal("submodule:docs/sub=REMOVED", groups[0].Items[0].Signature);
+    }
+
+    [Fact]
     public void CosmeticAndUnchanged_FormNoGroups()
     {
         var cosmetic = new ChangedItem(false, "docs/s.md#Quotas", "COSMETIC");

@@ -22,11 +22,15 @@ public sealed class RenameHistory
 
     private readonly Dictionary<string, SortedSet<string>> _targets = new(StringComparer.Ordinal);
 
-    public RenameHistory(IReadOnlyList<GitRename> renames, int minSimilarity, bool shallow)
+    // Spec 087 (F4): git's exact old paths, grouped by the platform comparer (ignoring case on Windows and macOS).
+    private readonly Dictionary<string, SortedSet<string>> _oldPaths;
+
+    public RenameHistory(IReadOnlyList<GitRename> renames, int minSimilarity, bool shallow, StringComparer? comparer = null)
     {
         Renames = renames;
         MinSimilarity = minSimilarity;
         Shallow = shallow;
+        _oldPaths = new Dictionary<string, SortedSet<string>>(comparer ?? GitPathComparer.Platform);
         foreach (var rename in renames)
         {
             if (!_targets.TryGetValue(rename.Old, out var set))
@@ -35,6 +39,12 @@ public sealed class RenameHistory
             }
 
             set.Add(rename.New);
+            if (!_oldPaths.TryGetValue(rename.Old, out var exact))
+            {
+                _oldPaths[rename.Old] = exact = new SortedSet<string>(StringComparer.Ordinal);
+            }
+
+            exact.Add(rename.Old);
         }
     }
 
@@ -57,20 +67,22 @@ public sealed class RenameHistory
     /// </summary>
     public (string? Target, string? Reason) ForwardCandidate(string path, Func<string, bool> exists)
     {
-        if (!_targets.ContainsKey(path))
+        var (start, ambiguous) = Resolve(path);
+        if (ambiguous)
+        {
+            return (null, Ambiguous);
+        }
+
+        if (start is null)
         {
             return (null, NoRenameReason);
         }
 
-        var visited = new HashSet<string>(StringComparer.Ordinal) { path };
-        var current = path;
+        var visited = new HashSet<string>(StringComparer.Ordinal) { start };
+        var current = start;
         for (var step = 0; step < MaxChain; step++)
         {
-            if (!_targets.TryGetValue(current, out var targets))
-            {
-                return (null, ChainEndsMissing);
-            }
-
+            var targets = _targets[current];
             if (targets.Count > 1)
             {
                 return (null, Ambiguous);
@@ -87,28 +99,61 @@ public sealed class RenameHistory
                 return (null, ChainEndsMissing);
             }
 
-            current = next;
+            var (key, nextAmbiguous) = Resolve(next);
+            if (nextAmbiguous)
+            {
+                return (null, Ambiguous);
+            }
+
+            if (key is null)
+            {
+                return (null, ChainEndsMissing);
+            }
+
+            current = key;
         }
 
         return (null, ChainEndsMissing);
     }
 
     /// <summary>
-    /// The path a file had before <paramref name="renamesSincePoint"/> (newest first), given its path now: each
-    /// rename whose new path is the current one is undone, newest to oldest.
+    /// Spec 087 (F4, FR-012): git's exact old path matching <paramref name="path"/> under the comparer — none, exactly
+    /// one (git's casing), or ambiguous (two or more distinct paths that differ only in case).
     /// </summary>
-    public static string PathAt(IEnumerable<GitRename> renamesSincePoint, string currentPath)
+    private (string? Key, bool Ambiguous) Resolve(string path) =>
+        _oldPaths.TryGetValue(path, out var exact)
+            ? exact.Count == 1 ? (exact.Min, false) : (null, true)
+            : (null, false);
+
+    /// <summary>
+    /// The path a file had before <paramref name="renamesSincePoint"/> (newest first), given its path now: each
+    /// rename whose new path is the current one is undone, newest to oldest. Spec 087 (F4, FR-013): paths compare with
+    /// <paramref name="comparer"/> (default: ignoring case on Windows and macOS); two or more distinct new paths that
+    /// match the current one only ignoring case are <see cref="Ambiguous"/>.
+    /// </summary>
+    public static (string? Path, string? Reason) PathAt(
+        IEnumerable<GitRename> renamesSincePoint, string currentPath, StringComparer? comparer = null)
     {
+        comparer ??= GitPathComparer.Platform;
+        var renames = renamesSincePoint.ToList();
         var path = currentPath;
-        foreach (var rename in renamesSincePoint)
+        foreach (var rename in renames)
         {
-            if (string.Equals(rename.New, path, StringComparison.Ordinal))
+            if (!comparer.Equals(rename.New, path))
             {
-                path = rename.Old;
+                continue;
             }
+
+            var matches = renames.Where(r => comparer.Equals(r.New, path)).Select(r => r.New).Distinct(StringComparer.Ordinal).Count();
+            if (matches > 1)
+            {
+                return (null, Ambiguous);
+            }
+
+            path = rename.Old;
         }
 
-        return path;
+        return (path, null);
     }
 
     /// <summary>

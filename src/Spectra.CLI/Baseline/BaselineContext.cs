@@ -52,6 +52,34 @@ public sealed class BaselineContext
     /// Spec 086: the relink candidate of <paramref name="sourceRef"/> when its file is missing (reason
     /// <see cref="NotFound"/>), else null — a resolving ref, or one missing for another reason, is never relinked.
     /// </summary>
+    /// <summary>Adds a note to the run's notes (ordered, de-duplicated).</summary>
+    public void AddNote(string note) => _notes.Add(note);
+
+    /// <summary>
+    /// Spec 087 (F1, FR-004a): one line per submodule that isn't checked out, counting every missing ref of
+    /// <paramref name="tests"/> that points into it — (test, ref) pairs, baselined or not — and the distinct tests.
+    /// Ordered by submodule path.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> SubmoduleNotesAsync(IEnumerable<Spectra.Core.Models.TestCase> tests, CancellationToken ct)
+    {
+        var references = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        var testIds = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        foreach (var test in tests)
+        {
+            foreach (var sourceRef in test.SourceRefs.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct(StringComparer.Ordinal))
+            {
+                if (await RelinkCandidateAsync(sourceRef, Renames, ct) is { Submodule: { } submodule })
+                {
+                    references[submodule] = references.GetValueOrDefault(submodule) + 1;
+                    if (!testIds.TryGetValue(submodule, out var ids)) testIds[submodule] = ids = new HashSet<string>(StringComparer.Ordinal);
+                    ids.Add(test.Id);
+                }
+            }
+        }
+
+        return references.Select(r => RenameResolver.SubmoduleNote(r.Key, r.Value, testIds[r.Key].Count)).ToList();
+    }
+
     public async Task<RelinkCandidate?> RelinkCandidateAsync(string sourceRef, RenameResolver renames, CancellationToken ct)
     {
         var section = await GetSectionAsync(sourceRef, ct);

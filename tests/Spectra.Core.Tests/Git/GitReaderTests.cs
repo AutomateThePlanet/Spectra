@@ -38,6 +38,11 @@ public class GitReaderTests
         Assert.Equal("0", call.Env["GIT_TERMINAL_PROMPT"]);
     }
 
+    [Fact]
+    public void TheAllowedSubcommands_AreExactlyTheFiveReadOnlyOnes() =>
+        // Spec 087 T6 (FR-019): the review fixes add no git subcommand (submodules are read with ls-files).
+        Assert.Equal(new[] { "cat-file", "log", "ls-files", "rev-parse", "show" }, GitReader.AllowedSubcommands.OrderBy(s => s, StringComparer.Ordinal));
+
     [Theory]
     [InlineData("status")]
     [InlineData("add")]

@@ -523,6 +523,45 @@ public class SkillsManifestTests : IDisposable
         Assert.Contains("between 50 and 100", step);
     }
 
+    // ---- Spec 087 F1 (FR-005): a submodule that isn't checked out is a setup problem ----
+
+    [Fact]
+    public void UpdateSkill_SubmoduleNotCheckedOut_IsSetup_NotReview()
+    {
+        var step = Section(SkillContent.Update, "**Step 3**", "**Step 4**").Replace("\r\n", "\n");
+        var paragraph = step.Split("\n\n").Single(p => p.Contains("not found; submodule not checked out", StringComparison.Ordinal));
+
+        Assert.Contains("git submodule update --init", paragraph);
+        Assert.Contains("re-run triage", paragraph);
+        Assert.Contains("not list", paragraph); // those tests are not listed for review
+        Assert.DoesNotContain("spectra-delete", paragraph);
+        Assert.DoesNotContain("spectra delete", paragraph);
+    }
+
+    [Fact]
+    public void UpdateSkill_NeverRunsGitSubmodule_TheUserDoes()
+    {
+        // Analysis I1: fenced blocks are commands the assistant runs; the git command is inline prose only.
+        var fences = System.Text.RegularExpressions.Regex.Matches(SkillContent.Update.Replace("\r\n", "\n"), "```[a-z]*\\n(.*?)```",
+            System.Text.RegularExpressions.RegexOptions.Singleline);
+
+        Assert.NotEmpty(fences);
+        Assert.All(fences, f => Assert.DoesNotContain("git submodule", f.Groups[1].Value));
+    }
+
+    [Fact]
+    public void UpdateSkill_WithholdsInit_WhileTheSubmoduleNoteIsPresent()
+    {
+        // Analysis U1: the first-time setup names the note and tells the user to initialise the submodule first.
+        var content = SkillContent.Update.Replace("\r\n", "\n");
+        var paragraph = content.Split("\n\n").Single(p => p.Contains("point into submodule", StringComparison.Ordinal));
+
+        Assert.Contains("source-baseline --init", paragraph);
+        Assert.Contains("don't offer", paragraph);
+        Assert.Contains("git submodule update --init", paragraph);
+        Assert.Contains("re-run triage", paragraph);
+    }
+
     [Fact]
     public void UpdateSkill_FirstTimeSetup_RelinksBeforeInit_ThenOffersFromDate()
     {

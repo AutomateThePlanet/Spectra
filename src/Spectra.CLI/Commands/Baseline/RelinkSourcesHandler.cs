@@ -33,10 +33,9 @@ public static class RelinkSourcesHandler
                 "Give exactly one of --suite <name> and --all-suites.");
         }
 
-        if (minSimilarity is < 50 or > 100)
+        if (BaselineCommandIO.ValidateMinSimilarity(minSimilarity) is { } invalid)
         {
-            return BaselineCommandIO.Fail(json, Command, BaselineCommandIO.ErrorInvalidArguments,
-                $"--min-similarity must be between 50 and 100 (got {minSimilarity}).");
+            return BaselineCommandIO.Fail(json, Command, BaselineCommandIO.ErrorInvalidArguments, invalid);
         }
 
         var loaded = await BaselineCommandIO.LoadConfigAsync(root, ct);

@@ -29,11 +29,7 @@ public sealed class GitReader
         new HashSet<string>(StringComparer.Ordinal) { "rev-parse", "log", "show", "ls-files", "cat-file" };
 
     /// <summary>Set on every call: git takes no optional locks (no <c>index.lock</c>) and never prompts.</summary>
-    public static readonly IReadOnlyDictionary<string, string> Environment = new Dictionary<string, string>(StringComparer.Ordinal)
-    {
-        ["GIT_OPTIONAL_LOCKS"] = "0",
-        ["GIT_TERMINAL_PROMPT"] = "0"
-    };
+    public static readonly IReadOnlyDictionary<string, string> Environment = GitEnvironment.Settings;
 
     private readonly IGitProcessRunner _runner;
 

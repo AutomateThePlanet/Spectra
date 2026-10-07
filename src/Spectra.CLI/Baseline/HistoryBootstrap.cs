@@ -26,13 +26,16 @@ public sealed class HistoryBootstrap
     private readonly GitOwner? _pinnedOwner;
     private readonly string? _pinnedCommit;
     private readonly Dictionary<string, (string? Commit, string? Reason)> _points = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, IReadOnlyList<GitRename>> _renamesSince = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (IReadOnlyList<GitRename> Renames, string? Reason)> _renamesSince = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HistoricRef> _results = new(StringComparer.Ordinal);
+
+    private readonly int _minSimilarity;
 
     private HistoryBootstrap(
         BaselineContext context, SourceRefResolver refs, OwnerResolver owners, DateTimeOffset? date, GitOwner? pinnedOwner,
-        string? pinnedCommit)
+        string? pinnedCommit, int minSimilarity)
     {
+        _minSimilarity = minSimilarity;
         _context = context;
         _refs = refs;
         _owners = owners;
@@ -45,8 +48,9 @@ public sealed class HistoryBootstrap
     public SortedSet<string> CurrentContentDocs { get; } = new(StringComparer.Ordinal);
 
     /// <summary>Bootstrap from each owner's last commit at or before <paramref name="date"/>.</summary>
-    public static HistoryBootstrap FromDate(BaselineContext context, SourceRefResolver refs, DateTimeOffset date) =>
-        new(context, refs, GitAccess.CreateOwnerResolver(), date, null, null);
+    public static HistoryBootstrap FromDate(
+        BaselineContext context, SourceRefResolver refs, DateTimeOffset date, int minSimilarity = RenameResolver.DefaultMinSimilarity) =>
+        new(context, refs, GitAccess.CreateOwnerResolver(), date, null, null, minSimilarity);
 
     /// <summary>
     /// Bootstrap with the repository containing <paramref name="ownerPath"/> pinned to <paramref name="rev"/>. Throws
@@ -54,7 +58,7 @@ public sealed class HistoryBootstrap
     /// repository or the revision doesn't resolve in it.
     /// </summary>
     public static async Task<HistoryBootstrap> FromRefAsync(
-        BaselineContext context, SourceRefResolver refs, string ownerPath, string rev, CancellationToken ct)
+        BaselineContext context, SourceRefResolver refs, string ownerPath, string rev, int minSimilarity, CancellationToken ct)
     {
         var owners = GitAccess.CreateOwnerResolver();
         var full = Path.GetFullPath(Path.Combine(refs.RepoRoot, ownerPath));
@@ -77,7 +81,7 @@ public sealed class HistoryBootstrap
                 $"--from-ref {rev} does not name a commit in {BaselineStore.Relative(refs.RepoRoot, owner.Root)}.");
         }
 
-        return new HistoryBootstrap(context, refs, owners, null, owner, commit);
+        return new HistoryBootstrap(context, refs, owners, null, owner, commit, minSimilarity);
     }
 
     /// <summary>
@@ -156,6 +160,15 @@ public sealed class HistoryBootstrap
         foreach (var location in locations)
         {
             var (owner, _) = await _owners.OwnerOfAsync(location.FullPath, ct);
+
+            // Spec 087 (F1): a missing ref into a submodule that isn't checked out is left unbaselined with that reason.
+            if (section.Current.Missing && owner is not null
+                && await _owners.UncheckedSubmoduleOfAsync(owner, location.FullPath, ct) is { } submodule)
+            {
+                var submodulePath = Path.GetRelativePath(_refs.RepoRoot, Path.Combine(owner.Root, submodule)).Replace('\\', '/');
+                return new Located(new HistoricRef(sourceRef, null, null, RenameResolver.SubmoduleReason(submodulePath), false), null, null, null);
+            }
+
             var point = owner is null ? (null, null) : await PointAsync(owner, ct);
             if (owner is null || point.Commit is null)
             {
@@ -167,8 +180,19 @@ public sealed class HistoryBootstrap
                 continue; // no repository, or not the pinned owner: try the next location, else current content
             }
 
-            var since = await RenamesSinceAsync(owner, point.Commit, ct);
-            var path = RenameHistory.PathAt(since, OwnerResolver.RelativePath(owner, location.FullPath));
+            var (since, historyReason) = await RenamesSinceAsync(owner, point.Commit, ct);
+            if (historyReason is not null)
+            {
+                // Spec 087 (F5, FR-016): a failed history read is never read as "no renames".
+                return new Located(new HistoricRef(sourceRef, null, null, $"git history unavailable: {historyReason}", false), null, null, null);
+            }
+
+            var (path, pathReason) = RenameHistory.PathAt(since, OwnerResolver.RelativePath(owner, location.FullPath));
+            if (path is null)
+            {
+                return new Located(new HistoricRef(sourceRef, null, null, pathReason, false), null, null, null);
+            }
+
             return new Located(null, owner, point.Commit, path);
         }
 
@@ -209,17 +233,18 @@ public sealed class HistoryBootstrap
         return point;
     }
 
-    private async Task<IReadOnlyList<GitRename>> RenamesSinceAsync(GitOwner owner, string commit, CancellationToken ct)
+    /// <summary>The renames since the point (newest first) at the chosen threshold, or why they couldn't be read.</summary>
+    private async Task<(IReadOnlyList<GitRename> Renames, string? Reason)> RenamesSinceAsync(GitOwner owner, string commit, CancellationToken ct)
     {
-        if (!_renamesSince.TryGetValue(owner.Root, out var renames))
+        if (!_renamesSince.TryGetValue(owner.Root, out var since))
         {
             var result = await _owners.Reader.RunAsync(owner.Root, "log",
-                ["-l0", "-M90%", "--diff-filter=R", "--name-status", "-z", "--format=%x1e%H", $"{commit}..HEAD"], null, ct);
-            renames = result.Ok ? RenameHistory.Parse(result.Stdout) : [];
-            _renamesSince[owner.Root] = renames;
+                ["-l0", $"-M{_minSimilarity}%", "--diff-filter=R", "--name-status", "-z", "--format=%x1e%H", $"{commit}..HEAD"], null, ct);
+            since = result.Ok ? (RenameHistory.Parse(result.Stdout), null) : ([], result.Unavailable);
+            _renamesSince[owner.Root] = since;
         }
 
-        return renames;
+        return since;
     }
 
     /// <summary>One <c>cat-file --batch</c> for every request: each blob's text, or null when it didn't exist.</summary>

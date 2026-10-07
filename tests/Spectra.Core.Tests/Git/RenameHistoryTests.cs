@@ -83,8 +83,8 @@ public class RenameHistoryTests
         // a → b (older), then b → c (newer): the file now at c was a before both.
         var since = new[] { new GitRename("2", 2, "b.md", "c.md", 100), new GitRename("1", 1, "a.md", "b.md", 100) };
 
-        Assert.Equal("a.md", RenameHistory.PathAt(since, "c.md"));
-        Assert.Equal("b.md", RenameHistory.PathAt(since.Take(1), "c.md"));
-        Assert.Equal("z.md", RenameHistory.PathAt(since, "z.md"));
+        Assert.Equal(("a.md", (string?)null), RenameHistory.PathAt(since, "c.md"));
+        Assert.Equal(("b.md", (string?)null), RenameHistory.PathAt(since.Take(1), "c.md"));
+        Assert.Equal(("z.md", (string?)null), RenameHistory.PathAt(since, "z.md"));
     }
 }
