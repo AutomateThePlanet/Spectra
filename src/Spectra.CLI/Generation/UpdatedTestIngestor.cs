@@ -30,6 +30,14 @@ public sealed class UpdatedTestIngestor
     /// <summary>The drift-guard failure class. Maps to the content-invalid exit class (5).</summary>
     public const string DriftDetected = "DRIFT_DETECTED";
 
+    /// <summary>Spec 089 (F2): the edit holds more than one test object. Content-invalid exit class (5).</summary>
+    public const string MultipleTests = "MULTIPLE_TESTS";
+
+    /// <summary>Spec 089 (F2): names the count and every object's id (<c>(no id)</c> when it has none).</summary>
+    public static string MultipleTestsMessage(IReadOnlyList<string?> ids) =>
+        $"The edit holds {ids.Count} test objects ({string.Join(", ", ids.Select(id => id ?? "(no id)"))}); "
+        + "a staged file holds exactly one test.";
+
     private readonly TestPersistenceService _persistence;
     private readonly TestValidator _validator;
 
@@ -63,6 +71,11 @@ public sealed class UpdatedTestIngestor
         ArgumentException.ThrowIfNullOrWhiteSpace(suite);
         ArgumentNullException.ThrowIfNull(originalTest);
         ArgumentNullException.ThrowIfNull(existingTests);
+
+        // Spec 089 (F2): one test per edit. Counted before validation, so an array with a second (even invalid) object
+        // never slips through as "one test".
+        if (GeneratedTestIngestor.ArrayObjects(content) is { Count: > 1 } objects)
+            return IngestResult.Failure(MultipleTests, MultipleTestsMessage(objects));
 
         // 1. Reuse the generation parse/validate pipeline verbatim (fail-loud on any defect).
         var parsed = GeneratedTestIngestor.ParseAndValidate(content, _validator);

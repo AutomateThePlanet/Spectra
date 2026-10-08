@@ -81,6 +81,11 @@ public sealed class UpdateSkillsHandler
         // Save updated manifest
         await manifestStore.SaveAsync(manifest, ct);
 
+        // Spec 089 (F6, FR-022a): existing workspaces get init's gitignore entries here (plain init refuses on them).
+        var gitIgnorePath = Path.Combine(currentDir, ".gitignore");
+        var added = await Init.SpectraGitIgnore.EnsureAsync(currentDir, ct);
+        (added.Count > 0 ? updated : unchanged).Add(gitIgnorePath);
+
         // Report results
         if (updated.Count > 0)
         {

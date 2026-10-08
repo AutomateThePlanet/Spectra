@@ -68,6 +68,8 @@ public static class UpdatePromptRenderer
             {
                 LinkedCriterionState.Removed => $"- {criterion.Id} (removed)\n",
                 LinkedCriterionState.ChangedSinceBaseline => $"- {criterion.Id} (changed since baseline): {OneLine(criterion.Text)}\n",
+                LinkedCriterionState.NotBaselined =>
+                    $"- {criterion.Id} (not baselined — compare the test with the current text): {OneLine(criterion.Text)}\n",
                 _ => $"- {criterion.Id}: {OneLine(criterion.Text)}\n"
             });
         }

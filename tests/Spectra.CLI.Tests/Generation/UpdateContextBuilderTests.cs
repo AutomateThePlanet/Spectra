@@ -174,14 +174,35 @@ public sealed class UpdateContextBuilderTests : IDisposable
     }
 
     [Fact]
-    public async Task Criteria_NeverBaselined_IsUnmarked_NoneLinked_IsEmpty()
+    public async Task Criteria_NeverBaselined_IsNotBaselined_NoneLinked_IsEmpty()
     {
+        // Spec 089 (F4): was Unchanged on 088 — a criterion with nothing to compare against is NotBaselined.
         _ws.WriteTest("storage", "TC-101", ["docs/storage.md#Quotas"]);
         _ws.WriteTest("storage", "TC-102", ["docs/storage.md#Quotas"], ["AC-2"]); // no baseline: AC-2 never baselined
 
         Assert.Empty((await BuildAsync("TC-101")).Criteria);
         var criterion = Assert.Single((await BuildAsync("TC-102")).Criteria);
-        Assert.Equal(LinkedCriterionState.Unchanged, criterion.State);
+        Assert.Equal(LinkedCriterionState.NotBaselined, criterion.State);
+    }
+
+    [Fact]
+    public async Task Criteria_AnEntryWithoutTheCriterion_IsNotBaselined_AndOutranksUnchangedAcrossTests()
+    {
+        // Spec 089 (F4): TC-101 baselined with AC-1; TC-102 baselined without it, then linked.
+        _ws.WriteTest("storage", "TC-101", ["docs/storage.md#Quotas"], ["AC-1"]);
+        _ws.WriteTest("storage", "TC-102", ["docs/storage.md#Quotas"]);
+        await _ws.InitBaselineAsync();
+        _ws.WriteTest("storage", "TC-102", ["docs/storage.md#Quotas"], ["AC-1"]);
+
+        Assert.Equal(LinkedCriterionState.Unchanged, Assert.Single((await BuildAsync("TC-101")).Criteria).State);
+        Assert.Equal(LinkedCriterionState.NotBaselined, Assert.Single((await BuildAsync("TC-102")).Criteria).State);
+        Assert.Equal(LinkedCriterionState.NotBaselined, Assert.Single((await BuildAsync("TC-101", "TC-102")).Criteria).State);
+
+        _ws.WriteCriteria("storage.criteria.yaml",
+            ("AC-1", "Each user MUST get 45GB"), ("AC-2", "Files MAY be shared by link"), ("AC-OTHER", "Unrelated rule"));
+
+        Assert.Equal(LinkedCriterionState.ChangedSinceBaseline,
+            Assert.Single((await BuildAsync("TC-101", "TC-102")).Criteria).State);
     }
 
     [Fact]

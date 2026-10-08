@@ -141,6 +141,22 @@ public sealed class GeneratedTestIngestor
         return order.Select(id => byId[id]).ToList();
     }
 
+    /// <summary>
+    /// Spec 089 (F2): the <c>id</c> of each object in the content's JSON array, found the way
+    /// <see cref="ParseAndValidate"/> finds the array; null for an object without a string id. Counts objects, not valid
+    /// tests. Returns null when the content holds no parseable array (the regular codes then apply).
+    /// </summary>
+    public static IReadOnlyList<string?>? ArrayObjects(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content) || !TryParseArray(ExtractJson(content), out var array))
+            return null;
+
+        return array.Value.EnumerateArray()
+            .Where(e => e.ValueKind == JsonValueKind.Object)
+            .Select(e => e.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String ? id.GetString() : null)
+            .ToList();
+    }
+
     // --- Relocated parse pipeline (Spec 053). No TryRepairTruncatedArray. ---
 
     private static string ExtractJson(string response)

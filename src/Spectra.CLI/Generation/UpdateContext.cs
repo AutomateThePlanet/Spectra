@@ -14,10 +14,16 @@ public enum SectionState
     Relink
 }
 
-/// <summary>Spec 088: a linked criterion's state in the update prompt.</summary>
+/// <summary>
+/// Spec 088: a linked criterion's state in the update prompt. Declared in precedence order: across a group, a criterion
+/// takes the highest state any linking test gives it (Spec 089 F4).
+/// </summary>
 public enum LinkedCriterionState
 {
     Unchanged,
+
+    /// <summary>Spec 089 (F4): no baseline value to compare with — no entry, or the entry lacks the criterion.</summary>
+    NotBaselined,
     ChangedSinceBaseline,
     Removed
 }
@@ -76,7 +82,7 @@ public static class UpdateContextBuilder
         var sectionTests = new List<List<string>>();
         var testSections = new List<List<string>>();
         var criterionIds = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
-        var criterionChanged = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var criterionStates = new Dictionary<string, LinkedCriterionState>(StringComparer.OrdinalIgnoreCase);
         var testCriteria = new List<List<string>>();
 
         foreach (var test in ordered)
@@ -113,10 +119,15 @@ public static class UpdateContextBuilder
 
                 linked.Add(id);
                 criterionIds.Add(id);
+                // Spec 089 (F4): this test's view of the criterion; across tests the highest state wins.
                 var (exists, current) = context.GetCriterion(id);
-                if (exists && entry is not null && entry.Criteria.TryGetValue(id, out var was) && !string.Equals(was, current, StringComparison.Ordinal))
+                var state = !exists ? LinkedCriterionState.Removed
+                    : entry is null || !entry.Criteria.TryGetValue(id, out var was) ? LinkedCriterionState.NotBaselined
+                    : string.Equals(was, current, StringComparison.Ordinal) ? LinkedCriterionState.Unchanged
+                    : LinkedCriterionState.ChangedSinceBaseline;
+                if (!criterionStates.TryGetValue(id, out var seen) || state > seen)
                 {
-                    criterionChanged.Add(id);
+                    criterionStates[id] = state;
                 }
             }
 
@@ -129,14 +140,10 @@ public static class UpdateContextBuilder
             sections.Add(await DescribeAsync(Label(i), keys[i].Ref, keys[i].Fingerprint, sectionTests[i], context, lightThreshold, ct));
         }
 
-        var criteria = criterionIds.Select(id =>
-        {
-            var (exists, _) = context.GetCriterion(id);
-            return !exists
+        var criteria = criterionIds.Select(id => criterionStates[id] == LinkedCriterionState.Removed
                 ? new CriterionBlock(id, null, LinkedCriterionState.Removed)
-                : new CriterionBlock(id, context.GetCriterionText(id),
-                    criterionChanged.Contains(id) ? LinkedCriterionState.ChangedSinceBaseline : LinkedCriterionState.Unchanged);
-        }).ToList();
+                : new CriterionBlock(id, context.GetCriterionText(id), criterionStates[id]))
+            .ToList();
 
         var blocks = new List<TestBlock>(ordered.Count);
         var nothing = new List<string>();

@@ -86,7 +86,7 @@ spectra ai source-baseline --init (--suite X | --all-suites) [--force] [--dry-ru
 spectra ai source-baseline --init (--suite X | --all-suites) (--from-date ISO | --from-ref REV --owner PATH) [--min-similarity 50-100] [--dry-run]  # Spec 086/087: from history
 spectra ai relink-sources (--suite X | --all-suites) [--min-similarity 50-100] [--dry-run]  # Spec 086: renamed docs (git, read-only)
 spectra ai compile-update-prompt --suite X (--test-id ID | --group G2)  # Spec 088: edit prompt (sections, linked criteria)
-spectra ai ingest-update X (--all | --test-id ID [--from FILE]) [--keep-baseline]  # Spec 088: unchanged = reviewed; --all deletes consumed staging
+spectra ai ingest-update X (--all | --test-id ID [--from FILE]) [--keep-baseline]  # Spec 088/089: --all reads .spectra/updates/X/, --all --keep-baseline reads .spectra/repairs/X/; unchanged_pending; exit 8 = a staged file failed
 spectra ai update [suite] [--diff] [--dry-run] [--no-interaction] [--no-review]  # LEGACY word-overlap classifier
 
 # Dashboard
@@ -155,6 +155,15 @@ system-under-test is unrelated to SPECTRA's removed execution adapter.
 - File-based (Markdown/YAML/JSON in `test-cases/`, `docs/_index/`, `docs/criteria/`, `_index.json`, `_manifest.yaml`, `_checksums.json`, `_criteria_index.yaml`) (045-doc-index-restructure)
 
 ## Recent Changes
+- **089-review-fixes-088 (v2.6.0, unreleased)**: Review fixes for 088; no features; no format change (one prompt label); each fix has a test that fails on `6ea7520`.
+  - **F1:** `IngestUpdateCommand.StagingFolder(mode)` — `--all` reads `.spectra/updates/<s>/updated-*`, `--all --keep-baseline` reads `.spectra/repairs/<s>/repaired-*`; `spectra-generate` 8b stages repairs there.
+  - **F2:** `GeneratedTestIngestor.ArrayObjects` (ids of the array's objects, counted before validation); `UpdatedTestIngestor.MultipleTests` (`MULTIPLE_TESTS`, exit 5 / per-file `failed`, also ahead of `ID_MISMATCH`).
+  - **F3:** `Baseline/PendingChangeCheck` (`TriageEngine.TriageTestAsync`, `cosmeticAcked: false`, threshold `update.light_threshold_words`; `NeedsEdit` = LOAD/CRITERIA_CHANGED/REMOVED/CRITERIA_REMOVED/RELINK) → outcome `unchanged_pending` (nothing recorded, file consumed, `bucket`/`why`), Rebuild mode only; single-form JSON gains `outcome`; batch JSON gains `unchanged_pending`. Skill asks acknowledge/edit-again for LOAD/CRITERIA_CHANGED only.
+  - **F4:** `LinkedCriterionState.NotBaselined` (enum in precedence order; group = strongest) → `(not baselined — compare the test with the current text)`.
+  - **F5:** `--all` exits 8 (`ExitStagedFailures`) when any staged file failed; both skills retry on 8 (the repair retry is the same repair attempt).
+  - **F6:** `Commands/Init/SpectraGitIgnore` (`Patterns` + `.spectra/updates/`, `.spectra/repairs/`; `EnsureAsync`) shared by `init` and `update-skills`.
+  - **Tests:** StagingFolderSplitTests, MultipleTestsTests, UnchangedPendingTests, CompileUpdatePromptCriterionLabelTests, IngestUpdateExitCodeTests, StagingGitIgnoreTests (+ rows in UpdateContextBuilderTests, UpdatedTestIngestorTests, SkillsManifestTests); 11 deliberate 088 assertion changes (tasks.md Notes).
+  - Core 1219 / CLI 1928 (1 pre-existing unrelated failure: ProfileFormatLoaderTests) / Execution 228 / Integration 8.
 - **088-update-prompt-context (v2.6.0, unreleased)**: Phase 3 — the update edit prompt carries what the model needs; model-free.
   - **Context:** `Generation/UpdateContext.cs` (`UpdateContextBuilder.BuildAsync(tests, baseline, BaselineContext, lightThreshold)` → `SectionBlock`s keyed by (ref, baseline fp), labelled `S1…` in order of first appearance; states `Changed` (bucket via `ChangeClassifier.ClassifyRef`, `why`, `Diff`), `Unchanged`, `NotBaselined`, `Removed` (triage reason; `RelinkCandidateAsync` for `not found`), `Relink`; linked criteria only, `ChangedSinceBaseline`/`Removed`; `NothingToReconcile`). `BaselineContext.GetRawSectionAsync` / `GetCriterionText`. Threshold = `update.light_threshold_words` (as triage).
   - **Render:** `UpdatePromptRenderer` (`SourceDiff`/`Criteria`/`Tests`; `~~~~` fences longer than any tilde run; LF only; byte-identical for identical inputs). Template `test-update.md`: `source_diff`, `acceptance_criteria`, `tests`, `profile_format` (+ legacy `test_case`/`current_source`). `UpdatePromptCompiler.CompileContext`: a user template without `{{tests}}`/`{{source_diff}}` → `--test-id` legacy values + warning, group → `TEMPLATE_OUTDATED` (hint: `update-skills` or `prompts reset test-update`).

@@ -36,6 +36,13 @@ public sealed class BaselineReviewFixTests : IDisposable
         File.Copy(payload, _ws.PathOf($".spectra/updates/{suite}/updated-{id}.json"), overwrite: true);
     }
 
+    /// <summary>Spec 089 (F1): repairs are staged in their own folder, read only by <c>--all --keep-baseline</c>.</summary>
+    private void StageRepair(string suite, string id, string payload)
+    {
+        Directory.CreateDirectory(_ws.PathOf($".spectra/repairs/{suite}"));
+        File.Copy(payload, _ws.PathOf($".spectra/repairs/{suite}/repaired-{id}.json"), overwrite: true);
+    }
+
     private static bool InRemoved(JsonElement triage, string test, string? @ref = null, string? criterion = null) =>
         triage.GetProperty("removed").EnumerateArray().Any(r =>
             r.GetProperty("test").GetString() == test
@@ -323,7 +330,7 @@ public sealed class BaselineReviewFixTests : IDisposable
     public async Task RepairBatch_WithKeepBaseline_LeavesThePendingChange()
     {
         await SeedPendingLoadAsync();
-        Stage("storage", "TC-101", EditedPayload("TC-101", ["docs/storage.md#Quotas", "docs/storage.md#Sharing"], []));
+        StageRepair("storage", "TC-101", EditedPayload("TC-101", ["docs/storage.md#Quotas", "docs/storage.md#Sharing"], []));
 
         var result = await _ws.RunJsonAsync("ai", "ingest-update", "storage", "--all", "--keep-baseline");
 

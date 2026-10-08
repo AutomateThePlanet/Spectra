@@ -1,5 +1,8 @@
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Spectra.CLI.Commands.Init;
 using Spectra.CLI.Generation;
+using Spectra.CLI.Infrastructure;
 using Spectra.Core.Models;
 using Spectra.Core.Parsing;
 
@@ -39,6 +42,42 @@ public static class UpdatePromptWorkspace
         return Directory.Exists(dir)
             ? Directory.GetFiles(dir).Select(f => Path.GetFileName(f)).OrderBy(n => n, StringComparer.Ordinal).ToArray()
             : [];
+    }
+
+    /// <summary>Spec 089: writes <c>.spectra/repairs/{suite}/repaired-{id}.json</c>, as the repair loop stages a repair.</summary>
+    public static string StageRepair(this BaselineTestWorkspace ws, string suite, string fileId, TestCase repaired) =>
+        ws.StageRepairRaw(suite, fileId, "[\n" + UpdatePromptCompiler.SerializeTest(repaired) + "\n]\n");
+
+    public static string StageRepairRaw(this BaselineTestWorkspace ws, string suite, string fileId, string content)
+    {
+        var path = ws.PathOf($".spectra/repairs/{suite}/repaired-{fileId}.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, content);
+        return path;
+    }
+
+    public static string[] RepairFiles(this BaselineTestWorkspace ws, string suite)
+    {
+        var dir = ws.PathOf($".spectra/repairs/{suite}");
+        return Directory.Exists(dir)
+            ? Directory.GetFiles(dir).Select(f => Path.GetFileName(f)).OrderBy(n => n, StringComparer.Ordinal).ToArray()
+            : [];
+    }
+
+    /// <summary>Spec 089: <c>ai ingest-update {suite} --all … --output-format json</c>, without throwing on a non-zero exit.</summary>
+    public static Task<(int Exit, string Out, string Err)> IngestAllAsync(
+        this BaselineTestWorkspace ws, string suite = "storage", params string[] extra) =>
+        ws.RunAsync(["ai", "ingest-update", suite, "--all", .. extra, "--output-format", "json"]);
+
+    /// <summary>Spec 089: runs the real <c>spectra init</c> (embedded template, no skills) in the workspace.</summary>
+    public static async Task InitWithRealTemplateAsync(this BaselineTestWorkspace ws)
+    {
+        var logger = LoggingSetup.CreateLoggerFactory(VerbosityLevel.Quiet).CreateLogger<InitHandler>();
+        var exit = await new InitHandler(logger, ws.Root).HandleAsync(force: false, skipSkills: true);
+        if (exit != ExitCodes.Success)
+        {
+            throw new Xunit.Sdk.XunitException($"spectra init exited {exit}");
+        }
     }
 
     /// <summary>The test as it is on disk.</summary>

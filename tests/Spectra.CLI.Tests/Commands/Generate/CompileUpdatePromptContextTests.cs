@@ -100,7 +100,8 @@ public sealed class CompileUpdatePromptContextTests : IDisposable
 
         Assert.True(exit == 0, error);
         Assert.Contains("State: REMOVED — not found; not in a git repository", prompt);
-        Assert.Contains("- AC-1: Each user MUST get 30GB", prompt);
+        // Spec 089 (F4): no baseline here, so the criterion is labelled not baselined (was "- AC-1: …" on 088).
+        Assert.Contains("- AC-1 (not baselined — compare the test with the current text): Each user MUST get 30GB", prompt);
     }
 
     [Theory]
