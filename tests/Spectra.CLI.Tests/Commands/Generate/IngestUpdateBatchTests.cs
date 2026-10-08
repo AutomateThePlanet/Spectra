@@ -176,7 +176,7 @@ public sealed class IngestUpdateBatchTests : IDisposable
 
         var (exit, out_, _) = await RunBatchAsync(Suite);
 
-        Assert.Equal(0, exit); // batch continues even with partial errors
+        Assert.Equal(8, exit); // batch continues even with partial errors; Spec 089 (F5): a failed file → exit 8
         var result = JsonSerializer.Deserialize<JsonElement>(out_.Trim());
         Assert.Equal(1, result.GetProperty("written").GetInt32());
         Assert.Equal(1, result.GetProperty("errors").GetInt32());
@@ -210,7 +210,7 @@ public sealed class IngestUpdateBatchTests : IDisposable
 
         var (exit, out_, _) = await RunBatchAsync(Suite);
 
-        Assert.Equal(0, exit);
+        Assert.Equal(8, exit); // Spec 089 (F5): NO_ORIGINAL is a failed file → exit 8
         var result = JsonSerializer.Deserialize<JsonElement>(out_.Trim());
         Assert.Equal(0, result.GetProperty("written").GetInt32());
     }

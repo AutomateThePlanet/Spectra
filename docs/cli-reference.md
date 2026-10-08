@@ -135,6 +135,11 @@ Compares installed files against bundled versions using SHA-256 hashes:
 - **User-modified files** → skipped with warning (preserves customizations)
 - **Missing files** → recreated
 
+It also applies `spectra init`'s idempotent `.gitignore` list (Spec 089): entries an older workspace lacks — such as
+`.spectra/updates/` and `.spectra/repairs/`, the update and repair staging folders — are appended under `# SPECTRA`,
+every other line is kept, and `.gitignore` is listed as updated. Plain `spectra init` still refuses on an existing
+workspace, so this is how existing workspaces get new entries.
+
 Reports a summary of updated, unchanged, and skipped files.
 
 ---
@@ -628,7 +633,7 @@ supporting `--output-format json`) are:
 | `spectra ai ingest-grounding --suite <s> --test <id> [--repaired] [--repair-attempts <n>]` | Write the durable condensed verdict block into the test `.md` frontmatter. |
 | `spectra ai ingest-grounding --suite <s> --all [--repaired] [--repair-attempts <n>]` | In batch form, writes grounding blocks for all eligible tests in one pass; without `--repaired` only grounded tests are written, and with `--repaired` all ungrounded tests (grounded plus partial re-verdicts) are written. Idempotent. |
 | `spectra ai ingest-verdict --suite <s> --all` | In batch form, classifies all `.spectra/verdicts/critic-verdict-*.json` files for the suite in one call, emitting a `{grounded, partial, hallucinated, errors}` summary. Advisory-gate only, so no files are written; replaces per-test `--from` loops. |
-| `spectra ai ingest-update <suite> --all` | In batch form, ingests all staged update files from `.spectra/updates/<suite>/updated-<id>.json` in one call, emitting `{written, unchanged, skipped_no_original, errors, results}`; consumed staging files are deleted, failed ones kept (Spec 088). Per-entry `--test-id --from` mode unchanged. |
+| `spectra ai ingest-update <suite> --all` | In batch form, ingests all staged update files from `.spectra/updates/<suite>/updated-<id>.json` in one call, emitting `{written, unchanged, unchanged_pending, skipped_no_original, errors, results}`; consumed staging files are deleted, failed ones kept (Spec 088); exit 8 when a file failed, and `--all --keep-baseline` reads `.spectra/repairs/<suite>/repaired-<id>.json` instead (Spec 089). Per-entry `--test-id --from` mode unchanged. |
 | `spectra ai compile-repair-prompt --suite <s> --test <id>` | Emit a repair prompt for a partial test (critic findings + source docs); plain text to stdout. |
 | `spectra ai record-drop --suite <s> --test <id> [--reason user_decided]` | Append a drop-trail entry before deleting a hallucinated or user-decided-to-drop test. |
 | `spectra ai review-flagged [--suite <s>]` | List and disposition flagged (still-partial) tests: accept, delete, or (via skill) retry repair. |
@@ -1031,7 +1036,9 @@ get two blocks). Its state:
 
 The current section is the 085 heading matcher's section, or the whole file for a ref without an anchor. The bucket
 uses `update.light_threshold_words`, as triage does. A criterion line is `- AC-1: text`, `- AC-1 (changed since
-baseline): text` or `- AC-1 (removed)`. Only criteria the tests link appear — never a suite-wide or repo-wide set.
+baseline): text`, `- AC-1 (not baselined — compare the test with the current text): text` (Spec 089: no baseline entry,
+or the entry lacks the criterion) or `- AC-1 (removed)`; across a group the strongest label wins (removed, changed, not
+baselined, unchanged). Only criteria the tests link appear — never a suite-wide or repo-wide set.
 
 **Refusals (exit 4, one JSON document on stderr in JSON mode, the shared failure shape):**
 
@@ -1062,34 +1069,70 @@ spectra ai ingest-update checkout --all
 | `suite` (positional) | Suite the edited test belongs to (required) |
 | `--test-id` | Id of the original test being edited (required without `--all`) |
 | `--from` | File with the edited-test JSON (omit to read stdin) |
-| `--all` | Ingest every staged `.spectra/updates/<suite>/updated-<id>.json` |
+| `--all` | Ingest every staged `.spectra/updates/<suite>/updated-<id>.json`; with `--keep-baseline`, every `.spectra/repairs/<suite>/repaired-<id>.json` instead |
 | `--keep-baseline` | Keep the source-change baseline (critic repairs; see below) |
 
-Exit code is `0` when persisted (id unchanged), `5` when the content is invalid or `DRIFT_DETECTED`, `6` when the schema is invalid, and `1` on a config/I/O error or when the original is not found; on any non-zero exit nothing is persisted.
+Exit codes:
+
+| Exit | Form | Meaning |
+|---|---|---|
+| `0` | both | Done: written, unchanged or `unchanged_pending` (single form); no staged file failed (`--all`) |
+| `5` | single | Content invalid, incl. `DRIFT_DETECTED` and `MULTIPLE_TESTS` (Spec 089); nothing persisted |
+| `6` | single | `SCHEMA_INVALID`; nothing persisted |
+| `8` | `--all` | Spec 089: the batch completed, but at least one staged file failed (even if every one did). Same JSON as exit 0; read `results` and retry the failed tests. Command-namespaced, like `suite delete`'s 8 |
+| `1` | both | Config, lock or baseline error (`BASELINE_UNREADABLE`, `BASELINE_WRITE_FAILED`), or the original isn't found (single form) |
+
+**One test per edit (Spec 089).** The content (a staged file, or `--from`) must hold exactly one test object. More than
+one — counted before validation, so an extra invalid object counts — fails with `MULTIPLE_TESTS`, naming the count and
+the ids (`(no id)` for one without an id); nothing is written. An empty array stays `NO_TESTS`.
 
 **Unchanged edits (Spec 088).** An edit identical to the original in every editable field (title, preconditions,
 steps, expected result, test data, scenario, `source_refs`, `criteria`) is not written. It counts as reviewed: the
 test's baseline entry is rebuilt from its current content, as `update-ack` would (with `--keep-baseline`, nothing is
 recorded). For the comparison only, CRLF / CR count as LF, trailing whitespace of each line and field is ignored and
 null equals empty; whitespace inside a line counts. The drift guard runs first. Single form: exit 0,
-`{"success":true,"persisted":0,"unchanged":true,"id":"TC-104",…}`, human `Test 'TC-104' needs no change; its baseline
-was refreshed.`
+`{"success":true,"outcome":"unchanged","persisted":0,"unchanged":true,"id":"TC-104",…}`, human `Test 'TC-104' needs no
+change; its baseline was refreshed.` Every single-form success JSON carries `outcome` (`written`, `unchanged` or
+`unchanged_pending`).
 
-**`--all` (Spec 077, 088).** Each staging file, in ordinal order, gets one outcome:
+**Unchanged while a change is pending (Spec 089).** Without `--keep-baseline`, an unchanged edit of a test that has a
+baseline entry is first classified exactly as `update-triage` would (same rules, `update.light_threshold_words`).
+`UNCHANGED`, `COSMETIC` and `LIGHT` count as reviewed (above). `LOAD`, `CRITERIA_CHANGED`, `REMOVED`,
+`CRITERIA_REMOVED` and `RELINK` need an edit, so the outcome is `unchanged_pending`: nothing is written or recorded, the
+change stays in triage. Single form: exit 0, `{"success":true,"outcome":"unchanged_pending","persisted":0,
+"unchanged":true,"id":"TC-104","bucket":"LOAD","why":["numbers: 30gb→45gb"],…}`, human `Test 'TC-104' returned
+unchanged — LOAD change still pending (acknowledge with update-ack or edit again).` A test without a baseline entry is
+recorded as before.
+
+**`--all` (Spec 077, 088, 089).** The folder follows the mode: `--all` reads only `.spectra/updates/<suite>/` (update
+edits, `spectra-update`); `--all --keep-baseline` reads only `.spectra/repairs/<suite>/repaired-<id>.json` (critic
+repairs, `spectra-generate`). Neither ever reads the other's folder, so a kept file is never ingested in the wrong
+baseline mode. Each staging file, in ordinal order, gets one outcome:
 
 | Outcome | Written | Baseline | Staging file |
 |---|---|---|---|
 | `written` | the test + index | rebuilt (kept with `--keep-baseline`) | deleted |
 | `unchanged` | nothing | rebuilt (none with `--keep-baseline`) | deleted |
+| `unchanged_pending` | nothing | untouched | deleted |
 | `failed` | nothing | — | kept |
 
 `failed` codes: the ingest codes (`EMPTY_CONTENT`, `MALFORMED_JSON`, `TRUNCATED`, `NO_TESTS`, `SCHEMA_INVALID`,
-`DRIFT_DETECTED`), `NO_ORIGINAL` (no test with that id), `ID_MISMATCH` (the staged test's `id` differs from the file
-name), `UNREADABLE`, `PERSIST_FAILED`. Staging files are deleted only after the batch recorded its baseline; on a
-baseline write failure none is deleted, so a re-run picks them up. The JSON keeps `written`, `skipped_no_original`
-(`NO_ORIGINAL` outcomes) and `errors` (the other failures) and adds `unchanged` and `results`
-(`[{test, file, outcome[, error_code, errors]}]`). The per-test summary is printed in every mode (stderr in JSON mode).
-A completed batch exits 0; failures are per file.
+`DRIFT_DETECTED`, `MULTIPLE_TESTS`), `NO_ORIGINAL` (no test with that id), `ID_MISMATCH` (the one staged test's `id`
+differs from the file name), `UNREADABLE`, `PERSIST_FAILED`. Staging files are deleted only after the batch recorded its
+baseline; on a baseline write failure none is deleted, so a re-run picks them up. The JSON keeps `written`,
+`skipped_no_original` (`NO_ORIGINAL` outcomes) and `errors` (the other failures) and adds `unchanged`,
+`unchanged_pending` and `results` (`[{test, file, outcome[, error_code, errors][, bucket, why]}]`). The per-test summary
+is printed in every mode (stderr in JSON mode):
+
+```
+Batch update-ingest for suite 'storage': written=1 unchanged=1 unchanged_pending=1 skipped_no_original=0 errors=1
+  TC-101: updated
+  TC-102: unchanged (reviewed, no edit needed)
+  TC-103: returned unchanged — LOAD change still pending (acknowledge with update-ack or edit again)
+  TC-104: failed [MULTIPLE_TESTS] The edit holds 3 test objects (…) (kept .spectra/updates/storage/updated-TC-104.json)
+```
+
+A completed batch exits 0 when no file failed and 8 when at least one did; an empty or missing folder exits 0.
 
 Spec 084: like `ingest-tests`, it locks and strictly loads the suite baseline before persisting and then replaces the
 edited test's entry (the single form and `--all`, which takes one lock for the batch); both JSON outputs gain

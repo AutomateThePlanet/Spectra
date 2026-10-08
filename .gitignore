@@ -39,6 +39,7 @@ TestResults/
 .spectra/verdicts/
 .spectra/dropped-tests.json
 .spectra/repairs/
+.spectra/updates/
 
 # Node (for runner-ui)
 node_modules/

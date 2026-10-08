@@ -373,86 +373,11 @@ public sealed class InitHandler
 
     private async Task UpdateGitIgnoreAsync(CancellationToken ct)
     {
-        var gitIgnorePath = Path.Combine(_workingDirectory, ".gitignore");
-        const string spectraSection = "# SPECTRA";
-
-        // Spec 040 lifecycle: PID/sentinel/lock/HWM are workspace-local
-        // derived state; never committed. Per FR-010, FR-020.
-        var patterns = new[]
+        // Spec 089 (F6): the list and the idempotent append are shared with spectra update-skills.
+        var added = await SpectraGitIgnore.EnsureAsync(_workingDirectory, ct);
+        if (added.Count > 0)
         {
-            ".execution/*.db",
-            ".execution/*.db-*",
-            ".spectra.lock",
-            ".spectra/.pid",
-            ".spectra/.cancel",
-            ".spectra/id-allocator.lock",
-            ".spectra/id-allocator.json",
-            ".spectra/progress.json",
-            ".spectra/analysis.json",
-            ".spectra/generated.json",
-            ".spectra/updated.json",
-            ".spectra/criteria.json",
-            ".spectra/critic-verdict.json",
-            ".spectra/seam-progress.html",
-            ".spectra/skills-manifest.json",
-            // Spec 078: run-status files every long-running command writes (incl. dry runs).
-            ".spectra-result.json",
-            ".spectra-progress.html",
-            // Spec 079: cross-process lock for criteria index/file writes.
-            ".spectra/criteria.lock",
-            // Spec 084: the baseline lock and the update-triage detail (scratch). The baselines
-            // (test-cases/*/_source-baseline.json) and .spectra/source-snapshots/ are committed.
-            ".spectra/baseline.lock",
-            ".spectra/update-triage.json",
-        };
-        var newEntries = new List<string>();
-
-        if (File.Exists(gitIgnorePath))
-        {
-            var content = await File.ReadAllTextAsync(gitIgnorePath, ct);
-
-            // Check which patterns are missing (idempotent)
-            foreach (var pattern in patterns)
-            {
-                if (!content.Contains(pattern))
-                {
-                    newEntries.Add(pattern);
-                }
-            }
-
-            if (newEntries.Count > 0)
-            {
-                var needsHeader = !content.Contains(spectraSection);
-                var sb = new System.Text.StringBuilder(content.TrimEnd());
-                sb.AppendLine();
-                sb.AppendLine();
-
-                if (needsHeader)
-                {
-                    sb.AppendLine(spectraSection);
-                }
-
-                foreach (var entry in newEntries)
-                {
-                    sb.AppendLine(entry);
-                }
-
-                await File.WriteAllTextAsync(gitIgnorePath, sb.ToString(), ct);
-                _logger.LogDebug("Updated .gitignore with SPECTRA patterns");
-            }
-        }
-        else
-        {
-            // Create new .gitignore
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine(spectraSection);
-            foreach (var pattern in patterns)
-            {
-                sb.AppendLine(pattern);
-            }
-
-            await File.WriteAllTextAsync(gitIgnorePath, sb.ToString(), ct);
-            _logger.LogDebug("Created .gitignore with SPECTRA patterns");
+            _logger.LogDebug("Updated .gitignore with {Count} SPECTRA pattern(s)", added.Count);
         }
     }
 

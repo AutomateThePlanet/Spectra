@@ -188,18 +188,39 @@ is staged, ingest them all in one call with the Bash tool:
 ```
 spectra ai ingest-update <suite> --all --output-format json --verbosity quiet
 ```
-Exit `0` → read `results` (one entry per staged file) and report each test:
+Exit `0` (no file failed) or `8` (the batch completed, but at least one staged file failed) →
+read `results` (one entry per staged file) and report each test. Exit `8` is never a reason to
+stop: retry the `failed` tests as below and continue.
 - `written` → updated; the id is unchanged, the index was regenerated and the test's baseline
   was recorded (it leaves triage);
 - `unchanged` → acknowledged: reviewed, no edit needed; its baseline was recorded;
+- `unchanged_pending` → you returned the test unchanged, but its `bucket` still needs an edit;
+  nothing was recorded, so the change stays in triage. Handle these after the group (below);
 - `failed` → nothing was written for that test and its staging file is kept; `error_code` says
   why: `DRIFT_DETECTED` (you changed an out-of-scope field — redo the edit touching ONLY what
   the doc change requires), `MALFORMED_JSON` / `TRUNCATED` / `NO_TESTS` / `EMPTY_CONTENT`
-  (fix the JSON), `SCHEMA_INVALID` (fix the offending field), `ID_MISMATCH` (the id inside the
-  file differs from the file name), `NO_ORIGINAL` (no test with that id in the suite).
+  (fix the JSON), `MULTIPLE_TESTS` (the file held more than one test — write one test per
+  file), `SCHEMA_INVALID` (fix the offending field), `ID_MISMATCH` (the id inside the file
+  differs from the file name), `NO_ORIGINAL` (no test with that id in the suite).
 
-The staging files of `written` and `unchanged` tests are deleted by the CLI. Exit `1` → an
-error; see "Exit codes" below.
+The staging files of `written`, `unchanged` and `unchanged_pending` tests are deleted by the
+CLI. Exit `1` → an error; see "Exit codes" below.
+
+**Returned unchanged, still pending.** List each `unchanged_pending` test with its `bucket` and
+`why`, then:
+- `LOAD` or `CRITERIA_CHANGED` → ask the user, per group, whether to **acknowledge** it (the
+  change needs no edit to the test) or **edit again**. Never acknowledge without the user's
+  answer.
+  - acknowledge → `spectra ai update-ack --suite <suite> --ids <id1>,<id2> --output-format json --verbosity quiet`;
+  - edit again → `spectra ai compile-update-prompt --suite <suite> --test-id <id>`, edit it
+    in-session, write `.spectra/updates/<suite>/updated-<id>.json` with the Write tool, and run
+    `spectra ai ingest-update <suite> --all --output-format json --verbosity quiet`. This counts
+    toward the same at most two retries per test as a failure.
+- `REMOVED`, `CRITERIA_REMOVED` or `RELINK` → edit groups never contain these (Step 4), so the
+  documentation changed again since triage. Say so, offer no acknowledgement (`update-ack`
+  refuses them: `REF_REMOVED` for `REMOVED` and `RELINK`, `CRITERION_REMOVED` for
+  `CRITERIA_REMOVED`), and tell the user to re-run `spectra ai update-triage`; Step 2a
+  (`RELINK`) or Step 3 (`REMOVED` / `CRITERIA_REMOVED`) then handles the test.
 
 **Bounded retry:** retry a `failed` test **at most twice** (3 attempts in all), on its own:
 ```
@@ -222,8 +243,9 @@ in triage and is reported again next time — nothing is deferred silently.
 {"phases":["Step 1 — Triage","Step 2 — Review","Step 5 — Edit tests","Step 7 — Report"],"active":3}
 ```
 For the suite, summarize: the bucket counts, COSMETIC auto-acknowledged, tests edited (with
-ids), tests returned unchanged and tests acknowledged (with ids), REMOVED / CRITERIA_REMOVED
-left for the user, tests skipped or failed after retries, and any unbaselined tests.
+ids), tests returned unchanged and tests acknowledged (with ids), tests returned unchanged
+with a change still pending (with bucket), REMOVED / CRITERIA_REMOVED left for the user,
+tests skipped or failed after retries, and any unbaselined tests.
 
 Write `.spectra/progress.json`: `{"active":4}` (terminal — seam-progress page renders Complete).
 

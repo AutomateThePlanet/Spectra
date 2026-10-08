@@ -544,6 +544,91 @@ public class SkillsManifestTests : IDisposable
         Assert.Contains("`.spectra/progress.json`", contract);
     }
 
+    // ---- Spec 089: review fixes for 088 ----
+
+    private static string GenerateSkill => SkillContent.All["spectra-generate"].Replace("\r\n", "\n");
+
+    [Fact]
+    public void GenerateSkill_StagesRepairsInTheRepairsFolder_NeverTheUpdateFolder()
+    {
+        // F1 (FR-005): the repair loop writes .spectra/repairs/; the table row names it too.
+        var content = GenerateSkill;
+
+        Assert.Contains("`.spectra/repairs/{suite}/repaired-{id}.json`", content);
+        Assert.DoesNotContain(".spectra/updates/{suite}/updated-{id}.json", content);
+        var row = content.Split('\n').Single(l => l.StartsWith("| `ingest-update {suite} --all --keep-baseline`", StringComparison.Ordinal));
+        Assert.Contains(".spectra/repairs/{suite}/repaired-{id}.json", row);
+    }
+
+    [Fact]
+    public void GenerateSkill_Exit8_RetriesTheFailedRepairsAtMostTwice_AsTheSameRepairAttempt()
+    {
+        // F5 (FR-020, analysis A1): exit 8 is not a STOP; the retry completes the same repair attempt.
+        var content = GenerateSkill;
+        var start = content.IndexOf("**After all repairs staged", StringComparison.Ordinal);
+        var end = content.IndexOf("**After re-critic phase completes", StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start);
+        var step = content[start..end];
+
+        Assert.Contains("Exit `8`", step);
+        Assert.Contains("`results`", step);
+        Assert.Contains("**at most twice**", step);
+        Assert.Contains("This is not a STOP", step);
+        Assert.Contains("completes the same repair attempt", step);
+        Assert.Contains("--repair-attempts N", step);
+        Assert.Contains("re-critiqued once", step);
+        Assert.Contains("reported `written` or `unchanged` in `results`", step);
+    }
+
+    [Fact]
+    public void GenerateSkill_NonStopRestatement_SaysExit8IsNotAStop_AndTheWrittenZeroGuardIsUnchanged()
+    {
+        var content = GenerateSkill;
+
+        Assert.Contains("Exit `8` from `ingest-update --all` is neither broken nor zero-result", content);
+        // The 075 hard regression gate stays verbatim.
+        Assert.Contains("- **If `written == 0` AND `kept-grounded > 0`:** STOP immediately. Do NOT proceed to 8b.", content);
+        Assert.Contains("GROUNDING-INGEST ANOMALY: `ingest-grounding --all` returned `written: 0`", content);
+    }
+
+    [Fact]
+    public void UpdateSkill_Exit8_ReadsResults_AndNeverStops()
+    {
+        var step = UpdateStep("**Step 5**", "**Step 6**");
+
+        Assert.Contains("Exit `0` (no file failed) or `8`", step);
+        Assert.Contains("Exit `8` is never a reason to\nstop", step);
+        Assert.Contains("`MULTIPLE_TESTS`", step);
+    }
+
+    [Fact]
+    public void UpdateSkill_UnchangedPending_AsksToAcknowledgeOrEditAgain_ForLoadAndCriteriaChangedOnly()
+    {
+        // F3 (FR-015, analysis I1/A2).
+        var step = UpdateStep("**Step 5**", "**Step 6**");
+        var start = step.IndexOf("**Returned unchanged, still pending.**", StringComparison.Ordinal);
+        var end = step.IndexOf("**Bounded retry:**", StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start);
+        var block = step[start..end];
+
+        Assert.Contains("`unchanged_pending`", step);
+        Assert.Contains("`LOAD` or `CRITERIA_CHANGED` → ask the user", block);
+        Assert.Contains("Never acknowledge without the user's\n  answer", block);
+        Assert.Contains("spectra ai update-ack --suite <suite> --ids <id1>,<id2>", block);
+        Assert.Contains("spectra ai compile-update-prompt --suite <suite> --test-id <id>", block);
+        Assert.Contains("`.spectra/updates/<suite>/updated-<id>.json`", block);
+        Assert.Contains("spectra ai ingest-update <suite> --all --output-format json --verbosity quiet", block);
+        Assert.Contains("at most two retries per test", block);
+
+        var others = block[block.IndexOf("- `REMOVED`, `CRITERIA_REMOVED` or `RELINK`", StringComparison.Ordinal)..];
+        Assert.Contains("changed again since triage", others);
+        Assert.Contains("offer no acknowledgement", others);
+        Assert.Contains("`REF_REMOVED`", others);
+        Assert.Contains("`CRITERION_REMOVED`", others);
+        Assert.Contains("spectra ai update-triage", others);
+        Assert.DoesNotContain("update-ack --suite", others);
+    }
+
     [Fact]
     public void UpdateSkill_DoesNotKeepTheBaseline() =>
         Assert.DoesNotContain("--keep-baseline", SkillContent.Update);

@@ -159,13 +159,18 @@ SPECTRA keeps, for every test, a fingerprint of each doc section it references (
 5. **Edit** — group by group. `spectra ai compile-update-prompt --suite checkout --group G2` gives the assistant one
    prompt for all the group's tests: each doc section they reference once — as it is now, the previous version
    (normalised: lowercased, markup removed) and the words that changed — or why it no longer resolves; only the
-   criteria the tests link, marked when changed since the baseline or removed; then each test. The assistant edits
-   in-session, stages one file per test (`.spectra/updates/checkout/updated-<id>.json`) and runs
-   `spectra ai ingest-update checkout --all`. That keeps each test's id and manual notes, fails loud on out-of-scope
-   drift and records the new baseline. A test returned **unchanged** is not written but counts as reviewed (its
-   baseline is rebuilt, as with `update-ack`). Each test is reported as updated, unchanged or failed; the staging
-   files of updated and unchanged tests are deleted, a failed one is kept and retried at most twice on its own
-   (`--test-id`). A group too big for one prompt (`PROMPT_TOO_LARGE`, over `analysis.max_prompt_tokens`) is edited
+   criteria the tests link, marked when changed since the baseline, not baselined, or removed; then each test. The
+   assistant edits in-session, stages one file per test — exactly one test per file
+   (`.spectra/updates/checkout/updated-<id>.json`) — and runs `spectra ai ingest-update checkout --all`. That keeps
+   each test's id and manual notes, fails loud on out-of-scope drift and records the new baseline. A test returned
+   **unchanged** is not written; it counts as reviewed (its baseline is rebuilt, as with `update-ack`) when its change
+   was small (LIGHT, COSMETIC). When a LOAD or CRITERIA_CHANGED change is still pending, it is reported as returned
+   unchanged with the change still pending, nothing is recorded, and the assistant asks you whether to acknowledge it
+   or edit again — it never acknowledges on its own. A REMOVED, CRITERIA_REMOVED or RELINK change seen at that point
+   means the docs changed again since triage: the assistant says so and asks you to re-run triage. Each test is
+   reported as updated, unchanged, still pending or failed; the staging files of all but failed tests are deleted, a
+   failed one is kept and retried at most twice on its own (`--test-id`). A batch with a failed file exits 8, so
+   scripts see it too. A group too big for one prompt (`PROMPT_TOO_LARGE`, over `analysis.max_prompt_tokens`) is edited
    test by test. A customised `.spectra/prompts/test-update.md` from before this version still works per test, with
    a warning; `spectra update-skills` (for a copy you never edited) or `spectra prompts reset test-update` brings the
    group layout.
@@ -208,7 +213,11 @@ docs, and the docs in none — the reason relinking or a history bootstrap isn't
 reads git; without git everything works as before and missing files are REMOVED with `not found; no git`.
 
 **Repairs and broken files.** Critic repairs during generation or flagged-test review keep the test's baseline
-(`ingest-update --keep-baseline`), so a pending doc change is still in triage afterwards. A test file that fails to
+(`ingest-update --keep-baseline`), so a pending doc change is still in triage afterwards. Generation stages its repairs
+in `.spectra/repairs/<suite>/` and ingests them with `ingest-update <suite> --all --keep-baseline`, which reads only
+that folder; the update edit step reads only `.spectra/updates/<suite>/`. A file kept after a failure is therefore
+never picked up by the other flow in the wrong baseline mode. `spectra init` (new workspaces) and
+`spectra update-skills` (existing ones) gitignore both folders. A test file that fails to
 parse keeps its baseline entry: no command prunes a suite while any of its test files can't be read, and each says so.
 
 **Commit the baseline.** Commit `test-cases/*/_source-baseline.json` and `.spectra/source-snapshots/` (the snapshots

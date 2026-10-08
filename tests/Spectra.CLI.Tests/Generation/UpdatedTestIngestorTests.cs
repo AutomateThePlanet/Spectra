@@ -295,6 +295,32 @@ public sealed class UpdatedTestIngestorTests : IDisposable
         Assert.True(UpdatedTestIngestor.IsUnchanged(original, original with { Preconditions = "line one  \r\nline two\n\n" }));
     }
 
+    // ---------- Spec 089 F2: one test per edit ----------
+
+    [Fact]
+    public async Task Ingest_TwoTestObjects_IsMultipleTests_NothingWritten()
+    {
+        var original = Original();
+        var two = "[" + EditJson(id: "TC-100").Trim().Trim('[', ']') + "," + EditJson(id: "TC-101").Trim().Trim('[', ']') + "]";
+
+        var result = await NewIngestor().IngestAsync(two, _testsPath, Suite, original, [original], default);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(UpdatedTestIngestor.MultipleTests, result.ErrorCode);
+        Assert.Equal("The edit holds 2 test objects (TC-100, TC-101); a staged file holds exactly one test.", Assert.Single(result.Errors));
+        Assert.False(Directory.Exists(Path.Combine(_testsPath, Suite)), "nothing written");
+    }
+
+    [Fact]
+    public void ArrayObjects_CountsObjects_NotValidTests()
+    {
+        Assert.Equal(["TC-1", null], GeneratedTestIngestor.ArrayObjects("[{\"id\":\"TC-1\",\"title\":\"t\"},{\"title\":\"no id\"}]"));
+        Assert.Equal(["TC-1"], GeneratedTestIngestor.ArrayObjects("```json\n[{\"id\":\"TC-1\"}]\n```"));
+        Assert.Empty(GeneratedTestIngestor.ArrayObjects("[]")!);
+        Assert.Null(GeneratedTestIngestor.ArrayObjects("not json"));
+        Assert.Null(GeneratedTestIngestor.ArrayObjects(null));
+    }
+
     [Fact]
     public async Task Ingest_SchemaInvalidEdit_FailsLoud()
     {

@@ -6,6 +6,7 @@ using Spectra.CLI.Generation;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.IO;
 using Spectra.CLI.Options;
+using Spectra.Core.Baseline;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
@@ -29,6 +30,12 @@ public sealed class IngestUpdateCommand : Command
     private const int ExitError = 1;
     private const int ExitContentInvalid = 5; // EMPTY/MALFORMED/TRUNCATED/NO_TESTS/DRIFT_DETECTED
     private const int ExitSchemaInvalid = 6;  // SCHEMA_INVALID
+
+    /// <summary>
+    /// Spec 089 (F5): <c>--all</c> completed but at least one staged file failed. Command-namespaced, like
+    /// <c>suite delete</c>'s 8; the JSON is the same as for 0.
+    /// </summary>
+    private const int ExitStagedFailures = 8;
 
     public IngestUpdateCommand()
         : base("ingest-update", "Validate and persist an edited test, preserving id and manual fields (fail-loud)")
@@ -145,6 +152,7 @@ public sealed class IngestUpdateCommand : Command
         IngestResult result;
         BaselineWriteSummary? baselineSummary = null;
         BaselineStoreException? afterPersist = null;
+        PendingChange? pending = null;
         var warnings = new List<string>();
         try
         {
@@ -153,9 +161,18 @@ public sealed class IngestUpdateCommand : Command
                 var baseline = await BaselineStore.LoadSuiteAsync(currentDir, testsPath, suite, ct);
                 var ingested = await ingestor.IngestAsync(content, testsPath, suite, original, existingTests, ct);
 
+                // Spec 089 (F3): an unchanged edit only counts as reviewed when no change needing an edit is pending.
+                if (ingested is { IsSuccess: true, Unchanged: true } && mode == RecordMode.Rebuild)
+                {
+                    var context = await BaselineContext.CreateAsync(currentDir, config, ct);
+                    var change = await PendingChangeCheck.ClassifyAsync(
+                        suite, ingested.Original!, baseline, context, LightThreshold(config), ct);
+                    pending = PendingChangeCheck.IsPending(change) ? change : null;
+                }
+
                 // Spec 088 FR-015: an unchanged edit is a review — its baseline is rebuilt (kept with --keep-baseline).
                 IReadOnlyList<TestCase> record = ingested.Unchanged
-                    ? (mode == RecordMode.Rebuild ? [ingested.Original!] : [])
+                    ? (mode == RecordMode.Rebuild && pending is null ? [ingested.Original!] : [])
                     : ingested.PersistedTests;
                 if (ingested.IsSuccess && record.Count > 0)
                 {
@@ -178,6 +195,35 @@ public sealed class IngestUpdateCommand : Command
             return WriteAfterPersistFailure(json, suite, ids, afterPersist);
         }
 
+        if (result is { IsSuccess: true, Unchanged: true } && pending is not null)
+        {
+            // Spec 089 (F3, FR-013): returned unchanged while a change needing an edit is pending — nothing recorded.
+            BaselineCommandIO.PrintWarnings(warnings);
+            var bucket = pending.Bucket.Wire();
+            if (json)
+            {
+                Console.Out.WriteLine(JsonSerializer.Serialize(new
+                {
+                    success = true,
+                    outcome = StagedOutcome.UnchangedPending,
+                    persisted = 0,
+                    unchanged = true,
+                    id = original.Id,
+                    bucket,
+                    why = pending.Why,
+                    baseline = new BaselineWriteSummary { Mode = mode }.ToJson(),
+                    warnings
+                }));
+            }
+            else
+            {
+                Console.Out.WriteLine($"Test '{original.Id}' {PendingText(bucket)}.");
+                foreach (var why in pending.Why)
+                    Console.Out.WriteLine($"  - {why}");
+            }
+            return ExitSuccess;
+        }
+
         if (result is { IsSuccess: true, Unchanged: true })
         {
             // Spec 088 FR-015: reviewed, no edit needed — nothing written, the baseline rebuilt (kept with --keep-baseline).
@@ -188,6 +234,7 @@ public sealed class IngestUpdateCommand : Command
                 Console.Out.WriteLine(JsonSerializer.Serialize(new
                 {
                     success = true,
+                    outcome = StagedOutcome.Unchanged,
                     persisted = 0,
                     unchanged = true,
                     id = original.Id,
@@ -214,6 +261,7 @@ public sealed class IngestUpdateCommand : Command
                 Console.Out.WriteLine(JsonSerializer.Serialize(new
                 {
                     success = true,
+                    outcome = StagedOutcome.Written,
                     persisted = result.PersistedTests.Count,
                     unchanged = false,
                     id,
@@ -277,7 +325,9 @@ public sealed class IngestUpdateCommand : Command
             return ExitError;
         }
 
-        var stagingDir = Path.Combine(currentDir, ".spectra", "updates", suite);
+        // Spec 089 (F1): the folder follows the mode, so a kept file is never ingested in the other flow's mode.
+        var (folder, prefix) = StagingFolder(mode);
+        var stagingDir = Path.Combine(currentDir, ".spectra", folder, suite);
         if (!Directory.Exists(stagingDir))
         {
             EmitBatchResult(json, suite, []);
@@ -304,9 +354,10 @@ public sealed class IngestUpdateCommand : Command
             await BaselineStore.WithLockAsync(currentDir, async () =>
             {
                 var baseline = await BaselineStore.LoadSuiteAsync(currentDir, testsPath, suite, ct);
-                await IngestStagedAsync();
+                await IngestStagedAsync(baseline);
 
                 // Spec 088 FR-015: an unchanged edit is a review — its baseline is rebuilt like a written one's.
+                // Spec 089 (F3): an unchanged_pending one is not.
                 var record = outcomes
                     .Where(o => o.Outcome == StagedOutcome.Written
                         || (o.Outcome == StagedOutcome.Unchanged && mode == RecordMode.Rebuild))
@@ -349,18 +400,21 @@ public sealed class IngestUpdateCommand : Command
 
         BaselineCommandIO.PrintWarnings(warnings);
         EmitBatchResult(json, suite, outcomes, baselineSummary ?? new BaselineWriteSummary { Mode = mode }, warnings);
-        return ExitSuccess;
 
-        async Task IngestStagedAsync()
+        // Spec 089 (F5): a completed batch with a failed file exits 8, so a caller can't miss it without the JSON.
+        return outcomes.Any(o => o.Outcome == StagedOutcome.Failed) ? ExitStagedFailures : ExitSuccess;
+
+        async Task IngestStagedAsync(SourceBaseline baseline)
         {
-            var stagingFiles = Directory.GetFiles(stagingDir, "updated-*.json").OrderBy(f => f, StringComparer.Ordinal);
+            BaselineContext? context = null; // created on the first unchanged edit (Spec 089 F3)
+            var stagingFiles = Directory.GetFiles(stagingDir, prefix + "*.json").OrderBy(f => f, StringComparer.Ordinal);
             foreach (var sf in stagingFiles)
             {
                 ct.ThrowIfCancellationRequested();
 
                 var fileName = Path.GetFileNameWithoutExtension(sf);
-                var testId = fileName.StartsWith("updated-", StringComparison.OrdinalIgnoreCase)
-                    ? fileName["updated-".Length..] : null;
+                var testId = fileName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                    ? fileName[prefix.Length..] : null;
                 if (string.IsNullOrEmpty(testId)) continue;
 
                 var file = Path.GetRelativePath(currentDir, sf).Replace(Path.DirectorySeparatorChar, '/');
@@ -384,8 +438,16 @@ public sealed class IngestUpdateCommand : Command
                     continue;
                 }
 
-                var stagedId = StagedId(content);
-                if (stagedId is not null && !string.Equals(stagedId, original.Id, StringComparison.OrdinalIgnoreCase))
+                // Spec 089 (F2): more than one object is MULTIPLE_TESTS, whatever the first one's id.
+                var objects = GeneratedTestIngestor.ArrayObjects(content);
+                if (objects is { Count: > 1 })
+                {
+                    outcomes.Add(StagedOutcome.Fail(original.Id, sf, file, UpdatedTestIngestor.MultipleTests,
+                        UpdatedTestIngestor.MultipleTestsMessage(objects)));
+                    continue;
+                }
+
+                if (objects is [{ } stagedId] && !string.Equals(stagedId, original.Id, StringComparison.OrdinalIgnoreCase))
                 {
                     outcomes.Add(StagedOutcome.Fail(original.Id, sf, file, StagedOutcome.IdMismatch,
                         $"The staged test's id '{stagedId}' differs from the file name's '{original.Id}'."));
@@ -409,7 +471,22 @@ public sealed class IngestUpdateCommand : Command
                 }
                 else if (result.Unchanged)
                 {
-                    outcomes.Add(new StagedOutcome(original.Id, sf, file, StagedOutcome.Unchanged, result.Original));
+                    // Spec 089 (F3): without --keep-baseline, check what is still pending before counting it as reviewed.
+                    PendingChange? change = null;
+                    if (mode == RecordMode.Rebuild)
+                    {
+                        context ??= await BaselineContext.CreateAsync(currentDir, config, ct);
+                        change = await PendingChangeCheck.ClassifyAsync(
+                            suite, result.Original!, baseline, context, LightThreshold(config), ct);
+                    }
+
+                    outcomes.Add(PendingChangeCheck.IsPending(change)
+                        ? new StagedOutcome(original.Id, sf, file, StagedOutcome.UnchangedPending, result.Original)
+                        {
+                            Bucket = change!.Bucket.Wire(),
+                            Why = change.Why
+                        }
+                        : new StagedOutcome(original.Id, sf, file, StagedOutcome.Unchanged, result.Original));
                 }
                 else
                 {
@@ -422,24 +499,19 @@ public sealed class IngestUpdateCommand : Command
         }
     }
 
-    /// <summary>Spec 088: the <c>id</c> of the staged array's first object, or null when it can't be read.</summary>
-    private static string? StagedId(string content)
-    {
-        try
-        {
-            using var doc = JsonDocument.Parse(content);
-            var root = doc.RootElement;
-            var first = root.ValueKind == JsonValueKind.Array && root.GetArrayLength() > 0 ? root[0] : root;
-            return first.ValueKind == JsonValueKind.Object
-                && first.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String
-                ? id.GetString()
-                : null;
-        }
-        catch (JsonException)
-        {
-            return null; // the ingestor reports malformed content
-        }
-    }
+    /// <summary>
+    /// Spec 089 (F1, FR-001/FR-002): update edits (<c>--all</c>) and critic repairs (<c>--all --keep-baseline</c>) each
+    /// have their own folder under <c>.spectra/</c> and file prefix; neither batch reads the other's.
+    /// </summary>
+    internal static (string Folder, string Prefix) StagingFolder(RecordMode mode) =>
+        mode == RecordMode.KeepBaseline ? ("repairs", "repaired-") : ("updates", "updated-");
+
+    /// <summary>Spec 089 (F3): the LIGHT/LOAD threshold, the same expression triage and compile-update-prompt use.</summary>
+    private static int LightThreshold(SpectraConfig config) => config.Update?.EffectiveLightThresholdWords ?? 12;
+
+    /// <summary>Spec 089 (F3, FR-013/FR-014): the wording for a test returned unchanged while a change is pending.</summary>
+    internal static string PendingText(string bucket) =>
+        $"returned unchanged — {bucket} change still pending (acknowledge with update-ack or edit again)";
 
     /// <summary>Spec 084: records the persisted tests' entries; an I/O failure here is reported, not thrown.</summary>
     private static async Task<(BaselineWriteSummary?, BaselineStoreException?)> RecordAsync(
@@ -471,20 +543,22 @@ public sealed class IngestUpdateCommand : Command
     {
         var written = outcomes.Count(o => o.Outcome == StagedOutcome.Written);
         var unchanged = outcomes.Count(o => o.Outcome == StagedOutcome.Unchanged);
+        var unchangedPending = outcomes.Count(o => o.Outcome == StagedOutcome.UnchangedPending);
         var skippedNoOriginal = outcomes.Count(o => o.ErrorCode == StagedOutcome.NoOriginal);
         var errors = outcomes.Count(o => o.Outcome == StagedOutcome.Failed && o.ErrorCode != StagedOutcome.NoOriginal);
 
         // Spec 088: the per-test summary is never suppressed — stdout in human mode, stderr in JSON mode.
         var human = json ? Console.Error : Console.Out;
         human.WriteLine(
-            $"Batch update-ingest for suite '{suite}': " +
-            $"written={written} unchanged={unchanged} skipped_no_original={skippedNoOriginal} errors={errors}");
+            $"Batch update-ingest for suite '{suite}': written={written} unchanged={unchanged} " +
+            $"unchanged_pending={unchangedPending} skipped_no_original={skippedNoOriginal} errors={errors}");
         foreach (var o in outcomes)
         {
             human.WriteLine(o.Outcome switch
             {
                 StagedOutcome.Written => $"  {o.TestId}: updated",
                 StagedOutcome.Unchanged => $"  {o.TestId}: unchanged (reviewed, no edit needed)",
+                StagedOutcome.UnchangedPending => $"  {o.TestId}: {PendingText(o.Bucket!)}",
                 _ => $"  {o.TestId}: failed [{o.ErrorCode}] {string.Join(" ", o.Errors)} (kept {o.File})"
             });
         }
@@ -498,6 +572,7 @@ public sealed class IngestUpdateCommand : Command
                 suite,
                 written,
                 unchanged,
+                unchanged_pending = unchangedPending,
                 skipped_no_original = skippedNoOriginal,
                 errors,
                 results = outcomes.Select(o => o.ToJson()).ToList(),
@@ -538,6 +613,9 @@ internal sealed record StagedOutcome(string TestId, string Path, string File, st
     public const string Unchanged = "unchanged";
     public const string Failed = "failed";
 
+    /// <summary>Spec 089 (F3): returned unchanged while a change needing an edit is pending; nothing recorded.</summary>
+    public const string UnchangedPending = "unchanged_pending";
+
     public const string NoOriginal = "NO_ORIGINAL";
     public const string Unreadable = "UNREADABLE";
     public const string IdMismatch = "ID_MISMATCH";
@@ -547,10 +625,19 @@ internal sealed record StagedOutcome(string TestId, string Path, string File, st
 
     public IReadOnlyList<string> Errors { get; init; } = [];
 
+    /// <summary>Spec 089 (F3): the pending bucket (wire name) of an <see cref="UnchangedPending"/> outcome.</summary>
+    public string? Bucket { get; init; }
+
+    /// <summary>Spec 089 (F3): triage's reasons for the pending bucket.</summary>
+    public IReadOnlyList<string> Why { get; init; } = [];
+
     public static StagedOutcome Fail(string testId, string path, string file, string code, params string[] errors) =>
         new(testId, path, file, Failed) { ErrorCode = code, Errors = errors };
 
-    public object ToJson() => Outcome == Failed
-        ? new { test = TestId, file = File, outcome = Outcome, error_code = ErrorCode, errors = Errors }
-        : new { test = TestId, file = File, outcome = Outcome };
+    public object ToJson() => Outcome switch
+    {
+        Failed => new { test = TestId, file = File, outcome = Outcome, error_code = ErrorCode, errors = Errors },
+        UnchangedPending => new { test = TestId, file = File, outcome = Outcome, bucket = Bucket, why = Why },
+        _ => new { test = TestId, file = File, outcome = Outcome }
+    };
 }

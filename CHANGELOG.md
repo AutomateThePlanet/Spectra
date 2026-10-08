@@ -335,6 +335,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ingest-update` single form: JSON gains `unchanged`. The `--all` JSON gains `unchanged` and `results`; the human
   summary lists each test and is printed in JSON mode too (stderr).
 
+### Fixed (review fixes, Spec 089)
+
+- **Update edits and critic repairs no longer share a staging folder.** A file kept after a failed ingest was picked up
+  by the other flow's next batch and ingested in that flow's baseline mode — a leftover repair ingested by the update
+  flow marked pending doc changes as reviewed. Now `ingest-update <suite> --all` reads only `.spectra/updates/<suite>/`
+  and `--all --keep-baseline` reads only `.spectra/repairs/<suite>/repaired-<id>.json`, where `spectra-generate`'s
+  repair loop now stages its repairs.
+- **A staged file holding several tests fails loud.** Only the first test of a staged array was used and the file was
+  deleted. An edit (staged file or `--from`) must now hold exactly one test object; more than one fails with
+  `MULTIPLE_TESTS`, naming the count and the ids, and nothing is written (exit 5 in the single form; a kept `failed`
+  file in a batch).
+- **Returning a test unchanged no longer hides a substantive change.** An identical edit rebuilt the baseline whatever
+  was pending, so a missed LOAD change vanished from triage. Without `--keep-baseline`, an unchanged test with a
+  baseline entry is now classified as triage would: UNCHANGED, COSMETIC and LIGHT are `unchanged` (recorded, as
+  before); LOAD, CRITERIA_CHANGED, REMOVED, CRITERIA_REMOVED and RELINK are the new outcome `unchanged_pending` — nothing
+  recorded, `bucket` and `why` in the result, the change still in triage. `spectra-update` asks the user per group to
+  acknowledge or edit again (LOAD / CRITERIA_CHANGED) and never acknowledges on its own; for REMOVED, CRITERIA_REMOVED
+  and RELINK it says the docs changed again since triage and asks for a new triage.
+- **Criteria without a baseline value are no longer shown as unchanged.** The edit prompt labels them
+  `(not baselined — compare the test with the current text)`, like sections.
+- **A batch with failed files says so.** `ingest-update --all` exits 8 when at least one staged file failed (0 when
+  none did; `unchanged_pending` is not a failure); the JSON is unchanged. Both skills read `results` and retry instead
+  of stopping.
+- **The staging folders are gitignored.** `spectra init` adds `.spectra/updates/` and `.spectra/repairs/`; `spectra
+  update-skills` now applies the same list to existing workspaces (plain `init` still refuses on them).
+
 ### Notes
 
 - **One-time `source_section` churn.** Because `source_section` is now read, the first re-extraction after
@@ -345,6 +371,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   write do it). Two docs that already shared one file are reported as collisions; re-extract both.
 - **Known issue, not changed here:** an imported criterion with neither an `id` nor a `source` can't be matched
   on re-import, so re-importing it adds a copy.
+- **Repair leftovers from before 089 (Spec 089).** A repair loop from before 089 staged its repairs in
+  `.spectra/updates/<suite>/`; one kept there after a failure can't be told apart from an update edit, so the next
+  update batch (`ingest-update <suite> --all`) would ingest it and rebuild that test's baseline. Before the first update
+  batch after upgrading, look in `.spectra/updates/*/` and delete any `updated-*.json` a repair run left behind.
+- **Existing workspaces (Spec 089):** run `spectra update-skills` to get the new skills, the new `test-update` template
+  and the two new `.gitignore` entries.
 
 ## [2.5.0] - 2026-09-24 — Lossless test writes and doc-reference resolution
 
