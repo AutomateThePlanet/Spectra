@@ -467,7 +467,8 @@ cat ./criteria.json | spectra ai ingest-criteria --doc docs/payment.md
 ### `spectra ai compile-critic-prompt` (critic subagent)
 
 Deterministic, model-free compilation of the **critic verification prompt** for one generated
-test, serving as the verification analogue of `compile-prompt`. Writes nothing; calls no model. The
+test, serving as the verification analogue of `compile-prompt`. It writes only the fingerprint record (below) —
+never the verdict — and calls no model. The
 `spectra-critic` `context: fork` subagent runs the emitted prompt in a fresh, isolated context
 (test artifact + selected source docs only) and hands its verdict to `ingest-verdict`.
 
@@ -483,6 +484,11 @@ spectra ai compile-critic-prompt --test ./tc-900.json --docs ./docs/checkout
   `.spectra/verdicts/critic-input-<id>.json` = `{id, suite, file, fingerprint}` — the content the critic judges, not its
   grounding block. Nothing is written on a refusal. `ingest-verdict` / `ingest-grounding` refuse a verdict whose test
   changed since (`VERDICT_STALE`).
+- Spec 091 (FR-001): the record also has `compiled_at` (UTC, ISO 8601), when it was written. A verdict file written
+  more than 2 s before it is stale (`VERDICT_STALE`, "older than the last critic prompt"), so a critic run that compiled
+  the prompt but wrote no verdict never revives an older one. Nothing is deleted or renamed.
+- Compiling the whole suite (`--suite S` without `--test`) records `compiled_at` for every test, so every verdict
+  written before it — including partial verdicts waiting for repair — becomes stale and needs a new critic run.
 
 ### `spectra ai ingest-verdict` (fail-loud boundary)
 
@@ -502,6 +508,10 @@ spectra ai ingest-verdict --from ./verdict.json --output-format json
   since → exit `4`, `VERDICT_STALE` (shared failure shape). `--suite <s> --all` doesn't classify stale verdicts:
   `skipped_stale` (count) and `stale` (ids). A verdict without a record (from before 090, stdin, or another path) is
   accepted as before.
+- Spec 091 (FR-002): a verdict file last written more than 2 s (the file-system timestamp allowance) before its record's
+  `compiled_at` is also stale — the message says it is older than the last critic prompt for that test. A record
+  written by 090 (no `compiled_at`) keeps the fingerprint-only rule; the rule compares times, not contents, so a new
+  verdict written after the compile is fresh even when byte-identical to an older one.
 
 ### `spectra ai ingest-grounding` (durable verdict write-back)
 
@@ -521,13 +531,28 @@ spectra ai ingest-grounding --suite reporting --test TC-113 \
 ```bash
 # After 8a critic loop — write all grounded tests in one call (partial skipped: pre-repair filter)
 spectra ai ingest-grounding --suite reporting --all --output-format json
-# After 8b repair loop — write all repair-attempted tests (grounded + still-partial)
-spectra ai ingest-grounding --suite reporting --all --repaired --repair-attempts 1 --output-format json
+# After 8b repair loop — write the re-critiqued tests (grounded + still-partial); --ids is required with --repaired
+spectra ai ingest-grounding --suite reporting --all --repaired --repair-attempts 1 --ids TC-113,TC-114 --output-format json
 ```
 
-`--all` scans `.spectra/verdicts/critic-verdict-*.json`, filters to the named suite via `_index.json`, and writes each eligible block in one pass. It is idempotent, since tests whose `.md` already has a `grounding:` block are skipped (`skipped_already_written`). Without `--repaired`, partial verdicts are skipped (`skipped_partial_pre_repair`) because they need one repair attempt first. With `--repaired`, all ungrounded tests (both `grounded` and `partial` re-verdicts) are written.
+`--all` scans `.spectra/verdicts/critic-verdict-*.json`, filters to the named suite via `_index.json`, and writes each eligible block in one pass. It is idempotent, since tests whose `.md` already has a `grounding:` block are skipped (`skipped_already_written`). Without `--repaired`, partial verdicts are skipped (`skipped_partial_pre_repair`) because they need one repair attempt first. With `--repaired`, the listed tests' `grounded` and `partial` re-verdicts are written.
 
-Batch output (JSON): `{ command, mode:"batch", suite, written, skipped_already_written, skipped_partial_pre_repair, errors, skipped_manual, manual, skipped_stale, stale }`.
+| Flag | Description |
+|------|-------------|
+| `--ids a,b` | Spec 091: with `--all`, consider only these tests (comma-separated; trimmed, de-duplicated, case-insensitive). Required with `--all --repaired`. Ids not in the suite are listed under `not_found` (not a failure) |
+
+Argument checks (Spec 091), in this order, before config, index or verdicts are read — usage errors are plain stderr
+in both output modes, exit `1`, nothing written:
+1. `--test` with `--all` → `Use either --test <id> or --all, not both.` (before 091, `--all` won);
+2. `--ids` without `--all` → `--ids is only valid with --all.`;
+3. neither `--test` nor `--all` → `Either --test <id> or --all must be specified.`;
+4. `--all --repaired` with no ids → exit `4`, `IDS_REQUIRED` (shared failure shape): only the tests re-critiqued after
+   a repair may be marked repaired — never a test whose repair failed to ingest, nor a partial verdict left over from an
+   interrupted run.
+
+Batch output (JSON): `{ command, mode:"batch", suite, written, skipped_already_written, skipped_partial_pre_repair, errors, skipped_manual, manual, skipped_stale, stale, skipped_hallucinated, hallucinated, not_found }`.
+The human summary — the counts line, then `TC-140: hallucinated, waiting for review` per kept hallucinated test and
+`TC-999: not found in suite 'reporting'` per unknown id — goes to stdout in human mode and to stderr in JSON mode.
 
 Spec 090:
 - **Manual verdicts are never overwritten (FR-A3).** `--test` → exit `4`, `MANUAL_VERDICT`; `--all` → `skipped_manual`
@@ -537,9 +562,17 @@ Spec 090:
 - An update edit drops the test's critic block and verdict (see `ingest-update`), so the existing skip-if-present rule
   lets the new verdict land — there is no replace option.
 
+Spec 091:
+- **Verdicts older than the last critic prompt are stale** (`compiled_at` rule, see `compile-critic-prompt`). `--test
+  [--from <file>]` is checked by test id, against the last-write time of the file actually read.
+- **Kept hallucinated tests (F3).** In `--all`, a hallucinated verdict for a test whose file still exists is counted in
+  `skipped_hallucinated` and listed under `hallucinated` — kept for review (the update flow leaves that decision to the
+  user), not written and not an error. Unreadable or unparseable verdict files and refused writes still count as
+  `errors`; a test whose file is gone (dropped by the generation flow) is skipped as before.
+
 - **grounded** → condensed "verified clean" block (`verdict: grounded`, `score`, `verified_at`).
 - **partial** → block with condensed findings + `flagged_for_review: true` (unless `--repaired`; the `spectra-review-flagged` skill then dispositions flagged tests).
-- **hallucinated** → refuses (exit 4); use `record-drop` + `spectra delete` instead.
+- **hallucinated** → `--test` refuses (exit 4); use `record-drop` + `spectra delete` instead. `--all` lists it under `hallucinated` (Spec 091).
 - Exit code is `0` when written, `4` when hallucinated is refused, `5` for an empty verdict, `6` for a parse failure, and `1` for an environment error.
 
 ### `spectra ai record-drop` (drop audit trail)

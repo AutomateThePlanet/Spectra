@@ -66,10 +66,12 @@ public sealed class RepairLoopAfterEditTests : IDisposable
         await CompileAsync("TC-102");
         _ws.WriteVerdict("TC-102", reverdict);
         Ok(await _ws.IngestVerdictAllAsync());
-        var second = Ok(await _ws.IngestGroundingAsync("--suite", "storage", "--all", "--repaired", "--repair-attempts", "1"));
+        // Spec 091 (FR-007): the repaired batch names the re-critiqued test, so TC-101 is no longer considered.
+        var second = Ok(await _ws.IngestGroundingAsync(
+            "--suite", "storage", "--all", "--repaired", "--repair-attempts", "1", "--ids", "TC-102"));
 
         Assert.Equal(1, second.GetProperty("written").GetInt32());
-        Assert.Equal(1, second.GetProperty("skipped_already_written").GetInt32()); // TC-101
+        Assert.Equal(0, second.GetProperty("skipped_already_written").GetInt32());
         var grounding = _ws.GroundingOf("storage", "TC-102")!;
         Assert.Equal(reverdict == "grounded" ? VerificationVerdict.Grounded : VerificationVerdict.Partial, grounding.Verdict);
         Assert.True(grounding.Repaired);

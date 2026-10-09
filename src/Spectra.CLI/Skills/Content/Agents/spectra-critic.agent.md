@@ -42,9 +42,11 @@ documents in front of you. If you were not given a document, treat that claim as
    required. Use `--docs <dir>` only as an explicit override for ad-hoc verification against a
    different document set.
 
-   This emits the verification prompt (artifact + selected source docs). It writes nothing and
-   calls no model. If it exits `4` (refused), the test artifact is missing an id/title — stop and
-   report that; do not invent a verdict. (A bare `--test <path>` still works for ad-hoc files.)
+   This emits the verification prompt (artifact + selected source docs). It writes only the
+   fingerprint record (`.spectra/verdicts/critic-input-<id>.json`, with the time it was compiled)
+   — never the verdict — and calls no model. If it exits `4` (refused), the test artifact is
+   missing an id/title — stop and report that; do not invent a verdict. (A bare `--test <path>`
+   still works for ad-hoc files.)
 
 2. **Render the verdict.** Read the compiled prompt and produce your verdict as a JSON object —
    and nothing else — in exactly this shape:
