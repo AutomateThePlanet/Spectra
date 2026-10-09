@@ -83,10 +83,10 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void AgentContent_HasAllAgents()
     {
-        // skill-pair-merge: spectra-generation and spectra-execution merged into their flow skills;
-        // only the context:fork critic subagent remains as a bundled agent.
-        Assert.Single(AgentContent.All);
-        Assert.True(AgentContent.All.ContainsKey("spectra-critic.agent.md"));
+        // Spec 092: the critic plus the three orchestration subagents (updater, repairer, extractor).
+        Assert.Equal(
+            new[] { "spectra-critic.agent.md", "spectra-extractor.agent.md", "spectra-repairer.agent.md", "spectra-updater.agent.md" },
+            AgentContent.All.Keys.OrderBy(k => k, StringComparer.Ordinal).ToArray());
     }
 
     [Fact]
@@ -483,49 +483,53 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void UpdateSkill_EditLoop_CompilesPerGroup_StagesPerTest_IngestsAll()
     {
-        var step = UpdateStep("**Step 5**", "**Step 6**");
+        // Spec 092: the edit step runs in the spectra-updater subagent.
+        var agent = Normalised(UpdaterAgent);
 
-        Assert.Contains("spectra ai compile-update-prompt --suite <suite> --group <group>", step);
-        Assert.Contains("`.spectra/updates/<suite>/updated-<id>.json`", step);
-        Assert.Contains("Write tool", step);
-        Assert.Contains("spectra ai ingest-update <suite> --all --output-format json --verbosity quiet", step);
-        Assert.True(step.IndexOf("--group <group>", StringComparison.Ordinal)
-            < step.IndexOf("--all --output-format", StringComparison.Ordinal));
+        Assert.Contains("spectra ai compile-update-prompt --suite <suite> --group <group>", agent);
+        Assert.Contains("`.spectra/updates/<suite>/updated-<id>.json`", agent);
+        Assert.Contains("Write tool", agent);
+        Assert.Contains("spectra ai ingest-update <suite> --all --output-format json --verbosity quiet", agent);
+        Assert.True(agent.IndexOf("--group <group>", StringComparison.Ordinal)
+            < agent.IndexOf("--all --output-format", StringComparison.Ordinal));
     }
 
     [Fact]
     public void UpdateSkill_EditLoop_ReportsEachResult_UnchangedIsAcknowledged()
     {
-        var step = UpdateStep("**Step 5**", "**Step 6**");
+        // Spec 092: the updater reads `results`; the skill reports its lines.
+        var agent = Normalised(UpdaterAgent);
 
-        Assert.Contains("`results`", step);
-        Assert.Contains("`written`", step);
-        Assert.Contains("`unchanged`", step);
-        Assert.Contains("`failed`", step);
-        Assert.Contains("acknowledged", step);
+        Assert.Contains("`results`", agent);
+        Assert.Contains("`written`", agent);
+        Assert.Contains("`unchanged`", agent);
+        Assert.Contains("`failed`", agent);
+        Assert.Contains("acknowledged", agent);
     }
 
     [Fact]
     public void UpdateSkill_EditLoop_RetriesAFailedTestAtMostTwice_WithTestId()
     {
-        var step = UpdateStep("**Step 5**", "**Step 6**");
+        // Spec 092: the bounded retry runs in the spectra-updater subagent.
+        var agent = Normalised(UpdaterAgent);
 
-        Assert.Contains("at most twice", step);
-        Assert.Contains("spectra ai compile-update-prompt --suite <suite> --test-id <id>", step);
-        Assert.Contains("report it and continue", step);
+        Assert.Contains("at most twice", agent);
+        Assert.Contains("spectra ai compile-update-prompt --suite <suite> --test-id <id>", agent);
+        Assert.Contains("report it and continue", agent);
     }
 
     [Fact]
     public void UpdateSkill_EditLoop_HandlesTheCompileRefusals()
     {
-        var step = UpdateStep("**Step 5**", "**Step 6**");
+        // Spec 092: the compile refusals are handled in the spectra-updater subagent.
+        var agent = Normalised(UpdaterAgent);
 
         foreach (var code in new[] { "PROMPT_TOO_LARGE", "TEMPLATE_OUTDATED", "NOTHING_TO_RECONCILE", "TRIAGE_STALE" })
         {
-            Assert.Contains(code, step);
+            Assert.Contains(code, agent);
         }
 
-        Assert.Contains("spectra prompts reset test-update", step);
+        Assert.Contains("spectra prompts reset test-update", agent);
     }
 
     [Fact]
@@ -538,15 +542,23 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void UpdateSkill_NonStop_AllowsWritesToTheStagingFiles()
     {
+        // Spec 092: the skill writes only progress; the staging files are the subagents' writes.
         var contract = UpdateStep("## NON-STOP CONTRACT", "## Update test cases for a suite");
 
-        Assert.Contains("`.spectra/updates/<suite>/updated-<id>.json`", contract);
         Assert.Contains("`.spectra/progress.json`", contract);
+        Assert.Contains("`Write` to `.spectra/updates/<suite>/updated-<id>.json`", Normalised(UpdaterAgent));
     }
 
     // ---- Spec 089: review fixes for 088 ----
 
     private static string GenerateSkill => SkillContent.All["spectra-generate"].Replace("\r\n", "\n");
+
+    // Spec 092: the edit, repair and extraction steps moved into these subagents.
+    private static string UpdaterAgent => AgentContent.All["spectra-updater.agent.md"].Replace("\r\n", "\n");
+
+    private static string RepairerAgent => AgentContent.All["spectra-repairer.agent.md"].Replace("\r\n", "\n");
+
+    private static string ExtractorAgent => AgentContent.All["spectra-extractor.agent.md"].Replace("\r\n", "\n");
 
     [Fact]
     public void GenerateSkill_StagesRepairsInTheRepairsFolder_NeverTheUpdateFolder()
@@ -594,20 +606,21 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void UpdateSkill_Exit8_ReadsResults_AndNeverStops()
     {
-        var step = UpdateStep("**Step 5**", "**Step 6**");
+        // Spec 092: the ingest and its exit codes are the spectra-updater subagent's.
+        var agent = Normalised(UpdaterAgent);
 
-        Assert.Contains("Exit `0` (no file failed) or `8`", step);
-        Assert.Contains("Exit `8` is never a reason to\nstop", step);
-        Assert.Contains("`MULTIPLE_TESTS`", step);
+        Assert.Contains("Exit `0` (no file failed) or `8`", agent);
+        Assert.Contains("Exit `8` is never a reason to stop", agent);
+        Assert.Contains("`MULTIPLE_TESTS`", agent);
     }
 
     [Fact]
     public void UpdateSkill_UnchangedPending_AsksToAcknowledgeOrEditAgain_ForLoadAndCriteriaChangedOnly()
     {
-        // F3 (FR-015, analysis I1/A2).
+        // F3 (FR-015, analysis I1/A2). Spec 092: the user's decision stays in the skill; "edit again" is the updater.
         var step = UpdateStep("**Step 5**", "**Step 6**");
         var start = step.IndexOf("**Returned unchanged, still pending.**", StringComparison.Ordinal);
-        var end = step.IndexOf("**Bounded retry:**", StringComparison.Ordinal);
+        var end = step.IndexOf("**Step 5a**", StringComparison.Ordinal);
         Assert.True(start >= 0 && end > start);
         var block = step[start..end];
 
@@ -615,10 +628,8 @@ public class SkillsManifestTests : IDisposable
         Assert.Contains("`LOAD` or `CRITERIA_CHANGED` → ask the user", block);
         Assert.Contains("Never acknowledge without the user's\n  answer", block);
         Assert.Contains("spectra ai update-ack --suite <suite> --ids <id1>,<id2>", block);
-        Assert.Contains("spectra ai compile-update-prompt --suite <suite> --test-id <id>", block);
-        Assert.Contains("`.spectra/updates/<suite>/updated-<id>.json`", block);
-        Assert.Contains("spectra ai ingest-update <suite> --all --output-format json --verbosity quiet", block);
-        Assert.Contains("at most two retries per test", block);
+        Assert.Contains("`spectra-updater` subagent with `suite: <suite>` and `ids: <id>`", Normalised(block));
+        Assert.Contains("at most twice per test", Normalised(block));
 
         var others = block[block.IndexOf("- `REMOVED`, `CRITERIA_REMOVED` or `RELINK`", StringComparison.Ordinal)..];
         Assert.Contains("changed again since triage", others);
@@ -634,23 +645,24 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void UpdateSkill_ReverifiesEditedTests_AskingOnce_WithOneRepair()
     {
-        // FR-A4 (spec T5).
+        // FR-A4 (spec T5). Spec 092: the critic compiles its own prompt; the repair runs in the spectra-repairer.
         var step = UpdateStep("**Step 5a**", "**Step 6**");
+        var flat = Normalised(step);
 
         Assert.Contains("Re-verify the edited tests with the critic\nnow? (recommended)", step);
         Assert.Contains("don't ask again", step);
         Assert.Contains("`manual_verdict_kept`", step);
-        Assert.Contains("`spectra-critic` subagent with the Task tool", step);
-        Assert.Contains("spectra ai compile-critic-prompt --suite <suite> --test <id>", step);
+        Assert.Contains("`spectra-critic` subagent with the Task tool", flat);
+        Assert.Contains("spectra ai compile-critic-prompt --suite <suite> --test <id>", AgentContent.All["spectra-critic.agent.md"]);
         Assert.Contains("spectra ai ingest-verdict --suite <suite> --all --output-format json", step);
         Assert.Contains("spectra ai ingest-grounding --suite <suite> --all --output-format json", step);
-        Assert.Contains("spectra ai compile-repair-prompt --suite <suite> --test <id>", step);
-        Assert.Contains("`.spectra/repairs/<suite>/repaired-<id>.json`", step);
-        Assert.Contains("spectra ai ingest-update <suite> --all --keep-baseline", step);
+        Assert.Contains("spectra ai compile-repair-prompt --suite <suite> --test <id>", RepairerAgent);
+        Assert.Contains("`.spectra/repairs/<suite>/repaired-<id>.json`", RepairerAgent);
+        Assert.Contains("spectra ai ingest-update <suite> --all --keep-baseline", RepairerAgent);
         Assert.Contains("--repaired --repair-attempts 1", step);
         Assert.Contains("still hallucinated", step);
-        Assert.Contains("restore the previous version from\n  git (the user runs that", step);
-        Assert.Contains("never runs `spectra ai record-drop` or `spectra delete`", step);
+        Assert.Contains("restore the previous version from git (the user runs that", flat);
+        Assert.Contains("never runs `spectra ai record-drop` or `spectra delete`", flat);
         Assert.DoesNotMatch(@"(?m)^\s*spectra (ai record-drop|delete)\b", step);
     }
 
@@ -671,14 +683,14 @@ public class SkillsManifestTests : IDisposable
         var contract = UpdateStep("## NON-STOP CONTRACT", "## Update test cases for a suite");
 
         Assert.Contains("`spectra-critic`", contract);
-        Assert.Contains("`.spectra/repairs/<suite>/repaired-<id>.json`", contract);
+        Assert.Contains("`Write` to `.spectra/repairs/<suite>/repaired-<id>.json`", Normalised(RepairerAgent));
     }
 
     [Fact]
     public void BothSkills_KeepAFailedFileAsFailedId_AndRetryWithAFreshFile()
     {
-        // FR-B1.
-        var update = UpdateStep("**Step 5**", "**Step 5a**");
+        // FR-B1. Spec 092: the update edit (and its retry) runs in the spectra-updater subagent.
+        var update = Normalised(UpdaterAgent);
         Assert.Contains("`.spectra/updates/<suite>/failed-<id>.json`", update);
         Assert.Contains("write a fresh `.spectra/updates/<suite>/updated-<id>.json`", update);
         Assert.DoesNotContain("it replaces the kept file", update);
@@ -711,12 +723,11 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void UpdateSkill_DoesNotKeepTheBaseline()
     {
-        // Spec 085: the update edit rebuilds the baseline. Spec 090 (FR-A4): only the re-verify repair (Step 5a), which
-        // fixes grounding rather than doc drift, keeps it — and it ingests from the repairs folder.
-        var lines = SkillContent.Update.Replace("\r\n", "\n").Split('\n').Where(l => l.Contains("--keep-baseline")).ToList();
-        Assert.Single(lines);
-        Assert.Contains("spectra ai ingest-update <suite> --all --keep-baseline", lines[0]);
-        Assert.DoesNotContain("--keep-baseline", UpdateStep("**Step 5**", "**Step 5a**"));
+        // Spec 085: the update edit rebuilds the baseline. Spec 090 (FR-A4): only the re-verify repair keeps it — and
+        // Spec 092 moved that repair into the spectra-repairer subagent, so neither the skill nor the updater keeps it.
+        Assert.DoesNotContain("--keep-baseline", SkillContent.Update);
+        Assert.DoesNotContain("--keep-baseline", UpdaterAgent);
+        Assert.Contains("spectra ai ingest-update <suite> --all --keep-baseline", RepairerAgent);
     }
 
     [Fact]
@@ -833,12 +844,15 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void CriteriaSkill_UsesCompiledPromptAsTheOnlyDocumentSource()
     {
-        var content = SkillContent.All["spectra-criteria"];
+        // Spec 092: the extraction turn runs in the spectra-extractor subagent; this session never reads the document.
+        var skill = SkillContent.All["spectra-criteria"];
+        var agent = Normalised(ExtractorAgent);
 
-        Assert.DoesNotContain("file tools to read", content);
-        Assert.DoesNotContain("reading the document with your file tools", content);
-        Assert.Contains("it already contains the full document text", content);
-        Assert.Contains("do not\nread `{path}` separately", content.Replace("\r\n", "\n"));
+        Assert.DoesNotContain("file tools to read", skill);
+        Assert.DoesNotContain("reading the document with your file tools", skill);
+        Assert.DoesNotContain("file tools to read", agent);
+        Assert.Contains("it already contains the full document text", agent);
+        Assert.Contains("do not read `<doc>` separately", agent);
     }
 
     // ---- Spec 079: moved / deleted docs and the changeset summary ----
@@ -862,16 +876,17 @@ public class SkillsManifestTests : IDisposable
 
         Assert.Contains("criteria added / modified / removed", content);
         Assert.Contains("removed** criterion id that tests still reference", content);
-        Assert.Contains("Exit 7 (`INVALID_CRITERION_ID`)", content);
+        // Spec 092: the extraction and its regeneration rules moved into the spectra-extractor subagent.
+        var agent = Normalised(ExtractorAgent);
+        Assert.Contains("Exit 7 (`INVALID_CRITERION_ID`)", agent);
         // Spec 078 wording is kept.
-        Assert.Contains("it already contains the full document text", content);
+        Assert.Contains("it already contains the full document text", agent);
     }
 
     // Spec 080 B5: every criteria write step tells the session what to do on exit 1.
     [Theory]
     [InlineData("**1a.", "**1b.")]
     [InlineData("**1b.", "The Step 2 work-list")]
-    [InlineData("**2c.", "Update `.spectra/progress.json`: `{\"active\":2}`")]
     public void CriteriaSkill_WriteSteps_HandleExit1(string sectionStart, string sectionEnd)
     {
         var content = SkillContent.All["spectra-criteria"].Replace("\r\n", "\n");
@@ -894,11 +909,32 @@ public class SkillsManifestTests : IDisposable
 
     // Spec 081 C4: the compile step reads the unified failure fields.
     [Fact]
+    public void CriteriaExtractor_IngestStep_HandlesExit1()
+    {
+        // Spec 092: the former Step 2c (the ingest) runs in the spectra-extractor subagent.
+        var content = Normalised(ExtractorAgent);
+        var start = content.IndexOf("**3. Ingest", StringComparison.Ordinal);
+        var end = content.IndexOf("## Your final message", start, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start);
+        var section = content[start..end];
+
+        Assert.Contains("Exit 1", section);
+        Assert.Contains("<error_code>", section);
+        Assert.Contains("`LOCK_TIMEOUT`", section);
+        Assert.Contains("retry the same command once", section);
+        foreach (var code in new[] { "CRITERIA_FILE_UNREADABLE", "CRITERIA_FILE_COLLISION", "INVALID_DOC_PATH" })
+        {
+            Assert.Contains(code, section);
+        }
+    }
+
+    [Fact]
     public void CriteriaSkill_CompileStep_ReadsErrorsNotMessage()
     {
-        var content = SkillContent.All["spectra-criteria"];
-        var start = content.IndexOf("**2a.", StringComparison.Ordinal);
-        var end = content.IndexOf("**2b.", start, StringComparison.Ordinal);
+        // Spec 092: the compile step runs in the spectra-extractor subagent.
+        var content = ExtractorAgent;
+        var start = content.IndexOf("**1. Compile", StringComparison.Ordinal);
+        var end = content.IndexOf("**2. Extract", start, StringComparison.Ordinal);
         Assert.True(start >= 0 && end > start);
         var section = content[start..end];
 
@@ -959,31 +995,34 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void UpdateSkill_RepairedGrounding_PassesTheTestsId()
     {
-        // FR-009, section-scoped to Step 5a.
+        // FR-009, section-scoped to Step 5a. Spec 092: one call for every repair that landed.
         var step = UpdateStep("**Step 5a**", "**Step ");
 
-        Assert.Contains("--repaired --repair-attempts 1 --ids <id>", step);
+        Assert.Contains("--repaired --repair-attempts 1 --ids <id1>,<id2>", step);
     }
 
     [Fact]
     public void UpdateSkill_AFailedRepairIngest_IsRetriedAtMostTwice_InStep5a()
     {
-        // FR-009 (analysis U4/T2): Step 5's own "at most twice" (for edits) must not satisfy this.
-        var step = UpdateStep("**Step 5a**", "**Step ");
+        // FR-009 (analysis U4/T2). Spec 092: the retry runs in the spectra-repairer subagent; Step 5a says so and
+        // passes the landed ids.
+        var flat = Normalised(UpdateStep("**Step 5a**", "**Step "));
+        Assert.Contains("retries a failed repair ingest at most twice", flat);
+        Assert.Contains("--ids <id1>,<id2>", flat);
 
-        Assert.Contains("at most twice", step);
-        Assert.Contains("repaired-<id>.json", step);
-        Assert.Contains("--ids <id>", step);
+        var repairer = Normalised(RepairerAgent);
+        Assert.Contains("at most twice", repairer);
+        Assert.Contains("repaired-<id>.json", repairer);
     }
 
     [Fact]
     public void UpdateSkill_ReCritiquesOnlyALandedRepair_AndReportsAFailedOne()
     {
-        // FR-009 (analysis C1): step 4 only after `written` or `unchanged`; a still-failed repair gets no repaired
-        // grounding and is reported.
+        // FR-009 (analysis C1): re-critic only after `written` or `unchanged`; a still-failed repair gets no repaired
+        // grounding and is reported. Spec 092: by the repairer's returned lines.
         var step = Normalised(UpdateStep("**Step 5a**", "**Step "));
 
-        Assert.Contains("only when step 3 reported `written` or `unchanged`", step);
+        Assert.Contains("only for the ids it returned `written` or `unchanged`", step);
         Assert.Contains("repair failed: <error_code>", step);
         Assert.Contains("no repaired grounding", step);
         Assert.Contains("unverified", step);

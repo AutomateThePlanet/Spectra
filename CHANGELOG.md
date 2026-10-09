@@ -430,6 +430,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Invalid option combinations on `ingest-grounding` are refused:** `--test` with `--all` (where `--all` used to win)
   and `--ids` without `--all` exit 1 with a plain message.
 
+### Changed (Spec 092 — update and criteria subagents, Phase 5)
+
+- **The update and criteria skills orchestrate; subagents do the heavy work.** A large update no longer fills the
+  conversation with doc sections, edit prompts, test JSON and verdicts, and criteria extraction no longer pulls whole
+  documents into it:
+  - `spectra-update` hands each triage group to the new `spectra-updater` subagent (compile → edit → stage → ingest,
+    bounded retries) and partial / hallucinated tests to the new `spectra-repairer`; it routes each edited test by the
+    critic's one-line answer instead of reading verdict files, and keeps every user decision (buckets, REMOVED review,
+    relink, `unchanged_pending`, still hallucinated). A "Context budget contract" says what the main session never
+    reads.
+  - `spectra-criteria` hands each changed document to the new `spectra-extractor` subagent; moves, retirements and
+    migration stay in the main session with your confirmation.
+  - Every per-test outcome, baseline summary, warning and criteria changeset line (added, modified old → new, removed
+    with referencing tests, metadata) is relayed to you, built from the subagents' returned lines.
+- **The critic ends with one line:** `<id> | <verdict> <score>` or `<id> | failed: <reason>`.
+- **Every bundled agent installs to `.claude/agents/`** by one rule (nothing goes to `.github/agents/`); `spectra init`
+  installs four agents and `spectra update-skills` adds the three new ones to an existing workspace.
+- No CLI command, flag, config key, prompt template or file format changed.
+
 ### Notes
 
 - **One-time `source_section` churn.** Because `source_section` is now read, the first re-extraction after
@@ -456,6 +475,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **090 records (Spec 091)** keep the fingerprint-only rule until the critic prompt is compiled again for that test.
 - **Compiling the whole suite** (`compile-critic-prompt --suite S` without `--test`) makes every older verdict stale.
 - **`ingest-grounding --test` together with `--all` is now refused** (exit 1); `--all` used to win.
+- **Existing workspaces (Spec 092):** run `spectra update-skills` to get the three new subagents and the orchestrating
+  update / criteria skills. A customised `spectra-update` or `spectra-criteria` skill is skipped and keeps the
+  in-session flow until you refresh it (`spectra update-skills` after discarding your changes).
 
 ## [2.5.0] - 2026-09-24 — Lossless test writes and doc-reference resolution
 

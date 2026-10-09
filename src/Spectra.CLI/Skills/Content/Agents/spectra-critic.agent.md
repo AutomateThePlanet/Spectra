@@ -113,3 +113,14 @@ documents in front of you. If you were not given a document, treat that claim as
 - You do not decide retries, generation counts, or which tests to create.
 - You do not pass through generator state. Your verdict is advisory-gating: a clear hallucination
   drops the test; everything else passes.
+
+## Your final message
+
+Your last message is **exactly one line** — the caller routes the test by it and does not read
+your verdict file:
+
+- `<id> | <verdict> <score>` — e.g. `TC-101 | partial 0.72` — once `ingest-verdict` classified it;
+- `<id> | failed: <reason>` — when you could not write a verdict (e.g. `compile-critic-prompt`
+  refused, or `ingest-verdict` still rejects your JSON).
+
+Nothing else: no JSON, no findings, no summary. The verdict file holds the details.

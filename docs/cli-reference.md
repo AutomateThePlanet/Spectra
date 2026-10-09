@@ -86,7 +86,7 @@ spectra init
 ```
 
 Creates `spectra.config.json` (including a `coverage` section with `criteria_dir: docs/criteria` and `criteria_file:
-docs/criteria/_criteria_index.yaml`), `docs/`, `test-cases/`, `docs/criteria/_criteria_index.yaml`, `profiles/_default.yaml`, `.spectra/prompts/` (5 templates), `.claude/skills/` (12 bundled SKILLs), `.claude/agents/` (2 agent prompts), `CUSTOMIZATION.md`, and `USAGE.md`.
+docs/criteria/_criteria_index.yaml`), `docs/`, `test-cases/`, `docs/criteria/_criteria_index.yaml`, `profiles/_default.yaml`, `.spectra/prompts/` (5 templates), `.claude/skills/` (12 bundled SKILLs), `.claude/agents/` (4 subagents: `spectra-critic`, and `spectra-updater`, `spectra-repairer`, `spectra-extractor` for the update and criteria skills — Spec 092), `CUSTOMIZATION.md`, and `USAGE.md`.
 
 **Options:**
 
@@ -134,6 +134,11 @@ Compares installed files against bundled versions using SHA-256 hashes:
 - **Unmodified files** → updated to latest version
 - **User-modified files** → skipped with warning (preserves customizations)
 - **Missing files** → recreated
+
+Spec 092: this is how an existing workspace gets the update and criteria subagents (`spectra-updater`,
+`spectra-repairer`, `spectra-extractor`) under `.claude/agents/`. Every bundled agent installs there — nothing goes to
+`.github/agents/`. A customised update or criteria skill is skipped as usual and keeps its in-session flow until you
+refresh it.
 
 It also offers `spectra init`'s `.gitignore` patterns to an existing workspace (Spec 089; Spec 090 FR-D1–FR-D3):
 - **Only patterns never offered before** are added. The offered set is recorded in `.spectra/skills-manifest.json`
