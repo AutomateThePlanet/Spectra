@@ -11,7 +11,7 @@ This guide shows how to use SPECTRA through Claude Code. Every workflow below sh
 ## Prerequisites
 
 1. [Claude Code](https://claude.com/claude-code), installed and signed in.
-2. `spectra init` completed in your project (creates SKILL files in `.claude/skills/` and the critic subagent in `.claude/agents/`).
+2. `spectra init` completed in your project (creates SKILL files in `.claude/skills/` and the subagents in `.claude/agents/`: the critic, and the updater, repairer and extractor the update and criteria skills delegate to). On an existing project, `spectra update-skills` adds any that are missing; a customised update or criteria skill keeps its older, in-session flow until you refresh it.
 3. Documentation files present in `docs/` (the source material for test generation and acceptance criteria).
 
 ## Getting Started
@@ -66,6 +66,7 @@ After generating, you can continue:
 3. Files created: one criteria file per document, mirroring its path (`docs/a/login.md` → `docs/criteria/docs/a/login.criteria.yaml`), and a master `docs/criteria/_criteria_index.yaml`.
 4. **IDs stay stable.** When a document changes, the assistant sees its existing criteria and keeps each criterion's ID when it still expresses the same requirement, even if reworded. A removed criterion's ID is never reused for something else.
 5. **You see what changed.** Each document's refresh reports criteria added, modified (old → new text) and removed, and for each removed criterion the tests that still reference it.
+   Each changed document is extracted by a `spectra-extractor` subagent in its own context, so the documents never fill your conversation; the assistant relays every line it returns — the outcome and the full changeset — and builds the summary from them.
 6. **Deleted and moved documents.** A document moved without changes keeps its criteria and IDs. A deleted document is shown with the criteria that would be removed; its criteria are only retired after you confirm.
 7. **Inconclusive extractions are retried, not cached.** If a document's extraction comes back unparseable or empty, it's retried once more with a short backoff. Documents that remain inconclusive after retries are reported under `failed_documents` and re-attempted on the next run instead of being silently skipped. A genuine "no criteria found" result (a real, valid empty list) is cached normally.
 8. `--force` remains the full re-extraction escape hatch, ignoring the hash cache and re-extracting every document.
@@ -160,8 +161,10 @@ SPECTRA keeps, for every test, a fingerprint of each doc section it references (
    prompt for all the group's tests: each doc section they reference once — as it is now, the previous version
    (normalised: lowercased, markup removed) and the words that changed — or why it no longer resolves; only the
    criteria the tests link, marked when changed since the baseline, not baselined, or removed; then each test. The
-   assistant edits in-session, stages one file per test — exactly one test per file
-   (`.spectra/updates/checkout/updated-<id>.json`) — and runs `spectra ai ingest-update checkout --all`. That keeps
+   assistant hands each group to a `spectra-updater` subagent, which edits in its own context, stages one file per
+   test — exactly one test per file (`.spectra/updates/checkout/updated-<id>.json`) — and runs
+   `spectra ai ingest-update checkout --all`; it returns one line per test, which the assistant relays to you, so
+   the prompts and test text never fill your conversation. That keeps
    each test's id and manual notes, fails loud on out-of-scope drift and records the new baseline. A test returned
    **unchanged** is not written; it counts as reviewed (its baseline is rebuilt, as with `update-ack`) when its change
    was small (LIGHT, COSMETIC). When a LOAD or CRITERIA_CHANGED change is still pending, it is reported as returned
@@ -182,6 +185,8 @@ SPECTRA keeps, for every test, a fingerprint of each doc section it references (
    flagged for review if still partial; hallucinated gets one repair, and if still hallucinated the assistant stops for
    that test and asks you — edit again, restore the previous version from git (you run it), or delete it with the
    delete skill. The update flow never drops or deletes a test on its own. A verdict for content that changed after the
+   The critic (`spectra-critic`) answers in one line per test, and a partial or hallucinated test is repaired by a
+   `spectra-repairer` subagent, so verdicts and repair prompts stay out of your conversation too. A verdict for content that changed after the
    critic saw it is refused (`VERDICT_STALE`), and so is a verdict older than the last critic prompt for its test — so a
    critic run that compiled the prompt but wrote nothing never revives an older verdict. A repair that still fails to
    ingest after two retries is reported ("repair failed") and never marked repaired; only the tests re-critiqued after a
