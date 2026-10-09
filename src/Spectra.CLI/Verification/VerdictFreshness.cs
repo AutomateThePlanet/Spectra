@@ -8,12 +8,14 @@ namespace Spectra.CLI.Verification;
 /// <summary>
 /// Spec 090 (FR-A2): what <c>compile-critic-prompt</c> records for one test — the content fingerprint the critic was
 /// given — at <c>.spectra/verdicts/critic-input-&lt;id&gt;.json</c>. Written by the CLI, never by the model.
+/// Spec 091 (FR-001): <see cref="CompiledAt"/> is when the record was written; a 090 record has none.
 /// </summary>
 public sealed record VerdictRecord(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("suite")] string? Suite,
     [property: JsonPropertyName("file")] string File,
-    [property: JsonPropertyName("fingerprint")] string Fingerprint);
+    [property: JsonPropertyName("fingerprint")] string Fingerprint,
+    [property: JsonPropertyName("compiled_at")] DateTimeOffset? CompiledAt = null);
 
 /// <summary>Spec 090: whether a verdict still describes the test's current content.</summary>
 public enum Freshness
@@ -28,20 +30,44 @@ public enum Freshness
     NoRecord
 }
 
-public sealed record FreshnessResult(Freshness State, string? Recorded = null, string? Current = null)
+/// <summary>Spec 091: why a verdict is stale.</summary>
+public enum StaleReason
+{
+    /// <summary>Spec 090: the test changed since the critic prompt was compiled.</summary>
+    ContentChanged,
+
+    /// <summary>Spec 091 (FR-002): the verdict file was written before the last critic prompt for the test.</summary>
+    OlderThanPrompt
+}
+
+public sealed record FreshnessResult(
+    Freshness State,
+    string? Recorded = null,
+    string? Current = null,
+    StaleReason Reason = StaleReason.ContentChanged,
+    DateTime? VerdictWrittenAt = null,
+    DateTimeOffset? CompiledAt = null)
 {
     public bool IsStale => State == Freshness.Stale;
 
     /// <summary>The refusal message for a stale verdict.</summary>
-    public string Message(string id) =>
-        $"The verdict for {id} was given to different content (recorded {Recorded}, now {Current}); "
-        + $"run the critic for {id} again.";
+    public string Message(string id) => Reason == StaleReason.OlderThanPrompt
+        ? $"The verdict for {id} is older than the last critic prompt for {id} "
+          + $"(verdict written {VerdictWrittenAt:u}, prompt compiled {CompiledAt?.UtcDateTime:u}); run the critic for {id} again."
+        : $"The verdict for {id} was given to different content (recorded {Recorded}, now {Current}); "
+          + $"run the critic for {id} again.";
 }
 
 /// <summary>Spec 090 (FR-A2): the fingerprint record of each verdict, and the staleness check against it.</summary>
 public static class VerdictFreshness
 {
     public const string ErrorVerdictStale = "VERDICT_STALE";
+
+    /// <summary>
+    /// Spec 091 (FR-002): how much older than <c>compiled_at</c> a verdict file may look and still be fresh — coarse
+    /// file-system timestamps and the gap between the process clock and the file-system clock.
+    /// </summary>
+    public static readonly TimeSpan TimestampAllowance = TimeSpan.FromSeconds(2);
 
     private const string VerdictPrefix = "critic-verdict-";
     private const string RecordPrefix = "critic-input-";
@@ -80,8 +106,13 @@ public static class VerdictFreshness
         }
     }
 
-    /// <summary>Checks the verdict of <paramref name="id"/> against the test's current content.</summary>
-    public static FreshnessResult Check(string root, string id, TestCase current)
+    /// <summary>
+    /// Checks the verdict of <paramref name="id"/> against the test's current content (Spec 090) and, when the record
+    /// has <c>compiled_at</c> and <paramref name="verdictPath"/> is the file being ingested, against the time the
+    /// critic prompt was compiled (Spec 091): a verdict written more than <see cref="TimestampAllowance"/> before it is
+    /// stale. A 090 record, or a verdict without a file (stdin), gets the fingerprint rule only.
+    /// </summary>
+    public static FreshnessResult Check(string root, string id, TestCase current, string? verdictPath = null)
     {
         var record = ReadRecord(root, id);
         if (record is null)
@@ -90,13 +121,26 @@ public static class VerdictFreshness
         }
 
         var now = TestContentFingerprint.Of(current);
-        return string.Equals(record.Fingerprint, now, StringComparison.Ordinal)
-            ? new FreshnessResult(Freshness.Fresh, record.Fingerprint, now)
-            : new FreshnessResult(Freshness.Stale, record.Fingerprint, now);
+        if (!string.Equals(record.Fingerprint, now, StringComparison.Ordinal))
+        {
+            return new FreshnessResult(Freshness.Stale, record.Fingerprint, now);
+        }
+
+        if (record.CompiledAt is { } compiledAt && verdictPath is not null && System.IO.File.Exists(verdictPath))
+        {
+            var writtenAt = System.IO.File.GetLastWriteTimeUtc(verdictPath);
+            if (writtenAt < compiledAt.UtcDateTime - TimestampAllowance)
+            {
+                return new FreshnessResult(Freshness.Stale, record.Fingerprint, now, StaleReason.OlderThanPrompt, writtenAt, compiledAt);
+            }
+        }
+
+        return new FreshnessResult(Freshness.Fresh, record.Fingerprint, now);
     }
 
     /// <summary>Checks against the test file the record names (single-form <c>ingest-verdict --from</c>).</summary>
-    public static async Task<FreshnessResult> CheckRecordedTestAsync(string root, string id, CancellationToken ct = default)
+    public static async Task<FreshnessResult> CheckRecordedTestAsync(
+        string root, string id, string? verdictPath = null, CancellationToken ct = default)
     {
         var record = ReadRecord(root, id);
         if (record is null)
@@ -111,7 +155,7 @@ public static class VerdictFreshness
         }
 
         var parsed = new TestCaseParser().Parse(await File.ReadAllTextAsync(path, ct), Path.GetFileName(path));
-        return parsed.IsSuccess ? Check(root, id, parsed.Value!) : new FreshnessResult(Freshness.NoRecord);
+        return parsed.IsSuccess ? Check(root, id, parsed.Value!, verdictPath) : new FreshnessResult(Freshness.NoRecord);
     }
 
     /// <summary>The test id of a verdict file in <c>.spectra/verdicts/</c> named <c>critic-verdict-&lt;id&gt;.json</c>; else null.</summary>

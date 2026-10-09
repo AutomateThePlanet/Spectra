@@ -291,7 +291,9 @@ public sealed class CompileCriticPromptCommand : Command
         try
         {
             var file = Path.GetRelativePath(root, testPath).Replace(Path.DirectorySeparatorChar, '/');
-            await VerdictFreshness.WriteRecordAsync(root, new VerdictRecord(id, suite, file, TestContentFingerprint.Of(test)), ct);
+            // Spec 091 (FR-001): the record also says when the prompt was compiled; a verdict written before that is stale.
+            await VerdictFreshness.WriteRecordAsync(
+                root, new VerdictRecord(id, suite, file, TestContentFingerprint.Of(test), DateTimeOffset.UtcNow), ct);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

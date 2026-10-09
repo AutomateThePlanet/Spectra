@@ -919,4 +919,86 @@ public class SkillsManifestTests : IDisposable
         Assert.DoesNotContain("`null` for a config", content);
         Assert.DoesNotContain("with `error_code` `null`", content);
     }
+
+    // ---- Spec 091: review fixes for 090 (T8) ----
+
+    private static string Normalised(string text) => System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
+
+    /// <summary>The blank-line-separated paragraph of <paramref name="content"/> that contains <paramref name="needle"/>.</summary>
+    private static string ParagraphWith(string content, string needle)
+    {
+        var paragraph = content.Split("\n\n").FirstOrDefault(p => p.Contains(needle, StringComparison.Ordinal));
+        Assert.True(paragraph is not null, $"no paragraph contains {needle}");
+        return paragraph!;
+    }
+
+    [Fact]
+    public void GenerateSkill_RepairedGrounding_PassesOnlyTheReCritiquedIds()
+    {
+        // FR-009: the call names the ids, and the paragraph that holds it defines them (repair ingest written or
+        // unchanged, minus dropped tests) — the re-critic heading's "written or unchanged" alone doesn't count.
+        var content = GenerateSkill;
+
+        Assert.Contains("--repaired --repair-attempts 1 --ids", content);
+        var paragraph = ParagraphWith(content, "--ids {ids}");
+        Assert.Contains("written", paragraph);
+        Assert.Contains("unchanged", paragraph);
+        Assert.Contains("dropped", paragraph);
+    }
+
+    [Fact]
+    public void GenerateSkill_SkippedHallucinated_IsNotAFailure()
+    {
+        // FR-012.
+        var content = Normalised(GenerateSkill);
+
+        Assert.Contains("`skipped_hallucinated`", content);
+        Assert.Contains("not a failure", content);
+    }
+
+    [Fact]
+    public void UpdateSkill_RepairedGrounding_PassesTheTestsId()
+    {
+        // FR-009, section-scoped to Step 5a.
+        var step = UpdateStep("**Step 5a**", "**Step ");
+
+        Assert.Contains("--repaired --repair-attempts 1 --ids <id>", step);
+    }
+
+    [Fact]
+    public void UpdateSkill_AFailedRepairIngest_IsRetriedAtMostTwice_InStep5a()
+    {
+        // FR-009 (analysis U4/T2): Step 5's own "at most twice" (for edits) must not satisfy this.
+        var step = UpdateStep("**Step 5a**", "**Step ");
+
+        Assert.Contains("at most twice", step);
+        Assert.Contains("repaired-<id>.json", step);
+        Assert.Contains("--ids <id>", step);
+    }
+
+    [Fact]
+    public void UpdateSkill_ReCritiquesOnlyALandedRepair_AndReportsAFailedOne()
+    {
+        // FR-009 (analysis C1): step 4 only after `written` or `unchanged`; a still-failed repair gets no repaired
+        // grounding and is reported.
+        var step = Normalised(UpdateStep("**Step 5a**", "**Step "));
+
+        Assert.Contains("only when step 3 reported `written` or `unchanged`", step);
+        Assert.Contains("repair failed: <error_code>", step);
+        Assert.Contains("no repaired grounding", step);
+        Assert.Contains("unverified", step);
+        Assert.Contains("waiting for the user", step);
+    }
+
+    [Fact]
+    public void CriticAgent_SaysTheCompileWritesOnlyTheFingerprintRecord()
+    {
+        // FR-013 (F4), whitespace normalised so wrapping can't defeat it.
+        var agent = Normalised(AgentContent.All["spectra-critic.agent.md"]);
+
+        Assert.DoesNotContain("It writes nothing", agent);
+        Assert.Contains("writes only the fingerprint record", agent);
+        Assert.Contains("never the verdict", agent);
+        Assert.Contains("calls no model", agent);
+    }
 }

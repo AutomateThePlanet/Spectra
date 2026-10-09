@@ -85,10 +85,11 @@ public sealed class IngestVerdictCommand : Command
             content = await File.ReadAllTextAsync(from, ct);
 
             // Spec 090 (FR-A2): a verdict file in .spectra/verdicts/ with a fingerprint record must still describe the
-            // test it judged. Stdin and other paths have no record and are accepted as before.
+            // test it judged; Spec 091 (FR-002): and must not be older than the last critic prompt for it. Stdin and
+            // other paths have no record and are accepted as before.
             var root = Directory.GetCurrentDirectory();
             if (VerdictFreshness.IdOfVerdictFile(root, from) is { } id
-                && await VerdictFreshness.CheckRecordedTestAsync(root, id, ct) is { IsStale: true } stale)
+                && await VerdictFreshness.CheckRecordedTestAsync(root, id, from, ct) is { IsStale: true } stale)
             {
                 CriteriaCommandIO.WriteFailure(json, "ingest-verdict", VerdictFreshness.ErrorVerdictStale, stale.Message(id));
                 return ExitRefused;
@@ -182,11 +183,11 @@ public sealed class IngestVerdictCommand : Command
             // Filter to this suite via index lookup
             if (!indexLookup.TryGetValue(testId, out var entry)) continue;
 
-            // Spec 090 (FR-A2): a verdict given to other content is not classified.
+            // Spec 090 (FR-A2) / 091 (FR-002): a verdict given to other content, or older than the last prompt, is not classified.
             var testPath = Path.Combine(suitePath, entry.File);
             if (File.Exists(testPath)
                 && parser.Parse(await File.ReadAllTextAsync(testPath, ct), entry.File) is { IsSuccess: true } parsed
-                && VerdictFreshness.Check(currentDir, testId, parsed.Value!).IsStale)
+                && VerdictFreshness.Check(currentDir, testId, parsed.Value!, vf).IsStale)
             {
                 stale.Add(testId);
                 continue;

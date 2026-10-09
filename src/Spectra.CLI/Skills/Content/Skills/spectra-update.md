@@ -259,10 +259,23 @@ Then read each test's verdict file (Read tool) and route it:
      — fix ONLY what the critic flagged; keep the id and the structure;
   2. write it, as a JSON array with that one test, to `.spectra/repairs/<suite>/repaired-<id>.json`
      with the Write tool;
-  3. `spectra ai ingest-update <suite> --all --keep-baseline --output-format json --verbosity quiet`;
-  4. invoke the `spectra-critic` subagent again for `<id>`, then
+  3. `spectra ai ingest-update <suite> --all --keep-baseline --output-format json --verbosity quiet`,
+     then read `<id>`'s entry in `results`. If it is `failed`, re-patch it according to its
+     `error_code` (`MULTIPLE_TESTS`: one test per file; `DRIFT_DETECTED`: touch only what the
+     critic flagged; `MALFORMED_JSON` / `SCHEMA_INVALID`: fix the JSON), write a fresh
+     `.spectra/repairs/<suite>/repaired-<id>.json` and run the same call again — at most twice,
+     the same bound as Step 5 edits. These retries are part of the same repair attempt: they
+     don't change `--repair-attempts 1`;
+  4. only when step 3 reported `written` or `unchanged` for `<id>`: invoke the `spectra-critic`
+     subagent again for `<id>`, then
      `spectra ai ingest-verdict --suite <suite> --all --output-format json` and
-     `spectra ai ingest-grounding --suite <suite> --all --repaired --repair-attempts 1 --output-format json`.
+     `spectra ai ingest-grounding --suite <suite> --all --repaired --repair-attempts 1 --ids <id> --output-format json`
+     (Spec 091: `--ids` names the re-critiqued test, so nothing else is marked repaired).
+- **repair failed** — step 3 still reports `failed` after those retries (the file is kept as
+  `.spectra/repairs/<suite>/failed-<id>.json`): report "repair failed: <error_code>", run no critic
+  and write no repaired grounding, and list the test as **unverified** if it was partial, or as
+  **waiting for the user** if it was hallucinated — with the same choices as a test that stays
+  hallucinated (below).
 - **still partial** after the repair → it is flagged for review (its block says so); report it.
 - **still hallucinated** after the repair → stop for that test and ask the user to choose: edit
   it again (`compile-update-prompt --test-id`, as in Step 5), restore the previous version from

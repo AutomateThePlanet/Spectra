@@ -247,6 +247,7 @@ Classifies all verdict files for the suite in one call; emits `{grounded, partia
 spectra ai ingest-grounding --suite {suite} --all --output-format json
 ```
 Writes grounding blocks for all grounded tests in one pass; skips partial tests (pre-repair filter — their blocks are written after 8b). Test files are at `test-cases/{suite}/{id}.md` (never use `find` or `cat` to locate them).
+`skipped_hallucinated` / `hallucinated` (Spec 091) lists tests that were kept with a hallucinated verdict — for example by the update flow, which leaves that decision to the user. That is not a failure and not part of `written`: report the ids and continue.
 
 **After batch grounding-ingest — check the result before proceeding to 8b (MANDATORY):**
 
@@ -311,11 +312,11 @@ spectra ai ingest-verdict --suite {suite} --all --output-format json
 ```
 Classifies all verdict files (including re-verdicts) in one call; emits updated `{grounded, partial, hallucinated, errors}` counts.
 
-**After batch verdict-ingest — batch grounding-ingest for all repair-attempted tests (one call, no loop):**
+**After batch verdict-ingest — batch grounding-ingest for the re-critiqued tests (one call, no loop):**
 ```
-spectra ai ingest-grounding --suite {suite} --all --repaired --repair-attempts 1 --output-format json
+spectra ai ingest-grounding --suite {suite} --all --repaired --repair-attempts 1 --ids {ids} --output-format json
 ```
-Writes grounding blocks for all tests that went through repair: `grounded` blocks for successfully repaired tests, `partial` blocks (`flagged_for_review: true` unless repaired) for those still unresolved. Tests already grounded from the post-8a call are skipped (idempotent).
+`{ids}` is the comma-separated list of the tests re-critiqued in this round — those whose repair ingest reported `written` or `unchanged` in `results` — minus any test dropped in the re-critic phase. A repair that failed is never in it (Spec 091: `--all --repaired` refuses without `--ids` with `IDS_REQUIRED`, so a test whose repair didn't land is never marked repaired). If the list is empty, skip this call. Writes grounding blocks for those tests: `grounded` blocks for successfully repaired tests, `partial` blocks (`flagged_for_review: true` unless repaired) for those still unresolved.
 
 **Resume note:** If the repair loop is interrupted (session end, cancellation), re-run `compile-repair-batch` after re-invoking the generate skill. The command skips tests whose grounding block is already written — it resumes from where it left off, never restarts from scratch, never double-processes a completed test. Run `spectra ai audit-grounding --suite {suite}` first to see what remains.
 

@@ -182,7 +182,11 @@ SPECTRA keeps, for every test, a fingerprint of each doc section it references (
    flagged for review if still partial; hallucinated gets one repair, and if still hallucinated the assistant stops for
    that test and asks you — edit again, restore the previous version from git (you run it), or delete it with the
    delete skill. The update flow never drops or deletes a test on its own. A verdict for content that changed after the
-   critic saw it is refused (`VERDICT_STALE`). The summary lists grounded, flagged, hallucinated and unverified tests.
+   critic saw it is refused (`VERDICT_STALE`), and so is a verdict older than the last critic prompt for its test — so a
+   critic run that compiled the prompt but wrote nothing never revives an older verdict. A repair that still fails to
+   ingest after two retries is reported ("repair failed") and never marked repaired; only the tests re-critiqued after a
+   repair get a repaired block. A test kept with a hallucinated verdict is named in later grounding runs ("waiting for
+   review"), not counted as an error. The summary lists grounded, flagged, hallucinated and unverified tests.
 6. **Acknowledge** — tests you reviewed and kept as they are without an edit prompt get
    `spectra ai update-ack --suite checkout --ids …`, so they leave triage. A change you neither edit nor acknowledge
    is reported again next time.
@@ -300,10 +304,10 @@ spectra ai review-flagged --suite checkout --no-interaction --output-format json
 When a batch has many partials, the `spectra-generate` skill runs a **manifest-driven** repair loop that completes reliably across sessions, batching the mechanical steps instead of looping per test:
 
 1. `spectra ai compile-repair-batch --suite <s>` reads all partial verdict JSONs, filters to those still missing a grounding block, and compiles every repair prompt into one JSON manifest, deterministically and with no model call.
-2. For each manifest entry, the assistant patches the test in-session and writes the corrected test JSON to `.spectra/updates/<suite>/updated-<id>.json`.
-3. Once all repairs are staged, they're ingested in one batch call: `spectra ai ingest-update <suite> --all`.
-4. Each repaired test is re-verified by the `spectra-critic` subagent, then all resulting verdicts are classified in one batch call: `spectra ai ingest-verdict --suite <s> --all`.
-5. All resulting grounding blocks are written in one batch call: `spectra ai ingest-grounding --suite <s> --all --repaired`.
+2. For each manifest entry, the assistant patches the test in-session and writes the corrected test JSON to `.spectra/repairs/<suite>/repaired-<id>.json`.
+3. Once all repairs are staged, they're ingested in one batch call: `spectra ai ingest-update <suite> --all --keep-baseline`. A repair that fails is kept as `failed-<id>.json` and retried at most twice.
+4. Each repaired test that landed (`written` or `unchanged`) is re-verified by the `spectra-critic` subagent, then all resulting verdicts are classified in one batch call: `spectra ai ingest-verdict --suite <s> --all`.
+5. The grounding blocks of exactly those re-critiqued tests are written in one batch call: `spectra ai ingest-grounding --suite <s> --all --repaired --ids <ids>`. `--ids` is required with `--repaired`, so a test whose repair failed, or a partial verdict left over from an interrupted run, is never marked repaired.
 6. If interrupted or the session runs out, re-running from step 1 picks up exactly where it left off. The grounding block already written into a test's `.md` frontmatter is the resume checkpoint, so nothing is double-processed or restarted from scratch.
 
 To check resume state or inspect grounding status directly:

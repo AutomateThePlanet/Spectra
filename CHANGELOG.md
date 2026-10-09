@@ -408,6 +408,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a `.gitignore` (it says `no .gitignore; add: …`); it counts a pattern present only on a whole matching line, honours
   `!pattern`; and it appends without changing existing bytes, in the file's own newline style, naming what it added.
 
+### Fixed (review fixes, Spec 091)
+
+- **A failed critic run no longer revives an old verdict.** After a test changed outside `ingest-update` (a hand edit,
+  `relink-sources`, a restore from git), a critic run that compiled the prompt but wrote no verdict paired the old
+  verdict with a record matching the new content, and the next grounding batch wrote it. The fingerprint record now
+  has `compiled_at`; a verdict file written more than 2 s before it is `VERDICT_STALE` ("older than the last critic
+  prompt") in `ingest-verdict` (`--from`, `--all`) and `ingest-grounding` (`--test`, `--all`). Times, not contents, are
+  compared, so a new verdict identical to the old one is still accepted.
+- **`--all --repaired` no longer marks unrepaired tests as repaired.** It wrote `repaired: true` blocks for every test
+  with a fresh verdict and no block, including a test whose repair failed to ingest. `ingest-grounding --all` gains
+  `--ids a,b` (unknown ids → `not_found`), and `--all --repaired` without it is refused with `IDS_REQUIRED` (exit 4).
+  Both skills pass exactly the re-critiqued tests; `spectra-update` retries a failed repair ingest at most twice and
+  then reports "repair failed" instead of re-critiquing it.
+- **Kept hallucinated tests are named, not counted as errors.** In `ingest-grounding --all`, a hallucinated verdict for
+  a test that still exists (kept by the update flow for the user) is `skipped_hallucinated` / `hallucinated`, and the
+  human summary says `TC-140: hallucinated, waiting for review`. Unreadable verdict files and refused writes are still
+  `errors`. The human summary of the batch now also goes to stderr in JSON mode.
+- **The critic agent describes the compile correctly:** it writes only the fingerprint record, never the verdict, and
+  calls no model.
+- **Invalid option combinations on `ingest-grounding` are refused:** `--test` with `--all` (where `--all` used to win)
+  and `--ids` without `--all` exit 1 with a plain message.
+
 ### Notes
 
 - **One-time `source_section` churn.** Because `source_section` is now read, the first re-extraction after
@@ -429,6 +451,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`depends_on` lists are not supported** (such tests don't parse today); `spectra delete` leaves a dependent with a
   list unchanged and warns.
 - **Known gap:** `spectra suite delete` doesn't remove the suite's staging folders.
+- **Customised skills (Spec 091):** a skill copy that calls `ingest-grounding --all --repaired` without `--ids` now
+  fails with `IDS_REQUIRED`; run `spectra update-skills` (unmodified copies) or add `--ids`.
+- **090 records (Spec 091)** keep the fingerprint-only rule until the critic prompt is compiled again for that test.
+- **Compiling the whole suite** (`compile-critic-prompt --suite S` without `--test`) makes every older verdict stale.
+- **`ingest-grounding --test` together with `--all` is now refused** (exit 1); `--all` used to win.
 
 ## [2.5.0] - 2026-09-24 — Lossless test writes and doc-reference resolution
 
