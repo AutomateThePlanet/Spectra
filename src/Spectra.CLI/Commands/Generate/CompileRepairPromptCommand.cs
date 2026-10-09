@@ -16,7 +16,8 @@ namespace Spectra.CLI.Commands.Generate;
 /// <summary>
 /// Spec 071 FR4: <c>spectra ai compile-repair-prompt</c>. Deterministic, model-free repair-prompt
 /// compiler for partial tests. Reads the test artifact and its per-test verdict JSON, emits a
-/// plain-text repair prompt to stdout. Refuses (exit 4) for non-partial verdicts.
+/// plain-text repair prompt to stdout. Refuses (exit 4) for a grounded verdict; Spec 090 (FR-A6) accepts
+/// hallucinated as well as partial verdicts.
 /// Mirrors compile-critic-prompt in structure; never calls a model.
 /// </summary>
 public sealed class CompileRepairPromptCommand : Command
@@ -122,11 +123,12 @@ public sealed class CompileRepairPromptCommand : Command
 
         var verResult = classification.Result!;
 
-        // Only compile repair prompts for partial verdicts
-        if (verResult.Verdict != VerificationVerdict.Partial)
+        // Spec 090 (FR-A6): partial and hallucinated verdicts can be repaired (the update flow repairs a hallucinated
+        // edit once instead of dropping a test that existed before); a grounded verdict has nothing to repair.
+        if (verResult.Verdict is not (VerificationVerdict.Partial or VerificationVerdict.Hallucinated))
         {
             Console.Error.WriteLine(
-                $"Refusing to compile repair prompt: verdict is '{verResult.Verdict.ToString().ToLowerInvariant()}' (repair is for partial verdicts only).");
+                $"Refusing to compile repair prompt: verdict is '{verResult.Verdict.ToString().ToLowerInvariant()}' (repair is for partial or hallucinated verdicts only).");
             return ExitRefused;
         }
 

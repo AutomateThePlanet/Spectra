@@ -132,8 +132,10 @@ public sealed class DeleteHandlerTests : IDisposable
         Assert.False(File.Exists(deletePath));
         Assert.True(File.Exists(dependentPath));
 
+        // Spec 090 (FR-C1): the fixture now writes the scalar form (a block list doesn't parse); the key is dropped.
         var dependentContent = await File.ReadAllTextAsync(dependentPath);
-        Assert.DoesNotContain("- TC-100", dependentContent);
+        Assert.DoesNotContain("depends_on", dependentContent);
+        Assert.Contains("id: TC-200", dependentContent);
     }
 
     [Fact]

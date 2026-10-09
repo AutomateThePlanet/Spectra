@@ -1,10 +1,14 @@
 using System.CommandLine;
 using System.Text.Json;
+using Spectra.CLI.Criteria;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.IO;
 using Spectra.CLI.Options;
+using Spectra.CLI.Verification;
 using Spectra.Core.Index;
+using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
+using Spectra.Core.Models.Grounding;
 using Spectra.Core.Parsing;
 
 namespace Spectra.CLI.Commands.Generate;
@@ -21,7 +25,10 @@ public sealed class IngestGroundingCommand : Command
 {
     private const int ExitSuccess = 0;
     private const int ExitError = 1;
-    private const int ExitHallucinatedRefused = 4;
+    private const int ExitHallucinatedRefused = 4; // refusals: hallucinated; Spec 090: MANUAL_VERDICT, VERDICT_STALE
+
+    /// <summary>Spec 090 (FR-A3): a Manual verdict is a human judgement the critic never replaces.</summary>
+    public const string ErrorManualVerdict = "MANUAL_VERDICT";
     private const int ExitVerdictEmpty = 5;
     private const int ExitVerdictParseFailed = 6;
 
@@ -87,7 +94,7 @@ public sealed class IngestGroundingCommand : Command
         var verdictDir = Path.Combine(currentDir, ".spectra", "verdicts");
         if (!Directory.Exists(verdictDir))
         {
-            EmitBatchResult(json, suite, 0, 0, 0, 0);
+            EmitBatchResult(json, suite, 0, 0, 0, 0, [], []);
             return ExitSuccess;
         }
 
@@ -97,6 +104,8 @@ public sealed class IngestGroundingCommand : Command
         var parser = new TestCaseParser();
         var service = new GroundingWriteBackService(new TestFileWriter());
         int written = 0, skippedAlreadyWritten = 0, skippedPartialPreRepair = 0, errors = 0;
+        var manual = new List<string>();
+        var stale = new List<string>();
 
         var verdictFiles = Directory.GetFiles(verdictDir, "critic-verdict-*.json").OrderBy(f => f);
         foreach (var vf in verdictFiles)
@@ -115,19 +124,36 @@ public sealed class IngestGroundingCommand : Command
             var testFilePath = Path.Combine(suitePath, testEntry.File);
             if (!File.Exists(testFilePath)) continue; // hallucinated — file gone, skip silently
 
-            // Idempotent: skip tests whose .md already has a grounding block
+            TestCase? existing = null;
             try
             {
                 var existingContent = await File.ReadAllTextAsync(testFilePath, ct);
                 var rel = Path.GetRelativePath(suitePath, testFilePath);
                 var parsedExisting = parser.Parse(existingContent, rel);
-                if (parsedExisting.IsSuccess && parsedExisting.Value is { } existing && existing.Grounding is not null)
-                {
-                    skippedAlreadyWritten++;
-                    continue;
-                }
+                existing = parsedExisting.IsSuccess ? parsedExisting.Value : null;
             }
             catch { /* on parse error, attempt write */ }
+
+            // Spec 090 (FR-A3): a Manual verdict is never overwritten (checked before the already-written skip).
+            if (existing?.Grounding?.Verdict == VerificationVerdict.Manual)
+            {
+                manual.Add(testId);
+                continue;
+            }
+
+            // Idempotent: skip tests whose .md already has a grounding block
+            if (existing?.Grounding is not null)
+            {
+                skippedAlreadyWritten++;
+                continue;
+            }
+
+            // Spec 090 (FR-A2): a verdict given to other content is not written.
+            if (existing is not null && VerdictFreshness.Check(currentDir, testId, existing).IsStale)
+            {
+                stale.Add(testId);
+                continue;
+            }
 
             string verdictJson;
             try { verdictJson = await File.ReadAllTextAsync(vf, ct); }
@@ -158,12 +184,13 @@ public sealed class IngestGroundingCommand : Command
             else errors++;
         }
 
-        EmitBatchResult(json, suite, written, skippedAlreadyWritten, skippedPartialPreRepair, errors);
+        EmitBatchResult(json, suite, written, skippedAlreadyWritten, skippedPartialPreRepair, errors, manual, stale);
         return ExitSuccess;
     }
 
     private static void EmitBatchResult(bool json, string suite, int written,
-        int skippedAlreadyWritten, int skippedPartialPreRepair, int errors)
+        int skippedAlreadyWritten, int skippedPartialPreRepair, int errors,
+        IReadOnlyList<string> manual, IReadOnlyList<string> stale)
     {
         if (json)
         {
@@ -175,7 +202,11 @@ public sealed class IngestGroundingCommand : Command
                 written,
                 skipped_already_written = skippedAlreadyWritten,
                 skipped_partial_pre_repair = skippedPartialPreRepair,
-                errors
+                errors,
+                skipped_manual = manual.Count,
+                manual,
+                skipped_stale = stale.Count,
+                stale
             }));
         }
         else
@@ -183,7 +214,9 @@ public sealed class IngestGroundingCommand : Command
             Console.Out.WriteLine(
                 $"Batch grounding-ingest for suite '{suite}': written={written} " +
                 $"skipped_already_written={skippedAlreadyWritten} " +
-                $"skipped_partial_pre_repair={skippedPartialPreRepair} errors={errors}");
+                $"skipped_partial_pre_repair={skippedPartialPreRepair} errors={errors}" +
+                (manual.Count > 0 ? $" skipped_manual={manual.Count} ({string.Join(", ", manual)})" : "") +
+                (stale.Count > 0 ? $" skipped_stale={stale.Count} ({string.Join(", ", stale)})" : ""));
         }
     }
 
@@ -229,6 +262,22 @@ public sealed class IngestGroundingCommand : Command
         {
             Console.Error.WriteLine($"Verdict file is empty: {verdictPath}");
             return ExitVerdictEmpty;
+        }
+
+        // Spec 090 (FR-A3, FR-A2): never overwrite a Manual verdict; never write a verdict given to other content.
+        var current = new TestCaseParser().Parse(await File.ReadAllTextAsync(testFilePath, ct), entry.File);
+        if (current.IsSuccess && current.Value!.Grounding?.Verdict == VerificationVerdict.Manual)
+        {
+            CriteriaCommandIO.WriteFailure(json, "ingest-grounding", ErrorManualVerdict,
+                $"{testId} has a Manual verdict; the critic never replaces it. Nothing was written.");
+            return ExitHallucinatedRefused;
+        }
+
+        if (current.IsSuccess && VerdictFreshness.Check(currentDir, testId, current.Value!) is { IsStale: true } stale)
+        {
+            CriteriaCommandIO.WriteFailure(json, "ingest-grounding", VerdictFreshness.ErrorVerdictStale,
+                stale.Message(testId) + " Nothing was written.");
+            return ExitHallucinatedRefused;
         }
 
         var service = new GroundingWriteBackService(new TestFileWriter());

@@ -65,7 +65,8 @@ public sealed class UpdatedTestIngestor
         string suite,
         TestCase originalTest,
         IReadOnlyList<TestCase> existingTests,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool persist = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(testsPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(suite);
@@ -101,9 +102,13 @@ public sealed class UpdatedTestIngestor
         // 4. Persist through the single write+index path. allForIndex = existing with the original
         //    replaced by the edited test (same id ⇒ replace in place).
         var allForIndex = ReplaceById(existingTests, edited);
-        await _persistence.PersistAsync(testsPath, suite, [edited], allForIndex, ct);
+        // Spec 090 (FR-B2): a dry run returns exactly what a real run would, without writing.
+        if (persist)
+        {
+            await _persistence.PersistAsync(testsPath, suite, [edited], allForIndex, ct);
+        }
 
-        return IngestResult.Success([edited]);
+        return IngestResult.Success([edited], manualVerdictKept: edited.Grounding is not null);
     }
 
     /// <summary>
@@ -133,8 +138,9 @@ public sealed class UpdatedTestIngestor
     /// <summary>
     /// Produces the test to persist: <paramref name="original"/> with only the editable content fields
     /// replaced from <paramref name="candidate"/>. Everything else — id, file path, priority, component,
-    /// tags, grounding (incl. a Manual verdict), estimated duration, links, custom metadata, lifecycle
-    /// fields and the source layout (unknown frontmatter keys and body sections) — stays the original's.
+    /// tags, a Manual verdict, estimated duration, links, custom metadata, lifecycle fields and the source
+    /// layout (unknown frontmatter keys and body sections) — stays the original's. Spec 090 (FR-A1): a critic
+    /// grounding block is dropped, because it judged the old content.
     /// </summary>
     public static TestCase ApplyEdit(TestCase original, TestCase candidate)
     {
@@ -143,6 +149,9 @@ public sealed class UpdatedTestIngestor
 
         return original with
         {
+            // Spec 090 (FR-A1): a critic verdict described the old content, so an edit drops it; a Manual verdict (a
+            // human judgement) is kept.
+            Grounding = original.Grounding?.Verdict == VerificationVerdict.Manual ? original.Grounding : null,
             Title = candidate.Title,
             Preconditions = candidate.Preconditions,
             Steps = candidate.Steps,

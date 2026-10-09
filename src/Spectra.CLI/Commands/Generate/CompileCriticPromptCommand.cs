@@ -108,6 +108,8 @@ public sealed class CompileCriticPromptCommand : Command
             return ExitRefused;
         }
 
+        await RecordAsync(currentDir, test!.Id, suite: null, testFull, test, ct);
+
         if (json)
         {
             Console.Out.WriteLine(JsonSerializer.Serialize(new { prompt = result.Prompt }));
@@ -252,6 +254,7 @@ public sealed class CompileCriticPromptCommand : Command
                 return ExitRefused;
             }
             compiled.Add((entry.Id, result.Prompt!));
+            await RecordAsync(currentDir, entry.Id, suite, full, test!, ct);
         }
 
         if (json)
@@ -277,6 +280,23 @@ public sealed class CompileCriticPromptCommand : Command
             }
         }
         return ExitSuccess;
+    }
+
+    /// <summary>
+    /// Spec 090 (FR-A2): records the fingerprint of the content the critic is given, so a verdict can only be ingested
+    /// onto that content. A failed write is a warning: the verdict is then accepted as one without a record.
+    /// </summary>
+    private static async Task RecordAsync(string root, string id, string? suite, string testPath, TestCase test, CancellationToken ct)
+    {
+        try
+        {
+            var file = Path.GetRelativePath(root, testPath).Replace(Path.DirectorySeparatorChar, '/');
+            await VerdictFreshness.WriteRecordAsync(root, new VerdictRecord(id, suite, file, TestContentFingerprint.Of(test)), ct);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"Warning: could not record the critic input for {id}: {ex.Message}");
+        }
     }
 
     private static async Task<TestCase?> LoadTestAsync(string fullPath, string currentDir, CancellationToken ct)

@@ -52,4 +52,8 @@ public sealed class AuditGroundingSummary
 
     [JsonPropertyName("flagged_for_review")]
     public required int FlaggedForReview { get; init; }
+
+    /// <summary>Spec 090 (FR-A7): tests with neither a verdict file nor a grounding block.</summary>
+    [JsonPropertyName("unverified")]
+    public int Unverified { get; init; }
 }

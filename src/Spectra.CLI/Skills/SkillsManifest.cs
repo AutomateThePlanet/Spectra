@@ -13,6 +13,14 @@ public sealed class SkillsManifest
 
     [JsonPropertyName("files")]
     public Dictionary<string, string> Files { get; set; } = new();
+
+    /// <summary>
+    /// Spec 090 (FR-D1): the gitignore patterns offered to this workspace (appended, already present, or negated by the
+    /// user). Null in a workspace from before 090.
+    /// </summary>
+    [JsonPropertyName("gitignore_offered")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? GitIgnoreOffered { get; set; }
 }
 
 /// <summary>

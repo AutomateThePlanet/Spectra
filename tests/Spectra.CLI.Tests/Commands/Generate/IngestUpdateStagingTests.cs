@@ -90,7 +90,7 @@ public sealed class IngestUpdateStagingTests : IDisposable
         var failed = Result(batch, "TC-103");
         Assert.Equal("failed", failed.GetProperty("outcome").GetString());
         Assert.Equal("MALFORMED_JSON", failed.GetProperty("error_code").GetString());
-        Assert.Equal(".spectra/updates/storage/updated-TC-103.json", failed.GetProperty("file").GetString());
+        Assert.Equal(".spectra/updates/storage/failed-TC-103.json", failed.GetProperty("file").GetString()); // Spec 090 (FR-B1): a failed file is kept as failed-<id>.json
 
         Assert.Contains("Each user gets 45GB", File.ReadAllText(_ws.PathOf("test-cases/storage/TC-101.md")));
         Assert.Equal(tc102Before, File.ReadAllBytes(_ws.PathOf("test-cases/storage/TC-102.md")));
@@ -98,16 +98,16 @@ public sealed class IngestUpdateStagingTests : IDisposable
         Assert.False(await InTriageAsync("TC-101"));
         Assert.Equal("LOAD", await BucketAsync("TC-102"));
         Assert.True(await InTriageAsync("TC-103"));
-        Assert.Equal(["updated-TC-103.json"], _ws.StagedFiles("storage"));
+        Assert.Equal(["failed-TC-103.json"], _ws.StagedFiles("storage"));
 
+        // Spec 090 (FR-B1): was exit 8 with TC-103 failing again; the kept failed-TC-103.json is never read again.
         var (againExit, again) = await IngestAllAsync();
 
-        Assert.Equal(8, againExit);
+        Assert.Equal(0, againExit);
         Assert.Equal(0, again.GetProperty("written").GetInt32());
-        Assert.Equal(0, again.GetProperty("unchanged").GetInt32());
-        Assert.Equal(0, again.GetProperty("unchanged_pending").GetInt32());
-        Assert.Equal(1, again.GetProperty("errors").GetInt32());
-        Assert.Equal("TC-103", Assert.Single(again.GetProperty("results").EnumerateArray()).GetProperty("test").GetString());
+        Assert.Equal(0, again.GetProperty("errors").GetInt32());
+        Assert.Empty(again.GetProperty("results").EnumerateArray());
+        Assert.Equal(["failed-TC-103.json"], _ws.StagedFiles("storage"));
     }
 
     [Fact]
@@ -123,7 +123,7 @@ public sealed class IngestUpdateStagingTests : IDisposable
         var result = Result(batch, "TC-999");
         Assert.Equal("failed", result.GetProperty("outcome").GetString());
         Assert.Equal("NO_ORIGINAL", result.GetProperty("error_code").GetString());
-        Assert.Equal(["updated-TC-999.json"], _ws.StagedFiles("storage"));
+        Assert.Equal(["failed-TC-999.json"], _ws.StagedFiles("storage")); // Spec 090 (FR-B1): a failed file is kept as failed-<id>.json
     }
 
     [Fact]
@@ -140,7 +140,7 @@ public sealed class IngestUpdateStagingTests : IDisposable
         Assert.Equal("ID_MISMATCH", result.GetProperty("error_code").GetString());
         Assert.Contains("TC-102", result.GetProperty("errors")[0].GetString());
         Assert.Equal(tc101Before, File.ReadAllBytes(_ws.PathOf("test-cases/storage/TC-101.md")));
-        Assert.Equal(["updated-TC-101.json"], _ws.StagedFiles("storage"));
+        Assert.Equal(["failed-TC-101.json"], _ws.StagedFiles("storage")); // Spec 090 (FR-B1): a failed file is kept as failed-<id>.json
     }
 
     [Fact]
@@ -211,10 +211,13 @@ public sealed class IngestUpdateStagingTests : IDisposable
         Assert.Contains($"TC-102: {Pending}", error);
         Assert.Contains("TC-103: failed [MALFORMED_JSON]", error);
 
+        // Spec 090 (FR-B1): a fresh failing file for the human-mode run (the first one is now failed-TC-103.json).
+        _ws.StageRaw("storage", "TC-103", Malformed);
         var (humanExit, human, _) = await _ws.RunAsync("ai", "ingest-update", "storage", "--all");
 
         Assert.Equal(8, humanExit);
         Assert.Contains("written=0 unchanged=0 unchanged_pending=0 skipped_no_original=0 errors=1", human);
         Assert.Contains("TC-103: failed [MALFORMED_JSON]", human);
+        Assert.Contains("(kept .spectra/updates/storage/failed-TC-103.json)", human);
     }
 }

@@ -57,11 +57,15 @@ public sealed record IngestResult
 
     private IngestResult() { }
 
+    /// <summary>Spec 090 (FR-A1): the edited test kept its Manual verdict (a critic verdict is always dropped).</summary>
+    public bool ManualVerdictKept { get; private init; }
+
     /// <summary>Creates a successful result listing the persisted tests.</summary>
-    public static IngestResult Success(IReadOnlyList<TestCase> persisted) => new()
+    public static IngestResult Success(IReadOnlyList<TestCase> persisted, bool manualVerdictKept = false) => new()
     {
         IsSuccess = true,
-        PersistedTests = persisted ?? []
+        PersistedTests = persisted ?? [],
+        ManualVerdictKept = manualVerdictKept
     };
 
     /// <summary>Spec 088: the edit changed nothing; nothing was written.</summary>

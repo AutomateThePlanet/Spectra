@@ -373,12 +373,18 @@ public sealed class InitHandler
 
     private async Task UpdateGitIgnoreAsync(CancellationToken ct)
     {
-        // Spec 089 (F6): the list and the idempotent append are shared with spectra update-skills.
-        var added = await SpectraGitIgnore.EnsureAsync(_workingDirectory, ct);
+        // Spec 089 (F6): the list is shared with spectra update-skills. Spec 090 (FR-D1/FR-D3): the append keeps the
+        // file's bytes, and every pattern is recorded as offered so update-skills never re-adds one the user removes.
+        var added = await SpectraGitIgnore.EnsureForInitAsync(_workingDirectory, ct);
         if (added.Count > 0)
         {
             _logger.LogDebug("Updated .gitignore with {Count} SPECTRA pattern(s)", added.Count);
         }
+
+        var manifestStore = new Skills.SkillsManifestStore(_workingDirectory);
+        var manifest = await manifestStore.LoadAsync(ct);
+        manifest.GitIgnoreOffered = [.. SpectraGitIgnore.Patterns];
+        await manifestStore.SaveAsync(manifest, ct);
     }
 
     private static string GetEmbeddedTemplate(string templateName)

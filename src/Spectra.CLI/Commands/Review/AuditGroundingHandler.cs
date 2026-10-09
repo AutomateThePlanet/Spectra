@@ -43,18 +43,13 @@ public sealed class AuditGroundingHandler
         }
 
         var verdictDir = Path.Combine(_currentDir, ".spectra", "verdicts");
-        if (!Directory.Exists(verdictDir))
-        {
-            EmitEmpty(suite, json);
-            return 0;
-        }
 
         var parser = new TestCaseParser();
         var indexLookup = index.Tests
             .ToDictionary(t => t.Id, t => t, StringComparer.OrdinalIgnoreCase);
 
         var entries = new List<AuditGroundingEntry>();
-        var verdictFiles = Directory.GetFiles(verdictDir, "critic-verdict-*.json");
+        var verdictFiles = Directory.Exists(verdictDir) ? Directory.GetFiles(verdictDir, "critic-verdict-*.json") : [];
 
         foreach (var vf in verdictFiles.OrderBy(f => f))
         {
@@ -124,12 +119,41 @@ public sealed class AuditGroundingHandler
             });
         }
 
+        // Spec 090 (FR-A7): every indexed test without a verdict file is listed too, judged by its grounding block —
+        // .spectra/verdicts/ is gitignored, so a fresh clone has blocks but no verdict files. The entries above (tests
+        // with a verdict file) are unchanged.
+        var withVerdict = entries.Select(e => e.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var test in index.Tests.Where(t => !withVerdict.Contains(t.Id)).OrderBy(t => t.Id, StringComparer.Ordinal))
+        {
+            ct.ThrowIfCancellationRequested();
+            var testFilePath = Path.Combine(suitePath, test.File);
+            Spectra.Core.Models.Grounding.GroundingMetadata? grounding = null;
+            if (File.Exists(testFilePath))
+            {
+                try
+                {
+                    var parsed = parser.Parse(await File.ReadAllTextAsync(testFilePath, ct), Path.GetRelativePath(testsPath, testFilePath));
+                    grounding = parsed.IsSuccess ? parsed.Value?.Grounding : null;
+                }
+                catch { /* unreadable: reported as unverified */ }
+            }
+
+            entries.Add(EntryFromBlock(test.Id, grounding, Path.GetRelativePath(_currentDir, testFilePath).Replace('\\', '/')));
+        }
+
+        if (entries.Count == 0)
+        {
+            EmitEmpty(suite, json);
+            return 0;
+        }
+
         var summary = new AuditGroundingSummary
         {
             Total = entries.Count,
             GroundingWritten = entries.Count(e => e.GroundingWritten),
             PartialPendingRepair = entries.Count(e => e.ActionNeeded == "repair"),
-            FlaggedForReview = entries.Count(e => e.FlaggedForReview)
+            FlaggedForReview = entries.Count(e => e.FlaggedForReview),
+            Unverified = entries.Count(e => e.Verdict == Unverified)
         };
 
         if (json)
@@ -151,6 +175,37 @@ public sealed class AuditGroundingHandler
         return 0;
     }
 
+    /// <summary>Spec 090 (FR-A7): the verdict of a test with no verdict file.</summary>
+    internal const string Unverified = "none";
+
+    /// <summary>
+    /// Spec 090 (FR-A7): an entry for a test without a verdict file. A critic block → its verdict and the existing
+    /// action rule; a Manual block → <c>manual</c>, nothing to do; no block → <c>none</c>, the critic must run.
+    /// </summary>
+    private static AuditGroundingEntry EntryFromBlock(string id, Spectra.Core.Models.Grounding.GroundingMetadata? grounding, string file)
+    {
+        if (grounding is null)
+        {
+            return new AuditGroundingEntry
+            {
+                Id = id, Verdict = Unverified, Score = 0.0, GroundingWritten = false, FlaggedForReview = false,
+                ActionNeeded = "critic", File = file
+            };
+        }
+
+        var manual = grounding.Verdict == Spectra.Core.Models.Grounding.VerificationVerdict.Manual;
+        return new AuditGroundingEntry
+        {
+            Id = id,
+            Verdict = grounding.Verdict.ToString().ToLowerInvariant(),
+            Score = grounding.Score,
+            GroundingWritten = true,
+            FlaggedForReview = !manual && grounding.FlaggedForReview,
+            ActionNeeded = !manual && grounding.FlaggedForReview ? "review" : "none",
+            File = file
+        };
+    }
+
     private static void EmitEmpty(string suite, bool json)
     {
         if (json)
@@ -163,7 +218,7 @@ public sealed class AuditGroundingHandler
                 Tests = [],
                 Summary = new AuditGroundingSummary
                 {
-                    Total = 0, GroundingWritten = 0, PartialPendingRepair = 0, FlaggedForReview = 0
+                    Total = 0, GroundingWritten = 0, PartialPendingRepair = 0, FlaggedForReview = 0, Unverified = 0
                 }
             });
         }
@@ -200,7 +255,8 @@ public sealed class AuditGroundingHandler
         Console.WriteLine();
         Console.WriteLine(
             $"Summary: {summary.Total} total | {summary.GroundingWritten} grounded | " +
-            $"{summary.PartialPendingRepair} pending repair | {summary.FlaggedForReview} flagged");
+            $"{summary.PartialPendingRepair} pending repair | {summary.FlaggedForReview} flagged" +
+            (summary.Unverified > 0 ? $" | {summary.Unverified} unverified" : ""));
     }
 
     public static async Task<string> ResolveTestsDirAsync(string currentDir, CancellationToken ct)

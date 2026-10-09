@@ -22,10 +22,6 @@ namespace Spectra.CLI.Commands.Delete;
 /// </remarks>
 public sealed class DeleteHandler
 {
-    private static readonly Regex DependsOnLineRegex = new(
-        @"^(\s*-\s+[""']?)(?<id>[A-Za-z][A-Za-z0-9_-]*-\d+)([""']?\s*)$",
-        RegexOptions.Multiline | RegexOptions.Compiled);
-
     private readonly VerbosityLevel _verbosity;
     private readonly OutputFormat _outputFormat;
 
@@ -66,24 +62,25 @@ public sealed class DeleteHandler
             return ExitCodes.Error;
         }
 
-        // Phase 1: resolve. Build a plan: (id, file, suite, automated_by[]).
-        var plan = await ResolveAsync(testCasesDir, ids, ct).ConfigureAwait(false);
+        // Phase 1: resolve by each file's parsed frontmatter id (Spec 090 FR-C1: never a regex over the file).
+        var service = await TestDeletionService.LoadAsync(workspace, testCasesDir, ct).ConfigureAwait(false);
+        var resolved = service.Resolve(ids);
 
         // Phase 2: pre-flight checks — bail before any write.
         var skipped = new List<SkippedTest>();
         var preflightFailures = new List<DeleteError>();
         var preflightExitCode = ExitCodes.Success;
 
-        foreach (var item in plan)
+        foreach (var (id, target) in resolved)
         {
-            if (item.File is null)
+            if (target is null)
             {
-                skipped.Add(new SkippedTest { Id = item.Id, Reason = "TEST_NOT_FOUND" });
+                skipped.Add(new SkippedTest { Id = id, Reason = "TEST_NOT_FOUND" });
                 preflightExitCode = ExitCodes.NotFound;
             }
-            else if (item.AutomatedBy.Count > 0 && !noAutomationCheck && !force)
+            else if (target.AutomatedBy.Count > 0 && !noAutomationCheck && !force)
             {
-                skipped.Add(new SkippedTest { Id = item.Id, Reason = "AUTOMATION_LINKED" });
+                skipped.Add(new SkippedTest { Id = id, Reason = "AUTOMATION_LINKED" });
                 if (preflightExitCode == ExitCodes.Success)
                 {
                     preflightExitCode = ExitCodes.AutomationLinked;
@@ -91,7 +88,10 @@ public sealed class DeleteHandler
             }
         }
 
-        var resolvable = plan.Where(p => p.File is not null && skipped.All(s => !s.Id.Equals(p.Id, StringComparison.OrdinalIgnoreCase))).ToList();
+        var resolvable = resolved
+            .Where(r => r.Target is not null && skipped.All(s => !s.Id.Equals(r.Id, StringComparison.OrdinalIgnoreCase)))
+            .Select(r => r.Target!)
+            .ToList();
 
         // If pre-flight fully blocks, emit a result without writing.
         if (resolvable.Count == 0 || preflightExitCode == ExitCodes.NotFound || preflightExitCode == ExitCodes.AutomationLinked)
@@ -114,39 +114,35 @@ public sealed class DeleteHandler
             return preflightExitCode;
         }
 
-        // Build dependency-cleanup plan
-        var idsToDelete = resolvable.Select(p => p.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var dependents = await FindDependentsAsync(testCasesDir, idsToDelete, ct).ConfigureAwait(false);
+        // Spec 090 (FR-C1/FR-C2): the cleanup plan — scalar dependents, list-form warnings, baseline entries, staging
+        // and verdict files.
+        var plan = await service.PlanAsync(resolvable, ct).ConfigureAwait(false);
 
         if (dryRun)
         {
-            var deletedPreview = resolvable.Select(p => new DeletedTest
-            {
-                Id = p.Id,
-                Suite = p.Suite!,
-                File = MakeRelative(workspace, p.File!),
-                Title = p.Title,
-                AutomatedBy = p.AutomatedBy,
-                StrandedAutomation = p.AutomatedBy
-            }).ToList();
             var dryResult = new DeleteResult
             {
                 Command = "delete",
                 Status = "completed",
                 DryRun = true,
-                Deleted = deletedPreview,
-                DependencyCleanup = dependents.Select(d => new DependencyCleanup { TestId = d.DependentId, RemovedDep = d.RemovedDep }).ToList(),
+                Deleted = resolvable.Select(t => ToDeletedTest(workspace, t)).ToList(),
+                DependencyCleanup = plan.ScalarDependents.Select(d => new DependencyCleanup { TestId = d.DependentId, RemovedDep = d.RemovedDep }).ToList(),
                 Skipped = skipped,
-                Message = $"Dry run: {resolvable.Count} test(s) would be deleted; {dependents.Count} depends_on reference(s) would be removed."
+                BaselineEntriesRemoved = plan.BaselineEntries.Select(e => $"{e.Suite}/{e.Id}").ToList(),
+                StagingFilesRemoved = plan.StagingFiles.Select(service.Relative).ToList(),
+                VerdictFilesRemoved = plan.VerdictFiles.Select(service.Relative).ToList(),
+                Warnings = plan.Warnings,
+                Message = $"Dry run: {resolvable.Count} test(s) would be deleted; {plan.ScalarDependents.Count} depends_on reference(s) would be removed."
             };
             EmitResult(dryResult);
+            EmitHumanSummary(dryResult);
             return ExitCodes.Success;
         }
 
         // Interactive confirmation (unless --force / --no-interaction)
         if (!force && !noInteraction && _outputFormat == OutputFormat.Human)
         {
-            if (!Confirm(resolvable, dependents))
+            if (!Confirm(resolvable, plan))
             {
                 EmitResult(new DeleteResult
                 {
@@ -158,282 +154,63 @@ public sealed class DeleteHandler
             }
         }
 
-        // Phase 3: write. Atomic per-file rewrites.
-        var deleted = new List<DeletedTest>();
-        var cleanups = new List<DependencyCleanup>();
-        var errors = new List<DeleteError>();
-
-        // 3a. Update _index.json for each affected suite
-        var suiteToIds = resolvable.GroupBy(p => p.Suite!, StringComparer.OrdinalIgnoreCase);
-        foreach (var grp in suiteToIds)
-        {
-            ct.ThrowIfCancellationRequested();
-            try
-            {
-                await UpdateSuiteIndexAsync(testCasesDir, grp.Key, grp.Select(p => p.Id).ToHashSet(StringComparer.OrdinalIgnoreCase), ct).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                foreach (var item in grp)
-                {
-                    errors.Add(new DeleteError { Id = item.Id, Message = $"Failed to update _index.json: {ex.Message}" });
-                }
-            }
-        }
-
-        // 3b. Rewrite each dependent test's depends_on
-        foreach (var d in dependents)
-        {
-            ct.ThrowIfCancellationRequested();
-            try
-            {
-                await StripDependsOnAsync(d.File, idsToDelete, ct).ConfigureAwait(false);
-                cleanups.Add(new DependencyCleanup { TestId = d.DependentId, RemovedDep = d.RemovedDep });
-            }
-            catch (Exception ex)
-            {
-                errors.Add(new DeleteError { Id = d.DependentId, Message = $"Failed to update depends_on: {ex.Message}" });
-            }
-        }
-
-        // 3c. Delete test files last so a partial failure doesn't strand state.
-        foreach (var item in resolvable)
-        {
-            ct.ThrowIfCancellationRequested();
-            try
-            {
-                File.Delete(item.File!);
-                deleted.Add(new DeletedTest
-                {
-                    Id = item.Id,
-                    Suite = item.Suite!,
-                    File = MakeRelative(workspace, item.File!),
-                    Title = item.Title,
-                    AutomatedBy = item.AutomatedBy,
-                    StrandedAutomation = item.AutomatedBy
-                });
-            }
-            catch (Exception ex)
-            {
-                errors.Add(new DeleteError { Id = item.Id, Message = $"Failed to delete file: {ex.Message}" });
-            }
-        }
+        // Phase 3: write — indexes, dependents (lossless), baseline, staging and verdict files, test files last.
+        var outcome = await service.ApplyAsync(plan, ct).ConfigureAwait(false);
+        var errors = outcome.Errors.Select(e => new DeleteError { Id = e.Id, Message = e.Message }).ToList();
 
         var result = new DeleteResult
         {
             Command = "delete",
             Status = errors.Count == 0 ? "completed" : "failed",
             DryRun = false,
-            Deleted = deleted,
-            DependencyCleanup = cleanups,
+            Deleted = outcome.Deleted.Select(t => ToDeletedTest(workspace, t)).ToList(),
+            DependencyCleanup = outcome.DependentsCleaned.Select(d => new DependencyCleanup { TestId = d.DependentId, RemovedDep = d.RemovedDep }).ToList(),
             Skipped = skipped,
             Errors = errors,
-            Message = $"Deleted {deleted.Count} test(s); cleaned up {cleanups.Count} depends_on reference(s)."
+            BaselineEntriesRemoved = outcome.BaselineEntriesRemoved.Select(e => $"{e.Suite}/{e.Id}").ToList(),
+            StagingFilesRemoved = outcome.StagingFilesRemoved.Select(service.Relative).ToList(),
+            VerdictFilesRemoved = outcome.VerdictFilesRemoved.Select(service.Relative).ToList(),
+            Warnings = plan.Warnings,
+            Message = $"Deleted {outcome.Deleted.Count} test(s); cleaned up {outcome.DependentsCleaned.Count} depends_on reference(s)."
         };
         EmitResult(result);
+        EmitHumanSummary(result);
 
         return errors.Count == 0 ? ExitCodes.Success : ExitCodes.Error;
     }
 
-    private static async Task<List<ResolvedItem>> ResolveAsync(string testCasesDir, IReadOnlyList<string> ids, CancellationToken ct)
+    private static DeletedTest ToDeletedTest(string workspace, DeletionTarget t) => new()
     {
-        var plan = new List<ResolvedItem>();
-        foreach (var id in ids)
-        {
-            ct.ThrowIfCancellationRequested();
-            var match = await FindTestCaseFileAsync(testCasesDir, id, ct).ConfigureAwait(false);
-            if (match is null)
-            {
-                plan.Add(new ResolvedItem { Id = id });
-                continue;
-            }
+        Id = t.Id,
+        Suite = t.Suite,
+        File = MakeRelative(workspace, t.File),
+        Title = t.Title,
+        AutomatedBy = t.AutomatedBy,
+        StrandedAutomation = t.AutomatedBy
+    };
 
-            var (file, suite, title, automatedBy) = match.Value;
-            plan.Add(new ResolvedItem
-            {
-                Id = id,
-                File = file,
-                Suite = suite,
-                Title = title,
-                AutomatedBy = automatedBy
-            });
-        }
-        return plan;
-    }
-
-    private static async Task<(string File, string Suite, string? Title, IReadOnlyList<string> AutomatedBy)?> FindTestCaseFileAsync(
-        string testCasesDir, string id, CancellationToken ct)
+    /// <summary>Spec 090: the extra cleanup and the list-form warnings, in human mode.</summary>
+    private void EmitHumanSummary(DeleteResult result)
     {
-        if (!Directory.Exists(testCasesDir))
-        {
-            return null;
-        }
-
-        // Common case: file is `<id>.md` directly inside its suite dir
-        foreach (var suiteDir in Directory.EnumerateDirectories(testCasesDir))
-        {
-            var candidate = Path.Combine(suiteDir, $"{id}.md");
-            if (File.Exists(candidate))
-            {
-                var suite = Path.GetFileName(suiteDir);
-                var (title, automatedBy) = await ReadFrontmatterMetadataAsync(candidate, ct).ConfigureAwait(false);
-                return (candidate, suite, title, automatedBy);
-            }
-        }
-
-        // Fallback: scan all .md files for matching id: in frontmatter
-        foreach (var file in Directory.EnumerateFiles(testCasesDir, "*.md", SearchOption.AllDirectories))
-        {
-            ct.ThrowIfCancellationRequested();
-            string content;
-            try
-            {
-                content = await File.ReadAllTextAsync(file, ct).ConfigureAwait(false);
-            }
-            catch (IOException) { continue; }
-
-            if (Regex.IsMatch(content, $@"^\s*id:\s*[""']?{Regex.Escape(id)}[""']?\s*$", RegexOptions.Multiline))
-            {
-                var suite = Path.GetFileName(Path.GetDirectoryName(file)) ?? string.Empty;
-                var (title, automatedBy) = await ReadFrontmatterMetadataAsync(file, ct).ConfigureAwait(false);
-                return (file, suite, title, automatedBy);
-            }
-        }
-
-        return null;
-    }
-
-    private static async Task<(string? Title, IReadOnlyList<string> AutomatedBy)> ReadFrontmatterMetadataAsync(string filePath, CancellationToken ct)
-    {
-        string? title = null;
-        var automation = new List<string>();
-        try
-        {
-            var lines = await File.ReadAllLinesAsync(filePath, ct).ConfigureAwait(false);
-            var inFrontmatter = false;
-            var inAutomatedBy = false;
-            for (var i = 0; i < lines.Length; i++)
-            {
-                var line = lines[i];
-                if (i == 0 && line.Trim() == "---") { inFrontmatter = true; continue; }
-                if (inFrontmatter && line.Trim() == "---") { break; }
-                if (!inFrontmatter) { continue; }
-
-                if (line.StartsWith("title:", StringComparison.OrdinalIgnoreCase))
-                {
-                    title = line["title:".Length..].Trim().Trim('"', '\'');
-                    inAutomatedBy = false;
-                }
-                else if (line.StartsWith("automated_by:", StringComparison.OrdinalIgnoreCase))
-                {
-                    inAutomatedBy = true;
-                    var inline = line["automated_by:".Length..].Trim();
-                    if (!string.IsNullOrEmpty(inline) && inline != "[]")
-                    {
-                        automation.Add(inline.Trim('"', '\''));
-                    }
-                }
-                else if (inAutomatedBy && line.TrimStart().StartsWith("- "))
-                {
-                    automation.Add(line.TrimStart()[2..].Trim().Trim('"', '\''));
-                }
-                else if (!line.StartsWith(" ") && !line.StartsWith("\t"))
-                {
-                    inAutomatedBy = false;
-                }
-            }
-        }
-        catch
-        {
-            // best-effort
-        }
-        return (title, automation);
-    }
-
-    private static async Task<List<(string DependentId, string File, string RemovedDep)>> FindDependentsAsync(
-        string testCasesDir, HashSet<string> idsToDelete, CancellationToken ct)
-    {
-        var results = new List<(string, string, string)>();
-        foreach (var file in Directory.EnumerateFiles(testCasesDir, "*.md", SearchOption.AllDirectories))
-        {
-            ct.ThrowIfCancellationRequested();
-            string content;
-            try
-            {
-                content = await File.ReadAllTextAsync(file, ct).ConfigureAwait(false);
-            }
-            catch (IOException) { continue; }
-
-            var matches = DependsOnLineRegex.Matches(content);
-            if (matches.Count == 0) { continue; }
-
-            string? dependentId = null;
-            var idMatch = Regex.Match(content, @"^\s*id:\s*[""']?(?<id>[A-Za-z][A-Za-z0-9_-]*-\d+)[""']?\s*$", RegexOptions.Multiline);
-            if (idMatch.Success)
-            {
-                dependentId = idMatch.Groups["id"].Value;
-            }
-
-            foreach (Match m in matches)
-            {
-                var dep = m.Groups["id"].Value;
-                if (idsToDelete.Contains(dep) && dependentId is not null && !idsToDelete.Contains(dependentId))
-                {
-                    results.Add((dependentId, file, dep));
-                }
-            }
-        }
-        return results;
-    }
-
-    private static async Task StripDependsOnAsync(string filePath, HashSet<string> idsToRemove, CancellationToken ct)
-    {
-        var content = await File.ReadAllTextAsync(filePath, ct).ConfigureAwait(false);
-        var rewritten = DependsOnLineRegex.Replace(content, m =>
-        {
-            var id = m.Groups["id"].Value;
-            return idsToRemove.Contains(id) ? string.Empty : m.Value;
-        });
-        // Collapse the empty replacements' line endings
-        rewritten = Regex.Replace(rewritten, @"\r?\n\r?\n+", Environment.NewLine + Environment.NewLine);
-        if (rewritten != content)
-        {
-            await AtomicFileWriter.WriteAllTextAsync(filePath, rewritten, ct).ConfigureAwait(false);
-        }
-    }
-
-    private static async Task UpdateSuiteIndexAsync(string testCasesDir, string suite, HashSet<string> removedIds, CancellationToken ct)
-    {
-        var indexPath = Path.Combine(testCasesDir, suite, "_index.json");
-        if (!File.Exists(indexPath))
+        if (_outputFormat != OutputFormat.Human)
         {
             return;
         }
 
-        var writer = new IndexWriter();
-        var index = await writer.ReadAsync(indexPath, ct).ConfigureAwait(false);
-        if (index?.Tests is null)
-        {
-            return;
-        }
-
-        var remaining = index.Tests.Where(t => t.Id is null || !removedIds.Contains(t.Id)).ToList();
-        if (remaining.Count == index.Tests.Count)
-        {
-            return; // no change
-        }
-
-        var newIndex = new MetadataIndex
-        {
-            Suite = index.Suite,
-            GeneratedAt = DateTime.UtcNow,
-            Tests = remaining
-        };
-        await writer.WriteAsync(indexPath, newIndex, ct).ConfigureAwait(false);
+        var verb = result.DryRun ? "Would remove" : "Removed";
+        if (result.BaselineEntriesRemoved.Count > 0)
+            Console.WriteLine($"{verb} baseline entries: {string.Join(", ", result.BaselineEntriesRemoved)}");
+        if (result.StagingFilesRemoved.Count > 0)
+            Console.WriteLine($"{verb} staging files: {string.Join(", ", result.StagingFilesRemoved)}");
+        if (result.VerdictFilesRemoved.Count > 0)
+            Console.WriteLine($"{verb} verdict files: {string.Join(", ", result.VerdictFilesRemoved)}");
+        foreach (var warning in result.Warnings)
+            Console.Error.WriteLine($"Warning: {warning}");
     }
 
-    private bool Confirm(IReadOnlyList<ResolvedItem> resolvable, IReadOnlyList<(string DependentId, string File, string RemovedDep)> dependents)
+    private bool Confirm(IReadOnlyList<DeletionTarget> resolvable, DeletionPlan plan)
     {
+        var dependents = plan.ScalarDependents;
         Console.WriteLine();
         Console.WriteLine($"Delete {resolvable.Count} test(s)?");
         foreach (var item in resolvable)
@@ -527,14 +304,5 @@ public sealed class DeleteHandler
         {
             Console.Error.WriteLine(message);
         }
-    }
-
-    private sealed class ResolvedItem
-    {
-        public required string Id { get; init; }
-        public string? File { get; init; }
-        public string? Suite { get; init; }
-        public string? Title { get; init; }
-        public IReadOnlyList<string> AutomatedBy { get; init; } = Array.Empty<string>();
     }
 }

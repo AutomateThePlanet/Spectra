@@ -109,8 +109,9 @@ public sealed class CompileRepairPromptCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task CompileRepairPrompt_HallucinatedVerdict_Exits4()
+    public async Task CompileRepairPrompt_HallucinatedVerdict_CompilesAPrompt()
     {
+        // Spec 090 (FR-A6): was exit 4 (partial only); the update flow repairs a hallucinated edit once.
         var original = Directory.GetCurrentDirectory();
         try
         {
@@ -119,7 +120,7 @@ public sealed class CompileRepairPromptCommandTests : IDisposable
             WriteVerdictJson("TC-138", "hallucinated");
             var exit = await RunAsync("ai", "compile-repair-prompt",
                 "--suite", "reporting", "--test", "TC-138");
-            Assert.Equal(4, exit);
+            Assert.Equal(0, exit);
         }
         finally { Directory.SetCurrentDirectory(original); }
     }

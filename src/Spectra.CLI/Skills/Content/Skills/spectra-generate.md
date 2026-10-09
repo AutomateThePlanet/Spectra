@@ -287,10 +287,11 @@ plus `unchanged` and per-file `results`. Consumed staging files are deleted; a f
 `--keep-baseline` keeps each repaired test's source-change baseline as it was (a repair is not a doc update).
 
 - Exit `0` → every staged repair was ingested.
-- Exit `8` → the batch completed but some repairs failed (Spec 089). Read `results`: for each `failed` test, re-patch it
+- Exit `8` → the batch completed but some repairs failed (Spec 089). Read `results`: each failed repair is kept as
+  `.spectra/repairs/{suite}/failed-{id}.json` (Spec 090), which no later batch reads. For each `failed` test, re-patch it
   fixing the reported `error_code` (`MULTIPLE_TESTS`: one test per file; `DRIFT_DETECTED`: touch only what the critic
-  flagged; `MALFORMED_JSON` / `SCHEMA_INVALID`: fix the JSON), write `.spectra/repairs/{suite}/repaired-{id}.json` again,
-  and run the same call again — **at most twice**, then continue with the tests that were ingested. This is not a STOP.
+  flagged; `MALFORMED_JSON` / `SCHEMA_INVALID`: fix the JSON), write a fresh `.spectra/repairs/{suite}/repaired-{id}.json`
+  (the kept `failed-{id}.json` is removed when it succeeds), and run the same call again — **at most twice**, then continue with the tests that were ingested. This is not a STOP.
   Re-staging after an ingest failure completes the same repair attempt: it does not increase the count passed to
   `ingest-grounding --repaired --repair-attempts N`, and it does not trigger a critic pass on its own — a test written on
   a retry is re-critiqued once, in the re-critic phase below, like any other repaired test.

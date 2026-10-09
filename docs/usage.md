@@ -169,11 +169,20 @@ SPECTRA keeps, for every test, a fingerprint of each doc section it references (
    or edit again — it never acknowledges on its own. A REMOVED, CRITERIA_REMOVED or RELINK change seen at that point
    means the docs changed again since triage: the assistant says so and asks you to re-run triage. Each test is
    reported as updated, unchanged, still pending or failed; the staging files of all but failed tests are deleted, a
-   failed one is kept and retried at most twice on its own (`--test-id`). A batch with a failed file exits 8, so
-   scripts see it too. A group too big for one prompt (`PROMPT_TOO_LARGE`, over `analysis.max_prompt_tokens`) is edited
+   failed one is kept as `.spectra/updates/checkout/failed-<id>.json` (so the next batch doesn't fail on it again) and
+   retried at most twice by writing a fresh `updated-<id>.json`. A batch with a failed file exits 8, so scripts see it
+   too; `ingest-update checkout --all --dry-run` shows what a batch would do without writing anything. A group too big for one prompt (`PROMPT_TOO_LARGE`, over `analysis.max_prompt_tokens`) is edited
    test by test. A customised `.spectra/prompts/test-update.md` from before this version still works per test, with
    a warning; `spectra update-skills` (for a copy you never edited) or `spectra prompts reset test-update` brings the
    group layout.
+   **Re-verification.** An edit removes the test's critic verdict (a Manual verdict is kept and reported), so an
+   edited test never carries a verdict given to different content. Edited tests show as unverified in
+   `audit-grounding` until they are re-verified. After each group the assistant asks once per run whether to re-verify
+   the edited tests now (default yes) and runs the critic on each: grounded is done; partial gets one repair and is
+   flagged for review if still partial; hallucinated gets one repair, and if still hallucinated the assistant stops for
+   that test and asks you — edit again, restore the previous version from git (you run it), or delete it with the
+   delete skill. The update flow never drops or deletes a test on its own. A verdict for content that changed after the
+   critic saw it is refused (`VERDICT_STALE`). The summary lists grounded, flagged, hallucinated and unverified tests.
 6. **Acknowledge** — tests you reviewed and kept as they are without an edit prompt get
    `spectra ai update-ack --suite checkout --ids …`, so they leave triage. A change you neither edit nor acknowledge
    is reported again next time.
@@ -217,7 +226,13 @@ reads git; without git everything works as before and missing files are REMOVED 
 in `.spectra/repairs/<suite>/` and ingests them with `ingest-update <suite> --all --keep-baseline`, which reads only
 that folder; the update edit step reads only `.spectra/updates/<suite>/`. A file kept after a failure is therefore
 never picked up by the other flow in the wrong baseline mode. `spectra init` (new workspaces) and
-`spectra update-skills` (existing ones) gitignore both folders. A test file that fails to
+`spectra update-skills` (existing ones) gitignore both folders. `update-skills` only adds a pattern it has never
+offered to the workspace before, so one you removed stays removed, and it never creates a `.gitignore`.
+
+**Deleting tests.** `spectra delete` (or the delete skill) removes the deleted ids from dependents' `depends_on` without
+touching anything else in those files, and removes the tests' baseline entries, staging files and verdict files, so a
+later triage or batch doesn't trip over them. A `depends_on` list is not supported; such a dependent is left as it is,
+with a warning. A test file that fails to
 parse keeps its baseline entry: no command prunes a suite while any of its test files can't be read, and each says so.
 
 **Commit the baseline.** Commit `test-cases/*/_source-baseline.json` and `.spectra/source-snapshots/` (the snapshots

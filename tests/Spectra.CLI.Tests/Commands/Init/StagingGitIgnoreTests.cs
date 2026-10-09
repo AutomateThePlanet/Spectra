@@ -64,6 +64,11 @@ public sealed class StagingGitIgnoreTests : IDisposable
         _ws.WriteTest("storage", "TC-101", ["docs/storage.md#Quotas"]);
         await _ws.InitBaselineAsync();
         File.WriteAllText(GitIgnorePath, Pre089GitIgnore);
+        // Spec 090: today's init records the offered gitignore patterns; a real pre-089 workspace has no such record.
+        var manifestPath = _ws.PathOf(".spectra/skills-manifest.json");
+        var manifest = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(manifestPath))!.AsObject();
+        manifest.Remove("gitignore_offered");
+        File.WriteAllText(manifestPath, manifest.ToJsonString());
 
         var (exit, _, error) = await _ws.RunAsync("update-skills");
 

@@ -138,7 +138,7 @@ public sealed class StagingFolderSplitTests : IDisposable
         Assert.Equal(["TC-102", "TC-103"], ResultTests(updates));
         Assert.All(updates.GetProperty("results").EnumerateArray(),
             r => Assert.StartsWith(".spectra/updates/", r.GetProperty("file").GetString()));
-        Assert.Equal(["repaired-TC-102.json"], ws.RepairFiles("storage"));
+        Assert.Equal(["failed-TC-102.json"], ws.RepairFiles("storage")); // Spec 090 (FR-B1): a failed file is kept as failed-<id>.json
     }
 
     [Fact]
@@ -200,8 +200,9 @@ public sealed class StagingFolderSplitTests : IDisposable
             await Repairs();
         }
 
-        Assert.Equal(["repaired-TC-102.json"], _ws.RepairFiles("storage"));
-        Assert.Equal(["updated-TC-102.json"], _ws.StagedFiles("storage"));
+        // Spec 090 (FR-B1): a failed file is kept as failed-<id>.json
+        Assert.Equal(["failed-TC-102.json"], _ws.RepairFiles("storage"));
+        Assert.Equal(["failed-TC-102.json"], _ws.StagedFiles("storage"));
         Assert.Equal("LOAD", await BucketAsync("TC-101")); // repaired with the baseline kept
         Assert.Null(await BucketAsync("TC-103"));          // edited with the baseline rebuilt
     }

@@ -88,7 +88,7 @@ public sealed class MultipleTestsTests : IDisposable
         Assert.All(ids, id => Assert.Equal(before[id], TestFile(id)));
         Assert.Equal("written", Result(batch, "TC-111").GetProperty("outcome").GetString());
         Assert.Contains("Edited TC-111", TestFile("TC-111"));
-        Assert.Equal(["updated-TC-101.json"], _ws.StagedFiles("storage"));
+        Assert.Equal(["failed-TC-101.json"], _ws.StagedFiles("storage")); // Spec 090 (FR-B1): a failed file is kept as failed-<id>.json
     }
 
     [Fact]
