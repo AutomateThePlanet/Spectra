@@ -629,9 +629,95 @@ public class SkillsManifestTests : IDisposable
         Assert.DoesNotContain("update-ack --suite", others);
     }
 
+    // ---- Spec 090: re-verification after update edits, failed staging files, delete delegation ----
+
     [Fact]
-    public void UpdateSkill_DoesNotKeepTheBaseline() =>
-        Assert.DoesNotContain("--keep-baseline", SkillContent.Update);
+    public void UpdateSkill_ReverifiesEditedTests_AskingOnce_WithOneRepair()
+    {
+        // FR-A4 (spec T5).
+        var step = UpdateStep("**Step 5a**", "**Step 6**");
+
+        Assert.Contains("Re-verify the edited tests with the critic\nnow? (recommended)", step);
+        Assert.Contains("don't ask again", step);
+        Assert.Contains("`manual_verdict_kept`", step);
+        Assert.Contains("`spectra-critic` subagent with the Task tool", step);
+        Assert.Contains("spectra ai compile-critic-prompt --suite <suite> --test <id>", step);
+        Assert.Contains("spectra ai ingest-verdict --suite <suite> --all --output-format json", step);
+        Assert.Contains("spectra ai ingest-grounding --suite <suite> --all --output-format json", step);
+        Assert.Contains("spectra ai compile-repair-prompt --suite <suite> --test <id>", step);
+        Assert.Contains("`.spectra/repairs/<suite>/repaired-<id>.json`", step);
+        Assert.Contains("spectra ai ingest-update <suite> --all --keep-baseline", step);
+        Assert.Contains("--repaired --repair-attempts 1", step);
+        Assert.Contains("still hallucinated", step);
+        Assert.Contains("restore the previous version from\n  git (the user runs that", step);
+        Assert.Contains("never runs `spectra ai record-drop` or `spectra delete`", step);
+        Assert.DoesNotMatch(@"(?m)^\s*spectra (ai record-drop|delete)\b", step);
+    }
+
+    [Fact]
+    public void UpdateSkill_ReportsTheReverificationCounts()
+    {
+        var step = UpdateStep("**Step 7**", "## Update all suites");
+
+        foreach (var count in new[] { "grounded", "partial (flagged for review)", "hallucinated", "unverified", "manual verdict kept" })
+        {
+            Assert.Contains(count, step);
+        }
+    }
+
+    [Fact]
+    public void UpdateSkill_NonStop_AllowsTheCriticAndTheRepairsFolder()
+    {
+        var contract = UpdateStep("## NON-STOP CONTRACT", "## Update test cases for a suite");
+
+        Assert.Contains("`spectra-critic`", contract);
+        Assert.Contains("`.spectra/repairs/<suite>/repaired-<id>.json`", contract);
+    }
+
+    [Fact]
+    public void BothSkills_KeepAFailedFileAsFailedId_AndRetryWithAFreshFile()
+    {
+        // FR-B1.
+        var update = UpdateStep("**Step 5**", "**Step 5a**");
+        Assert.Contains("`.spectra/updates/<suite>/failed-<id>.json`", update);
+        Assert.Contains("write a fresh `.spectra/updates/<suite>/updated-<id>.json`", update);
+        Assert.DoesNotContain("it replaces the kept file", update);
+
+        var generate = GenerateSkill;
+        Assert.Contains("`.spectra/repairs/{suite}/failed-{id}.json`", generate);
+        Assert.Contains("write a fresh `.spectra/repairs/{suite}/repaired-{id}.json`", generate);
+    }
+
+    [Fact]
+    public void UpdateSkill_DelegatesDeletesToTheDeleteSkill_NeverRunsDelete()
+    {
+        // FR-C4.
+        var content = SkillContent.Update;
+
+        Assert.Contains("spectra-delete", content);
+        Assert.DoesNotMatch(@"(?m)^\s*spectra delete\b", content);
+    }
+
+    [Fact]
+    public void ReviewFlaggedSkill_StillPassesTheRepairAttemptsExplicitly()
+    {
+        // Analysis C1: FR-A1 drops the flagged block on the repair, so the attempt count must not come from it.
+        var content = SkillContent.All["spectra-review-flagged"];
+
+        Assert.Contains("ingest-grounding", content);
+        Assert.Contains("--repaired --repair-attempts 2", content);
+    }
+
+    [Fact]
+    public void UpdateSkill_DoesNotKeepTheBaseline()
+    {
+        // Spec 085: the update edit rebuilds the baseline. Spec 090 (FR-A4): only the re-verify repair (Step 5a), which
+        // fixes grounding rather than doc drift, keeps it — and it ingests from the repairs folder.
+        var lines = SkillContent.Update.Replace("\r\n", "\n").Split('\n').Where(l => l.Contains("--keep-baseline")).ToList();
+        Assert.Single(lines);
+        Assert.Contains("spectra ai ingest-update <suite> --all --keep-baseline", lines[0]);
+        Assert.DoesNotContain("--keep-baseline", UpdateStep("**Step 5**", "**Step 5a**"));
+    }
 
     [Fact]
     public void UpdateSkill_AllSuitesIsOneTriageCall() =>

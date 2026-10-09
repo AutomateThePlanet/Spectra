@@ -135,10 +135,17 @@ Compares installed files against bundled versions using SHA-256 hashes:
 - **User-modified files** → skipped with warning (preserves customizations)
 - **Missing files** → recreated
 
-It also applies `spectra init`'s idempotent `.gitignore` list (Spec 089): entries an older workspace lacks — such as
-`.spectra/updates/` and `.spectra/repairs/`, the update and repair staging folders — are appended under `# SPECTRA`,
-every other line is kept, and `.gitignore` is listed as updated. Plain `spectra init` still refuses on an existing
-workspace, so this is how existing workspaces get new entries.
+It also offers `spectra init`'s `.gitignore` patterns to an existing workspace (Spec 089; Spec 090 FR-D1–FR-D3):
+- **Only patterns never offered before** are added. The offered set is recorded in `.spectra/skills-manifest.json`
+  (`gitignore_offered`), so a pattern you removed stays removed. A workspace from before 090 has no record: every
+  pattern of the 089 list except `.spectra/updates/` and `.spectra/repairs/` counts as already offered.
+- **No `.gitignore`** → none is created; the output says `no .gitignore; add: <patterns>` and nothing is recorded.
+- **Present** means a whole trimmed, non-comment line equal to the pattern or to the pattern without its trailing `/`
+  (a longer line containing it doesn't count). A `!pattern` negation is your choice: the pattern isn't added.
+- **Append** keeps every existing byte: one newline in the file's own style (LF or CRLF) only when the file doesn't end
+  with one, `# SPECTRA` only when absent, then the patterns. The output names them: `Updated: .gitignore (added: …)`.
+
+Plain `spectra init` still refuses on an existing workspace, so this is how existing workspaces get new entries.
 
 Reports a summary of updated, unchanged, and skipped files.
 
@@ -472,6 +479,10 @@ spectra ai compile-critic-prompt --test ./tc-900.json --docs ./docs/checkout
 - It refuses to emit when the test artifact is missing (no id/title), exiting `4`; an empty `--docs` set is
   allowed (the prompt notes "no documentation provided") and is not treated as a refusal.
 - Exit code is `0` when compiled/emitted, `4` when refused, and `1` on an environment error.
+- Spec 090 (FR-A2): for each test it compiles (suite mode or `--test <path>`), it writes the fingerprint record
+  `.spectra/verdicts/critic-input-<id>.json` = `{id, suite, file, fingerprint}` — the content the critic judges, not its
+  grounding block. Nothing is written on a refusal. `ingest-verdict` / `ingest-grounding` refuse a verdict whose test
+  changed since (`VERDICT_STALE`).
 
 ### `spectra ai ingest-verdict` (fail-loud boundary)
 
@@ -487,6 +498,10 @@ spectra ai ingest-verdict --from ./verdict.json --output-format json
 - It fails loud on damage, so a missing or unparseable `verdict` or `score` is a `ParseFailure` with a
   specific error, **never** a silent `partial`/`0.5` soft pass. Empty input is `EmptyResponse`.
 - Exit code is `0` for a classified verdict, `5` for `EmptyResponse`, `6` for `ParseFailure`, and `1` for an environment error.
+- Spec 090 (FR-A2): `--from .spectra/verdicts/critic-verdict-<id>.json` with a fingerprint record whose test has changed
+  since → exit `4`, `VERDICT_STALE` (shared failure shape). `--suite <s> --all` doesn't classify stale verdicts:
+  `skipped_stale` (count) and `stale` (ids). A verdict without a record (from before 090, stdin, or another path) is
+  accepted as before.
 
 ### `spectra ai ingest-grounding` (durable verdict write-back)
 
@@ -512,7 +527,15 @@ spectra ai ingest-grounding --suite reporting --all --repaired --repair-attempts
 
 `--all` scans `.spectra/verdicts/critic-verdict-*.json`, filters to the named suite via `_index.json`, and writes each eligible block in one pass. It is idempotent, since tests whose `.md` already has a `grounding:` block are skipped (`skipped_already_written`). Without `--repaired`, partial verdicts are skipped (`skipped_partial_pre_repair`) because they need one repair attempt first. With `--repaired`, all ungrounded tests (both `grounded` and `partial` re-verdicts) are written.
 
-Batch output (JSON): `{ command, mode:"batch", suite, written, skipped_already_written, skipped_partial_pre_repair, errors }`.
+Batch output (JSON): `{ command, mode:"batch", suite, written, skipped_already_written, skipped_partial_pre_repair, errors, skipped_manual, manual, skipped_stale, stale }`.
+
+Spec 090:
+- **Manual verdicts are never overwritten (FR-A3).** `--test` → exit `4`, `MANUAL_VERDICT`; `--all` → `skipped_manual`
+  (count) and `manual` (ids), checked before the already-written skip.
+- **Stale verdicts are refused (FR-A2).** A verdict whose fingerprint record no longer matches the test → `--test`:
+  exit `4`, `VERDICT_STALE`; `--all`: `skipped_stale` / `stale`. Nothing is written.
+- An update edit drops the test's critic block and verdict (see `ingest-update`), so the existing skip-if-present rule
+  lets the new verdict land — there is no replace option.
 
 - **grounded** → condensed "verified clean" block (`verdict: grounded`, `score`, `verified_at`).
 - **partial** → block with condensed findings + `flagged_for_review: true` (unless `--repaired`; the `spectra-review-flagged` skill then dispositions flagged tests).
@@ -545,9 +568,11 @@ spectra ai compile-repair-prompt --suite reporting --test TC-113 \
   --from .spectra/verdicts/critic-verdict-TC-113.json
 ```
 
-- Refuses (exit 4) if verdict is not `partial` or if no non-grounded findings exist.
+- Refuses (exit 4) if the verdict is `grounded` or if no non-grounded findings exist. Spec 090 (FR-A6): it accepts
+  `partial` and `hallucinated` verdicts — the update flow repairs a hallucinated edit once instead of dropping a test
+  that existed before (the generation flow still record-drops hallucinated tests before any repair).
 - The agent patches in-session, then `ingest-update` + re-critic + `ingest-grounding` close the loop.
-- Exit code is `0` when emitted, `4` when refused (not partial / no findings), `5` when the verdict is empty, `6` on a parse failure, and `1` on error.
+- Exit code is `0` when emitted, `4` when refused (grounded / no findings), `5` when the verdict is empty, `6` on a parse failure, and `1` on error.
 
 ### `spectra ai review-flagged` (human review phase)
 
@@ -582,6 +607,18 @@ Output per test: `id`, `verdict`, `score`, `grounding_written` (bool), `flagged_
 - `action_needed: review` means partial with grounding written, but `flagged_for_review: true`; use `review-flagged`.
 - `action_needed: none` means the test is grounded and clean.
 - Exit code is `0` on success and `1` when the suite is not found.
+
+Spec 090 (FR-A7): entries for tests that have a verdict file are unchanged. Every indexed test **without** a verdict file
+is listed too, judged by its grounding block (verdict files are workspace-local, so a fresh clone can have blocks but no verdict
+files):
+
+| Test file | `verdict` | `grounding_written` | `action_needed` |
+|---|---|---|---|
+| critic grounding block | the block's verdict and score | `true` | `review` when flagged, else `none` |
+| Manual block | `manual` | `true` | `none` |
+| no block (e.g. just edited by `ingest-update`) | `none` | `false` | `critic` |
+
+The summary gains `unverified` (tests with verdict `none`).
 
 ### `spectra ai compile-repair-batch` (deterministic batch repair manifest)
 
@@ -1071,6 +1108,7 @@ spectra ai ingest-update checkout --all
 | `--from` | File with the edited-test JSON (omit to read stdin) |
 | `--all` | Ingest every staged `.spectra/updates/<suite>/updated-<id>.json`; with `--keep-baseline`, every `.spectra/repairs/<suite>/repaired-<id>.json` instead |
 | `--keep-baseline` | Keep the source-change baseline (critic repairs; see below) |
+| `--dry-run` | Spec 090: report the outcome each edit would get, with the same exit code; write nothing |
 
 Exit codes:
 
@@ -1133,6 +1171,21 @@ Batch update-ingest for suite 'storage': written=1 unchanged=1 unchanged_pending
 ```
 
 A completed batch exits 0 when no file failed and 8 when at least one did; an empty or missing folder exits 0.
+
+**Spec 090.**
+- **Verdicts (FR-A1).** A written edit (single or `--all`, with or without `--keep-baseline`) removes the test's critic
+  grounding block in the same write and deletes `.spectra/verdicts/critic-verdict-<id>.json` and its fingerprint
+  record, so `audit-grounding` shows the test unverified until the critic runs again. A Manual verdict is kept: the
+  single-form JSON has `manual_verdict_kept: true`, the batch JSON lists the ids under `manual_verdict_kept`, and the
+  human line reads `TC-101: updated (manual verdict kept)`. `unchanged` and `unchanged_pending` touch nothing.
+- **Failed staging files (FR-B1).** A file that fails is renamed to `failed-<id>.json` in the same folder (replacing an
+  older one), and `results[].file` gives that path. `--all` never reads `failed-*`, so a later batch doesn't fail on it
+  again. A later `written`, `unchanged` or `unchanged_pending` outcome for the id deletes its `failed-<id>.json`. To
+  retry, write a fresh `updated-<id>.json` / `repaired-<id>.json`. On a baseline write failure nothing is renamed.
+- **`--dry-run` (FR-B2).** Single form and `--all`: the same outcomes (incl. `MULTIPLE_TESTS`, `ID_MISMATCH`,
+  `DRIFT_DETECTED`, `unchanged_pending`) and the same exit code as the real run, with `dry_run: true` in the JSON and a
+  `Dry run: nothing written.` line. No test, index, baseline, staging or verdict file changes, and no baseline lock is
+  taken.
 
 Spec 084: like `ingest-tests`, it locks and strictly loads the suite baseline before persisting and then replaces the
 edited test's entry (the single form and `--all`, which takes one lock for the batch); both JSON outputs gain
@@ -1337,6 +1390,19 @@ spectra delete TC-142 --no-interaction --output-format json
 | `--no-automation-check` | off | Override automation guard without forcing past confirmation |
 
 Exit code is 0 on success, 1 for a generic error, 3 for missing arguments, 4 for `TEST_NOT_FOUND`, 5 for `AUTOMATION_LINKED`, and 130 for SIGINT.
+
+Spec 090 (FR-C1–FR-C3):
+- Ids are read from each file's parsed frontmatter, never from a pattern over the file.
+- A dependent with a scalar `depends_on: <deleted id>` has the key dropped through the lossless writer: nothing else in
+  its file changes, except a comment line directly above `depends_on:`, which goes with the key. Body lines and
+  `criteria:` entries are never touched.
+- A dependent whose `depends_on` is a block or flow list (such tests don't parse today) is left unchanged, with a
+  warning: `TC-203: depends_on is a list (not supported) and names TC-101; not changed (…)`.
+- The deleted tests' baseline entries are removed (under the baseline lock), with their `updated-` / `repaired-` /
+  `failed-` staging files and their verdict file and fingerprint record. Snapshots are kept.
+- The JSON adds `baseline_entries_removed` (`suite/id`), `staging_files_removed`, `verdict_files_removed` and
+  `warnings`; `--dry-run` fills them with what would happen.
+- Legacy `spectra ai update … --delete-orphaned` deletes through the same service.
 
 ### `spectra suite list|rename|delete`
 

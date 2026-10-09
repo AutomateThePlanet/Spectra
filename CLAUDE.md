@@ -86,7 +86,7 @@ spectra ai source-baseline --init (--suite X | --all-suites) [--force] [--dry-ru
 spectra ai source-baseline --init (--suite X | --all-suites) (--from-date ISO | --from-ref REV --owner PATH) [--min-similarity 50-100] [--dry-run]  # Spec 086/087: from history
 spectra ai relink-sources (--suite X | --all-suites) [--min-similarity 50-100] [--dry-run]  # Spec 086: renamed docs (git, read-only)
 spectra ai compile-update-prompt --suite X (--test-id ID | --group G2)  # Spec 088: edit prompt (sections, linked criteria)
-spectra ai ingest-update X (--all | --test-id ID [--from FILE]) [--keep-baseline]  # Spec 088/089: --all reads .spectra/updates/X/, --all --keep-baseline reads .spectra/repairs/X/; unchanged_pending; exit 8 = a staged file failed
+spectra ai ingest-update X (--all | --test-id ID [--from FILE]) [--keep-baseline] [--dry-run]  # Spec 088/089: --all reads .spectra/updates/X/, --all --keep-baseline reads .spectra/repairs/X/; unchanged_pending; exit 8 = a staged file failed (kept as failed-<id>.json, Spec 090)
 spectra ai update [suite] [--diff] [--dry-run] [--no-interaction] [--no-review]  # LEGACY word-overlap classifier
 
 # Dashboard
@@ -126,6 +126,7 @@ spectra run finalize [<run-id>] [--force]
 spectra prompts list|show|validate|reset [template] [--raw] [--all]
 
 # Other
+spectra delete <ids…> [--dry-run] [--force]          # Spec 090: scalar depends_on via the lossless writer; removes baseline entries, staging + verdict files
 spectra validate [--output-format json]
 spectra update-skills
 spectra init [--skip-skills]
@@ -155,6 +156,13 @@ system-under-test is unrelated to SPECTRA's removed execution adapter.
 - File-based (Markdown/YAML/JSON in `test-cases/`, `docs/_index/`, `docs/criteria/`, `_index.json`, `_manifest.yaml`, `_checksums.json`, `_criteria_index.yaml`) (045-doc-index-restructure)
 
 ## Recent Changes
+- **090-reverify-after-update (v2.6.0, unreleased)**: Phase 4 — edited tests are re-verified; stale verdicts are never written.
+  - **Verdicts:** `Verification/TestContentFingerprint` (sha256 of `UpdatePromptCompiler.SerializeTest`, no grounding) + `VerdictFreshness` (record `.spectra/verdicts/critic-input-<id>.json` = `{id, suite, file, fingerprint}`, written by `compile-critic-prompt`; `VERDICT_STALE` exit 4 in `ingest-verdict --from` / `ingest-grounding --test`, `skipped_stale`/`stale` in `--all`; no record = accepted). `ingest-grounding`: `MANUAL_VERDICT` / `skipped_manual`. `UpdatedTestIngestor.ApplyEdit` keeps only a Manual block (`IngestResult.ManualVerdictKept`); a written edit deletes the verdict file + record (`manual_verdict_kept` in JSON). `compile-repair-prompt` accepts hallucinated. `audit-grounding` lists indexed tests without a verdict file from their block (`none`/`critic`, `unverified` count).
+  - **Staging:** `ingest-update --all` renames a failed file to `failed-<id>.json` (never read by `--all`; a later success deletes it); `--dry-run` (single and `--all`, same outcomes + exit, no lock, nothing written).
+  - **Delete:** `Commands/Delete/TestDeletionService` (parsed ids; scalar `depends_on` dropped via `TestFileWriter`; lists/unparseable → warning; `BaselineStore.RemoveEntriesAsync` under the lock; staging + verdict files) used by `DeleteHandler` and legacy `UpdateHandler`; `DeleteResult` adds `baseline_entries_removed`, `staging_files_removed`, `verdict_files_removed`, `warnings`.
+  - **Gitignore:** `SpectraGitIgnore.OfferNewAsync` (offered set in `SkillsManifest.GitIgnoreOffered`; pre-090 = 089 list minus staging folders; no create; whole-line presence, `!` respected; byte-preserving append in the file's newline style via `Core/Text/Newlines`); `init` records the full list.
+  - **Skill:** `spectra-update` Step 5a re-verify (ask once; critic per written test; one repair for partial/hallucinated; still hallucinated → ask the user, never drop/delete); summary counts.
+  - Core 1219 / CLI 2001 (1 pre-existing unrelated failure: ProfileFormatLoaderTests) / Execution 228 / Integration 8.
 - **089-review-fixes-088 (v2.6.0, unreleased)**: Review fixes for 088; no features; no format change (one prompt label); each fix has a test that fails on `6ea7520`.
   - **F1:** `IngestUpdateCommand.StagingFolder(mode)` — `--all` reads `.spectra/updates/<s>/updated-*`, `--all --keep-baseline` reads `.spectra/repairs/<s>/repaired-*`; `spectra-generate` 8b stages repairs there.
   - **F2:** `GeneratedTestIngestor.ArrayObjects` (ids of the array's objects, counted before validation); `UpdatedTestIngestor.MultipleTests` (`MULTIPLE_TESTS`, exit 5 / per-file `failed`, also ahead of `ID_MISMATCH`).

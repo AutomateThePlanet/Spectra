@@ -153,6 +153,26 @@ public sealed class UpdatedTestIngestorTests : IDisposable
         Assert.Null(result.PersistedTests[0].Grounding); // preserved from original (was null)
     }
 
+    [Fact]
+    public async Task Ingest_CriticGrounding_IsDropped_ManualIsKept_AndReported()
+    {
+        // Spec 090 (FR-A1): a critic verdict judged the old content, so a written edit drops it; Manual stays.
+        var critic = ManualGrounding() with { Verdict = VerificationVerdict.Grounded, Critic = "claude-sonnet-4-6" };
+        var criticOriginal = Original(id: "TC-100", grounding: critic);
+
+        var dropped = await NewIngestor().IngestAsync(EditJson(), _testsPath, Suite, criticOriginal, [criticOriginal], default);
+
+        Assert.True(dropped.IsSuccess);
+        Assert.Null(dropped.PersistedTests[0].Grounding);
+        Assert.False(dropped.ManualVerdictKept);
+
+        var manualOriginal = Original(id: "TC-100", grounding: ManualGrounding());
+        var kept = await NewIngestor().IngestAsync(EditJson(title: "Edited again"), _testsPath, Suite, manualOriginal, [manualOriginal], default);
+
+        Assert.Equal(VerificationVerdict.Manual, kept.PersistedTests[0].Grounding!.Verdict);
+        Assert.True(kept.ManualVerdictKept);
+    }
+
     // ---------- US3: drift guard (T017) ----------
 
     [Fact]

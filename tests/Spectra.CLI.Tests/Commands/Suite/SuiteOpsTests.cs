@@ -142,7 +142,11 @@ public sealed class SuiteOpsTests : IDisposable
     public async Task Delete_ExternalDeps_RefusesByDefault()
     {
         _ws.AddTestCase("checkout", "TC-100");
-        _ws.AddTestCase("orders", "TC-200", dependsOn: new[] { "TC-100" });
+        _ws.AddTestCase("checkout", "TC-101");
+        // Spec 090: TempWorkspace writes one id as the scalar form now. Suite delete (out of 090's scope) still detects
+        // only the block-list form, so this test keeps the list (two ids) to exercise its existing behaviour; the
+        // scalar gap in suite delete is recorded as a known finding in specs/090 tasks.md Notes.
+        _ws.AddTestCase("orders", "TC-200", dependsOn: new[] { "TC-100", "TC-101" });
 
         var handler = new SuiteDeleteHandler(VerbosityLevel.Quiet, OutputFormat.Json);
         var exit = await handler.ExecuteAsync("checkout", dryRun: false, force: false, noInteraction: true);

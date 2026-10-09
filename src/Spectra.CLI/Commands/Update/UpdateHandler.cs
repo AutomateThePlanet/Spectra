@@ -687,15 +687,36 @@ public sealed class UpdateHandler
             onProposalApplied?.Invoke(originalTest.Id);
         }
 
-        // Delete tests
+        // Delete tests — Spec 090 (FR-C3): through the shared delete service (index, scalar depends_on, baseline entry,
+        // staging and verdict files), never a bare file delete.
+        if (result.ToDelete.Count > 0)
+        {
+            var service = await Delete.TestDeletionService.LoadAsync(
+                Directory.GetCurrentDirectory(), Path.GetDirectoryName(Path.GetFullPath(suitePath))!, ct);
+            var targets = service.Resolve(result.ToDelete.Select(p => p.OriginalTest.Id))
+                .Where(r => r.Target is not null)
+                .Select(r => r.Target!)
+                .ToList();
+            var plan = await service.PlanAsync(targets, ct);
+            var outcome = await service.ApplyAsync(plan, ct);
+            foreach (var deleted in outcome.Deleted)
+            {
+                Console.WriteLine($"  Deleted: {deleted.Id}");
+            }
+
+            foreach (var warning in plan.Warnings)
+            {
+                Console.Error.WriteLine($"  Warning: {warning}");
+            }
+
+            foreach (var (id, message) in outcome.Errors)
+            {
+                Console.Error.WriteLine($"  Delete of {id}: {message}");
+            }
+        }
+
         foreach (var proposal in result.ToDelete)
         {
-            var path = TestFilePathOf(proposal.OriginalTest, suitePath);
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-                Console.WriteLine($"  Deleted: {proposal.OriginalTest.Id}");
-            }
             onProposalApplied?.Invoke(proposal.OriginalTest.Id);
         }
 

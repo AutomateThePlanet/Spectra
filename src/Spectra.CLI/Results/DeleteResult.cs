@@ -18,6 +18,22 @@ public sealed class DeleteResult : CommandResult
 
     [JsonPropertyName("errors")]
     public IReadOnlyList<DeleteError> Errors { get; init; } = Array.Empty<DeleteError>();
+
+    /// <summary>Spec 090 (FR-C2): baseline entries removed (or, on a dry run, to remove), as <c>suite/id</c>.</summary>
+    [JsonPropertyName("baseline_entries_removed")]
+    public IReadOnlyList<string> BaselineEntriesRemoved { get; init; } = Array.Empty<string>();
+
+    /// <summary>Spec 090 (FR-C2): staging files removed (repo-relative).</summary>
+    [JsonPropertyName("staging_files_removed")]
+    public IReadOnlyList<string> StagingFilesRemoved { get; init; } = Array.Empty<string>();
+
+    /// <summary>Spec 090 (FR-C2): verdict files and fingerprint records removed (repo-relative).</summary>
+    [JsonPropertyName("verdict_files_removed")]
+    public IReadOnlyList<string> VerdictFilesRemoved { get; init; } = Array.Empty<string>();
+
+    /// <summary>Spec 090 (FR-C1): dependents left unchanged (a list-form or unparseable <c>depends_on</c>).</summary>
+    [JsonPropertyName("warnings")]
+    public IReadOnlyList<string> Warnings { get; init; } = Array.Empty<string>();
 }
 
 public sealed class DeletedTest

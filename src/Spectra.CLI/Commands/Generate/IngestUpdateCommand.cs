@@ -6,6 +6,7 @@ using Spectra.CLI.Generation;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.IO;
 using Spectra.CLI.Options;
+using Spectra.CLI.Verification;
 using Spectra.Core.Baseline;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
@@ -46,12 +47,15 @@ public sealed class IngestUpdateCommand : Command
         var allFlag = new Option<bool>("--all", "Batch mode: ingest all staged updates from .spectra/updates/{suite}/ (Spec 077)");
         var keepBaselineFlag = new Option<bool>("--keep-baseline",
             "Keep the existing source-change baseline (critic repairs); only add entries for new refs and criteria (Spec 085)");
+        var dryRunFlag = new Option<bool>("--dry-run",
+            "Report the outcome each edit would get, with the same exit code, and write nothing (Spec 090)");
 
         AddArgument(suiteArgument);
         AddOption(testIdOption);
         AddOption(fromOption);
         AddOption(allFlag);
         AddOption(keepBaselineFlag);
+        AddOption(dryRunFlag);
 
         this.SetHandler(async (context) =>
         {
@@ -60,6 +64,7 @@ public sealed class IngestUpdateCommand : Command
             var from = context.ParseResult.GetValueForOption(fromOption);
             var all = context.ParseResult.GetValueForOption(allFlag);
             var mode = context.ParseResult.GetValueForOption(keepBaselineFlag) ? RecordMode.KeepBaseline : RecordMode.Rebuild;
+            var dryRun = context.ParseResult.GetValueForOption(dryRunFlag);
             var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
             var json = outputFormat == OutputFormat.Json;
 
@@ -71,7 +76,7 @@ public sealed class IngestUpdateCommand : Command
                     context.ExitCode = ExitError;
                     return;
                 }
-                context.ExitCode = await RunBatchAsync(suite, json, mode, context.GetCancellationToken());
+                context.ExitCode = await RunBatchAsync(suite, json, mode, dryRun, context.GetCancellationToken());
             }
             else
             {
@@ -81,12 +86,13 @@ public sealed class IngestUpdateCommand : Command
                     context.ExitCode = ExitError;
                     return;
                 }
-                context.ExitCode = await RunAsync(suite, testId, from, json, mode, context.GetCancellationToken());
+                context.ExitCode = await RunAsync(suite, testId, from, json, mode, dryRun, context.GetCancellationToken());
             }
         });
     }
 
-    private static async Task<int> RunAsync(string suite, string testId, string? from, bool json, RecordMode mode, CancellationToken ct)
+    private static async Task<int> RunAsync(
+        string suite, string testId, string? from, bool json, RecordMode mode, bool dryRun, CancellationToken ct)
     {
         var currentDir = Directory.GetCurrentDirectory();
         var configPath = Path.Combine(currentDir, "spectra.config.json");
@@ -156,10 +162,10 @@ public sealed class IngestUpdateCommand : Command
         var warnings = new List<string>();
         try
         {
-            result = await BaselineStore.WithLockAsync(currentDir, async () =>
+            result = await LockedUnlessDryRunAsync(currentDir, dryRun, async () =>
             {
                 var baseline = await BaselineStore.LoadSuiteAsync(currentDir, testsPath, suite, ct);
-                var ingested = await ingestor.IngestAsync(content, testsPath, suite, original, existingTests, ct);
+                var ingested = await ingestor.IngestAsync(content, testsPath, suite, original, existingTests, ct, persist: !dryRun);
 
                 // Spec 089 (F3): an unchanged edit only counts as reviewed when no change needing an edit is pending.
                 if (ingested is { IsSuccess: true, Unchanged: true } && mode == RecordMode.Rebuild)
@@ -174,7 +180,7 @@ public sealed class IngestUpdateCommand : Command
                 IReadOnlyList<TestCase> record = ingested.Unchanged
                     ? (mode == RecordMode.Rebuild && pending is null ? [ingested.Original!] : [])
                     : ingested.PersistedTests;
-                if (ingested.IsSuccess && record.Count > 0)
+                if (ingested.IsSuccess && record.Count > 0 && !dryRun)
                 {
                     (baselineSummary, afterPersist) = await RecordAsync(
                         currentDir, config, testsPath, suite, baseline, record, mode, warnings, ct);
@@ -187,6 +193,18 @@ public sealed class IngestUpdateCommand : Command
         {
             CriteriaCommandIO.WriteFailure(json, "ingest-update", ex.ErrorCode, ex.Message + " Nothing was persisted.");
             return ExitError;
+        }
+
+        // Spec 090 (FR-A1): the content changed, so the verdict that judged the old content goes (even when the
+        // baseline write failed afterwards).
+        if (result is { IsSuccess: true, Unchanged: false } && result.PersistedTests.Count > 0 && !dryRun)
+        {
+            RemoveVerdictFiles(currentDir, result.PersistedTests[0].Id, warnings);
+        }
+
+        if (dryRun && !json)
+        {
+            Console.Out.WriteLine("Dry run: nothing written.");
         }
 
         if (result.IsSuccess && afterPersist is not null)
@@ -205,6 +223,7 @@ public sealed class IngestUpdateCommand : Command
                 Console.Out.WriteLine(JsonSerializer.Serialize(new
                 {
                     success = true,
+                    dry_run = dryRun,
                     outcome = StagedOutcome.UnchangedPending,
                     persisted = 0,
                     unchanged = true,
@@ -234,6 +253,7 @@ public sealed class IngestUpdateCommand : Command
                 Console.Out.WriteLine(JsonSerializer.Serialize(new
                 {
                     success = true,
+                    dry_run = dryRun,
                     outcome = StagedOutcome.Unchanged,
                     persisted = 0,
                     unchanged = true,
@@ -261,18 +281,21 @@ public sealed class IngestUpdateCommand : Command
                 Console.Out.WriteLine(JsonSerializer.Serialize(new
                 {
                     success = true,
+                    dry_run = dryRun,
                     outcome = StagedOutcome.Written,
                     persisted = result.PersistedTests.Count,
                     unchanged = false,
+                    manual_verdict_kept = result.ManualVerdictKept,
                     id,
-                    baseline = baselineSummary!.ToJson(),
+                    baseline = (baselineSummary ?? new BaselineWriteSummary { Mode = mode }).ToJson(),
                     warnings
                 }));
             }
             else
             {
-                Console.Out.WriteLine($"Updated test '{id}' in suite '{suite}' (id preserved).");
-                Console.Out.WriteLine(baselineSummary!.ToHuman());
+                Console.Out.WriteLine($"{(dryRun ? "Would update" : "Updated")} test '{id}' in suite '{suite}' (id preserved)."
+                    + (result.ManualVerdictKept ? " Its Manual verdict was kept." : ""));
+                Console.Out.WriteLine((baselineSummary ?? new BaselineWriteSummary { Mode = mode }).ToHuman());
             }
             return ExitSuccess;
         }
@@ -297,7 +320,7 @@ public sealed class IngestUpdateCommand : Command
         return result.ErrorCode == IngestErrorCode.SchemaInvalid ? ExitSchemaInvalid : ExitContentInvalid;
     }
 
-    private static async Task<int> RunBatchAsync(string suite, bool json, RecordMode mode, CancellationToken ct)
+    private static async Task<int> RunBatchAsync(string suite, bool json, RecordMode mode, bool dryRun, CancellationToken ct)
     {
         var currentDir = Directory.GetCurrentDirectory();
         var configPath = Path.Combine(currentDir, "spectra.config.json");
@@ -330,7 +353,7 @@ public sealed class IngestUpdateCommand : Command
         var stagingDir = Path.Combine(currentDir, ".spectra", folder, suite);
         if (!Directory.Exists(stagingDir))
         {
-            EmitBatchResult(json, suite, []);
+            EmitBatchResult(json, suite, [], dryRun: dryRun);
             return ExitSuccess;
         }
 
@@ -351,7 +374,7 @@ public sealed class IngestUpdateCommand : Command
         // Spec 084 FR-027: one baseline lock for the batch; strict load before the first persist.
         try
         {
-            await BaselineStore.WithLockAsync(currentDir, async () =>
+            await LockedUnlessDryRunAsync(currentDir, dryRun, async () =>
             {
                 var baseline = await BaselineStore.LoadSuiteAsync(currentDir, testsPath, suite, ct);
                 await IngestStagedAsync(baseline);
@@ -363,7 +386,7 @@ public sealed class IngestUpdateCommand : Command
                         || (o.Outcome == StagedOutcome.Unchanged && mode == RecordMode.Rebuild))
                     .Select(o => o.Test!)
                     .ToList();
-                if (record.Count > 0)
+                if (record.Count > 0 && !dryRun)
                 {
                     (baselineSummary, afterPersist) = await RecordAsync(
                         currentDir, config, testsPath, suite, baseline, record, mode, warnings, ct);
@@ -378,6 +401,13 @@ public sealed class IngestUpdateCommand : Command
             return ExitError;
         }
 
+        // Spec 090 (FR-A1): written edits drop the verdict that judged their old content (whatever happened to the
+        // baseline afterwards — the test file already changed).
+        foreach (var w in outcomes.Where(o => o.Outcome == StagedOutcome.Written && !dryRun))
+        {
+            RemoveVerdictFiles(currentDir, w.TestId, warnings);
+        }
+
         if (afterPersist is not null)
         {
             // Spec 088 FR-016: no staging file is deleted when the baseline was not recorded.
@@ -385,21 +415,36 @@ public sealed class IngestUpdateCommand : Command
             return WriteAfterPersistFailure(json, suite, ids, afterPersist);
         }
 
-        // Spec 088 FR-016: the staging files of consumed edits (written or unchanged) are deleted; failed ones stay.
-        foreach (var consumed in outcomes.Where(o => o.Outcome != StagedOutcome.Failed))
+        // Spec 088 FR-016: the staging files of consumed edits are deleted. Spec 090 (FR-B1): a failed one is renamed to
+        // failed-<id>.json, which no batch reads again; a consumed edit also clears the id's older failed-<id>.json.
+        for (var i = 0; i < outcomes.Count && !dryRun; i++)
         {
+            var o = outcomes[i];
+            var failedPath = Path.Combine(stagingDir, $"{FailedPrefix}{o.TestId}.json");
             try
             {
-                File.Delete(consumed.Path);
+                if (o.Outcome == StagedOutcome.Failed)
+                {
+                    File.Move(o.Path, failedPath, overwrite: true);
+                    outcomes[i] = o with { Path = failedPath, File = RepoRelative(currentDir, failedPath) };
+                }
+                else
+                {
+                    File.Delete(o.Path);
+                    if (File.Exists(failedPath))
+                    {
+                        File.Delete(failedPath);
+                    }
+                }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                warnings.Add($"Could not delete the staging file {consumed.File}: {ex.Message}");
+                warnings.Add($"Could not settle the staging file {o.File}: {ex.Message}");
             }
         }
 
         BaselineCommandIO.PrintWarnings(warnings);
-        EmitBatchResult(json, suite, outcomes, baselineSummary ?? new BaselineWriteSummary { Mode = mode }, warnings);
+        EmitBatchResult(json, suite, outcomes, baselineSummary ?? new BaselineWriteSummary { Mode = mode }, warnings, dryRun);
 
         // Spec 089 (F5): a completed batch with a failed file exits 8, so a caller can't miss it without the JSON.
         return outcomes.Any(o => o.Outcome == StagedOutcome.Failed) ? ExitStagedFailures : ExitSuccess;
@@ -457,7 +502,7 @@ public sealed class IngestUpdateCommand : Command
                 IngestResult result;
                 try
                 {
-                    result = await ingestor.IngestAsync(content, testsPath, suite, original, existingTests, ct);
+                    result = await ingestor.IngestAsync(content, testsPath, suite, original, existingTests, ct, persist: !dryRun);
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
@@ -492,7 +537,10 @@ public sealed class IngestUpdateCommand : Command
                 {
                     // Later edits in the batch regenerate the index from the already-edited tests.
                     var edited = result.PersistedTests[0];
-                    outcomes.Add(new StagedOutcome(original.Id, sf, file, StagedOutcome.Written, edited));
+                    outcomes.Add(new StagedOutcome(original.Id, sf, file, StagedOutcome.Written, edited)
+                    {
+                        ManualVerdictKept = result.ManualVerdictKept
+                    });
                     existingTests = existingTests.Select(t => ReferenceEquals(t, original) ? edited : t).ToList();
                 }
             }
@@ -505,6 +553,32 @@ public sealed class IngestUpdateCommand : Command
     /// </summary>
     internal static (string Folder, string Prefix) StagingFolder(RecordMode mode) =>
         mode == RecordMode.KeepBaseline ? ("repairs", "repaired-") : ("updates", "updated-");
+
+    /// <summary>
+    /// Spec 090 (FR-B2): a real run takes the baseline lock; a dry run only reads (strict load, no lock), so it never
+    /// waits on or blocks a writer.
+    /// </summary>
+    private static Task<T> LockedUnlessDryRunAsync<T>(string root, bool dryRun, Func<Task<T>> body, CancellationToken ct) =>
+        dryRun ? body() : BaselineStore.WithLockAsync(root, body, ct);
+
+    /// <summary>Spec 090 (FR-B1): a failed staging file's new name; <c>--all</c> only reads its folder's prefix.</summary>
+    internal const string FailedPrefix = "failed-";
+
+    private static string RepoRelative(string root, string path) =>
+        Path.GetRelativePath(root, path).Replace(Path.DirectorySeparatorChar, '/');
+
+    /// <summary>Spec 090 (FR-A1): deletes the test's verdict file and fingerprint record; a failure is a warning.</summary>
+    private static void RemoveVerdictFiles(string root, string id, List<string> warnings)
+    {
+        try
+        {
+            VerdictFiles.Remove(root, id);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            warnings.Add($"Could not delete the old verdict of {id}: {ex.Message}");
+        }
+    }
 
     /// <summary>Spec 089 (F3): the LIGHT/LOAD threshold, the same expression triage and compile-update-prompt use.</summary>
     private static int LightThreshold(SpectraConfig config) => config.Update?.EffectiveLightThresholdWords ?? 12;
@@ -539,7 +613,7 @@ public sealed class IngestUpdateCommand : Command
 
     private static void EmitBatchResult(
         bool json, string suite, IReadOnlyList<StagedOutcome> outcomes, BaselineWriteSummary? baseline = null,
-        IReadOnlyList<string>? warnings = null)
+        IReadOnlyList<string>? warnings = null, bool dryRun = false)
     {
         var written = outcomes.Count(o => o.Outcome == StagedOutcome.Written);
         var unchanged = outcomes.Count(o => o.Outcome == StagedOutcome.Unchanged);
@@ -549,6 +623,11 @@ public sealed class IngestUpdateCommand : Command
 
         // Spec 088: the per-test summary is never suppressed — stdout in human mode, stderr in JSON mode.
         var human = json ? Console.Error : Console.Out;
+        if (dryRun)
+        {
+            human.WriteLine("Dry run: nothing written.");
+        }
+
         human.WriteLine(
             $"Batch update-ingest for suite '{suite}': written={written} unchanged={unchanged} " +
             $"unchanged_pending={unchangedPending} skipped_no_original={skippedNoOriginal} errors={errors}");
@@ -556,7 +635,7 @@ public sealed class IngestUpdateCommand : Command
         {
             human.WriteLine(o.Outcome switch
             {
-                StagedOutcome.Written => $"  {o.TestId}: updated",
+                StagedOutcome.Written => $"  {o.TestId}: updated{(o.ManualVerdictKept ? " (manual verdict kept)" : "")}",
                 StagedOutcome.Unchanged => $"  {o.TestId}: unchanged (reviewed, no edit needed)",
                 StagedOutcome.UnchangedPending => $"  {o.TestId}: {PendingText(o.Bucket!)}",
                 _ => $"  {o.TestId}: failed [{o.ErrorCode}] {string.Join(" ", o.Errors)} (kept {o.File})"
@@ -570,11 +649,13 @@ public sealed class IngestUpdateCommand : Command
                 command = "ingest-update",
                 mode = "batch",
                 suite,
+                dry_run = dryRun,
                 written,
                 unchanged,
                 unchanged_pending = unchangedPending,
                 skipped_no_original = skippedNoOriginal,
                 errors,
+                manual_verdict_kept = outcomes.Where(o => o.ManualVerdictKept).Select(o => o.TestId).ToList(),
                 results = outcomes.Select(o => o.ToJson()).ToList(),
                 baseline = (baseline ?? new BaselineWriteSummary()).ToJson(),
                 warnings = warnings ?? []
@@ -627,6 +708,9 @@ internal sealed record StagedOutcome(string TestId, string Path, string File, st
 
     /// <summary>Spec 089 (F3): the pending bucket (wire name) of an <see cref="UnchangedPending"/> outcome.</summary>
     public string? Bucket { get; init; }
+
+    /// <summary>Spec 090 (FR-A1): a written edit kept the test's Manual verdict.</summary>
+    public bool ManualVerdictKept { get; init; }
 
     /// <summary>Spec 089 (F3): triage's reasons for the pending bucket.</summary>
     public IReadOnlyList<string> Why { get; init; } = [];

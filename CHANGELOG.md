@@ -361,6 +361,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The staging folders are gitignored.** `spectra init` adds `.spectra/updates/` and `.spectra/repairs/`; `spectra
   update-skills` now applies the same list to existing workspaces (plain `init` still refuses on them).
 
+### Added (Spec 090 — re-verification after update edits, Phase 4)
+
+- **Edited tests are re-verified.** `spectra-update` gains a re-verify step after each group: it asks once per run
+  (default yes), runs the critic on each written test, writes the verdicts, and repairs a partial or hallucinated test
+  once (`.spectra/repairs/`, `ingest-update --all --keep-baseline`, re-critic, `--repaired --repair-attempts 1`). Still
+  partial → flagged for review. Still hallucinated → it stops for that test and asks you (edit again, restore from git,
+  or delete via the delete skill); the update flow never drops or deletes a test. The summary lists grounded, flagged,
+  hallucinated and unverified tests.
+- **Verdicts are tied to the content they judged.** `compile-critic-prompt` writes
+  `.spectra/verdicts/critic-input-<id>.json` (the test's content fingerprint). `ingest-verdict` and `ingest-grounding`
+  refuse a verdict whose test changed since: `VERDICT_STALE` (exit 4) in single mode, `skipped_stale` / `stale` with
+  `--all`.
+- **`ingest-update --dry-run`** (single and `--all`): the same outcomes and exit code as a real run; nothing written,
+  no lock taken.
+
+### Changed (Spec 090)
+
+- **An update edit drops the test's critic verdict.** A written edit (with or without `--keep-baseline`) removes the
+  critic grounding block in the same write and deletes the verdict file and fingerprint record. A Manual verdict is kept
+  and reported (`manual_verdict_kept`). `unchanged` / `unchanged_pending` touch nothing.
+- **`ingest-grounding` never overwrites a Manual verdict:** `MANUAL_VERDICT` (exit 4) with `--test`, `skipped_manual` /
+  `manual` with `--all`.
+- **`compile-repair-prompt` accepts hallucinated verdicts** (partial as before), so the update flow can repair instead of
+  dropping a test that existed before.
+- **`audit-grounding` lists every indexed test.** Tests without a verdict file are judged by their grounding block
+  (critic block → its verdict, Manual → `manual`, none → verdict `none`, `action_needed: critic`); the summary gains
+  `unverified`. Entries for tests with a verdict file are unchanged.
+- **`spectra delete` cleans up after the update workflow.** It also removes the deleted tests' baseline entries (under
+  the baseline lock), their `updated-` / `repaired-` / `failed-` staging files and their verdict files; the JSON adds
+  `baseline_entries_removed`, `staging_files_removed`, `verdict_files_removed` and `warnings`, and `--dry-run` lists
+  them. Legacy `ai update --delete-orphaned` deletes through the same service.
+
+### Fixed (Spec 090)
+
+- **An edited test no longer keeps a verdict given to different content.** `ingest-update` copied the original's
+  grounding block onto the edit, so an edited test stayed "grounded".
+- **`spectra delete` no longer damages dependents.** The `depends_on` cleanup matched any `- <ID>` line in the file
+  (body steps included), missed the scalar form `depends_on: TC-101`, read the dependent's id from the first `id:` line
+  anywhere, and collapsed every run of blank lines in the file. Now ids come from the parsed frontmatter and a scalar
+  `depends_on` naming a deleted test is dropped through the lossless writer; nothing else in the file changes.
+- **A failed staging file no longer fails every later batch (089 review).** It is renamed to `failed-<id>.json`, which
+  `--all` never reads; `results[].file` gives that path, and a later successful ingest of the id deletes it.
+- **`update-skills` respects your `.gitignore` (089 review).** It only adds patterns never offered to the workspace
+  before (recorded in the skills manifest as `gitignore_offered`), so a removed pattern stays removed; it never creates
+  a `.gitignore` (it says `no .gitignore; add: …`); it counts a pattern present only on a whole matching line, honours
+  `!pattern`; and it appends without changing existing bytes, in the file's own newline style, naming what it added.
+
 ### Notes
 
 - **One-time `source_section` churn.** Because `source_section` is now read, the first re-extraction after
@@ -377,6 +424,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   batch after upgrading, look in `.spectra/updates/*/` and delete any `updated-*.json` a repair run left behind.
 - **Existing workspaces (Spec 089):** run `spectra update-skills` to get the new skills, the new `test-update` template
   and the two new `.gitignore` entries.
+- **Verdicts from before 090 (Spec 090)** have no fingerprint record and are accepted as before.
+- **`compile-critic-prompt` now writes a file** (`.spectra/verdicts/critic-input-<id>.json`, next to the verdict files).
+- **`depends_on` lists are not supported** (such tests don't parse today); `spectra delete` leaves a dependent with a
+  list unchanged and warns.
+- **Known gap:** `spectra suite delete` doesn't remove the suite's staging folders.
 
 ## [2.5.0] - 2026-09-24 — Lossless test writes and doc-reference resolution
 

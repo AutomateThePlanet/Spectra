@@ -87,6 +87,29 @@ public static class BaselineStore
     }
 
     /// <summary>
+    /// Spec 090 (FR-C2): removes the entries of deleted tests from a suite's baseline — and nothing else (no prune). The
+    /// caller holds the baseline lock. A missing baseline file removes nothing. Returns the removed ids.
+    /// </summary>
+    public static async Task<IReadOnlyList<string>> RemoveEntriesAsync(
+        string repoRoot, string testsPath, string suite, IReadOnlyCollection<string> ids, CancellationToken ct)
+    {
+        var path = SuiteFile(testsPath, suite);
+        if (!File.Exists(path))
+        {
+            return [];
+        }
+
+        var baseline = await LoadSuiteAsync(repoRoot, testsPath, suite, ct);
+        var removed = ids.Where(id => baseline.Tests.Remove(id)).ToList();
+        if (removed.Count > 0)
+        {
+            await WriteAtomicAsync(path, SourceBaselineSerializer.Serialize(baseline), ct);
+        }
+
+        return removed;
+    }
+
+    /// <summary>
     /// Spec 085 FR-007: the suite's test files as they are on disk — every <c>*.md</c> not starting with <c>_</c>,
     /// parsed in ordinal order — with the repo-relative paths of the files that failed to parse.
     /// </summary>

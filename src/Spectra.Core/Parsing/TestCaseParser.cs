@@ -382,11 +382,7 @@ public sealed partial class TestCaseParser
         return BodySegmentKind.Unknown;
     }
 
-    private static string DetectNewline(string markdown)
-    {
-        var lineBreak = markdown.IndexOf('\n');
-        return lineBreak > 0 && markdown[lineBreak - 1] == '\r' ? "\r\n" : "\n";
-    }
+    private static string DetectNewline(string markdown) => Spectra.Core.Text.Newlines.Detect(markdown);
 
     private static DateTimeOffset? ParseOrphanedDate(string? value)
     {

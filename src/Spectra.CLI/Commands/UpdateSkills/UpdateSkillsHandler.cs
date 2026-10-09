@@ -78,13 +78,16 @@ public sealed class UpdateSkillsHandler
             ProfileFormatLoader.LoadEmbeddedCustomizationGuide(),
             manifest, updated, unchanged, skipped, ct);
 
+        // Spec 089 (F6) / Spec 090 (FR-D1): existing workspaces get new gitignore patterns here — only ones never offered
+        // before (recorded in the manifest), never by creating a .gitignore.
+        var offer = await Init.SpectraGitIgnore.OfferNewAsync(currentDir, manifest.GitIgnoreOffered, ct);
+        if (!offer.MissingFile)
+        {
+            manifest.GitIgnoreOffered = offer.Offered;
+        }
+
         // Save updated manifest
         await manifestStore.SaveAsync(manifest, ct);
-
-        // Spec 089 (F6, FR-022a): existing workspaces get init's gitignore entries here (plain init refuses on them).
-        var gitIgnorePath = Path.Combine(currentDir, ".gitignore");
-        var added = await Init.SpectraGitIgnore.EnsureAsync(currentDir, ct);
-        (added.Count > 0 ? updated : unchanged).Add(gitIgnorePath);
 
         // Report results
         if (updated.Count > 0)
@@ -99,6 +102,16 @@ public sealed class UpdateSkillsHandler
             _progress.Info("Unchanged:");
             foreach (var f in unchanged)
                 _progress.Info($"  {Path.GetRelativePath(currentDir, f)}");
+        }
+
+        // Spec 090 (FR-D1): name the patterns added, or the ones to add by hand when there is no .gitignore.
+        if (offer.Added.Count > 0)
+        {
+            _progress.Success($"Updated: .gitignore (added: {string.Join(", ", offer.Added)})");
+        }
+        else if (offer.MissingFile && offer.Candidates.Count > 0)
+        {
+            _progress.Warning($"no .gitignore; add: {string.Join(", ", offer.Candidates)}");
         }
 
         if (skipped.Count > 0)

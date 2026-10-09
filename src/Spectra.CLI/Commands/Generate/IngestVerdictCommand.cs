@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Text.Json;
+using Spectra.CLI.Criteria;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
 using Spectra.CLI.Verification;
@@ -7,6 +8,7 @@ using Spectra.Core.Index;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Grounding;
+using Spectra.Core.Parsing;
 
 namespace Spectra.CLI.Commands.Generate;
 
@@ -24,6 +26,7 @@ public sealed class IngestVerdictCommand : Command
 {
     private const int ExitSuccess = 0;
     private const int ExitError = 1;
+    private const int ExitRefused = 4; // Spec 090: VERDICT_STALE
     private const int ExitEmpty = 5;        // EmptyResponse
     private const int ExitParseInvalid = 6; // ParseFailure
 
@@ -80,6 +83,16 @@ public sealed class IngestVerdictCommand : Command
                 return ExitError;
             }
             content = await File.ReadAllTextAsync(from, ct);
+
+            // Spec 090 (FR-A2): a verdict file in .spectra/verdicts/ with a fingerprint record must still describe the
+            // test it judged. Stdin and other paths have no record and are accepted as before.
+            var root = Directory.GetCurrentDirectory();
+            if (VerdictFreshness.IdOfVerdictFile(root, from) is { } id
+                && await VerdictFreshness.CheckRecordedTestAsync(root, id, ct) is { IsStale: true } stale)
+            {
+                CriteriaCommandIO.WriteFailure(json, "ingest-verdict", VerdictFreshness.ErrorVerdictStale, stale.Message(id));
+                return ExitRefused;
+            }
         }
         else
         {
@@ -145,7 +158,7 @@ public sealed class IngestVerdictCommand : Command
         var verdictDir = Path.Combine(currentDir, ".spectra", "verdicts");
         if (!Directory.Exists(verdictDir))
         {
-            EmitBatchResult(json, suite, 0, 0, 0, 0);
+            EmitBatchResult(json, suite, 0, 0, 0, 0, []);
             return ExitSuccess;
         }
 
@@ -153,6 +166,8 @@ public sealed class IngestVerdictCommand : Command
             .ToDictionary(t => t.Id, t => t, StringComparer.OrdinalIgnoreCase);
 
         int grounded = 0, partial = 0, hallucinated = 0, errors = 0;
+        var stale = new List<string>();
+        var parser = new TestCaseParser();
 
         var verdictFiles = Directory.GetFiles(verdictDir, "critic-verdict-*.json").OrderBy(f => f);
         foreach (var vf in verdictFiles)
@@ -165,7 +180,17 @@ public sealed class IngestVerdictCommand : Command
             if (string.IsNullOrEmpty(testId)) continue;
 
             // Filter to this suite via index lookup
-            if (!indexLookup.ContainsKey(testId)) continue;
+            if (!indexLookup.TryGetValue(testId, out var entry)) continue;
+
+            // Spec 090 (FR-A2): a verdict given to other content is not classified.
+            var testPath = Path.Combine(suitePath, entry.File);
+            if (File.Exists(testPath)
+                && parser.Parse(await File.ReadAllTextAsync(testPath, ct), entry.File) is { IsSuccess: true } parsed
+                && VerdictFreshness.Check(currentDir, testId, parsed.Value!).IsStale)
+            {
+                stale.Add(testId);
+                continue;
+            }
 
             string content;
             try { content = await File.ReadAllTextAsync(vf, ct); }
@@ -188,12 +213,12 @@ public sealed class IngestVerdictCommand : Command
             }
         }
 
-        EmitBatchResult(json, suite, grounded, partial, hallucinated, errors);
+        EmitBatchResult(json, suite, grounded, partial, hallucinated, errors, stale);
         return ExitSuccess;
     }
 
     private static void EmitBatchResult(bool json, string suite,
-        int grounded, int partial, int hallucinated, int errors)
+        int grounded, int partial, int hallucinated, int errors, IReadOnlyList<string> stale)
     {
         if (json)
         {
@@ -205,14 +230,17 @@ public sealed class IngestVerdictCommand : Command
                 grounded,
                 partial,
                 hallucinated,
-                errors
+                errors,
+                skipped_stale = stale.Count,
+                stale
             }));
         }
         else
         {
             Console.Out.WriteLine(
                 $"Batch verdict-ingest for suite '{suite}': " +
-                $"grounded={grounded} partial={partial} hallucinated={hallucinated} errors={errors}");
+                $"grounded={grounded} partial={partial} hallucinated={hallucinated} errors={errors}" +
+                (stale.Count > 0 ? $" skipped_stale={stale.Count} ({string.Join(", ", stale)})" : ""));
         }
     }
 

@@ -87,10 +87,11 @@ public sealed class IngestUpdateExitCodeTests : IDisposable
         Assert.Equal(code, failed.GetProperty("error_code").GetString());
         Assert.Equal(1, batch.GetProperty("written").GetInt32());
         Assert.Contains("Edited TC-101", File.ReadAllText(_ws.PathOf("test-cases/storage/TC-101.md")));
-        Assert.Equal([failing], _ws.StagedFiles("storage"));
+        var kept = failing.Replace("updated-", "failed-"); // Spec 090 (FR-B1): a failed file is kept as failed-<id>.json
+        Assert.Equal([kept], _ws.StagedFiles("storage"));
 
         // Same JSON shape as a clean batch.
-        File.Delete(_ws.PathOf($".spectra/updates/storage/{failing}"));
+        File.Delete(_ws.PathOf($".spectra/updates/storage/{kept}"));
         _ws.StageEdit("storage", "TC-103", Edited("TC-103"));
         var (cleanExit, cleanOutput, _) = await _ws.IngestAllAsync();
         Assert.Equal(0, cleanExit);
@@ -159,7 +160,7 @@ public sealed class IngestUpdateExitCodeTests : IDisposable
 
         Assert.Equal(8, exit);
         Assert.Equal("MALFORMED_JSON", BaselineTestWorkspace.Json(output).GetProperty("results")[0].GetProperty("error_code").GetString());
-        Assert.Equal(["repaired-TC-102.json"], _ws.RepairFiles("storage"));
+        Assert.Equal(["failed-TC-102.json"], _ws.RepairFiles("storage")); // Spec 090 (FR-B1): a failed file is kept as failed-<id>.json
     }
 
     [Fact]

@@ -80,14 +80,17 @@ public sealed class AuditGroundingCommandTests : IDisposable
         {
             Directory.SetCurrentDirectory(_dir);
             WriteTestMd("smoke", "TC-300", withGrounding: false);
-            // No verdict dir — should return success with empty list
+            // No verdict dir — success. Spec 090 (FR-A7): was an empty list; the indexed test without a verdict
+            // file or a grounding block is now listed as unverified.
             var exit = await RunAsync("audit-grounding", "--suite", "smoke", "--output-format", "json");
             Assert.Equal(0, exit);
             var json = captured.ToString().Trim();
             var result = JsonSerializer.Deserialize<AuditGroundingResult>(json,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             Assert.NotNull(result);
-            Assert.Equal(0, result!.Summary.Total);
+            Assert.Equal(1, result!.Summary.Total);
+            Assert.Equal(1, result.Summary.Unverified);
+            Assert.Equal("none", Assert.Single(result.Tests).Verdict);
         }
         finally
         {
