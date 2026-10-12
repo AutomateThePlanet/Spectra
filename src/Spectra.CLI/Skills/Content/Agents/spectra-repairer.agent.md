@@ -57,8 +57,11 @@ retries are part of the same repair attempt.
 
 ## Your final message
 
-Your final message is these lines and nothing else (no prose, no JSON, no prompt text) — exactly one
-line per input id:
+Your final message is these lines and nothing else (no prose, no JSON, no prompt text) — one line
+per entry in `results` over your ingest calls, including leftover `repaired-<id>.json` files from an
+earlier run (attributed by id — the caller re-verifies or reports them), a retry's line replacing the
+earlier one for that id; plus a `failed` line for an input id whose compile was refused (it has no
+`results` entry). Every input id therefore has a line:
 
 - `<id> | written`
 - `<id> | unchanged`

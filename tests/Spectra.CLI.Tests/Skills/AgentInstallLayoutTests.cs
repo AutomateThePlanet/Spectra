@@ -18,7 +18,10 @@ public sealed class AgentInstallLayoutTests : IDisposable
     private static readonly string[] NewAgents =
         ["spectra-updater.agent.md", "spectra-repairer.agent.md", "spectra-extractor.agent.md"];
 
-    private static readonly string[] AllAgents = ["spectra-critic.agent.md", .. NewAgents];
+    // Spec 093: the generation skill's analyst and generator.
+    private static readonly string[] GenerateAgents = ["spectra-analyst.agent.md", "spectra-generator.agent.md"];
+
+    private static readonly string[] AllAgents = ["spectra-critic.agent.md", .. NewAgents, .. GenerateAgents];
 
     private readonly BaselineTestWorkspace _ws = new(writeConfig: false);
 
@@ -97,6 +100,47 @@ public sealed class AgentInstallLayoutTests : IDisposable
         }
 
         Assert.Equal(customised, File.ReadAllText(updateSkill));
+        AssertNoGithubAgents();
+    }
+
+    // ---- Spec 093 T2: a pre-093 workspace (092 agents installed, a customised generation skill) ----
+
+    [Fact]
+    public async Task UpdateSkills_OnAPre093Workspace_AddsTheAnalystAndGenerator_AndSkipsAModifiedSkill()
+    {
+        await InitWithSkillsAsync();
+
+        var store = new SkillsManifestStore(_ws.Root);
+        var manifest = await store.LoadAsync();
+        foreach (var name in GenerateAgents)
+        {
+            if (File.Exists(AgentFile(name)))
+            {
+                File.Delete(AgentFile(name));
+            }
+
+            foreach (var key in manifest.Files.Keys.Where(k => k.EndsWith(name, StringComparison.OrdinalIgnoreCase)).ToList())
+            {
+                manifest.Files.Remove(key);
+            }
+        }
+
+        await store.SaveAsync(manifest);
+
+        var generateSkill = _ws.PathOf(".claude/skills/spectra-generate/SKILL.md");
+        File.AppendAllText(generateSkill, "\nMy own note.\n");
+        var customised = File.ReadAllText(generateSkill);
+
+        var (exit, _, error) = await _ws.RunAsync("update-skills");
+
+        Assert.True(exit == 0, error);
+        foreach (var name in GenerateAgents)
+        {
+            Assert.True(File.Exists(AgentFile(name)), name);
+            Assert.Equal(AgentContent.All[name], File.ReadAllText(AgentFile(name)));
+        }
+
+        Assert.Equal(customised, File.ReadAllText(generateSkill));
         AssertNoGithubAgents();
     }
 }

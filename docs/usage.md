@@ -11,7 +11,7 @@ This guide shows how to use SPECTRA through Claude Code. Every workflow below sh
 ## Prerequisites
 
 1. [Claude Code](https://claude.com/claude-code), installed and signed in.
-2. `spectra init` completed in your project (creates SKILL files in `.claude/skills/` and the subagents in `.claude/agents/`: the critic, and the updater, repairer and extractor the update and criteria skills delegate to). On an existing project, `spectra update-skills` adds any that are missing; a customised update or criteria skill keeps its older, in-session flow until you refresh it.
+2. `spectra init` completed in your project (creates SKILL files in `.claude/skills/` and the subagents in `.claude/agents/`: the critic; the updater, repairer and extractor the update and criteria skills delegate to; and the analyst and generator the generate skill delegates to). On an existing project, `spectra update-skills` adds any that are missing; a customised generate, update or criteria skill keeps its older, in-session flow until you refresh it.
 3. Documentation files present in `docs/` (the source material for test generation and acceptance criteria).
 
 ## Getting Started
@@ -38,10 +38,11 @@ The most common workflow. Three levels of specificity:
 
 ### What to expect
 
-1. The analysis phase identifies testable behaviors and shows existing coverage.
-2. You approve the count, and generation begins as a turn in the same session.
-3. Each generated test is verified by the `spectra-critic` subagent before it's accepted.
-4. The results show the test cases created, verification verdicts, and file paths.
+1. The analysis phase identifies testable behaviors and shows existing coverage, plus a batch plan (one batch per group of up to 8 behaviors from one document).
+2. You approve the count, and generation runs batch by batch.
+3. Each generated test is verified by the `spectra-critic` subagent before it's accepted; partial tests get one repair.
+4. The results list every test created, by id and title, with its outcome (kept, repaired, flagged, dropped, or unverified when the critic couldn't judge it).
+   The analysis, each batch and the repairs run in subagents (`spectra-analyst`, `spectra-generator`, `spectra-repairer`), so the documents, prompts and test text never fill your conversation; the assistant relays every line they return. Each test's route follows the verdict the CLI classified (`ingest-verdict --all --ids`), not the critic's own summary.
 5. Optionally, suggestions for additional coverage areas are included.
 
 ### Follow-up prompts

@@ -220,34 +220,45 @@ critic checks it again. Tests reported `written (manual verdict kept)` keep thei
 (`manual_verdict_kept`): never send them to the critic; list them in the report as "manual
 verdict kept — review by hand".
 
+**Every `written` line goes through this step** (Spec 093), whenever it arrives: a group's, a
+line for a test of an earlier group (a leftover staging file, attributed by id), an "edit
+again", or a re-edit after "still hallucinated". Nothing loses its verification silently — a
+`written` test that isn't re-verified is listed as **unverified** in the report.
+
 The first time this happens in a run, ask once: "Re-verify the edited tests with the critic
 now? (recommended)". If the user declines, don't ask again; collect the edited tests as
 **unverified** for the report.
 
-Otherwise, for each `written` test of the group, invoke the `spectra-critic` subagent with the
-Task tool — suite + test id only, never a hand-built file path (the same procedure as the
-generation skill's critic step). The critic compiles its prompt and writes its verdict file; its
-final line is `<id> | <verdict> <score>` or `<id> | failed: <reason>`. Route the test by that final
-line — never read the verdict file:
-- `grounded` → done;
-- `partial` or `hallucinated` → collect the id for one repair attempt (below);
-- `failed: …`, or no such line → the test is **unverified**; report the reason. Never read the
-  verdict file to find out more.
-
-When every test of the group has been through the critic, run with the Bash tool:
+Otherwise, for each `written` test, invoke the `spectra-critic` subagent with the Task tool —
+suite + test id only, never a hand-built file path (the same procedure as the generation skill's
+critic step). The critic compiles its prompt and writes its verdict file; its final line
+(`<id> | <verdict> <score>` or `<id> | failed: <reason>`) is for progress only — never read the
+verdict file. When every test of the group has been through the critic, run with the Bash tool:
 ```
-spectra ai ingest-verdict --suite <suite> --all --output-format json
+spectra ai ingest-verdict --suite <suite> --all --ids <id1>,<id2> --output-format json
 spectra ai ingest-grounding --suite <suite> --all --output-format json
 ```
+Route each test by its entry in the verdict ingest's `results` — the verdict the CLI classified
+(Spec 093), not the critic's line:
+- `grounded` → done;
+- `partial` or `hallucinated` → collect the id for one repair attempt (below);
+- no `results` entry (the critic's compile was refused, its verdict stayed damaged, or the CLI
+  lists the test as stale or not found) → invoke the critic once more for that test and run the
+  verdict ingest for it again; if there is still no entry, the test is **unverified** (critic
+  could not judge): report it with the reason and the next step (run this step again for it, or
+  `spectra ai audit-grounding --suite <suite>`, where it shows as `none` / `critic`);
+- the critic's final line disagrees with the CLI's verdict → the test is **unverified**; report
+  both.
 
 **Repair.** If any ids were collected, invoke the `spectra-repairer` subagent once with the Task
 tool, passing `suite: <suite>` and `ids: <id1>,<id2>`. It patches only what the critic flagged,
 ingests the repairs (keeping each test's baseline), retries a failed repair ingest at most twice,
-and returns one line per id: `<id> | written`, `<id> | unchanged` or `<id> | failed <error_code>:
-<first error>`. Report every line. Then:
-- only for the ids it returned `written` or `unchanged` — the repairs that landed: invoke the
-  `spectra-critic` subagent again per id, then
-  `spectra ai ingest-verdict --suite <suite> --all --output-format json` and
+and returns one line per ingested file, attributed by id: `<id> | written`, `<id> | unchanged` or
+`<id> | failed <error_code>: <first error>`. Report every line. Then:
+- only for the ids it returned `written` or `unchanged` — the repairs that landed, plus any other
+  `written` id it reports (a leftover): invoke the `spectra-critic` subagent again per id, then
+  `spectra ai ingest-verdict --suite <suite> --all --ids <id1>,<id2> --output-format json` and route by
+  `results` as above, then
   `spectra ai ingest-grounding --suite <suite> --all --repaired --repair-attempts 1 --ids <id1>,<id2> --output-format json`
   (Spec 091: `--ids` names exactly the re-critiqued tests, so nothing else is marked repaired);
 - **repair failed** — a `failed` line: report "repair failed: <error_code>", run no critic and
@@ -257,9 +268,8 @@ and returns one line per id: `<id> | written`, `<id> | unchanged` or `<id> | fai
 - an id with no line → report "repair outcome unknown", leave it unverified, and do not
   re-critique it.
 
-After the repair:
-- **still partial** (the re-critic's final line) → it is flagged for review (its block says so);
-  report it.
+After the repair, by the re-critic's `results` entry:
+- **still partial** → it is flagged for review (its block says so); report it.
 - **still hallucinated** → stop for that test and ask the user to choose: edit it again (the
   `spectra-updater` subagent with `ids: <id>`), restore the previous version from git (the user
   runs that — never run git yourself), or delete it through the `spectra-delete` skill. This skill
