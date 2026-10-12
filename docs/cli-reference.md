@@ -86,7 +86,7 @@ spectra init
 ```
 
 Creates `spectra.config.json` (including a `coverage` section with `criteria_dir: docs/criteria` and `criteria_file:
-docs/criteria/_criteria_index.yaml`), `docs/`, `test-cases/`, `docs/criteria/_criteria_index.yaml`, `profiles/_default.yaml`, `.spectra/prompts/` (5 templates), `.claude/skills/` (12 bundled SKILLs), `.claude/agents/` (4 subagents: `spectra-critic`, and `spectra-updater`, `spectra-repairer`, `spectra-extractor` for the update and criteria skills — Spec 092), `CUSTOMIZATION.md`, and `USAGE.md`.
+docs/criteria/_criteria_index.yaml`), `docs/`, `test-cases/`, `docs/criteria/_criteria_index.yaml`, `profiles/_default.yaml`, `.spectra/prompts/` (5 templates), `.claude/skills/` (12 bundled SKILLs), `.claude/agents/` (6 subagents: `spectra-critic`; `spectra-updater`, `spectra-repairer`, `spectra-extractor` for the update and criteria skills — Spec 092; `spectra-analyst`, `spectra-generator` for the generate skill — Spec 093), `CUSTOMIZATION.md`, and `USAGE.md`.
 
 **Options:**
 
@@ -517,6 +517,22 @@ spectra ai ingest-verdict --from ./verdict.json --output-format json
   `compiled_at` is also stale — the message says it is older than the last critic prompt for that test. A record
   written by 090 (no `compiled_at`) keeps the fingerprint-only rule; the rule compares times, not contents, so a new
   verdict written after the compile is fresh even when byte-identical to an older one.
+- Spec 093 (FR-016–FR-018): `--suite <s> --all` also returns `results` — one `{id, verdict, score, gate}` per classified
+  test (`verdict` grounded / partial / hallucinated / manual; `gate` `drop` for hallucinated, else `pass`) — and
+  `not_found` (`[]` without `--ids`). Stale, unreadable and unparseable verdicts have no `results` entry; their lists
+  and counts are unchanged. The skills route each test by its `results` entry.
+
+| Flag | Description |
+|------|-------------|
+| `--ids a,b` | Spec 093: with `--all`, classify only these tests (comma-separated; trimmed, de-duplicated, case-insensitive — the 091 rule). Ids not in the suite → `not_found`. Without `--all` → `--ids is only valid with --all.` (exit 1) |
+
+```bash
+spectra ai ingest-verdict --suite storage --all --ids TC-101,TC-102 --output-format json
+```
+
+The batch's human summary — the counts line, then `TC-101: grounded 0.92 (pass)` per result and `TC-999: not found in
+suite 'storage'` per unknown id — goes to stdout in human mode and to stderr in JSON mode (Spec 093). The single
+`--from` / stdin form is unchanged.
 
 ### `spectra ai ingest-grounding` (durable verdict write-back)
 

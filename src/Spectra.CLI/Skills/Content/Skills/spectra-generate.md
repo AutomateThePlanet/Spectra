@@ -6,15 +6,18 @@ tools: [{{GENERATE_TOOLS}}]
 
 # SPECTRA Test Generation
 
-You generate test cases **in this session** through a deterministic CLI seam. The CLI never calls a model — it **compiles a grounded prompt**, *you* perform the generative turn in your own context (reading the docs with your file tools), and the CLI **ingests** and validates what you produced. Every test is then verified by the mandatory `spectra-critic` subagent before it counts as accepted.
+You generate test cases through a deterministic CLI seam. The CLI never calls a model — it **compiles a grounded prompt**, a model performs the generative turn (reading the docs), and the CLI **ingests** and validates what was produced. Every test is then verified by the mandatory `spectra-critic` subagent before it counts as accepted.
 
-The seam, for every flow:
+In the main flow (Spec 093) this session **orchestrates**: the `spectra-analyst` subagent analyses, the `spectra-generator` subagent generates each batch, and the `spectra-repairer` subagent repairs partial tests — each in its own context, returning a few lines. This session asks the user, runs the critic per test, routes each test by the verdict the CLI classified, and reports. Only the single-test from-description flow still generates in this session.
 
 ```
-compile (CLI, deterministic)  →  you generate in-session  →  ingest (CLI, fail-loud)  →  critic subagent (mandatory)
+spectra-analyst (compile-analysis-prompt → analyse → ingest-analysis)  →  you present + STOP for approval
+  →  per batch: spectra-generator (compile-prompt → generate → ingest-tests)
+  →  per test: spectra-critic  →  ingest-verdict --all --ids (CLI results route each test)
+  →  partial: spectra-repairer  →  critic again  →  ingest-grounding
 ```
 
-There is **no** `spectra ai generate` command anymore. Do not look for one. The commands you use are `spectra ai compile-prompt`, `compile-analysis-prompt`, `ingest-tests`, `ingest-analysis`, plus the critic's `compile-critic-prompt` / `ingest-verdict`.
+There is **no** `spectra ai generate` command anymore. Do not look for one. The seam commands are `spectra ai compile-prompt`, `compile-analysis-prompt`, `ingest-tests`, `ingest-analysis` (run by the subagents in the main flow), plus the critic's `compile-critic-prompt` / `ingest-verdict`.
 
 **ISTQB techniques**: SPECTRA's behavior analysis applies six ISTQB techniques (EP, BVA, DT, ST, EG, UC). The `ingest-analysis` recommendation includes a `technique_breakdown` map alongside `breakdown`. When you present the analyze recommendation, show BOTH the category breakdown and the technique breakdown so the user sees, e.g., how many BVA boundary test cases will be generated.
 
@@ -50,6 +53,8 @@ The ONLY time you skip analysis is when the user describes a single concrete sce
 
 ## CLI flags reference
 
+In the main flow (Spec 093), `compile-analysis-prompt` and `ingest-analysis` are run by `spectra-analyst`, `compile-prompt --count` and `ingest-tests` by `spectra-generator`, and `ingest-update --all --keep-baseline` by `spectra-repairer`; this session runs `compile-prompt --from-description` and `ingest-tests` only in the from-description flow. `compile-repair-batch` is not used by this skill (the command stays). `ingest-verdict --suite {name} --all --ids a,b` returns `results` — one `{id, verdict, score, gate}` per classified test — which this skill routes by.
+
 | Command / flag | Description |
 |------|-------------|
 | `compile-analysis-prompt --suite {name}` | Emits the behavior-analysis prompt (deterministic). REQUIRED suite — directory under `test-cases/`. |
@@ -71,7 +76,6 @@ The ONLY time you skip analysis is when the user describes a single concrete sce
 - Grounding state: `spectra ai audit-grounding --suite {suite} --output-format json` — NOT `ls .spectra/verdicts/`, NOT `grep grounding`
 - Test file path: `test-cases/{suite}/{id}.md` — test IDs always map to `{id}.md` in the suite directory. Never `find test-cases -name {id}.md`; never guess a flat path like `test-cases/{id}.md`
 - Resolved config: `spectra config --raw` — NOT `cat spectra.config.json`
-- Test file content: Read `test-cases/{suite}/{id}.md` directly with the Read tool — NOT `cat` or `grep`
 
 **There is NO `--priority`, `--type`, or `--category` flag.** Use `--focus` for ALL filtering by type, priority, or category. Capture the user's FULL intent in `--focus`:
 - "generate 15 negative test cases" → `--focus "negative tests"` (count 15)
@@ -82,10 +86,21 @@ The ONLY time you skip analysis is when the user describes a single concrete sce
 
 `compile-analysis-prompt` inlines documentation, so before emitting it estimates the prompt size against `ai.analysis.max_prompt_tokens` (default 96K). If the estimate exceeds the budget it exits with code 4 and an actionable message naming every candidate doc-suite + token cost. Two recovery paths:
 
+In the main flow this refusal arrives as `spectra-analyst`'s `refused:` / `refusal:` lines; re-running the analysis — with another doc suite from the candidates, or after the user raises the budget — means invoking `spectra-analyst` again with the new input. This session never runs `compile-analysis-prompt` itself.
+
 1. **Narrow with `--doc-suite {id}`** — re-run targeting one doc-suite that fits. Run `spectra docs list-suites` to discover IDs.
 2. **Raise the budget** — bump `ai.analysis.max_prompt_tokens` in `spectra.config.json`.
 
 ---
+
+## Context budget contract
+
+This session holds only what it needs to orchestrate (Spec 093). It **never reads** docs, compiled prompts, test files, generated / staged JSON or verdict files — not to check a result, not to explain one. Any step that would need them is done by the named subagent, which returns a few lines. This session's own tool calls are:
+- `spectra` commands with small JSON output (`ingest-verdict --all --ids`, `ingest-grounding`, `audit-grounding`, `record-drop`, `spectra delete`, `init-seam-progress`);
+- writes to `.spectra/progress.json`;
+- Task calls to `spectra-analyst`, `spectra-generator`, `spectra-critic` and `spectra-repairer`.
+
+Report every line a subagent returns, as returned — the user doesn't see a subagent's own output, so this session's report is how they learn what happened.
 
 ## Main generation flow (user names an area)
 
@@ -108,50 +123,34 @@ Write `.spectra/progress.json` with the Write tool:
 {"phases":["Step 1 — Compile analysis","Step 2 — Identify behaviors","Step 3 — Ingest analysis","Step 4 — Review (waiting for approval)","Step 5 — Compile generation","Step 6 — Generate tests","Step 7 — Ingest","Step 8 — Critic","Step 9 — Report"],"active":0}
 ```
 
-### Step 1 — Compile the analysis prompt
+### Steps 1–3 — Analysis (the `spectra-analyst` subagent)
 
-Run with the Bash tool and capture stdout:
-```
-spectra ai compile-analysis-prompt --suite {suite} --doc-suite {docSuite} [--focus "{focus}"] --output-format json
-```
-- Exit 4 → the budget was exceeded (or no suite given). Show the message verbatim and follow a recovery path above. Do NOT proceed.
-- Exit 1 → tell the user the error.
-- Exit 0 → stdout is the compiled analysis prompt. Proceed.
-
-Update `.spectra/progress.json`: `{"active":1}`
-
-### Step 2 — Identify behaviors IN-SESSION
-
-Read the compiled prompt. It instructs you to identify the distinct testable behaviors in the named documentation, each tagged with a category and an ISTQB technique. Do that now, in this turn, using your file tools to read the referenced docs as needed. Produce a JSON array (or `{"behaviors":[…]}`) exactly as the prompt specifies. **Write that JSON to `.spectra/analysis.json`** with the Write tool.
-
-Update `.spectra/progress.json`: `{"active":2}`
-
-### Step 3 — Ingest the analysis
-
-```
-spectra ai ingest-analysis --suite {suite} --from .spectra/analysis.json --output-format json
-```
-- Exit 5 (empty) or 6 (unparseable) → your behavior JSON was rejected. Re-read the compiled prompt, regenerate stricter JSON, and re-ingest. **Bounded: at most 2 attempts**, then STOP and report.
-- Exit 0 → the JSON holds the recommendation.
+Invoke the `spectra-analyst` subagent with the Task tool, passing `suite: {suite}`, `doc_suite: {docSuite}` and, when there is one, `focus: {focus}` — nothing else. It compiles the analysis prompt, identifies the behaviours in its own context, ingests them (with its own bounded retries), and returns the recommendation and a batch plan:
+- `already_covered: N`, `recommended: N`, `documents_analyzed: N`, `breakdown: …`, `techniques: …`, one `boundary_gap: …` line per gap;
+- one `batch <n> | count <k> | focus <doc>: <behaviours>` line per batch;
+- or `refused: <code>` and `refusal: …` lines — the pre-flight budget refusal: show the `refusal:` lines verbatim and follow a recovery path above (narrow the doc suite, or raise the budget) — re-running means invoking `spectra-analyst` again. Do NOT proceed;
+- a `stop: …` line → report it and stop.
 
 Update `.spectra/progress.json`: `{"active":3}`
 
 ### Step 4 — Present the recommendation and STOP
 
-From the `ingest-analysis` JSON show:
+From the analyst's lines show:
 
 **{already_covered}** test cases already exist. I recommend generating **{recommended}** new test cases:
 
-Category breakdown (one bullet per non-zero entry in `breakdown`, e.g. `happy_path`, `boundary`, `negative`, `edge_case`, `security`, `error_handling`):
+Category breakdown (one bullet per entry of the `breakdown:` line, e.g. `happy_path`, `boundary`, `negative`, `edge_case`, `security`, `error_handling`):
 - {category}: {count}
 
-ISTQB technique breakdown (non-zero entries from `technique_breakdown` — keys `BVA`, `EP`, `DT`, `ST`, `EG`, `UC`):
+ISTQB technique breakdown (entries of the `techniques:` line — keys `BVA`, `EP`, `DT`, `ST`, `EG`, `UC`):
 - BVA (Boundary Value Analysis): {count}
 - EP (Equivalence Partitioning): {count}
 - DT (Decision Table): {count}
 - ST (State Transition): {count}
 - EG (Error Guessing): {count}
 - UC (Use Case): {count}
+
+The `boundary_gap:` lines as an advisory list, and the batch plan (one line per batch: its count and focus).
 
 Shall I proceed?
 
@@ -163,20 +162,17 @@ Shall I proceed?
 
 Update `.spectra/progress.json`: `{"active":4}`
 
-### Step 5 — Compile the generation prompt
+### Steps 5–7 — Generation, one batch at a time (the `spectra-generator` subagent)
 
-Keep the SAME `--focus` from analysis. Use `{count}` = the user's explicit number or `recommended`. **`recommended` is advisory guidance, not a quota** — generate as many tests as the behavior needs (more or fewer is fine). **Acceptance-criteria coverage is the real adequacy signal**, not hitting the count.
-```
-spectra ai compile-prompt --suite {suite} --count {count} [--focus "{focus}"] --output-format json
-```
-- Exit 4 → refuse-to-emit; the `missing_input`/`message` names what's missing (e.g. no acceptance criteria resolved). Show it and follow the guidance.
-- Exit 0 → stdout is the compiled generation prompt.
+Use the batch plan. When the user stated an explicit count, it overrides `recommended`: split it over the batches in proportion to their counts (largest remainder, so the parts add up to the user's count). **`recommended` is advisory guidance, not a quota**; acceptance-criteria coverage is the real adequacy signal.
 
-Update `.spectra/progress.json`: `{"active":5}`
+For each batch, in order — one at a time, never in parallel (the id allocator and the suite index have a single writer) — update progress, then invoke the `spectra-generator` subagent with the Task tool, passing `suite: {suite}`, `focus: "<user focus>; <batch focus>"` (just the batch focus when the user gave none) and the batch's `count`. It compiles the generation prompt, generates in its own context (reading the docs), ingests (with its own bounded retries), and returns:
+- one `<id> | <title>` line per created test;
+- a `baseline: …` line and `warning: …` lines;
+- or `failed <error_code>: <first error>` — the batch failed after its retries: report it and run the next batch. Never generate a batch in this session;
+- a `stop: …` line → report it and stop.
 
-### Step 6 — Generate the tests IN-SESSION
-
-Read the compiled prompt and generate the requested test cases now, in this turn. **You have file access — read the relevant documents under `docs/` so every test is grounded in real product behavior**; never invent generic patterns. When acceptance criteria appear in the prompt under "ACCEPTANCE CRITERIA — MANDATORY", every test MUST map at least one criterion ID in its `criteria` array. Your output must be ONLY the JSON array of test cases the prompt's schema describes. **Write that JSON array to `.spectra/generated.json`** with the Write tool.
+Report every line, as returned. Collect the created ids and titles of all batches.
 
 Update `.spectra/progress.json`: `{"active":6}`
 
@@ -196,51 +192,37 @@ Update `.spectra/progress.json`: `{"active":6}`
 
 ---
 
-### Step 7 — Ingest (fail-loud)
-
-```
-spectra ai ingest-tests {suite} --from .spectra/generated.json --output-format json
-```
-- Exit 0 → `{ persisted, ids }`. The tests are written and the index updated. Proceed to the MANDATORY critic step.
-- Exit 5 (`EMPTY_CONTENT`/`MALFORMED_JSON`/`TRUNCATED`/`NO_TESTS`) or exit 6 (`SCHEMA_INVALID`) → **fail loud, nothing was persisted.** Read the `error_code` + `errors`, Regenerate addressing that *specific* error, rewrite `.spectra/generated.json`, and re-ingest. **Bounded retry: at most 2 attempts (retry limit = 2).** If it still fails, STOP and report the error; never present unverified tests as done.
-
----
-
 ## MANDATORY: verify every generated test with the critic subagent
 
 Verification is **mandatory and explicit — never skipped, never auto-invoked**. The `ingest-tests` boundary only validates schema; the `spectra-critic` subagent (a fresh, isolated `context: fork`) is the single critic of record for grounding. A test is not accepted until its critic step has passed.
 
-For EACH id in the `ingest-tests` `ids` list:
-
-For each id in the `ingest-tests` `ids` list, update `.spectra/progress.json` before invoking the critic:
+For each created id, update `.spectra/progress.json` before invoking the critic:
 ```json
 {"phases":["Step 1 — Compile analysis","Step 2 — Identify behaviors","Step 3 — Ingest analysis","Step 4 — Review (waiting for approval)","Step 5 — Compile generation","Step 6 — Generate tests","Step 7 — Ingest","Step 8 — Critic","Step 9 — Report"],"active":7,"loop":{"current":i,"total":N,"label":"critic for <id>"}}
 ```
 
-### Step 8 — Critic pass (per-test) + manifest-driven repair (Spec 072)
+### Step 8 — Critic pass (per-test) + repair (Spec 072, Spec 093)
 
-**8a — Per-test critic.** For EACH id in the `ingest-tests` `ids` list:
+**8a — Per-test critic.** For EACH created id:
 
-1. Update progress, then invoke the `spectra-critic` subagent with the Task tool — suite + test id only, no generator state, **never a hand-built file path**. The subagent compiles the prompt (`spectra ai compile-critic-prompt --suite {suite} --test {id}`, resolves id→path from `_index.json`) and writes `.spectra/verdicts/critic-verdict-{id}.json`. After the subagent returns, read the verdict file to determine routing:
-   ```
-   Read .spectra/verdicts/critic-verdict-{id}.json
-   ```
-2. **gate `pass` (verdict `grounded`):** Add to kept-grounded count. **Continue to the next test.** (Grounding blocks are written in one batch call after this loop — see post-8a step below.)
-3. **gate `partial`:** Note the id. Continue to next test — repair is batched in step 8b.
-4. **gate `drop` (verdict `hallucinated`):**
+1. Update progress, then invoke the `spectra-critic` subagent with the Task tool — suite + test id only, no generator state, **never a hand-built file path**. The subagent compiles the prompt (`spectra ai compile-critic-prompt --suite {suite} --test {id}`, resolves id→path from `_index.json`) and writes `.spectra/verdicts/critic-verdict-{id}.json`. Its final line (`<id> | <verdict> <score>` or `<id> | failed: <reason>`) is for progress only — never read the verdict file.
+
+**After 8a loop completes — batch verdict-ingest for the created tests (one call, no loop):**
+```
+spectra ai ingest-verdict --suite {suite} --all --ids <created ids> --output-format json
+```
+Route each test by its entry in `results` — the verdict the CLI classified, not the critic's line:
+2. **`grounded` (gate `pass`):** Add to kept-grounded count. (Grounding blocks are written in one batch call — see below.)
+3. **`partial`:** Note the id for the repair in 8b.
+4. **`hallucinated` (gate `drop`)** — only when the critic's line agrees or there is no line:
    ```
    spectra ai record-drop --suite {suite} --test {id} \
      --from .spectra/verdicts/critic-verdict-{id}.json --output-format json
    spectra delete {id} --force --no-interaction --output-format json --verbosity quiet
    ```
    → Trail written before delete. Add to dropped count.
-5. **ingest exit `5`/`6` or compile exit `4`:** fail loud. Regenerate that single test (bounded 2 attempts), then re-verify from step 1. Never keep an unverified test.
-
-**After 8a loop completes — batch verdict-ingest for all suite verdicts (one call, no loop):**
-```
-spectra ai ingest-verdict --suite {suite} --all --output-format json
-```
-Classifies all verdict files for the suite in one call; emits `{grounded, partial, hallucinated, errors}` summary. No per-test `--from` loop needed.
+5. **No `results` entry** (the critic's compile was refused, its verdict JSON stayed damaged, or the CLI lists the test as stale or not found): invoke the critic once more for that test and run the verdict ingest for it again. If there is still no entry, the test is kept as **unverified**: it is never counted as kept-grounded, never gets a grounding block, is never regenerated or deleted, and is listed in Step 9 under "Unverified (critic could not judge)".
+6. **The critic's line disagrees with the CLI's verdict** → the test is kept as **unverified** and reported with both — never dropped. (A test kept with a `hallucinated` verdict is later listed under `skipped_hallucinated` by the grounding batch; that is expected, not a failure.)
 
 **After batch verdict-ingest — batch grounding-ingest for grounded tests (one call, no loop):**
 ```
@@ -263,76 +245,46 @@ Parse the JSON result of the batch call. Check `written` against the `kept-groun
 
 **NON-STOP CONTRACT (restated):** A broken or zero-result CLI verb is a STOP signal — it is NEVER a license to do the work by hand. Manual editing of `.md` files, rewriting of `grounding:` frontmatter, and synthesizing verdict fields are PROHIBITED regardless of how blocked you are. If a CLI verb returns an anomaly, stop and report. Do not improvise. Exit `8` from `ingest-update --all` is neither broken nor zero-result: the batch completed and `results` lists the failed files — retry them as 8b describes.
 
-**8b — Manifest-driven repair (for partials).** After the per-test critic loop completes, compile the batch manifest in a single deterministic call:
+**8b — Repair (for partials).** If 8a noted partial ids, invoke the `spectra-repairer` subagent with the Task tool, passing `suite: {suite}` and `ids: <partial ids>`. It patches only what the critic flagged, stages the repairs in `.spectra/repairs/{suite}/`, ingests them with `ingest-update {suite} --all --keep-baseline` (keeping each test's baseline), retries a failed repair ingest at most twice (the same repair attempt), and returns one line per ingested file, attributed by id: `<id> | written`, `<id> | unchanged` or `<id> | failed <error_code>: <first error>`. Report every line.
 
+- `failed` → the repair didn't land: report it, flag the test (it stays **unverified** with its partial verdict), run no critic for it.
+- Every `written` line goes through the re-critic below — including a line for an id that wasn't in the partial list (a leftover repair file from an earlier run); a `written` test that isn't re-verified is listed as unverified in the report.
+
+**Re-critic phase — For EACH id the repairer returned `written` or `unchanged`:** invoke the `spectra-critic` subagent again (same Task-tool procedure as 8a.1). Then:
 ```
-spectra ai compile-repair-batch --suite {suite} --output-format json
+spectra ai ingest-verdict --suite {suite} --all --ids <re-critiqued ids> --output-format json
 ```
+Route by `results`, as in 8a:
+- `grounded`: Add to repaired-to-grounded count.
+- `partial`: Add to flagged-partial count. **Continue — do NOT stop the batch.**
+- `hallucinated` (only when the critic's line agrees or there is no line): `spectra ai record-drop --suite {suite} --test {id} --from .spectra/verdicts/critic-verdict-{id}.json --output-format json` then `spectra delete {id} --force --no-interaction --output-format json --verbosity quiet` → Add to dropped count.
+- no entry → the critic once more, then unverified (8a.5); a disagreement → unverified (8a.6).
 
-The command reads all partial verdict JSONs, **skips tests whose grounding block is already written** (the resume checkpoint — idempotent re-run), and emits a JSON array. If the array is empty, skip to Step 9.
-
-**Manifest consumption:** If `compile-repair-batch` output exceeded inline capacity and was saved to a tool-results file by the harness, use the **Read tool** to read the file. Iterate over the JSON entries **in-context** — do NOT pipe the manifest to `python -c`, `jq`, or any interpreter. The full `prompt` field per entry is needed and must be read in-context, not extracted via shell. Never accept a "scripting for all projects" allowlist option — that is the inverse of the non-stop contract.
-
-**Repair phase — For EACH entry in the manifest (patch and stage only — no CLI calls per entry):**
-
-1. Read the `prompt` field from the manifest entry (from inline result or via Read tool on the spilled file).
-2. Patch the test in-session: rewrite ONLY the elements the critic found ungrounded; preserve `id` and structure.
-3. Write the corrected test, as a JSON array with that one test, to `.spectra/repairs/{suite}/repaired-{id}.json` with the Write tool (Spec 089: repairs never go to `.spectra/updates/`, which the update flow reads).
-
-**After all repairs staged — batch ingest (one call, no loop):**
-```
-spectra ai ingest-update {suite} --all --keep-baseline --output-format json
-```
-Ingests all staged repairs from `.spectra/repairs/{suite}/` in one pass; emits `{written, skipped_no_original, errors}`
-plus `unchanged` and per-file `results`. Consumed staging files are deleted; a failed one is kept (Spec 088).
-`--keep-baseline` keeps each repaired test's source-change baseline as it was (a repair is not a doc update).
-
-- Exit `0` → every staged repair was ingested.
-- Exit `8` → the batch completed but some repairs failed (Spec 089). Read `results`: each failed repair is kept as
-  `.spectra/repairs/{suite}/failed-{id}.json` (Spec 090), which no later batch reads. For each `failed` test, re-patch it
-  fixing the reported `error_code` (`MULTIPLE_TESTS`: one test per file; `DRIFT_DETECTED`: touch only what the critic
-  flagged; `MALFORMED_JSON` / `SCHEMA_INVALID`: fix the JSON), write a fresh `.spectra/repairs/{suite}/repaired-{id}.json`
-  (the kept `failed-{id}.json` is removed when it succeeds), and run the same call again — **at most twice**, then continue with the tests that were ingested. This is not a STOP.
-  Re-staging after an ingest failure completes the same repair attempt: it does not increase the count passed to
-  `ingest-grounding --repaired --repair-attempts N`, and it does not trigger a critic pass on its own — a test written on
-  a retry is re-critiqued once, in the re-critic phase below, like any other repaired test.
-- Exit `1` → a whole-command error (config, lock, baseline); report it and stop.
-
-**Re-critic phase — For EACH repaired test reported `written` or `unchanged` in `results` (critic subagents, irreducibly per-test):**
-
-4. Invoke the `spectra-critic` subagent again for `{id}` (same Task-tool procedure as 8a.1). Subagent writes `.spectra/verdicts/critic-verdict-{id}.json`. After subagent returns, read the verdict file.
-5. Act on re-verdict:
-   - `grounded`: Add to repaired-to-grounded count. (Grounding block written in batch after 8b.)
-   - `partial`: Add to flagged-partial count. **Continue to next entry — do NOT stop the batch.** (Grounding block written in batch after 8b.)
-   - `hallucinated`: `spectra ai record-drop --suite {suite} --test {id} --from .spectra/verdicts/critic-verdict-{id}.json --output-format json` then `spectra delete {id} --force --no-interaction --output-format json --verbosity quiet` → Add to dropped count.
-
-**After re-critic phase completes — batch verdict-ingest (one call, no loop):**
-```
-spectra ai ingest-verdict --suite {suite} --all --output-format json
-```
-Classifies all verdict files (including re-verdicts) in one call; emits updated `{grounded, partial, hallucinated, errors}` counts.
-
-**After batch verdict-ingest — batch grounding-ingest for the re-critiqued tests (one call, no loop):**
+**After the re-critic — batch grounding-ingest for the re-critiqued tests (one call, no loop):**
 ```
 spectra ai ingest-grounding --suite {suite} --all --repaired --repair-attempts 1 --ids {ids} --output-format json
 ```
 `{ids}` is the comma-separated list of the tests re-critiqued in this round — those whose repair ingest reported `written` or `unchanged` in `results` — minus any test dropped in the re-critic phase. A repair that failed is never in it (Spec 091: `--all --repaired` refuses without `--ids` with `IDS_REQUIRED`, so a test whose repair didn't land is never marked repaired). If the list is empty, skip this call. Writes grounding blocks for those tests: `grounded` blocks for successfully repaired tests, `partial` blocks (`flagged_for_review: true` unless repaired) for those still unresolved.
 
-**Resume note:** If the repair loop is interrupted (session end, cancellation), re-run `compile-repair-batch` after re-invoking the generate skill. The command skips tests whose grounding block is already written — it resumes from where it left off, never restarts from scratch, never double-processes a completed test. Run `spectra ai audit-grounding --suite {suite}` first to see what remains.
+**Resume note:** If the repair is interrupted (session end, cancellation), re-invoke the generate skill and run `spectra ai audit-grounding --suite {suite} --output-format json`: the ids with `action_needed: repair` are the partial tests still to repair — hand them to the `spectra-repairer` subagent and continue with the re-critic phase. Tests whose grounding block is already written are never re-processed.
 
 Update `.spectra/progress.json`: `{"active":8}` (marks Step 9 active — complete sentinel is `active >= 9`).
 
 ### Step 9 — Report
 
-Report the four-bucket counts:
-- Kept grounded: {kept-grounded count} — list ids
-- Repaired to grounded: {repaired count} — list ids
-- Flagged partial (awaiting review): {flagged count} — list ids
-- Dropped hallucinated: {dropped count}
+Report from the returned lines and the CLI results — every created test by id and title with its outcome:
+- Kept grounded: {kept-grounded count} — ids and titles
+- Repaired to grounded: {repaired count} — ids and titles
+- Flagged partial (awaiting review): {flagged count} — ids and titles (incl. failed repairs)
+- Dropped hallucinated: {dropped count} — ids and titles
+- Failed batches: each `failed` line with its code
+- **Unverified (critic could not judge):** each test with its id, title, the reason, and the next step — run this skill's critic step (8a) again for these ids, or `spectra ai audit-grounding --suite {suite}`, where it shows as `none` / `critic`
+
+Also every `baseline:` and `warning:` line from the generator and repairer.
 
 If {flagged} > 0: "Run `spectra ai review-flagged --suite {suite}` to accept, retry repair, or delete flagged tests."
 
-If the ingest output contains a non-blocking `notes` entry (e.g. criteria coverage), surface it verbatim. If total-kept < requested, say "Run again to generate more." Never present a test as accepted unless its critic step passed.
+If total-kept < requested, say "Run again to generate more." Never present a test as accepted unless its critic step passed.
 
 Write `.spectra/progress.json`: `{"active":9}` (terminal — seam-progress page renders Complete).
 

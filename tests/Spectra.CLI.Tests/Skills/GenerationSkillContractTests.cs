@@ -38,13 +38,14 @@ public sealed class GenerationSkillContractTests
     public void GenerationSkill_DrivesFailLoudBoundedLoop()
     {
         var skill = Generate();
-        // Hands the verdict to the deterministic boundary and reacts to its fail-loud exit codes.
+        // Hands the verdict to the deterministic boundary.
         Assert.Contains("spectra ai ingest-verdict", skill);
         Assert.Contains("compile-critic-prompt", skill);
-        Assert.Contains("fail loud", skill);
-        // Bounded retry on the specific error; stop at the limit.
-        Assert.Contains("retry limit", skill);
-        Assert.Contains("Regenerate", skill);
+        // Spec 093: the fail-loud, bounded generate → ingest → regenerate loop runs in the spectra-generator subagent.
+        var generator = System.Text.RegularExpressions.Regex.Replace(AgentContent.All["spectra-generator.agent.md"], @"\s+", " ");
+        Assert.Contains("fail-loud", generator);
+        Assert.Contains("retry limit", generator);
+        Assert.Contains("regenerate", generator, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

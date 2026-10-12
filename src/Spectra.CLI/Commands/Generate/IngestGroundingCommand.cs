@@ -39,7 +39,7 @@ public sealed class IngestGroundingCommand : Command
 
     // Spec 091 (FR-006a): usage errors, plain stderr in both output modes (like the existing "Either …" message).
     internal const string TestWithAllMessage = "Use either --test <id> or --all, not both.";
-    internal const string IdsWithoutAllMessage = "--ids is only valid with --all.";
+    internal const string IdsWithoutAllMessage = IdList.IdsWithoutAllMessage;
     internal const string NeitherMessage = "Either --test <id> or --all must be specified.";
     private const int ExitVerdictEmpty = 5;
     private const int ExitVerdictParseFailed = 6;
@@ -111,10 +111,7 @@ public sealed class IngestGroundingCommand : Command
     }
 
     /// <summary>Spec 091 (FR-006): <c>--ids</c> split on commas, trimmed, empties dropped, de-duplicated case-insensitively.</summary>
-    internal static IReadOnlyList<string> ParseIds(string? value) =>
-        (value ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+    internal static IReadOnlyList<string> ParseIds(string? value) => IdList.Parse(value);
 
     private static async Task<int> RunBatchAsync(
         string suite, bool repaired, int repairAttempts, IReadOnlyList<string>? ids, bool json, CancellationToken ct)

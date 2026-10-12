@@ -83,9 +83,13 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void AgentContent_HasAllAgents()
     {
-        // Spec 092: the critic plus the three orchestration subagents (updater, repairer, extractor).
+        // Spec 092: the critic plus the update / criteria subagents; Spec 093: plus the generation skill's analyst and generator.
         Assert.Equal(
-            new[] { "spectra-critic.agent.md", "spectra-extractor.agent.md", "spectra-repairer.agent.md", "spectra-updater.agent.md" },
+            new[]
+            {
+                "spectra-analyst.agent.md", "spectra-critic.agent.md", "spectra-extractor.agent.md", "spectra-generator.agent.md",
+                "spectra-repairer.agent.md", "spectra-updater.agent.md",
+            },
             AgentContent.All.Keys.OrderBy(k => k, StringComparer.Ordinal).ToArray());
     }
 
@@ -458,8 +462,9 @@ public class SkillsManifestTests : IDisposable
 
     // ---- Spec 085 F5: critic repairs keep the source-change baseline ----
 
+    // Spec 093: spectra-generate no longer ingests repairs itself — the spectra-repairer subagent does, with
+    // --keep-baseline (asserted by UpdateSkill_DoesNotKeepTheBaseline and GenerateSkill_Exit8_…).
     [Theory]
-    [InlineData("spectra-generate")]
     [InlineData("spectra-review-flagged")]
     public void RepairIngests_KeepTheBaseline(string skill)
     {
@@ -575,20 +580,16 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void GenerateSkill_Exit8_RetriesTheFailedRepairsAtMostTwice_AsTheSameRepairAttempt()
     {
-        // F5 (FR-020, analysis A1): exit 8 is not a STOP; the retry completes the same repair attempt.
-        var content = GenerateSkill;
-        var start = content.IndexOf("**After all repairs staged", StringComparison.Ordinal);
-        var end = content.IndexOf("**After re-critic phase completes", StringComparison.Ordinal);
-        Assert.True(start >= 0 && end > start);
-        var step = content[start..end];
+        // F5 (FR-020, analysis A1): exit 8 is not a STOP; the retry completes the same repair attempt. Spec 093: the
+        // repair ingest and its retry run in the spectra-repairer subagent; 8b says so and re-critiques what landed.
+        var repairer = Normalised(RepairerAgent);
+        Assert.Contains("Exit `0` or `8`", repairer);
+        Assert.Contains("`results`", repairer);
+        Assert.Contains("**at most twice**", repairer);
+        Assert.Contains("same repair attempt", repairer);
 
-        Assert.Contains("Exit `8`", step);
-        Assert.Contains("`results`", step);
-        Assert.Contains("**at most twice**", step);
-        Assert.Contains("This is not a STOP", step);
-        Assert.Contains("completes the same repair attempt", step);
-        Assert.Contains("--repair-attempts N", step);
-        Assert.Contains("re-critiqued once", step);
+        var step = Normalised(GenerateSkill[GenerateSkill.IndexOf("**8b — Repair", StringComparison.Ordinal)..]);
+        Assert.Contains("retries a failed repair ingest at most twice (the same repair attempt)", step);
         Assert.Contains("reported `written` or `unchanged` in `results`", step);
     }
 
@@ -654,7 +655,8 @@ public class SkillsManifestTests : IDisposable
         Assert.Contains("`manual_verdict_kept`", step);
         Assert.Contains("`spectra-critic` subagent with the Task tool", flat);
         Assert.Contains("spectra ai compile-critic-prompt --suite <suite> --test <id>", AgentContent.All["spectra-critic.agent.md"]);
-        Assert.Contains("spectra ai ingest-verdict --suite <suite> --all --output-format json", step);
+        // Spec 093 (FR-015): the verdict ingest names the tests it routes.
+        Assert.Contains("spectra ai ingest-verdict --suite <suite> --all --ids <id1>,<id2> --output-format json", step);
         Assert.Contains("spectra ai ingest-grounding --suite <suite> --all --output-format json", step);
         Assert.Contains("spectra ai compile-repair-prompt --suite <suite> --test <id>", RepairerAgent);
         Assert.Contains("`.spectra/repairs/<suite>/repaired-<id>.json`", RepairerAgent);
@@ -689,15 +691,16 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void BothSkills_KeepAFailedFileAsFailedId_AndRetryWithAFreshFile()
     {
-        // FR-B1. Spec 092: the update edit (and its retry) runs in the spectra-updater subagent.
+        // FR-B1. Spec 092: the update edit (and its retry) runs in the spectra-updater subagent; Spec 093: the generation
+        // flow's repair (and its retry) runs in the spectra-repairer subagent.
         var update = Normalised(UpdaterAgent);
         Assert.Contains("`.spectra/updates/<suite>/failed-<id>.json`", update);
         Assert.Contains("write a fresh `.spectra/updates/<suite>/updated-<id>.json`", update);
         Assert.DoesNotContain("it replaces the kept file", update);
 
-        var generate = GenerateSkill;
-        Assert.Contains("`.spectra/repairs/{suite}/failed-{id}.json`", generate);
-        Assert.Contains("write a fresh `.spectra/repairs/{suite}/repaired-{id}.json`", generate);
+        var repairer = Normalised(RepairerAgent);
+        Assert.Contains("`.spectra/repairs/<suite>/failed-<id>.json`", repairer);
+        Assert.Contains("write a fresh `.spectra/repairs/<suite>/repaired-<id>.json`", repairer);
     }
 
     [Fact]
