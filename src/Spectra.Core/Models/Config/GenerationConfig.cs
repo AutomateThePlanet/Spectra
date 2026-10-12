@@ -19,4 +19,14 @@ public sealed class GenerationConfig
     [JsonPropertyName("categories")]
     public IReadOnlyList<string> Categories { get; init; } =
         ["happy_path", "negative", "boundary", "integration"];
+
+    /// <summary>
+    /// Spec 094: behaviours per generation batch in the analysis plan. Optional; missing or <c>null</c> means 8. Must be
+    /// 1–50.
+    /// </summary>
+    [JsonPropertyName("batch_size")]
+    public int? BatchSize { get; init; }
+
+    [JsonIgnore]
+    public int EffectiveBatchSize => BatchSize ?? 8;
 }

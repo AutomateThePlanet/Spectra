@@ -70,9 +70,9 @@ public sealed class GenerateAgentTests
             Assert.Contains(line, body);
         }
 
-        Assert.Contains("`batch <n> | count <k> | focus <", body);
-        Assert.Contains("at most 8 behaviours", body);
-        Assert.Contains("add up to `recommended`", body);
+        // Spec 094: the analyst copies the CLI's batch lines (the plan) instead of planning batches itself.
+        Assert.Contains("`batch <id> | count <k> | <section refs> | <behaviour titles>`", body);
+        Assert.Contains("verbatim", body);
         Assert.Contains("`refused: ", body);
         Assert.Contains("`refusal: ", body);
     }
@@ -82,7 +82,8 @@ public sealed class GenerateAgentTests
     {
         var body = Body(Agent(Generator));
 
-        Assert.Contains("spectra ai compile-prompt --suite <suite> --count <count> --focus", body);
+        // Spec 094: the generator compiles one batch of the generation plan.
+        Assert.Contains("spectra ai compile-prompt --suite <suite> --batch <batch>", body);
         Assert.Contains("`.spectra/generated.json`", body);
         Assert.Contains("spectra ai ingest-tests <suite> --from .spectra/generated.json", body);
         Assert.Contains("at most 2", body);

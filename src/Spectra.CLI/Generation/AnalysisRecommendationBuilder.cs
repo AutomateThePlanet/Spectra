@@ -62,8 +62,9 @@ public static class AnalysisRecommendationBuilder
             .GroupBy(b => b.Technique.Trim().ToUpperInvariant())
             .ToDictionary(g => g.Key, g => g.Count());
 
+        // Spec 094: a source may name a section (`doc#anchor`); sections of one document count once.
         var documentsAnalyzed = behaviors
-            .Select(b => b.Source)
+            .Select(b => DocumentOf(b.Source))
             .Where(s => !string.IsNullOrWhiteSpace(s))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Count();
@@ -81,7 +82,16 @@ public static class AnalysisRecommendationBuilder
             breakdown: breakdown,
             techniqueBreakdown: techniqueBreakdown,
             documentsAnalyzed: documentsAnalyzed,
-            boundaryGaps: boundaryGaps);
+            boundaryGaps: boundaryGaps,
+            behaviors: behaviors);
+    }
+
+    /// <summary>The document part of a source ref (everything before <c>#</c>), trimmed.</summary>
+    private static string DocumentOf(string? source)
+    {
+        var text = source ?? string.Empty;
+        var hash = text.IndexOf('#');
+        return (hash >= 0 ? text[..hash] : text).Trim();
     }
 
     // ---- Boundary-gap parsing (Spec 062) — strict, fail-loud (contrast with the tolerant behaviors parse) ----

@@ -75,7 +75,9 @@ public sealed class ConfigLoader
         ("coverage", ConfigSections.None),
         ("ai", ConfigSections.None),
         // Spec 084: `"update": null` would otherwise leave SpectraConfig.Update null.
-        ("update", ConfigSections.None)
+        ("update", ConfigSections.None),
+        // Spec 094: likewise `"generation": null` (generation.batch_size).
+        ("generation", ConfigSections.None)
     ];
 
     private static async Task<ConfigLoadResult> LoadEntryAsync(
@@ -355,6 +357,13 @@ public sealed class ConfigLoader
         {
             errors.Add(new ParseError("INVALID_UPDATE_GROUP_SIZE",
                 "update.group_size must be an integer ≥ 1", filePath));
+        }
+
+        // Spec 094: the optional generation batch size (a missing or null key means 8).
+        if (config.Generation is { BatchSize: < 1 or > 50 })
+        {
+            errors.Add(new ParseError("INVALID_GENERATION_BATCH_SIZE",
+                "generation.batch_size must be an integer from 1 to 50", filePath));
         }
 
         if (config.Update is { LightThresholdWords: < 0 })

@@ -31,7 +31,9 @@ public static class BaselineCommandIO
     {
         ErrorInvalidArguments, ErrorSuiteNotFound, ErrorTestNotFound, ErrorTriageMissing, ErrorGroupNotFound,
         ErrorTriageStale, ErrorRefRemoved, ErrorCriterionRemoved, HistoryBootstrap.ErrorGitRefUnavailable,
-        "NOTHING_TO_RECONCILE", "PROMPT_TOO_LARGE", "TEMPLATE_OUTDATED"
+        "NOTHING_TO_RECONCILE", "PROMPT_TOO_LARGE", "TEMPLATE_OUTDATED",
+        // Spec 094: compile-prompt --batch.
+        "PLAN_MISSING", "BATCH_NOT_FOUND", "PLAN_STALE", "MISSING_INPUT"
     };
 
     /// <summary>Compact JSON with relaxed escaping (so <c>#</c>, <c>→</c> and non-ASCII stay readable).</summary>

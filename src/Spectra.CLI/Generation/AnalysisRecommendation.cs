@@ -67,6 +67,9 @@ public sealed record AnalysisRecommendation
     /// <summary>Specific error(s) on a damage outcome; empty on success.</summary>
     public IReadOnlyList<string> Errors { get; private init; } = [];
 
+    /// <summary>Spec 094: the behaviours after the focus filter, in input order (the generation plan's input).</summary>
+    public IReadOnlyList<IdentifiedBehavior> Behaviors { get; private init; } = [];
+
     private AnalysisRecommendation() { }
 
     /// <summary>Creates a successful recommendation carrying the deterministic accounting.</summary>
@@ -76,9 +79,11 @@ public sealed record AnalysisRecommendation
         IReadOnlyDictionary<string, int> breakdown,
         IReadOnlyDictionary<string, int> techniqueBreakdown,
         int documentsAnalyzed,
-        IReadOnlyList<BoundaryGap>? boundaryGaps = null) => new()
+        IReadOnlyList<BoundaryGap>? boundaryGaps = null,
+        IReadOnlyList<IdentifiedBehavior>? behaviors = null) => new()
         {
             Outcome = AnalysisIngestOutcome.Recommendation,
+            Behaviors = behaviors ?? [],
             TotalBehaviors = totalBehaviors,
             AlreadyCovered = alreadyCovered,
             Breakdown = breakdown ?? new Dictionary<string, int>(),

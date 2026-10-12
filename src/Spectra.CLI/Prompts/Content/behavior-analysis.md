@@ -84,12 +84,14 @@ Categorize each behavior into one of these categories:
 For each behavior, provide:
 - category: one of the categories above
 - title: short description (max 80 chars)
-- source: which document it comes from
+- source: the most specific section it comes from, as `doc#anchor` — the same form tests use in `source_refs`, with
+  the anchor of a heading from the document's Sections list (e.g. `docs/form.md#username`); the bare document path
+  when the behavior spans the whole document
 - technique: which test design technique produced this behavior (EP, BVA, DT, ST, EG, UC)
 
 Return ONLY a JSON object in this exact format (no other text):
 
-{"behaviors": [{"category": "boundary", "title": "Input field rejects 21 chars (max is 20)", "source": "docs/form.md", "technique": "BVA"}]}
+{"behaviors": [{"category": "boundary", "title": "Input field rejects 21 chars (max is 20)", "source": "docs/form.md#username", "technique": "BVA"}]}
 
 ## BOUNDARY-COVERAGE GAPS
 
@@ -110,7 +112,7 @@ documentation implies no boundary, or every implied boundary is already covered,
 
 Full output shape with both arrays:
 
-{"behaviors": [{"category": "boundary", "title": "Input field rejects 21 chars (max is 20)", "source": "docs/form.md", "technique": "BVA"}], "boundary_gaps": [{"field": "username", "kind": "max-length", "description": "max length boundary (20) has no test", "source": "docs/form.md"}]}
+{"behaviors": [{"category": "boundary", "title": "Input field rejects 21 chars (max is 20)", "source": "docs/form.md#username", "technique": "BVA"}], "boundary_gaps": [{"field": "username", "kind": "max-length", "description": "max length boundary (20) has no test", "source": "docs/form.md"}]}
 
 ## DISTRIBUTION GUIDELINES
 

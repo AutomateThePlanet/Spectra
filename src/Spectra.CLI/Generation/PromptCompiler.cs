@@ -113,7 +113,10 @@ public static class PromptCompiler
                 ["acceptance_criteria"] = criteriaContext ?? "",
                 ["profile_format"] = jsonExample,
                 ["count"] = requestedCount.ToString(),
-                ["focus_areas"] = ""
+                ["focus_areas"] = "",
+                // Spec 094: count mode — the model reads the docs itself; no inlined sections.
+                ["read_docs"] = "yes",
+                ["source_sections"] = ""
             };
 
             return PromptTemplateLoader.Resolve(template, values);
@@ -125,23 +128,16 @@ public static class PromptCompiler
             ## CRITICAL RULES
 
             1. NEVER generate generic test patterns. Every test MUST trace to specific documentation.
-            2. Use the available tools to read documentation ON-DEMAND instead of relying on memory.
-            3. ALWAYS check for duplicates before generating tests.
+            2. Every step and expected result MUST come from the documentation — never from memory or assumptions.
 
-            ## WORKFLOW
+            ## DOCUMENTATION
 
-            Follow this exact workflow for test generation:
-
-            1. **LIST DOCUMENTS**: First, call ListDocumentationFiles to see what documentation is available.
-            2. **READ TEST INDEX**: Call ReadTestIndex to see existing tests and avoid duplicates.
-            3. **READ RELEVANT DOCS**: Based on the user's request, call ReadDocument for specific files.
-            4. **CHECK DUPLICATES**: Before finalizing, call CheckDuplicates with your proposed titles.
-            5. **GET TEST IDs**: Call GetNextTestIds to allocate unique IDs for new tests.
-            6. **GENERATE TESTS**: Return tests as a JSON array.
+            Read the relevant documentation with your file tools before writing any test, and ground every step and expected
+            result in what it says. Test IDs are assigned when the tests are ingested — do not invent them.
 
             ## OUTPUT FORMAT
 
-            After using tools to gather information, your FINAL message must contain ONLY a JSON array of test cases.
+            Your FINAL message must contain ONLY a JSON array of test cases.
             Do NOT include any explanatory text before or after the JSON. Output ONLY the JSON array.
 
             The JSON array must follow this exact schema:
@@ -160,11 +156,9 @@ public static class PromptCompiler
 
             {(string.IsNullOrEmpty(criteriaContext) ? "" : $"\n## ACCEPTANCE CRITERIA — MANDATORY\n\nYou MUST map each test case to matching acceptance criteria below. Every test MUST have at least one criterion ID in its \"criteria\" array. If a test doesn't match any criterion, use the closest related one.\n\n{criteriaContext}\n")}
             IMPORTANT:
-            1. Use the tools to read documentation and check for duplicates first
-            2. Only generate tests that are grounded in the documentation
-            3. Ensure unique test IDs using GetNextTestIds
-            4. Your FINAL response must be ONLY the JSON array — no other text
-            5. MANDATORY: For each test, populate the "criteria" array with IDs of acceptance criteria it verifies (e.g. ["AC-REPORTING-001", "AC-REPORTING-003"]). Never leave criteria empty when acceptance criteria are provided above.
+            1. Only generate tests that are grounded in the documentation
+            2. Your FINAL response must be ONLY the JSON array — no other text
+            3. MANDATORY: For each test, populate the "criteria" array with IDs of acceptance criteria it verifies (e.g. ["AC-REPORTING-001", "AC-REPORTING-003"]). Never leave criteria empty when acceptance criteria are provided above.
             """;
     }
 

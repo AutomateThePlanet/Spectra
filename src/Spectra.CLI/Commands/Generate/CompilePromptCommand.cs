@@ -35,6 +35,8 @@ public sealed class CompilePromptCommand : Command
         // (the description is the source of truth) so this mode uses the lenient assembly.
         var fromDescriptionOption = new Option<string?>("--from-description", "Compile a single-test prompt from a plain-language description");
         var contextOption = new Option<string?>("--context", "Additional context for --from-description (page, module, flow)");
+        // Spec 094: one batch of the suite's generation plan (written by ingest-analysis).
+        var batchOption = new Option<string?>("--batch", "Compile the prompt for one batch of the generation plan (an id from ingest-analysis, or 'unsourced')");
 
         AddArgument(suiteArgument);
         AddOption(suiteOption);
@@ -42,19 +44,48 @@ public sealed class CompilePromptCommand : Command
         AddOption(focusOption);
         AddOption(fromDescriptionOption);
         AddOption(contextOption);
+        AddOption(batchOption);
 
         this.SetHandler(async (context) =>
         {
             var suite = context.ParseResult.GetValueForOption(suiteOption)
                         ?? context.ParseResult.GetValueForArgument(suiteArgument);
-            var count = context.ParseResult.GetValueForOption(countOption) ?? 5;
+            var countValue = context.ParseResult.GetValueForOption(countOption);
+            var count = countValue ?? 5;
+            var batch = context.ParseResult.GetValueForOption(batchOption);
             var focus = context.ParseResult.GetValueForOption(focusOption) ?? "";
             var fromDescription = context.ParseResult.GetValueForOption(fromDescriptionOption);
             var descriptionContext = context.ParseResult.GetValueForOption(contextOption);
             var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
+            if (batch is not null)
+            {
+                context.ExitCode = await RunBatchAsync(suite, batch, countValue, focus, fromDescription,
+                    outputFormat == OutputFormat.Json, context.GetCancellationToken());
+                return;
+            }
+
             context.ExitCode = await RunAsync(suite, count, focus, fromDescription, descriptionContext,
                 outputFormat == OutputFormat.Json, context.GetCancellationToken());
         });
+    }
+
+    /// <summary>Spec 094: <c>--batch</c> (see <see cref="CompileBatchPrompt"/>); not combinable with <c>--from-description</c>.</summary>
+    private static async Task<int> RunBatchAsync(
+        string? suite, string batch, int? count, string focus, string? fromDescription, bool json, CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(fromDescription))
+        {
+            Console.Error.WriteLine("--batch cannot be combined with --from-description.");
+            return ExitError;
+        }
+
+        if (string.IsNullOrWhiteSpace(suite))
+        {
+            Console.Error.WriteLine("A target suite is required (--suite).");
+            return ExitError;
+        }
+
+        return await CompileBatchPrompt.RunAsync(suite, batch, count, string.IsNullOrWhiteSpace(focus) ? null : focus, json, ct);
     }
 
     private static async Task<int> RunAsync(

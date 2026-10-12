@@ -351,6 +351,54 @@ Intended to be driven by a generation skill: the skill runs this to get the
 prompt, the interactive agent generates the JSON, then the skill hands the
 result to `ingest-tests`.
 
+In count mode (`--count`, `--from-description`) the prompt tells the model to read the documentation with its file
+tools; test ids are assigned when the tests are ingested. Since Spec 094 no generation prompt names the tools that
+were removed in spec 069 (`ListDocumentationFiles`, `ReadTestIndex`, `CheckDuplicates`, `GetNextTestIds`).
+
+#### `--batch <id>` (Spec 094)
+
+```bash
+spectra ai compile-prompt --suite storage --batch 2 [--count 7] [--focus "..."] --output-format json
+```
+
+Compiles the prompt for one batch of the suite's **generation plan** (written by `ingest-analysis`, below). The prompt
+holds only that batch's behaviours (`- B3 [boundary · BVA] <title> (<ref>)`), the text of each of its doc sections
+once (fenced under `### <ref>`; a whole-document ref absorbs its sections, a section absorbs its sub-sections), and
+only the acceptance criteria of those sections — matched by `source_doc` and `source_section`; criteria without a
+`source_section` (or naming a heading the document no longer has, with a warning) only for a whole-document ref. When
+none match, all criteria of the batch's documents are used, with a warning. The prompt says the sections are the
+complete source for the batch and that each test's `source_refs` are the section refs of the behaviours it covers. The
+count is the batch's planned count unless `--count` is given. Identical inputs give byte-identical prompts.
+
+The prompt goes to stdout. stderr carries the mode and any warnings — in JSON mode one line
+`{"command":"compile-prompt","success":true,"mode":"batch","batch":"2","warnings":[…]}`, otherwise `Mode:` and
+`Warning:` lines.
+
+| Mode | When | Prompt |
+|---|---|---|
+| `batch` | a numbered batch | the batch prompt above |
+| `count` | `--batch unsourced` (behaviours whose source didn't resolve) | count mode, focus = the unsourced titles |
+| `count_fallback` | `.spectra/prompts/test-generation.md` predates 094 (no `{{source_sections}}`) and was customised, or has no skills-manifest record (e.g. a fresh clone) | count mode with your template, focus = the batch's titles and refs, plus a warning naming `spectra prompts reset test-generation` |
+
+An unedited pre-094 copy (its hash equals the skills manifest's record) compiles in `batch` mode with the bundled
+template and the warning "using the bundled test-generation template; run spectra update-skills to refresh your
+copy". A template never causes a refusal.
+
+Checks, in order — plan, batch, staleness, criteria, size (for `unsourced`: plan, batch, then count mode; for
+`count_fallback`: no size check). Refusals exit `4` with the shared failure shape on stderr
+(`{command, success, error_code, errors, warnings}`), and nothing is written:
+
+| Code | When |
+|---|---|
+| `PLAN_MISSING` | no plan for the suite, or an unreadable one ("re-run the analysis") |
+| `BATCH_NOT_FOUND` | no batch with that id (the message lists the plan's ids) |
+| `PLAN_STALE` | a section of the batch changed since the analysis, or no longer resolves (one `errors` entry per section) — re-run the analysis |
+| `MISSING_INPUT` | no acceptance criteria for the batch (`missing_input: "criteria_context"`) |
+| `PROMPT_TOO_LARGE` | the estimate exceeds `analysis.max_prompt_tokens` (default 96,000) |
+
+`--batch` with `--from-description` is a usage error (exit 1). Count mode without `--batch` keeps its options and its
+refusal shape (`{refused, missing_input, message}`).
+
 ### `spectra ai ingest-tests` (fail-loud boundary)
 
 Validates agent-generated test content and persists it **only when the whole
@@ -716,8 +764,9 @@ supporting `--output-format json`) are:
 | Command | Role |
 |---------|------|
 | `spectra ai compile-analysis-prompt --suite <s> [--doc-suite <id>] [--focus <text>]` | Emit the behavior-analysis prompt (analyze-first step). |
-| `spectra ai ingest-analysis --suite <s> [--from <file>]` | Turn the agent's behavior JSON into a recommendation (already-covered, recommended count, category + ISTQB technique breakdowns). |
-| `spectra ai compile-prompt --suite <s> --count <n> [--focus <text>]` | Emit the bulk generation prompt for `<n>` tests. |
+| `spectra ai ingest-analysis --suite <s> [--from <file>]` | Turn the agent's behavior JSON into a recommendation (already-covered, recommended count, category + ISTQB technique breakdowns) and save the suite's generation plan (Spec 094, below). |
+| `spectra ai compile-prompt --suite <s> --batch <id> [--count <n>] [--focus <text>]` | Emit the prompt for one batch of the generation plan: its behaviours, doc sections and their criteria (Spec 094, above). |
+| `spectra ai compile-prompt --suite <s> --count <n> [--focus <text>]` | Emit the bulk generation prompt for `<n>` tests (count mode: the model reads the docs). |
 | `spectra ai compile-prompt --suite <s> --from-description "<text>" [--context <text>]` | Emit a single-test prompt from a plain-language description (count forced to 1; matching criteria injected). |
 | `spectra ai ingest-tests <suite> [--from <file>]` | Validate and persist the agent-generated tests, failing loud with exit `5` for content-invalid and `6` for schema-invalid. |
 | `spectra ai compile-critic-prompt` / `spectra ai ingest-verdict` | The mandatory `spectra-critic` verification step. |
@@ -730,6 +779,21 @@ supporting `--output-format json`) are:
 | `spectra ai review-flagged [--suite <s>]` | List and disposition flagged (still-partial) tests: accept, delete, or (via skill) retry repair. |
 | `spectra ai compile-repair-batch --suite <s>` | Compile a batch repair manifest for all ungrounded partials (model-free, resume-aware). |
 | `spectra ai audit-grounding --suite <s> [--output-format json]` | Report per-test grounding state (id, verdict, grounding_written, flagged, action_needed); serves as the resume oracle plus inspection view. |
+
+**The generation plan (Spec 094).** On success `ingest-analysis` resolves each behaviour's `source` — the most specific
+`doc#anchor` it comes from, as tests use in `source_refs`, or a bare document path for the whole document — with the
+baseline's ref and section rules, and writes `.spectra/generation-plan/<suite>.json` (scratch, gitignored, replaced by
+the next analysis of the suite). Behaviours get ids `B1…` in input order. Batches group resolved behaviours by section in
+document order, at most `generation.batch_size` (default 8) per batch, never across documents; behaviours whose source
+doesn't resolve go to one `unsourced` batch. Counts: every batch gets at least 1; when `recommended` ≥ the number of
+batches the counts add up to `recommended` (1 each plus a share by behaviours — `count_rule: "proportional"`),
+otherwise every batch gets 1 (`count_rule: "one_per_batch"`, "counts raised to one per batch"). The JSON adds `plan`,
+`planned_total`, `count_rule`, `batches` (`id`, `count`, `source_refs`, `behaviors`), `unresolved` (`id`, `title`,
+`source`, `reason`) and `notes`; `documents_analyzed` counts documents (sections of one document once). The human
+summary — on stderr in JSON mode — adds one `batch <id> | count <k> | <refs> | <titles>` line per batch (a `|` in a
+title shown as `/`) and one `unresolved: <id> <title> — <reason>` line each. A failed analysis (exit 5/6) writes no
+plan; a plan that can't be written is exit 1 `PLAN_WRITE_FAILED`. The command loads `spectra.config.json` as a write
+command reading `source` (missing → `CONFIG_MISSING`; `generation.batch_size` outside 1–50 → `CONFIG_INVALID`).
 
 ISTQB techniques (EP, BVA, DT, ST, EG, UC) and coverage-aware analysis (existing
 `_index.json` / criteria / doc sections inform the recommended gap count) are applied inside the

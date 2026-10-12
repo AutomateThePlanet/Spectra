@@ -11,7 +11,7 @@ context: fork
 
 You run in a **fresh, isolated (`context: fork`) context**. The `spectra-generate` skill gives you a
 suite, a doc suite and an optional focus. You compile the analysis prompt, identify the testable
-behaviours, ingest them, and end with the recommendation and a batch plan. The main session never
+behaviours, ingest them, and end with the recommendation and the CLI's batch plan. The main session never
 sees the documentation or the prompt — only your final lines — so everything the user must decide
 on is in them.
 
@@ -47,7 +47,9 @@ spectra ai compile-analysis-prompt --suite <suite> --doc-suite <doc_suite> --foc
 **2. Identify the behaviours.** Read the compiled prompt. It instructs you to identify the distinct
 testable behaviours in the named documentation, each tagged with a category and an ISTQB technique
 (EP, BVA, DT, ST, EG, UC). Do that now, using your file tools to read the referenced docs as needed.
-Produce a JSON array (or `{"behaviors":[…]}`) exactly as the prompt specifies, and keep its
+Give each behaviour's `source` as the most specific section it comes from — `doc#anchor`, an anchor of
+a heading from the document's Sections list (the bare document path only when it spans the document):
+the CLI batches behaviours by section and the generator gets exactly those sections. Produce a JSON array (or `{"behaviors":[…]}`) exactly as the prompt specifies, and keep its
 `boundary_gaps` when the prompt asks for them. Write that JSON to `.spectra/analysis.json` with the
 Write tool.
 
@@ -59,15 +61,15 @@ spectra ai ingest-analysis --suite <suite> --from .spectra/analysis.json --outpu
   regenerate stricter JSON, and re-ingest — **at most 2** more attempts; then end with
   `stop: ingest-analysis: <error_code>: <errors[0]>`.
 - Exit 0 → the JSON holds the recommendation: `already_covered`, `recommended`,
-  `documents_analyzed`, `breakdown`, `technique_breakdown`, `boundary_gaps`.
+  `documents_analyzed`, `breakdown`, `technique_breakdown`, `boundary_gaps` — and the suite's
+  generation plan the CLI saved (Spec 094): `batches`, `unresolved`, `planned_total`, `count_rule`.
 
-**4. Plan the batches.** The ingest reports counts only, so plan from your own behaviour list:
-group the behaviours by `source` document, in the document's order, **at most 8 behaviours** per
-batch (a document with more gets several batches). Give each batch a count: its share of
-`recommended`, proportional to its number of behaviours, rounded by largest remainder so the counts
-**add up to `recommended`** exactly; drop a batch whose count is 0. A batch's focus names its
-document and its behaviours: `<source doc>: <behaviour title>; <behaviour title>; …`. When
-`recommended` is 0 there are no batches.
+**4. Copy the batches.** The ingest saved the suite's generation plan and printed it in its summary
+(on stderr): one `batch <id> | count <k> | <section refs> | <behaviour titles>` line per batch and one
+`unresolved: <id> <title> — <reason>` line per behaviour whose source did not resolve (those are in the
+`unsourced` batch). Copy these lines **verbatim**, in order. Never plan, merge, split or recount
+batches yourself — the CLI's plan is the one the generator compiles from. The JSON's `batches` and
+`unresolved` let you check that you have them all.
 
 ## Your final message
 
@@ -79,7 +81,8 @@ Your final message is these lines and nothing else (no prose, no JSON, no docume
 - `breakdown: <category>=<N>, …` (non-zero entries; `breakdown: none` when empty)
 - `techniques: <TECH>=<N>, …` (non-zero entries of `technique_breakdown`; `techniques: none` when empty)
 - one `boundary_gap: <kind> · <field> — <description> [<source>]` line per boundary gap
-- one `batch <n> | count <k> | focus <source doc>: <behaviour title>; …` line per batch
+- the CLI's `batch <id> | count <k> | <section refs> | <behaviour titles>` lines, verbatim
+- the CLI's `unresolved: <id> <title> — <reason>` lines, verbatim
 
 — or, on a refusal, the `refused:` and `refusal:` lines from step 1 — and a `stop: <reason>` line
 last, only if you had to stop.
@@ -92,6 +95,8 @@ documents_analyzed: 2
 breakdown: happy_path=5, boundary=4, negative=4
 techniques: BVA=4, EP=6, EG=3
 boundary_gap: max · quota — uploads at exactly 30 GB [docs/storage.md]
-batch 1 | count 6 | focus docs/storage.md: quota enforced on upload; quota shown in settings; …
-batch 2 | count 5 | focus docs/sharing.md: share link expiry; revoke a share; …
+batch 1 | count 6 | docs/sharing.md#share-links, docs/sharing.md#revoking | Share link expires after 7 days; Revoked share closes open sessions; …
+batch 2 | count 4 | docs/storage.md#quotas | Upload above 30 GB is refused; Upload at exactly 30 GB succeeds; …
+batch unsourced | count 1 |  | Audit log keeps 90 days
+unresolved: B12 Audit log keeps 90 days — not found
 ```

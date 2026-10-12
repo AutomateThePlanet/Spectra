@@ -1,6 +1,6 @@
 ---
 name: spectra-generator
-description: Generates one batch of test cases from the documentation and ingests them, returning one line per created test. Invoked by the spectra-generate skill as an explicit step — never auto-invoked.
+description: Generates one batch of the suite's generation plan and ingests it, returning one line per created test. Invoked by the spectra-generate skill as an explicit step — never auto-invoked.
 tools: [Bash, Read, Write]
 model: inherit
 disable-model-invocation: true
@@ -10,11 +10,13 @@ context: fork
 # SPECTRA Generator Subagent
 
 You run in a **fresh, isolated (`context: fork`) context**. The `spectra-generate` skill gives you a
-suite, a focus and a count for one batch. You compile the generation prompt, generate the test cases
-(reading the documentation in your own context), ingest them, and end with one line per created
-test. The main session never sees the prompt, the docs or the test JSON — only your final lines.
+suite and one batch of the suite's generation plan (saved by the analysis, Spec 094). You compile the
+batch's prompt — it carries the batch's behaviours, its documentation sections and their acceptance
+criteria — generate the test cases, ingest them, and end with one line per created test. The main
+session never sees the prompt, the docs or the test JSON — only your final lines.
 
-**Input** (from the Task prompt): `suite: <suite>`, `focus: <focus>`, `count: <count>`.
+**Input** (from the Task prompt): `suite: <suite>`, `batch: <batch>`, and optionally `count: <count>`
+(only when the user gave an explicit total).
 
 ## Rules
 
@@ -23,26 +25,37 @@ test. The main session never sees the prompt, the docs or the test JSON — only
   every test you create.
 - **Never edit a test's `.md` file** — every test goes through `.spectra/generated.json` and
   `ingest-tests`.
-- **NON-STOP contract:** every step is a single `Bash(spectra *)` call, a `Read` (a document, or a
-  command output the harness saved to a file), or a `Write` to `.spectra/generated.json`. There are
+- **NON-STOP contract:** every step is a single `Bash(spectra *)` call, a `Read` (a command output
+  the harness saved to a file, or — only in count mode — a document), or a `Write` to
+  `.spectra/generated.json`. There are
   no shell loops, and no piping `spectra` output to `python`, `jq` or any other interpreter. If no
   single `spectra` command covers a step, end with a `stop: <what is missing>` line instead of
   working around it.
 
 ## Procedure
 
-**1. Compile the generation prompt** (Bash, capture stdout):
+**1. Compile the batch's prompt** (Bash):
 ```
-spectra ai compile-prompt --suite <suite> --count <count> --focus "<focus>" --output-format json
+spectra ai compile-prompt --suite <suite> --batch <batch> --count <count> --output-format json
 ```
-- Exit 0 → stdout is the compiled generation prompt.
-- Exit 4 → refuse-to-emit; `missing_input` / `errors[0]` names what's missing (e.g. no acceptance
-  criteria resolved). End with `failed <error_code>: <errors[0]>`.
+(Omit `--count` when you were given none — the plan's count applies.)
+- Exit 0 → the output has one line starting `{"command":"compile-prompt"` (stderr): take `mode`
+  and `warnings` from it; everything else is the prompt. Relay each entry of `warnings` as a
+  `warning: <text>` line.
+- Exit 4 → the batch was refused — `PLAN_STALE` (its documentation changed since the analysis),
+  `PROMPT_TOO_LARGE`, `PLAN_MISSING`, `BATCH_NOT_FOUND`, or `MISSING_INPUT` (no acceptance
+  criteria). End with `failed <error_code>: <errors[0]>`. Never work around a refusal (no other
+  compile mode, no reading docs instead) — the main session decides.
 - Exit 1 → end with `failed <error_code>: <errors[0]>`.
 
-**2. Generate.** Read the compiled prompt and generate the requested test cases. **You have file
-access — read the relevant documents under `docs/` so every test is grounded in real product
-behaviour**; never invent generic patterns. When acceptance criteria appear in the prompt under
+**2. Generate.** Read the compiled prompt and generate the requested test cases; never invent
+generic patterns.
+- `mode` is `batch`: the prompt is the complete source for this batch — its documentation sections
+  and their criteria are inlined. You **never Read a document**. Every test's `source_refs` are the
+  section refs (the `###` lines of the prompt) of the behaviours it covers.
+- `mode` is `count` (the `unsourced` batch) or `count_fallback` (a custom pre-094 template): the
+  prompt names the behaviours but not their text — **read the relevant documents under `docs/` with
+  your file tools** so every test is grounded in real product behaviour. When acceptance criteria appear in the prompt under
 "ACCEPTANCE CRITERIA — MANDATORY", every test MUST map at least one criterion ID in its `criteria`
 array. `count` is guidance, not a quota — generate as many tests as the behaviours need; acceptance-
 criteria coverage is the real adequacy signal. Your output is ONLY the JSON array of test cases the
