@@ -92,7 +92,11 @@ public static class UpdatePromptRenderer
         return sb.ToString();
     }
 
-    private static void AppendFenced(StringBuilder sb, string heading, string language, string? text)
+    /// <summary>
+    /// Appends <paramref name="heading"/>, then <paramref name="text"/> (LF, trailing newlines trimmed) in a <c>~~~~</c>
+    /// fence longer than any tilde run in it. Spec 094: shared with the generation batch prompt.
+    /// </summary>
+    internal static void AppendFenced(StringBuilder sb, string heading, string language, string? text)
     {
         var body = Lf(text ?? string.Empty).TrimEnd('\n');
         var fence = new string('~', Math.Max(4, LongestTildeRun(body) + 1));

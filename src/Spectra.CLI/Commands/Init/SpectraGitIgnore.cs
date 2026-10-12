@@ -13,6 +13,7 @@ public static class SpectraGitIgnore
     private const string Section = "# SPECTRA";
     private const string Updates = ".spectra/updates/";
     private const string Repairs = ".spectra/repairs/";
+    private const string GenerationPlan = ".spectra/generation-plan/";
 
     public static IReadOnlyList<string> Patterns { get; } =
     [
@@ -44,13 +45,17 @@ public static class SpectraGitIgnore
         // Spec 089: the staging folders of update edits and critic repairs (scratch, consumed by ingest-update --all).
         Updates,
         Repairs,
+        // Spec 094: the per-suite generation plans (scratch, replaced by each analysis).
+        GenerationPlan,
     ];
 
     /// <summary>
     /// Spec 090 (FR-D1): what a workspace from before 090 (no record in its skills manifest) counts as already offered —
-    /// the 089 list without the two staging folders 089 introduced.
+    /// the 089 list without the two staging folders 089 introduced. Spec 094: and without every later entry, so a
+    /// pre-090 workspace is offered those too.
     /// </summary>
-    public static IReadOnlyList<string> Pre090Offered { get; } = Patterns.Where(p => p is not Updates and not Repairs).ToList();
+    public static IReadOnlyList<string> Pre090Offered { get; } =
+        Patterns.Where(p => p is not Updates and not Repairs and not GenerationPlan).ToList();
 
     /// <summary>
     /// Spec 090 (FR-D2): a whole trimmed, non-comment line equal to the pattern or to the pattern without its trailing

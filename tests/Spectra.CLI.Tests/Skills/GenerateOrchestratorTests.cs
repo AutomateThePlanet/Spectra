@@ -68,8 +68,9 @@ public sealed class GenerateOrchestratorTests
         Assert.Contains("`spectra-analyst`", flow);
         Assert.Contains("`spectra-generator`", flow);
         Assert.Contains("`spectra-repairer`", flow);
-        Assert.Contains("`focus: \"<user focus>; <batch focus>\"`", flow);
-        Assert.Contains("`count`", flow);
+        // Spec 094: the generator gets a batch id of the plan (and a count only for an explicit total).
+        Assert.Contains("`batch: <id>`", flow);
+        Assert.Contains("`count: <k>`", flow);
     }
 
     // ---- generate: routing, unverified, drops ----

@@ -8,11 +8,11 @@ tools: [{{GENERATE_TOOLS}}]
 
 You generate test cases through a deterministic CLI seam. The CLI never calls a model — it **compiles a grounded prompt**, a model performs the generative turn (reading the docs), and the CLI **ingests** and validates what was produced. Every test is then verified by the mandatory `spectra-critic` subagent before it counts as accepted.
 
-In the main flow (Spec 093) this session **orchestrates**: the `spectra-analyst` subagent analyses, the `spectra-generator` subagent generates each batch, and the `spectra-repairer` subagent repairs partial tests — each in its own context, returning a few lines. This session asks the user, runs the critic per test, routes each test by the verdict the CLI classified, and reports. Only the single-test from-description flow still generates in this session.
+In the main flow (Spec 093) this session **orchestrates**: the `spectra-analyst` subagent analyses, the `spectra-generator` subagent generates each batch, and the `spectra-repairer` subagent repairs partial tests — each in its own context, returning a few lines. This session asks the user, runs the critic per test, routes each test by the verdict the CLI classified, and reports. Only the single-test from-description flow still generates in this session. Since Spec 094 the analysis saves a generation plan: each batch is a set of behaviours from the same doc sections, and its prompt carries exactly those sections and their criteria, so the generator reads no docs for it.
 
 ```
 spectra-analyst (compile-analysis-prompt → analyse → ingest-analysis)  →  you present + STOP for approval
-  →  per batch: spectra-generator (compile-prompt → generate → ingest-tests)
+  →  per batch: spectra-generator (compile-prompt --batch → generate → ingest-tests)
   →  per test: spectra-critic  →  ingest-verdict --all --ids (CLI results route each test)
   →  partial: spectra-repairer  →  critic again  →  ingest-grounding
 ```
@@ -53,12 +53,13 @@ The ONLY time you skip analysis is when the user describes a single concrete sce
 
 ## CLI flags reference
 
-In the main flow (Spec 093), `compile-analysis-prompt` and `ingest-analysis` are run by `spectra-analyst`, `compile-prompt --count` and `ingest-tests` by `spectra-generator`, and `ingest-update --all --keep-baseline` by `spectra-repairer`; this session runs `compile-prompt --from-description` and `ingest-tests` only in the from-description flow. `compile-repair-batch` is not used by this skill (the command stays). `ingest-verdict --suite {name} --all --ids a,b` returns `results` — one `{id, verdict, score, gate}` per classified test — which this skill routes by.
+In the main flow (Spec 093/094), `compile-analysis-prompt` and `ingest-analysis` are run by `spectra-analyst`, `compile-prompt --batch` and `ingest-tests` by `spectra-generator`, and `ingest-update --all --keep-baseline` by `spectra-repairer`; this session runs `compile-prompt --from-description` and `ingest-tests` only in the from-description flow. `compile-repair-batch` is not used by this skill (the command stays). `ingest-verdict --suite {name} --all --ids a,b` returns `results` — one `{id, verdict, score, gate}` per classified test — which this skill routes by.
 
 | Command / flag | Description |
 |------|-------------|
 | `compile-analysis-prompt --suite {name}` | Emits the behavior-analysis prompt (deterministic). REQUIRED suite — directory under `test-cases/`. |
 | `compile-analysis-prompt --doc-suite {id}` | **Spec 040** Doc-suite ID from the manifest (`spectra docs list-suites`). Filters which documentation feeds the analyzer. **Required when `--suite` does not match a doc-suite ID** — otherwise the pre-flight budget check (default 96K tokens) refuses the run (exit 4). |
+| `compile-prompt --suite {name} --batch {id}` | **Spec 094** Emits the prompt for one batch of the suite's generation plan (saved by `ingest-analysis`): the batch's behaviours, its doc sections and their criteria. `--count {n}` overrides the plan's count. Refusals (exit 4): `PLAN_MISSING`, `BATCH_NOT_FOUND`, `PLAN_STALE`, `PROMPT_TOO_LARGE`, `MISSING_INPUT`. |
 | `compile-prompt --suite {name} --count {n}` | Emits the generation prompt for `{n}` tests (deterministic). NEVER invent `{n}` — use a number the user stated, or the `recommended` field from the analyze step. |
 | `compile-prompt --from-description "{text}"` | Single-test mode: emits a one-test prompt from a plain-language description. |
 | `--focus {text}` | Focus area: "negative", "edge cases", "high priority security", etc. Pass the SAME focus to analyze and generate. |
@@ -125,9 +126,9 @@ Write `.spectra/progress.json` with the Write tool:
 
 ### Steps 1–3 — Analysis (the `spectra-analyst` subagent)
 
-Invoke the `spectra-analyst` subagent with the Task tool, passing `suite: {suite}`, `doc_suite: {docSuite}` and, when there is one, `focus: {focus}` — nothing else. It compiles the analysis prompt, identifies the behaviours in its own context, ingests them (with its own bounded retries), and returns the recommendation and a batch plan:
+Invoke the `spectra-analyst` subagent with the Task tool, passing `suite: {suite}`, `doc_suite: {docSuite}` and, when there is one, `focus: {focus}` — nothing else. It compiles the analysis prompt, identifies the behaviours in its own context, ingests them (with its own bounded retries) — the ingest saves the suite's generation plan — and returns the recommendation and the plan's batches:
 - `already_covered: N`, `recommended: N`, `documents_analyzed: N`, `breakdown: …`, `techniques: …`, one `boundary_gap: …` line per gap;
-- one `batch <n> | count <k> | focus <doc>: <behaviours>` line per batch;
+- the CLI's `batch <id> | count <k> | <section refs> | <behaviour titles>` lines, and `unresolved: <id> <title> — <reason>` lines for behaviours whose source didn't resolve (they are in the `unsourced` batch, which is generated by reading the docs);
 - or `refused: <code>` and `refusal: …` lines — the pre-flight budget refusal: show the `refusal:` lines verbatim and follow a recovery path above (narrow the doc suite, or raise the budget) — re-running means invoking `spectra-analyst` again. Do NOT proceed;
 - a `stop: …` line → report it and stop.
 
@@ -150,7 +151,7 @@ ISTQB technique breakdown (entries of the `techniques:` line — keys `BVA`, `EP
 - EG (Error Guessing): {count}
 - UC (Use Case): {count}
 
-The `boundary_gap:` lines as an advisory list, and the batch plan (one line per batch: its count and focus).
+The `boundary_gap:` lines as an advisory list, the batch lines (each batch's count, doc sections and behaviours) and the unresolved behaviours.
 
 Shall I proceed?
 
@@ -164,12 +165,12 @@ Update `.spectra/progress.json`: `{"active":4}`
 
 ### Steps 5–7 — Generation, one batch at a time (the `spectra-generator` subagent)
 
-Use the batch plan. When the user stated an explicit count, it overrides `recommended`: split it over the batches in proportion to their counts (largest remainder, so the parts add up to the user's count). **`recommended` is advisory guidance, not a quota**; acceptance-criteria coverage is the real adequacy signal.
+Use the batch lines, in plan order. When the user stated an explicit total, it overrides `recommended`: split it over the batches in proportion to their counts (largest remainder, so the parts add up to the user's total) and pass each part as `count: <k>` — only for an explicit total; otherwise pass no count and the plan's count applies. **Never invoke the generator for a batch whose count is 0** (this happens only when the user's explicit total is smaller than the number of batches); Step 9 lists such a batch as "not generated (count 0 after splitting your total)". **`recommended` is advisory guidance, not a quota**; acceptance-criteria coverage is the real adequacy signal.
 
-For each batch, in order — one at a time, never in parallel (the id allocator and the suite index have a single writer) — update progress, then invoke the `spectra-generator` subagent with the Task tool, passing `suite: {suite}`, `focus: "<user focus>; <batch focus>"` (just the batch focus when the user gave none) and the batch's `count`. It compiles the generation prompt, generates in its own context (reading the docs), ingests (with its own bounded retries), and returns:
+For each batch, in order — one at a time, never in parallel (the id allocator and the suite index have a single writer) — update progress, then invoke the `spectra-generator` subagent with the Task tool, passing `suite: {suite}`, `batch: <id>` and, only for an explicit total, `count: <k>`. It compiles the batch's prompt (`compile-prompt --batch`: the batch's doc sections and their criteria — it reads no docs for a section batch; the `unsourced` batch, and any batch under a customised pre-094 `test-generation.md`, compile in count mode and it reads the docs), generates in its own context, ingests (with its own bounded retries), and returns:
 - one `<id> | <title>` line per created test;
-- a `baseline: …` line and `warning: …` lines;
-- or `failed <error_code>: <first error>` — the batch failed after its retries: report it and run the next batch. Never generate a batch in this session;
+- a `baseline: …` line and `warning: …` lines — report each distinct template warning (about the `test-generation` template) once per run, not once per batch;
+- or `failed <error_code>: <first error>` — the batch failed: report it and run the next batch. Never generate a batch in this session. `PLAN_STALE` (its doc sections changed since the analysis) and `PROMPT_TOO_LARGE` (its sections don't fit one prompt) are handled in Step 9;
 - a `stop: …` line → report it and stop.
 
 Report every line, as returned. Collect the created ids and titles of all batches.
@@ -278,6 +279,7 @@ Report from the returned lines and the CLI results — every created test by id 
 - Flagged partial (awaiting review): {flagged count} — ids and titles (incl. failed repairs)
 - Dropped hallucinated: {dropped count} — ids and titles
 - Failed batches: each `failed` line with its code
+- Not generated: each batch with count 0 after splitting the user's total, as "not generated (count 0 after splitting your total)"
 - **Unverified (critic could not judge):** each test with its id, title, the reason, and the next step — run this skill's critic step (8a) again for these ids, or `spectra ai audit-grounding --suite {suite}`, where it shows as `none` / `critic`
 
 Also every `baseline:` and `warning:` line from the generator and repairer.
@@ -285,6 +287,8 @@ Also every `baseline:` and `warning:` line from the generator and repairer.
 If {flagged} > 0: "Run `spectra ai review-flagged --suite {suite}` to accept, retry repair, or delete flagged tests."
 
 If total-kept < requested, say "Run again to generate more." Never present a test as accepted unless its critic step passed.
+
+**Stale or oversized batches (Spec 094).** If a batch failed with `PLAN_STALE` or `PROMPT_TOO_LARGE`, name those batches and offer once to re-run the analysis. If the user accepts, invoke `spectra-analyst` again (same suite, doc suite and focus) and go **back to Step 4**: present the new recommendation, name the batches that already ran in this session with their created test ids, suggest narrowing the focus to the stale sections, and STOP for approval. Nothing is regenerated automatically — the user decides.
 
 Write `.spectra/progress.json`: `{"active":9}` (terminal — seam-progress page renders Complete).
 

@@ -38,8 +38,8 @@ The most common workflow. Three levels of specificity:
 
 ### What to expect
 
-1. The analysis phase identifies testable behaviors and shows existing coverage, plus a batch plan (one batch per group of up to 8 behaviors from one document).
-2. You approve the count, and generation runs batch by batch.
+1. The analysis phase identifies testable behaviors — each with the doc section it comes from — and shows existing coverage, plus the batch plan the CLI saved: each batch groups up to `generation.batch_size` (default 8) behaviors from neighbouring sections of one document, every batch gets at least one test, and behaviors whose source couldn't be found are listed and generated in an `unsourced` batch.
+2. You approve the count, and generation runs batch by batch. Each batch's prompt already contains its doc sections and their acceptance criteria, so the generator doesn't browse the docs. If a batch's sections changed after the analysis (`PLAN_STALE`) or are too large for one prompt (`PROMPT_TOO_LARGE`), the assistant reports the batch and offers to re-run the analysis; you approve the new plan before anything more is generated. A customised `test-generation.md` from before this change still works: those batches are compiled the old way (the generator reads the docs) and the assistant tells you once to run `spectra prompts reset test-generation` (or `spectra update-skills` for an unedited copy).
 3. Each generated test is verified by the `spectra-critic` subagent before it's accepted; partial tests get one repair.
 4. The results list every test created, by id and title, with its outcome (kept, repaired, flagged, dropped, or unverified when the critic couldn't judge it).
    The analysis, each batch and the repairs run in subagents (`spectra-analyst`, `spectra-generator`, `spectra-repairer`), so the documents, prompts and test text never fill your conversation; the assistant relays every line they return. Each test's route follows the verdict the CLI classified (`ingest-verdict --all --ids`), not the critic's own summary.

@@ -95,21 +95,31 @@ public static class CriteriaContextLoader
         if (relevant.Count == 0)
             relevant = allCriteria;
 
-        // Format as context string
+        var context = Format(relevant);
+        return new CriteriaContextResult(context, suiteMatchedCount, allCriteria.Count);
+    }
+
+    /// <summary>
+    /// The criteria context block: one <c>- **ID** [RFC2119] text</c> line per criterion, with its component and technique
+    /// hint; null when there are none. Spec 094: shared by count mode and <c>compile-prompt --batch</c>;
+    /// <paramref name="newline"/> defaults to the platform's (count mode's output, unchanged).
+    /// </summary>
+    public static string? Format(IEnumerable<AcceptanceCriterion> criteria, string? newline = null)
+    {
+        var nl = newline ?? Environment.NewLine;
         var sb = new StringBuilder();
-        foreach (var criterion in relevant)
+        foreach (var criterion in criteria)
         {
             sb.Append($"- **{criterion.Id}**");
             if (!string.IsNullOrEmpty(criterion.Rfc2119))
                 sb.Append($" [{criterion.Rfc2119}]");
-            sb.AppendLine($" {criterion.Text}");
+            sb.Append($" {criterion.Text}").Append(nl);
             if (!string.IsNullOrEmpty(criterion.Component))
-                sb.AppendLine($"  Component: {criterion.Component}");
+                sb.Append($"  Component: {criterion.Component}").Append(nl);
             if (!string.IsNullOrEmpty(criterion.TechniqueHint))
-                sb.AppendLine($"  Technique hint: {criterion.TechniqueHint}");
+                sb.Append($"  Technique hint: {criterion.TechniqueHint}").Append(nl);
         }
 
-        var context = sb.Length > 0 ? sb.ToString() : null;
-        return new CriteriaContextResult(context, suiteMatchedCount, allCriteria.Count);
+        return sb.Length > 0 ? sb.ToString() : null;
     }
 }
