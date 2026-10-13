@@ -70,6 +70,9 @@ public sealed record AnalysisRecommendation
     /// <summary>Spec 094: the behaviours after the focus filter, in input order (the generation plan's input).</summary>
     public IReadOnlyList<IdentifiedBehavior> Behaviors { get; private init; } = [];
 
+    /// <summary>Spec 095: per behaviour (aligned with <see cref="Behaviors"/>), the id of the test that covers it, or null.</summary>
+    public IReadOnlyList<string?> CoveredBy { get; private init; } = [];
+
     private AnalysisRecommendation() { }
 
     /// <summary>Creates a successful recommendation carrying the deterministic accounting.</summary>
@@ -80,10 +83,12 @@ public sealed record AnalysisRecommendation
         IReadOnlyDictionary<string, int> techniqueBreakdown,
         int documentsAnalyzed,
         IReadOnlyList<BoundaryGap>? boundaryGaps = null,
-        IReadOnlyList<IdentifiedBehavior>? behaviors = null) => new()
+        IReadOnlyList<IdentifiedBehavior>? behaviors = null,
+        IReadOnlyList<string?>? coveredBy = null) => new()
         {
             Outcome = AnalysisIngestOutcome.Recommendation,
             Behaviors = behaviors ?? [],
+            CoveredBy = coveredBy ?? [],
             TotalBehaviors = totalBehaviors,
             AlreadyCovered = alreadyCovered,
             Breakdown = breakdown ?? new Dictionary<string, int>(),

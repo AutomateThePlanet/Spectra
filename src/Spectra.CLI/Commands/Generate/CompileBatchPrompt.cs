@@ -48,6 +48,10 @@ internal static class CompileBatchPrompt
         "custom test-generation template predates batch prompts — this batch is compiled in count mode (the generator reads "
         + "the docs); run spectra prompts reset test-generation to use section batches";
 
+    /// <summary>Spec 095 (FR-010): a plan written by 094 has no per-behaviour coverage.</summary>
+    public const string PredatesCoverageWarning =
+        "the generation plan predates per-behaviour coverage; re-run the analysis for corrected counts";
+
     public const string UnrecordedTemplateWarning =
         "custom test-generation template predates batch prompts — this batch is compiled in count mode (the generator reads "
         + "the docs); run spectra prompts reset test-generation (or spectra update-skills if you never edited it) to use "
@@ -78,6 +82,10 @@ internal static class CompileBatchPrompt
         }
 
         var plan = planLoad.Plan;
+        if (!plan.CoverageKnown)
+        {
+            warnings.Add(PredatesCoverageWarning);
+        }
 
         // 2. The batch.
         var batch = plan.FindBatch(batchId.Trim());

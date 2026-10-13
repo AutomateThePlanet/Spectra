@@ -496,8 +496,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tools and that ids are assigned when the tests are ingested.
 - `documents_analyzed` counts documents, not sections, when sources name sections.
 
+### Fixed (review fixes, Spec 095)
+
+- **`already_covered` / `recommended` count behaviours, per behaviour.** A behaviour is covered when an existing test
+  of the suite has a title at least `generation.duplicate_threshold` similar (default 0.6); `covered_by` names that test.
+  Before, a suite with any test or criterion reported its test count as "already covered" — a suite with 50 tests
+  recommended 0 for an analysis that found 12 new behaviours.
+- **The generation plan batches only uncovered behaviours.** Covered behaviours stay in the plan with `covered_by`,
+  are listed (`covered` in the JSON, `covered: <title> (<test>)` lines, "Already covered — not generated" in the generate
+  skill) and never reach a batch prompt; each batch's count is one per uncovered behaviour. Before, batch prompts asked
+  for tests of covered behaviours while the counts excluded them.
+
 ### Notes
 
+- **Changed meaning (Spec 095):** `already_covered` is now the number of covered *behaviours*, `recommended` the number
+  of uncovered ones. A plan written by 094 still compiles, with a warning to re-run the analysis for the corrected
+  counts. `generation.duplicate_threshold` outside (0, 1] is used as given, with a warning: at or below 0 every behaviour
+  of a suite that has tests counts as covered, above 1 none does.
 - **One-time `source_section` churn.** Because `source_section` is now read, the first re-extraction after
   upgrading reports a `source_section` metadata change on criteria extracted before.
 - **Custom prompt templates.** A `.spectra/prompts/criteria-extraction.md` override doesn't include the existing

@@ -27,6 +27,29 @@ public static class GenerationPlanWorkspace
         "criteria:\n"
         + "  - id: AC-S1\n    text: \"Links MUST expire after 7 days\"\n    rfc2119: MUST\n    source_type: document\n    source_doc: docs/sharing.md\n    source_section: Links\n    component: storage\n";
 
+    /// <summary>Spec 095: a plan as 094 wrote it: no duplicate_threshold, no covered_by.</summary>
+    public const string Plan094 = """
+        {
+          "version": 1,
+          "suite": "storage",
+          "focus": null,
+          "batch_size": 8,
+          "recommended": 2,
+          "planned_total": 2,
+          "count_rule": "proportional",
+          "behaviors": [
+            {"id": "B1", "title": "Quota refused", "category": "boundary", "technique": "BVA", "source": "docs/storage.md#upload-quota", "ref": "docs/storage.md#upload-quota", "resolved": true},
+            {"id": "B2", "title": "Links expire", "category": "happy_path", "technique": "EP", "source": "docs/sharing.md#links", "ref": "docs/sharing.md#links", "resolved": true}
+          ],
+          "sections": {},
+          "batches": [
+            {"batch_id": "1", "behavior_ids": ["B2"], "source_refs": ["docs/sharing.md#links"], "count": 1},
+            {"batch_id": "2", "behavior_ids": ["B1"], "source_refs": ["docs/storage.md#upload-quota"], "count": 1}
+          ],
+          "notes": []
+        }
+        """;
+
     /// <summary>The real <c>spectra init</c>, the two documents and their criteria.</summary>
     public static async Task SetUpAsync(BaselineTestWorkspace ws, bool criteria = true)
     {

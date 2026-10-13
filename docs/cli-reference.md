@@ -764,7 +764,7 @@ supporting `--output-format json`) are:
 | Command | Role |
 |---------|------|
 | `spectra ai compile-analysis-prompt --suite <s> [--doc-suite <id>] [--focus <text>]` | Emit the behavior-analysis prompt (analyze-first step). |
-| `spectra ai ingest-analysis --suite <s> [--from <file>]` | Turn the agent's behavior JSON into a recommendation (already-covered, recommended count, category + ISTQB technique breakdowns) and save the suite's generation plan (Spec 094, below). |
+| `spectra ai ingest-analysis --suite <s> [--from <file>]` | Turn the agent's behavior JSON into a recommendation (already-covered = behaviours an existing test covers, recommended = the uncovered ones, category + ISTQB technique breakdowns) and save the suite's generation plan (Spec 094/095, below). |
 | `spectra ai compile-prompt --suite <s> --batch <id> [--count <n>] [--focus <text>]` | Emit the prompt for one batch of the generation plan: its behaviours, doc sections and their criteria (Spec 094, above). |
 | `spectra ai compile-prompt --suite <s> --count <n> [--focus <text>]` | Emit the bulk generation prompt for `<n>` tests (count mode: the model reads the docs). |
 | `spectra ai compile-prompt --suite <s> --from-description "<text>" [--context <text>]` | Emit a single-test prompt from a plain-language description (count forced to 1; matching criteria injected). |
@@ -794,6 +794,21 @@ summary — on stderr in JSON mode — adds one `batch <id> | count <k> | <refs>
 title shown as `/`) and one `unresolved: <id> <title> — <reason>` line each. A failed analysis (exit 5/6) writes no
 plan; a plan that can't be written is exit 1 `PLAN_WRITE_FAILED`. The command loads `spectra.config.json` as a write
 command reading `source` (missing → `CONFIG_MISSING`; `generation.batch_size` outside 1–50 → `CONFIG_INVALID`).
+
+**Covered behaviours (Spec 095).** One rule decides, per behaviour, whether the suite's existing tests already cover it:
+an existing test whose title is at least `generation.duplicate_threshold` (default 0.6) similar to the behaviour's title
+(the duplicate detector's title similarity). The behaviour's `covered_by` is the most similar test (ties → the lowest id,
+ordinal). `already_covered` = covered behaviours, `recommended` = uncovered behaviours — with or without acceptance
+criteria (before 095, a suite with any test or criterion reported its test count as `already_covered`). The breakdowns
+still count all behaviours. The plan keeps every behaviour with `covered_by` and records `duplicate_threshold`, but
+batches only the uncovered ones: each batch's count is one per uncovered behaviour, summing to `recommended`; all
+covered → no batches. The JSON adds `covered` (`id`, `title`, `covered_by`); `unresolved` lists only uncovered
+behaviours, so a covered one appears only under `covered`, whatever its source. The summary adds one
+`covered: <title> (<covered_by>)` line each, between the batch lines and the `unresolved:` lines. A threshold outside
+(0, 1] is used as given, with the stderr warning "generation.duplicate_threshold = <v> is outside (0, 1]; every behaviour (≤ 0) or none (> 1) is treated as covered." (exit code unchanged).
+`compile-prompt --batch` never names a covered behaviour; a plan written by 094 (no `duplicate_threshold`) still
+compiles, with the warning "the generation plan predates per-behaviour coverage; re-run the analysis for corrected
+counts".
 
 ISTQB techniques (EP, BVA, DT, ST, EG, UC) and coverage-aware analysis (existing
 `_index.json` / criteria / doc sections inform the recommended gap count) are applied inside the

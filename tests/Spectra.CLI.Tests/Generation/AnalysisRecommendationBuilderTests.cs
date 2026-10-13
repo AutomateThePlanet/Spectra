@@ -1,5 +1,6 @@
 using Spectra.CLI.Agent.Analysis;
 using Spectra.CLI.Generation;
+using Spectra.Core.Models;
 
 namespace Spectra.CLI.Tests.Generation;
 
@@ -45,16 +46,90 @@ public sealed class AnalysisRecommendationBuilderTests
         Assert.Equal(1, result.TechniqueBreakdown["BVA"]);
     }
 
-    [Fact]
-    public void Build_RecommendedCount_FlooredAtZero_WhenSnapshotCoversAll()
-    {
-        // A coverage snapshot with an accurate existing-test count drives dedup (HasData → true).
-        var snapshot = new CoverageSnapshot { ExistingTestCount = 5 };
-        var result = AnalysisRecommendationBuilder.Build(Behaviors, [], snapshot, focusArea: null);
+    // ---- Spec 095 (FR-001–FR-003): one per-behaviour coverage rule; replaces the 044 row
+    // Build_RecommendedCount_FlooredAtZero_WhenSnapshotCoversAll (already_covered was the suite's test count). ----
 
-        Assert.True(result.IsSuccess);
-        Assert.Equal(5, result.AlreadyCovered);
-        Assert.Equal(0, result.RecommendedCount); // max(0, 3 - 5)
+    private static TestCase Test(string id, string title) => new()
+    {
+        Id = id, Title = title, Priority = Priority.Medium, Steps = ["step"], ExpectedResult = "ok", FilePath = ""
+    };
+
+    private static string Analysis(params string[] titles) =>
+        System.Text.Json.JsonSerializer.Serialize(new
+        {
+            behaviors = titles.Select((t, i) => new { category = i % 2 == 0 ? "happy_path" : "negative", title = t, source = "docs/a.md", technique = "EP" })
+        });
+
+    [Fact]
+    public void Build_ASnapshot_NoLongerDecidesTheCoveredCount()
+    {
+        var snapshot = new CoverageSnapshot { ExistingTestCount = 5 };
+
+        var withSnapshot = AnalysisRecommendationBuilder.Build(Behaviors, [], snapshot, focusArea: null);
+        var withoutSnapshot = AnalysisRecommendationBuilder.Build(Behaviors, [], snapshot: null, focusArea: null);
+
+        Assert.Equal(0, withSnapshot.AlreadyCovered);
+        Assert.Equal(3, withSnapshot.RecommendedCount);
+        Assert.Equal(withoutSnapshot.AlreadyCovered, withSnapshot.AlreadyCovered);
+        Assert.Equal(withoutSnapshot.RecommendedCount, withSnapshot.RecommendedCount);
+    }
+
+    [Fact]
+    public void Build_FiftyTests_TwelveGaps_RecommendsTwelve_WithAndWithoutASnapshot()
+    {
+        var tests = Enumerable.Range(1, 50).Select(i => Test($"TC-{i:D3}", $"Existing behaviour number {i} of the archive module")).ToList();
+        var titles = new List<string>
+        {
+            "Existing behaviour number 7 of the archive module",
+            "Existing behaviour number 21 of the archive module",
+            "Existing behaviour number 40 of the archive module",
+        };
+        titles.AddRange(Enumerable.Range(1, 12).Select(i => $"Quota warning banner variant {(char)('A' + i)} turns red"));
+        var content = Analysis([.. titles]);
+
+        var withSnapshot = AnalysisRecommendationBuilder.Build(content, tests, new CoverageSnapshot { ExistingTestCount = 50 }, focusArea: null);
+        var withoutSnapshot = AnalysisRecommendationBuilder.Build(content, tests, snapshot: null, focusArea: null);
+
+        foreach (var result in new[] { withSnapshot, withoutSnapshot })
+        {
+            Assert.Equal(3, result.AlreadyCovered);
+            Assert.Equal(12, result.RecommendedCount);
+            Assert.Equal(15, result.TotalBehaviors);
+        }
+    }
+
+    [Fact]
+    public void Build_TheThreshold_ComesFromTheCaller()
+    {
+        var tests = new[] { Test("TC-101", "Upload above quota is refused now") };
+        var content = Analysis("Upload above the quota is refused");
+
+        Assert.Equal(1, AnalysisRecommendationBuilder.Build(content, tests, null, null).AlreadyCovered);
+        Assert.Equal(0, AnalysisRecommendationBuilder.Build(content, tests, null, null, duplicateThreshold: 0.9).AlreadyCovered);
+    }
+
+    [Fact]
+    public void Build_CoveredBy_IsPerBehaviour_TiesToTheLowestId()
+    {
+        var tests = new[] { Test("TC-120", "Quota shown in settings"), Test("TC-105", "Quota shown in settings") };
+
+        var result = AnalysisRecommendationBuilder.Build(Analysis("Quota shown in settings", "Folder nested twenty levels deep"), tests, null, null);
+
+        Assert.Equal(new string?[] { "TC-105", null }, result.CoveredBy);
+        Assert.Equal(1, result.AlreadyCovered);
+        Assert.Equal(1, result.RecommendedCount);
+    }
+
+    [Fact]
+    public void Build_TheBreakdowns_StillCoverAllBehaviours()
+    {
+        var tests = new[] { Test("TC-101", "Quota shown in settings") };
+
+        var result = AnalysisRecommendationBuilder.Build(Analysis("Quota shown in settings", "Folder nested twenty levels deep"), tests, null, null);
+
+        Assert.Equal(1, result.Breakdown["happy_path"]);
+        Assert.Equal(1, result.Breakdown["negative"]);
+        Assert.Equal(2, result.TechniqueBreakdown["EP"]);
     }
 
     [Theory]

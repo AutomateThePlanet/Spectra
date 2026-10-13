@@ -1,4 +1,5 @@
 using Spectra.CLI.Generation.Plan;
+using Spectra.CLI.Tests.TestFixtures;
 
 namespace Spectra.CLI.Tests.Generation.Plan;
 
@@ -200,5 +201,108 @@ public sealed class GenerationPlanBuilderTests
     public void AnUnreadablePlan_IsRejected(string json)
     {
         Assert.Throws<GenerationPlanFormatException>(() => GenerationPlan.Parse(json));
+    }
+    // ---- Spec 095 (FR-006, FR-010; R5): only uncovered behaviours are batched ----
+
+    private static ResolvedBehavior CoveredAt(string doc, int position, string title, string anchor, string coveredBy) =>
+        new(title, "happy_path", "EP", $"{doc}#{anchor}", $"{doc}#{anchor}", doc, position, null, coveredBy);
+
+    private static GenerationPlan BuildAsIngest(IReadOnlyList<ResolvedBehavior> behaviors, int batchSize = 8) =>
+        GenerationPlanBuilder.Build("storage", null, batchSize, behaviors.Count(b => b.CoveredBy is null), behaviors,
+            behaviors.Where(b => b.Ref is not null).Select(b => b.Ref!).Distinct()
+                .ToDictionary(r => r, r => "sha256:" + new string('0', 64)),
+            [], duplicateThreshold: 0.6);
+
+    [Fact]
+    public void CoveredBehaviours_KeepTheirIdsAndCoveredBy_ButAreInNoBatch()
+    {
+        var plan = BuildAsIngest(
+        [
+            CoveredAt("docs/a.md", 1, "covered", "x", "TC-101"),
+            At("docs/a.md", 1, "open", "x"),
+            At("docs/b.md", 1, "other", "y"),
+        ]);
+
+        Assert.Equal(["B1", "B2", "B3"], plan.Behaviors.Select(b => b.Id));
+        Assert.Equal("TC-101", plan.Behaviors[0].CoveredBy);
+        Assert.Null(plan.Behaviors[1].CoveredBy);
+        Assert.DoesNotContain(plan.Batches, b => b.BehaviorIds.Contains("B1"));
+        Assert.Equal(["B2", "B3"], plan.Batches.SelectMany(b => b.BehaviorIds).Order());
+    }
+
+    [Fact]
+    public void ACoveredUnresolvedBehaviour_IsNotInTheUnsourcedBatch()
+    {
+        var plan = BuildAsIngest(
+        [
+            new ResolvedBehavior("covered", "negative", "EG", "docs/nope.md", null, null, 0, "not found", "TC-101"),
+            Unresolved("open", "docs/nope.md", "not found"),
+        ]);
+
+        var unsourced = Assert.Single(plan.Batches);
+        Assert.Equal(GenerationPlan.Unsourced, unsourced.BatchId);
+        Assert.Equal(["B2"], unsourced.BehaviorIds);
+    }
+
+    [Fact]
+    public void EveryBatchCount_EqualsItsBehaviours_AndTheSumIsRecommended()
+    {
+        var behaviors = new List<ResolvedBehavior>();
+        for (var d = 0; d < 4; d++)
+        {
+            behaviors.AddRange(Enumerable.Range(0, 3 + d * 2).Select(i => At($"docs/d{d}.md", i % 3, $"t{d}-{i}", $"s{i % 3}")));
+        }
+
+        behaviors.Add(CoveredAt("docs/d0.md", 1, "covered", "s1", "TC-101"));
+        behaviors.Add(Unresolved("u", "docs/nope.md", "not found"));
+        var plan = BuildAsIngest(behaviors, batchSize: 4);
+
+        Assert.All(plan.Batches, b => Assert.Equal(b.BehaviorIds.Count, b.Count));
+        Assert.Equal(plan.Recommended, plan.Batches.Sum(b => b.Count));
+        Assert.Equal(plan.Recommended, plan.PlannedTotal);
+        Assert.Equal(GenerationPlan.Proportional, plan.CountRule);
+    }
+
+    [Fact]
+    public void AllCovered_GivesNoBatches()
+    {
+        var plan = BuildAsIngest([CoveredAt("docs/a.md", 1, "c1", "x", "TC-101"), CoveredAt("docs/a.md", 2, "c2", "y", "TC-102")]);
+
+        Assert.Empty(plan.Batches);
+        Assert.Equal(0, plan.PlannedTotal);
+        Assert.Equal(0, plan.Recommended);
+    }
+
+    [Fact]
+    public void Sections_ListOnlyTheRefsBatchesUse()
+    {
+        var plan = BuildAsIngest([CoveredAt("docs/a.md", 1, "covered", "only-covered", "TC-101"), At("docs/a.md", 2, "open", "used")]);
+
+        Assert.Equal(["docs/a.md#used"], plan.Sections.Keys);
+    }
+
+    [Fact]
+    public void TheThreshold_IsSerialisedAfterTheBatchSize_ByteIdentically()
+    {
+        var behaviors = new[] { CoveredAt("docs/a.md", 1, "covered", "x", "TC-101"), At("docs/a.md", 2, "open", "y") };
+        var first = GenerationPlan.Serialize(BuildAsIngest(behaviors));
+
+        Assert.Equal(first, GenerationPlan.Serialize(BuildAsIngest(behaviors)));
+        Assert.True(first.IndexOf("\"batch_size\"", StringComparison.Ordinal) < first.IndexOf("\"duplicate_threshold\": 0.6", StringComparison.Ordinal));
+        Assert.Contains("\"covered_by\": \"TC-101\"", first);
+        Assert.Contains("\"covered_by\": null", first);
+        var parsed = GenerationPlan.Parse(first);
+        Assert.True(parsed.CoverageKnown);
+        Assert.Equal(first, GenerationPlan.Serialize(parsed));
+    }
+
+    [Fact]
+    public void A094Plan_Parses_WithCoverageUnknown_AndNoCoveredBehaviour()
+    {
+        var plan = GenerationPlan.Parse(GenerationPlanWorkspace.Plan094);
+
+        Assert.False(plan.CoverageKnown);
+        Assert.All(plan.Behaviors, b => Assert.Null(b.CoveredBy));
+        Assert.Equal(2, plan.Batches.Count);
     }
 }

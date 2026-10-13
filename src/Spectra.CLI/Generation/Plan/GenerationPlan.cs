@@ -6,8 +6,10 @@ namespace Spectra.CLI.Generation.Plan;
 /// <summary>Spec 094: one behaviour of the analysis, as the plan records it.</summary>
 /// <param name="Ref">The canonical section ref (null when unresolved).</param>
 /// <param name="Reason">Why the source did not resolve (null when resolved).</param>
+/// <param name="CoveredBy">Spec 095: the existing test that covers the behaviour (null when uncovered, or in a 094 plan).</param>
 public sealed record PlannedBehavior(
-    string Id, string Title, string Category, string Technique, string Source, string? Ref, bool Resolved, string? Reason);
+    string Id, string Title, string Category, string Technique, string Source, string? Ref, bool Resolved, string? Reason,
+    string? CoveredBy = null);
 
 /// <summary>Spec 094: a batch — its behaviours, the section refs they come from (in order) and how many tests to write.</summary>
 public sealed record PlannedBatch(string BatchId, IReadOnlyList<string> BehaviorIds, IReadOnlyList<string> SourceRefs, int Count);
@@ -31,7 +33,8 @@ public sealed record GenerationPlan(
     IReadOnlyList<PlannedBehavior> Behaviors,
     IReadOnlyDictionary<string, string> Sections,
     IReadOnlyList<PlannedBatch> Batches,
-    IReadOnlyList<string> Notes)
+    IReadOnlyList<string> Notes,
+    double? DuplicateThreshold = null)
 {
     public const int CurrentVersion = 1;
 
@@ -45,6 +48,12 @@ public sealed record GenerationPlan(
     public const string Unsourced = "unsourced";
 
     public PlannedBatch? FindBatch(string id) => Batches.FirstOrDefault(b => b.BatchId == id);
+
+    /// <summary>
+    /// Spec 095: the plan records per-behaviour coverage (written with <c>duplicate_threshold</c>). A 094 plan doesn't —
+    /// all its behaviours count as uncovered.
+    /// </summary>
+    public bool CoverageKnown => DuplicateThreshold is not null;
 
     public PlannedBehavior Behavior(string id) => Behaviors.First(b => b.Id == id);
 
@@ -62,6 +71,11 @@ public sealed record GenerationPlan(
             w.WriteString("suite", plan.Suite);
             w.WriteString("focus", plan.Focus);
             w.WriteNumber("batch_size", plan.BatchSize);
+            if (plan.DuplicateThreshold is { } threshold)
+            {
+                w.WriteNumber("duplicate_threshold", threshold);
+            }
+
             w.WriteNumber("recommended", plan.Recommended);
             w.WriteNumber("planned_total", plan.PlannedTotal);
             w.WriteString("count_rule", plan.CountRule);
@@ -80,6 +94,11 @@ public sealed record GenerationPlan(
                 if (!b.Resolved)
                 {
                     w.WriteString("reason", b.Reason);
+                }
+
+                if (plan.CoverageKnown)
+                {
+                    w.WriteString("covered_by", b.CoveredBy);
                 }
 
                 w.WriteEndObject();
@@ -134,7 +153,8 @@ public sealed record GenerationPlan(
             var behaviors = Array(root, "behaviors").Select(b => new PlannedBehavior(
                 Str(b, "id"), Str(b, "title"), Str(b, "category"), Str(b, "technique"), Str(b, "source"),
                 NullableStr(b, "ref"), Bool(b, "resolved"),
-                b.TryGetProperty("reason", out var r) && r.ValueKind == JsonValueKind.String ? r.GetString() : null)).ToList();
+                b.TryGetProperty("reason", out var r) && r.ValueKind == JsonValueKind.String ? r.GetString() : null,
+                OptionalStr(b, "covered_by"))).ToList();
 
             var sectionsElement = Required(root, "sections", JsonValueKind.Object);
             var sections = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -153,7 +173,8 @@ public sealed record GenerationPlan(
 
             return new GenerationPlan(
                 Str(root, "suite"), NullableStr(root, "focus"), Int(root, "batch_size"), Int(root, "recommended"),
-                Int(root, "planned_total"), Str(root, "count_rule"), behaviors, sections, batches, Strings(root, "notes"));
+                Int(root, "planned_total"), Str(root, "count_rule"), behaviors, sections, batches, Strings(root, "notes"),
+                OptionalNumber(root, "duplicate_threshold"));
         }
         catch (JsonException ex)
         {
@@ -196,6 +217,32 @@ public sealed record GenerationPlan(
         }
 
         return value.ValueKind == JsonValueKind.Null ? null : value.GetString();
+    }
+
+    /// <summary>Spec 095: an optional string (absent or null → null; a 094 plan has no <c>covered_by</c>).</summary>
+    private static string? OptionalStr(JsonElement e, string name)
+    {
+        if (!e.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        return value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : throw new GenerationPlanFormatException($"'{name}' is not a string");
+    }
+
+    /// <summary>Spec 095: an optional number (absent → null; a 094 plan has no <c>duplicate_threshold</c>).</summary>
+    private static double? OptionalNumber(JsonElement e, string name)
+    {
+        if (!e.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        return value.ValueKind == JsonValueKind.Number
+            ? value.GetDouble()
+            : throw new GenerationPlanFormatException($"'{name}' is not a number");
     }
 
     private static int Int(JsonElement e, string name)

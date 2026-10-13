@@ -20,15 +20,19 @@ public static class AnalysisRecommendationBuilder
     };
 
     /// <summary>
-    /// Classifies the agent content into a recommendation. Coverage dedup uses the
-    /// <paramref name="snapshot"/>'s accurate count when available, else a title-similarity
-    /// heuristic against <paramref name="existingTests"/>.
+    /// Classifies the agent content into a recommendation. Spec 095 (FR-001–FR-003): one per-behaviour coverage rule —
+    /// a behaviour is covered when an existing test's title is at least <paramref name="duplicateThreshold"/> similar
+    /// (<see cref="TitleCoverage"/>); <c>AlreadyCovered</c> counts covered behaviours, <c>RecommendedCount</c> the
+    /// uncovered ones, and <c>CoveredBy</c> names the covering test per behaviour. <paramref name="snapshot"/> no longer
+    /// affects any count (it used to make the suite's test count the covered count); it only feeds the analysis prompt's
+    /// coverage context elsewhere.
     /// </summary>
     public static AnalysisRecommendation Build(
         string agentContent,
         IReadOnlyList<TestCase> existingTests,
         CoverageSnapshot? snapshot,
-        string? focusArea)
+        string? focusArea,
+        double duplicateThreshold = 0.6)
     {
         if (string.IsNullOrWhiteSpace(agentContent))
             return AnalysisRecommendation.Empty("Agent analysis content was empty.");
@@ -44,11 +48,9 @@ public static class AnalysisRecommendationBuilder
             behaviors = FilterByFocus(behaviors, focusArea);
         }
 
-        // Compute dedup: use snapshot's accurate count when available,
-        // fall back to title-similarity heuristic otherwise.
-        var coveredCount = snapshot is not null && snapshot.HasData
-            ? snapshot.ExistingTestCount
-            : CountCoveredBehaviors(behaviors, existingTests);
+        // Spec 095: coverage per behaviour, the same rule with or without a snapshot.
+        var coveredBy = CoveredBy(behaviors, existingTests, duplicateThreshold);
+        var coveredCount = coveredBy.Count(id => id is not null);
 
         // Build breakdown — bucket empty/null/whitespace categories under "uncategorized".
         var breakdown = behaviors
@@ -83,7 +85,8 @@ public static class AnalysisRecommendationBuilder
             techniqueBreakdown: techniqueBreakdown,
             documentsAnalyzed: documentsAnalyzed,
             boundaryGaps: boundaryGaps,
-            behaviors: behaviors);
+            behaviors: behaviors,
+            coveredBy: coveredBy);
     }
 
     /// <summary>The document part of a source ref (everything before <c>#</c>), trimmed.</summary>
@@ -361,28 +364,21 @@ public static class AnalysisRecommendationBuilder
         return matches.Count > 0 ? matches : behaviors;
     }
 
+    /// <summary>Spec 095: the covering test's id per behaviour (null when uncovered), by <see cref="TitleCoverage"/>.</summary>
+    internal static IReadOnlyList<string?> CoveredBy(
+        IReadOnlyList<IdentifiedBehavior> behaviors,
+        IReadOnlyList<TestCase> existingTests,
+        double threshold) =>
+        TitleCoverage.Match(
+                behaviors.Select(b => b.Title ?? string.Empty).ToList(),
+                existingTests.Select(t => (t.Id ?? string.Empty, t.Title ?? string.Empty)).ToList(),
+                threshold)
+            .Select(m => m?.TestId)
+            .ToList();
+
+    /// <summary>The number of covered behaviours at the default threshold (Spec 095: the same rule as <see cref="Build"/>).</summary>
     internal static int CountCoveredBehaviors(
         IReadOnlyList<IdentifiedBehavior> behaviors,
-        IReadOnlyList<TestCase> existingTests)
-    {
-        if (existingTests.Count == 0)
-            return 0;
-
-        var detector = new DuplicateDetector();
-        var coveredCount = 0;
-
-        foreach (var behavior in behaviors)
-        {
-            // Check title similarity directly (behaviors don't have steps).
-            var isCovered = existingTests.Any(existing =>
-                detector.CalculateTitleSimilarity(behavior.Title, existing.Title) >= 0.6);
-
-            if (isCovered)
-            {
-                coveredCount++;
-            }
-        }
-
-        return coveredCount;
-    }
+        IReadOnlyList<TestCase> existingTests) =>
+        CoveredBy(behaviors, existingTests, 0.6).Count(id => id is not null);
 }
