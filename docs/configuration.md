@@ -124,7 +124,7 @@ that still carries `ai.critic.*` loads unchanged; the keys are ignored.
 |----------|------|---------|-------------|
 | `default_count` | int | `15` | Default number of test cases to generate |
 | `require_review` | bool | `true` | Require interactive review before writing |
-| `duplicate_threshold` | double | `0.6` | Similarity threshold for duplicate detection |
+| `duplicate_threshold` | double | `0.6` | Similarity threshold for duplicate detection. Spec 095: also the analysis coverage threshold — a behaviour whose title is at least this similar to an existing test's title counts as already covered and is not generated. Not range-checked; outside (0, 1] the analysis warns. |
 | `categories` | string[] | `["happy_path", "negative", "boundary", "integration"]` | Test case categories to generate |
 | `batch_size` | int | `8` | Spec 094: at most this many behaviors per generation batch in the analysis's generation plan. Optional; valid 1–50 (`CONFIG_INVALID` outside). |
 

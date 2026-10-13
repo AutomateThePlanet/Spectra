@@ -62,12 +62,14 @@ spectra ai ingest-analysis --suite <suite> --from .spectra/analysis.json --outpu
   `stop: ingest-analysis: <error_code>: <errors[0]>`.
 - Exit 0 → the JSON holds the recommendation: `already_covered`, `recommended`,
   `documents_analyzed`, `breakdown`, `technique_breakdown`, `boundary_gaps` — and the suite's
-  generation plan the CLI saved (Spec 094): `batches`, `unresolved`, `planned_total`, `count_rule`.
+  generation plan the CLI saved (Spec 094): `batches`, `unresolved`, `planned_total`, `count_rule` — and (Spec 095)
+  `covered`: the behaviours an existing test already covers, which are never batched.
 
 **4. Copy the batches.** The ingest saved the suite's generation plan and printed it in its summary
 (on stderr): one `batch <id> | count <k> | <section refs> | <behaviour titles>` line per batch and one
 `unresolved: <id> <title> — <reason>` line per behaviour whose source did not resolve (those are in the
-`unsourced` batch). Copy these lines **verbatim**, in order. Never plan, merge, split or recount
+`unsourced` batch), and one `covered: <title> (<covered_by>)` line per behaviour an existing test already covers
+(never generated). Copy these lines **verbatim**, in order. Never plan, merge, split or recount
 batches yourself — the CLI's plan is the one the generator compiles from. The JSON's `batches` and
 `unresolved` let you check that you have them all.
 
@@ -82,6 +84,7 @@ Your final message is these lines and nothing else (no prose, no JSON, no docume
 - `techniques: <TECH>=<N>, …` (non-zero entries of `technique_breakdown`; `techniques: none` when empty)
 - one `boundary_gap: <kind> · <field> — <description> [<source>]` line per boundary gap
 - the CLI's `batch <id> | count <k> | <section refs> | <behaviour titles>` lines, verbatim
+- the CLI's `covered: <title> (<covered_by>)` lines, verbatim
 - the CLI's `unresolved: <id> <title> — <reason>` lines, verbatim
 
 — or, on a refusal, the `refused:` and `refusal:` lines from step 1 — and a `stop: <reason>` line
@@ -98,5 +101,6 @@ boundary_gap: max · quota — uploads at exactly 30 GB [docs/storage.md]
 batch 1 | count 6 | docs/sharing.md#share-links, docs/sharing.md#revoking | Share link expires after 7 days; Revoked share closes open sessions; …
 batch 2 | count 4 | docs/storage.md#quotas | Upload above 30 GB is refused; Upload at exactly 30 GB succeeds; …
 batch unsourced | count 1 |  | Audit log keeps 90 days
+covered: Quota shown in settings (TC-104)
 unresolved: B12 Audit log keeps 90 days — not found
 ```

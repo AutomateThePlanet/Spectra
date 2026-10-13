@@ -173,6 +173,12 @@ public sealed class DuplicateDetector
         return (double)intersection / union;
     }
 
+    /// <summary>
+    /// Spec 095: the normalisation the title similarity uses — lowercase, letters/digits/whitespace only, words joined by
+    /// single spaces. Shared with <see cref="TitleCoverage"/> so both measure the same way.
+    /// </summary>
+    public static string NormalizeTitle(string text) => NormalizeText(text);
+
     private static string NormalizeText(string text)
     {
         if (string.IsNullOrWhiteSpace(text))

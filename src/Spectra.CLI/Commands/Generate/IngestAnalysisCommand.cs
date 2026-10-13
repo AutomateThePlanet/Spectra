@@ -11,6 +11,7 @@ using Spectra.Core.Config;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Parsing;
+using Spectra.Core.Validation;
 
 namespace Spectra.CLI.Commands.Generate;
 
@@ -103,18 +104,17 @@ public sealed class IngestAnalysisCommand : Command
         var suitePath = Path.Combine(testsPath, suite);
         var existingTests = await LoadExistingTestsAsync(suitePath, testsPath, ct);
 
-        CoverageSnapshot? snapshot = null;
-        if (existingTests.Count > 0)
+        // Spec 095 (FR-001–FR-004): one per-behaviour coverage rule at generation.duplicate_threshold. The coverage
+        // snapshot no longer decides any count (it used to make the suite's test count the covered count), so the ingest
+        // doesn't build it; the analysis prompt still gets its coverage context from compile-analysis-prompt.
+        var threshold = config.Generation.DuplicateThreshold;
+        var thresholdWarning = TitleCoverage.ThresholdWarning(threshold);
+        if (thresholdWarning is not null)
         {
-            var criteriaDir = Path.Combine(currentDir, config.Coverage?.CriteriaDir ?? "docs/criteria");
-            var criteriaIndexFile = Path.Combine(criteriaDir, "_criteria_index.yaml");
-            var docIndexFile = Path.Combine(currentDir, "docs", "_index.md");
-            var snapshotBuilder = new CoverageSnapshotBuilder(currentDir);
-            snapshot = await snapshotBuilder.BuildAsync(
-                suite, testsPath, criteriaDir, criteriaIndexFile, docIndexFile, ct);
+            BaselineCommandIO.PrintWarnings([thresholdWarning]);
         }
 
-        var result = AnalysisRecommendationBuilder.Build(content, existingTests, snapshot, focus);
+        var result = AnalysisRecommendationBuilder.Build(content, existingTests, snapshot: null, focus, threshold);
 
         if (result.IsSuccess)
         {
@@ -158,7 +158,14 @@ public sealed class IngestAnalysisCommand : Command
                         ["source_refs"] = b.SourceRefs,
                         ["behaviors"] = b.BehaviorIds.Select(id => plan.Behavior(id).Title)
                     }),
-                    ["unresolved"] = plan.Behaviors.Where(b => !b.Resolved).Select(b => new Dictionary<string, object?>
+                    ["covered"] = plan.Behaviors.Where(b => b.CoveredBy is not null).Select(b => new Dictionary<string, object?>
+                    {
+                        ["id"] = b.Id,
+                        ["title"] = b.Title,
+                        ["covered_by"] = b.CoveredBy
+                    }),
+                    // Spec 095 (M2): only uncovered behaviours; a covered one is listed only under `covered`.
+                    ["unresolved"] = plan.Behaviors.Where(b => !b.Resolved && b.CoveredBy is null).Select(b => new Dictionary<string, object?>
                     {
                         ["id"] = b.Id,
                         ["title"] = b.Title,
@@ -201,13 +208,15 @@ public sealed class IngestAnalysisCommand : Command
         var resolved = new List<ResolvedBehavior>();
         var sections = new Dictionary<string, string>(StringComparer.Ordinal);
         var notes = new List<string>();
-        foreach (var behavior in result.Behaviors)
+        for (var i = 0; i < result.Behaviors.Count; i++)
         {
+            var behavior = result.Behaviors[i];
+            var coveredBy = i < result.CoveredBy.Count ? result.CoveredBy[i] : null;
             var resolution = await PlanSectionResolver.ResolveAsync(context, behavior.Source, ct);
             resolved.Add(new ResolvedBehavior(
                 behavior.Title, behavior.Category ?? string.Empty, behavior.Technique ?? string.Empty, behavior.Source ?? string.Empty,
-                resolution.Ref, resolution.DocPath, resolution.Position, resolution.Reason));
-            if (!resolution.Resolved)
+                resolution.Ref, resolution.DocPath, resolution.Position, resolution.Reason, coveredBy));
+            if (!resolution.Resolved || coveredBy is not null)
             {
                 continue;
             }
@@ -220,9 +229,10 @@ public sealed class IngestAnalysisCommand : Command
             }
         }
 
+        // Spec 095: recommended = the uncovered behaviours, so each batch's count equals its behaviours.
         return GenerationPlanBuilder.Build(
             suite, string.IsNullOrWhiteSpace(focus) ? null : focus, config.Generation.EffectiveBatchSize,
-            result.RecommendedCount, resolved, sections, notes);
+            result.RecommendedCount, resolved, sections, notes, config.Generation.DuplicateThreshold);
     }
 
     private static void WriteSummary(TextWriter output, AnalysisRecommendation result, GenerationPlan plan)
@@ -261,7 +271,13 @@ public sealed class IngestAnalysisCommand : Command
             output.WriteLine(BatchLine(plan, batch));
         }
 
-        foreach (var behavior in plan.Behaviors.Where(b => !b.Resolved))
+        // Spec 095 (FR-007): the covered behaviours — never generated — between the batches and the unresolved ones.
+        foreach (var behavior in plan.Behaviors.Where(b => b.CoveredBy is not null))
+        {
+            output.WriteLine($"covered: {behavior.Title} ({behavior.CoveredBy})");
+        }
+
+        foreach (var behavior in plan.Behaviors.Where(b => !b.Resolved && b.CoveredBy is null))
         {
             output.WriteLine($"unresolved: {behavior.Id} {behavior.Title} — {behavior.Reason}");
         }
