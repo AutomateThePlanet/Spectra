@@ -32,10 +32,11 @@ public sealed class AiConfig
     public int AnalysisTimeoutMinutes { get; init; } = 2;
 
     /// <summary>
-    /// Number of tests requested per AI call. Default 30. Smaller batches
-    /// reduce per-batch latency on slow models at the cost of more total
-    /// round-trips. Pair with <see cref="GenerationTimeoutMinutes"/>.
+    /// Read by nothing since Spec 059 removed the in-process generator. Spec 096 (FR-013): kept only so an existing
+    /// config that still has <c>ai.generation_batch_size</c> loads (no section or key is ever required — Spec 083);
+    /// <c>spectra init</c> no longer writes it. The generation batch size is <c>generation.batch_size</c> (Spec 094).
     /// </summary>
+    [Obsolete("Ignored. The generation batch size is generation.batch_size (Spec 094).")]
     [JsonPropertyName("generation_batch_size")]
     public int GenerationBatchSize { get; init; } = 30;
 }

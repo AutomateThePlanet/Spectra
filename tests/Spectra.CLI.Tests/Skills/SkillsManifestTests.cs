@@ -25,13 +25,14 @@ public class SkillsManifestTests : IDisposable
     public async Task SaveAndLoad_RoundTrips()
     {
         var manifest = new SkillsManifest();
-        manifest.Files["/path/to/SKILL.md"] = "abc123";
+        // Spec 096: keys are repo-relative with '/'; an absolute key matching no install path is dropped on load.
+        manifest.Files[".claude/skills/spectra-x/SKILL.md"] = "abc123";
 
         await _store.SaveAsync(manifest);
         var loaded = await _store.LoadAsync();
 
         Assert.Single(loaded.Files);
-        Assert.Equal("abc123", loaded.Files["/path/to/SKILL.md"]);
+        Assert.Equal("abc123", loaded.Files[".claude/skills/spectra-x/SKILL.md"]);
     }
 
     [Fact]

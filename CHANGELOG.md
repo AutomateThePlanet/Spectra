@@ -507,6 +507,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   skill) and never reach a batch prompt; each batch's count is one per uncovered behaviour. Before, batch prompts asked
   for tests of covered behaviours while the counts excluded them.
 
+### Fixed (Spec 096 — workspace safety, Phase 6 part 1)
+
+- **`spectra update-skills` never overwrites an edited file.** `init` recorded templates, the profile,
+  `CUSTOMIZATION.md` and `USAGE.md` under relative keys, but `update-skills` looked them up by absolute path, found no
+  record and overwrote an edited copy whenever the bundled content changed. The skills manifest now has one key form
+  (repo-relative, `/`); older manifests are normalised on load (two records for one file both count; an absolute key
+  from another location is re-rooted by its install path, and only an unrecognised one is dropped, with one summary
+  warning). A file with no record is recorded when it equals the bundled content and otherwise skipped:
+  `skipped (no record — it may have been edited); run spectra prompts reset <id> or delete it to get the new version`.
+- **`spectra suite delete` cleans dependencies like `spectra delete`.** A single-value `depends_on` in another suite is
+  cleared through the lossless writer; a list or unparseable one is warned about and left alone. Before, a regex removed
+  every indented `- <id>` line in other suites' files (body included) and collapsed their blank-line runs. The suite's
+  staging folders (`.spectra/updates/<suite>/`, `.spectra/repairs/<suite>/`), generation plan and its tests' verdict and
+  fingerprint-record files are removed too; `--dry-run` lists all of it. JSON adds `dependents_cleaned`, `warnings`,
+  `leftovers_removed` (`leftovers` in a dry run); the human summary goes to stderr in JSON mode.
+- **`spectra show <id>`** finds tests through the suite folder plus the index's bare `file` (the legacy `suite/file` form
+  still works). Before, it missed every test written since 073.
+- **`spectra validate` fails on parse errors:** exit 1, status `failed`, `<n> error(s) found.`, and the parse errors in
+  the JSON `errors`. Before, a suite whose tests didn't parse reported "Validation passed".
+- **`.gitignore`:** the shared list gains `.spectra/verdicts/` and `.spectra/dropped-tests.json` (`update-skills` offers
+  them once). What was offered is recorded in `.gitignore` itself as `# spectra-offered: …` lines, so a pattern the
+  team removed is never re-added from a teammate's clone.
+- **`spectra delete` is faster** (2,500 tests: 3.8 s → 1.1 s): targets resolve through the suite indexes, only files that
+  mention `depends_on` have their frontmatter read, only targets and their single-value dependents are parsed in full,
+  and the files are read in parallel. Same results.
+- **Repository:** `.gitattributes` keeps `*.sh` at LF, so the acceptance scripts run in bash with `core.autocrlf=true`.
+- **Tests:** the `WorkingDirectory` collection is defined (no longer runs in parallel), and `ProfileFormatLoaderTests`
+  asserts a heading the usage guide has — the suite is fully green for the first time since 078.
+- **`ai.generation_batch_size`** is no longer written by `init`; it was read by nothing. `generation.batch_size` (094)
+  is the batch size. An existing config that has it still loads.
+
 ### Notes
 
 - **Changed meaning (Spec 095):** `already_covered` is now the number of covered *behaviours*, `recommended` the number
@@ -531,7 +562,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`compile-critic-prompt` now writes a file** (`.spectra/verdicts/critic-input-<id>.json`, next to the verdict files).
 - **`depends_on` lists are not supported** (such tests don't parse today); `spectra delete` leaves a dependent with a
   list unchanged and warns.
-- **Known gap:** `spectra suite delete` doesn't remove the suite's staging folders.
+- **`spectra suite delete` (Spec 096)** no longer edits a dependent whose `depends_on` is a list (it never parsed); it
+  warns instead, like `spectra delete`.
+- **Skills manifest keys (Spec 096)** are rewritten in the one repo-relative form on the next `update-skills`. A
+  `.spectra/skills-manifest.json` key that matches no SPECTRA install path is dropped with one warning.
+- **Gitignore marker (Spec 096):** `init` and `update-skills` write a `# spectra-offered: …` line; keep it in the
+  committed `.gitignore`. The old per-clone record (`gitignore_offered` in the skills manifest) is migrated once.
+- **`spectra validate` (Spec 096)** now exits 1 when a test doesn't parse; a CI step that ran it on such a suite passed
+  before and fails now.
 - **Customised skills (Spec 091):** a skill copy that calls `ingest-grounding --all --repaired` without `--ids` now
   fails with `IDS_REQUIRED`; run `spectra update-skills` (unmodified copies) or add `--ids`.
 - **090 records (Spec 091)** keep the fingerprint-only rule until the critic prompt is compiled again for that test.

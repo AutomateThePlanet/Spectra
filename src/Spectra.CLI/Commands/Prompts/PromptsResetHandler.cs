@@ -40,8 +40,8 @@ public sealed class PromptsResetHandler
             await File.WriteAllTextAsync(filePath, content, ct);
 
             // Update manifest hash
-            var relativePath = Path.Combine(".spectra", "prompts", $"{id}.md");
-            manifest.Files[relativePath] = FileHasher.ComputeHash(content);
+            // Spec 096: the one manifest key form (repo-relative, '/').
+            manifest.Record($".spectra/prompts/{id}.md", FileHasher.ComputeHash(content));
 
             Console.WriteLine($"✓ Reset {id}");
         }

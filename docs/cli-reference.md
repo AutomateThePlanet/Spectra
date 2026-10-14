@@ -106,6 +106,15 @@ spectra validate
 spectra validate --path test-cases/checkout
 ```
 
+Exit `1` (status `failed`, `<n> error(s) found.`) when a test file doesn't parse, the validator reports an error, or a
+profile error is counted; the parse errors are listed in the JSON `errors` too (Spec 096 — before, a suite whose tests
+didn't parse reported "Validation passed"). Warnings alone exit `0`.
+
+### `spectra show <id>`
+
+Shows one test. The file is found through its suite folder plus the `_index.json` entry's bare `file` (as every
+command writes it since 073); the legacy `suite/file` form still works (Spec 096).
+
 ### `spectra index`
 
 Rebuild `_index.json` files for all suites. `--rebuild` reconstructs each suite's index from the `.md` files of record (parsing every `*.md` under `test-cases/{suite}/` and regenerating the index from the parsed set). Use it to recover from any state where the index has drifted from the on-disk files, for example when recovering tests created by `--from-description` runs from versions before v1.52.3, which wired that path into the index automatically.
@@ -130,25 +139,39 @@ Update bundled SKILL and agent files to the latest version.
 spectra update-skills
 ```
 
-Compares installed files against bundled versions using SHA-256 hashes:
+Compares installed files against bundled versions using SHA-256 hashes recorded in `.spectra/skills-manifest.json`:
 - **Unmodified files** → updated to latest version
-- **User-modified files** → skipped with warning (preserves customizations)
+- **User-modified files** → skipped with warning (preserves customizations): `Skipped (customized by user):`
 - **Missing files** → recreated
+- **No record** (Spec 096) → recorded when the file equals the bundled content; otherwise never overwritten:
+  `<file>: skipped (no record — it may have been edited); run spectra prompts reset <id> or delete it to get the new version`
+  (prompt templates) or `…; delete it to get the new version` (skills, agents, the profile, `CUSTOMIZATION.md`).
+
+Spec 096: the manifest has one key form — the repo-relative path with `/`. An older manifest (relative keys from
+`init`, absolute keys from `update-skills`) is normalised on load and saved in that form: two records for one file
+both count as unedited, an absolute key from another location (a moved workspace) is re-rooted by its install path,
+and a key matching no install path is dropped with one warning:
+`<n> manifest entries from another location were dropped (was the workspace moved?)`.
 
 Spec 092: this is how an existing workspace gets the update and criteria subagents (`spectra-updater`,
 `spectra-repairer`, `spectra-extractor`) under `.claude/agents/`. Every bundled agent installs there — nothing goes to
 `.github/agents/`. A customised update or criteria skill is skipped as usual and keeps its in-session flow until you
 refresh it.
 
-It also offers `spectra init`'s `.gitignore` patterns to an existing workspace (Spec 089; Spec 090 FR-D1–FR-D3):
-- **Only patterns never offered before** are added. The offered set is recorded in `.spectra/skills-manifest.json`
-  (`gitignore_offered`), so a pattern you removed stays removed. A workspace from before 090 has no record: every
-  pattern of the 089 list except `.spectra/updates/` and `.spectra/repairs/` counts as already offered.
+It also offers `spectra init`'s `.gitignore` patterns to an existing workspace (Spec 089; Spec 090 FR-D1–FR-D3;
+Spec 096 adds `.spectra/verdicts/` and `.spectra/dropped-tests.json`):
+- **Only patterns never offered before** are added. Spec 096: the offered set is recorded in `.gitignore` itself, as
+  `# spectra-offered: p1, p2, …` lines (`init` writes one naming every pattern; each `update-skills` that offers or
+  migrates anything appends one). The file is committed, so a pattern the team removed stays removed in every clone.
+  Offered = the marker lines ∪ the old per-clone record (`gitignore_offered` in the skills manifest, migrated once and
+  then no longer kept) ∪, only when neither exists, the 089 list without `.spectra/updates/` and `.spectra/repairs/`
+  (a workspace from before 090). A negated pattern counts as offered and is marked too.
 - **No `.gitignore`** → none is created; the output says `no .gitignore; add: <patterns>` and nothing is recorded.
 - **Present** means a whole trimmed, non-comment line equal to the pattern or to the pattern without its trailing `/`
   (a longer line containing it doesn't count). A `!pattern` negation is your choice: the pattern isn't added.
 - **Append** keeps every existing byte: one newline in the file's own style (LF or CRLF) only when the file doesn't end
-  with one, `# SPECTRA` only when absent, then the patterns. The output names them: `Updated: .gitignore (added: …)`.
+  with one, `# SPECTRA` only when absent, then the patterns, then one marker line. The output names the patterns:
+  `Updated: .gitignore (added: …)`.
 
 Plain `spectra init` still refuses on an existing workspace, so this is how existing workspaces get new entries.
 
@@ -1552,6 +1575,19 @@ spectra suite delete <name> --force                         # skip automation/ex
 ```
 
 For `rename`/`delete`, exit code is 0 on success, 4 for `SUITE_NOT_FOUND`, 5 for `AUTOMATION_LINKED`, 6 for `SUITE_ALREADY_EXISTS`, 7 for `INVALID_SUITE_NAME` (must match `^[a-z0-9][a-z0-9_-]*$`), 8 for `EXTERNAL_DEPENDENCIES`, and 130 for SIGINT.
+
+`suite delete` (Spec 096) cleans dependencies the way `spectra delete` does:
+- a single-value `depends_on` in another suite naming one of the suite's tests is cleared through the lossless writer
+  (no other byte of that file changes);
+- a list or unparseable `depends_on` is left alone and reported in `warnings` (lists aren't supported);
+- any such reference refuses the delete without `--force` (`EXTERNAL_DEPENDENCIES`).
+
+It also removes the suite's leftovers: `.spectra/updates/<suite>/`, `.spectra/repairs/<suite>/` (incl. `failed-*`),
+`.spectra/generation-plan/<suite>.json`, and the verdict and fingerprint-record files of its tests. The suite folder
+(with `_index.json` and `_source-baseline.json`) goes as before; no other baseline is touched and no baseline lock is
+taken. `--dry-run` lists all of it and writes nothing. JSON adds `dependents_cleaned` (`id`, `suite`, `file`,
+`removed_dep`), `warnings`, and `leftovers_removed` (`leftovers` in a dry run); the human summary goes to stdout, or to
+stderr in JSON mode.
 
 ### `spectra cancel [--force]`
 

@@ -11,7 +11,9 @@ namespace Spectra.CLI.Tests.Commands.Init;
 /// Spec 090 T11–T13 (FR-D1–FR-D3, 089-review findings 2–4): <c>spectra update-skills</c> adds only gitignore patterns
 /// never offered to the workspace (recorded in the skills manifest), never creates a <c>.gitignore</c>, counts a pattern
 /// as present only by whole line, and appends without changing the file's bytes. On fc82b7a it re-added removed
-/// patterns, created the file, matched substrings and trimmed the file before appending.
+/// patterns, created the file, matched substrings and trimmed the file before appending. Spec 096 (FR-009): the record
+/// is now a <c># spectra-offered:</c> line in <c>.gitignore</c> itself, so these rows read it there, a pre-090
+/// workspace has no marker line, and an append ends with one marker line naming the newly offered patterns.
 /// </summary>
 [Collection(CriteriaCommandsCollection.Name)]
 public sealed class GitIgnoreOfferTests : IDisposable
@@ -33,12 +35,20 @@ public sealed class GitIgnoreOfferTests : IDisposable
     private static int Lines(string text, string line) =>
         text.Replace("\r\n", "\n").Split('\n').Count(l => l == line);
 
-    /// <summary>The real init with skills (update-skills needs the skills manifest), then a pre-090 manifest.</summary>
+    /// <summary>Spec 096: the marker line an append writes when nothing was marked before — every pattern.</summary>
+    private static string MarkerOfAll => $"{SpectraGitIgnore.MarkerPrefix} {string.Join(", ", SpectraGitIgnore.Patterns)}";
+
+    /// <summary>
+    /// The real init with skills (update-skills needs the skills manifest), then a pre-090 manifest and (Spec 096) a
+    /// <c>.gitignore</c> without marker lines.
+    /// </summary>
     private async Task InitPre090Async()
     {
         var logger = LoggingSetup.CreateLoggerFactory(VerbosityLevel.Quiet).CreateLogger<InitHandler>();
         Assert.Equal(ExitCodes.Success, await new InitHandler(logger, _ws.Root).HandleAsync(force: false, skipSkills: false));
         SetOffered(null);
+        File.WriteAllText(GitIgnorePath, string.Join("\n", File.ReadAllText(GitIgnorePath).Replace("\r\n", "\n").Split('\n')
+            .Where(l => !l.StartsWith(SpectraGitIgnore.MarkerPrefix, StringComparison.Ordinal))));
     }
 
     private void SetOffered(IEnumerable<string>? offered)
@@ -53,9 +63,11 @@ public sealed class GitIgnoreOfferTests : IDisposable
         File.WriteAllText(ManifestPath, manifest.ToJsonString());
     }
 
+    /// <summary>Spec 096: what the <c>.gitignore</c>'s marker lines record as offered.</summary>
     private string[] Offered() =>
-        JsonNode.Parse(File.ReadAllText(ManifestPath))!["gitignore_offered"]?.AsArray().Select(n => n!.GetValue<string>()).ToArray()
-        ?? [];
+        File.Exists(GitIgnorePath)
+            ? [.. SpectraGitIgnore.Marked(File.ReadAllText(GitIgnorePath).Replace("\r\n", "\n").Split('\n'))]
+            : [];
 
     private static string GitIgnoreOf(IEnumerable<string> lines, string newline, bool finalNewline) =>
         string.Join(newline, lines) + (finalNewline ? newline : "");
@@ -79,7 +91,9 @@ public sealed class GitIgnoreOfferTests : IDisposable
 
         await UpdateSkillsAsync();
 
-        Assert.Equal(withoutUpdates, File.ReadAllText(GitIgnorePath));
+        // Spec 096: the old record is migrated to a marker line; the pattern stays removed.
+        Assert.Equal(withoutUpdates + MarkerOfAll + "\n", File.ReadAllText(GitIgnorePath));
+        Assert.Contains(Updates, Offered());
     }
 
     [Fact]
@@ -145,7 +159,7 @@ public sealed class GitIgnoreOfferTests : IDisposable
 
         await UpdateSkillsAsync();
 
-        Assert.Equal(original, File.ReadAllText(GitIgnorePath));
+        Assert.Equal(original + MarkerOfAll + "\n", File.ReadAllText(GitIgnorePath));
         Assert.Contains(Updates, Offered());
     }
 
@@ -160,7 +174,7 @@ public sealed class GitIgnoreOfferTests : IDisposable
 
         await UpdateSkillsAsync();
 
-        Assert.Equal(original + "\r\n" + Updates + "\r\n" + Repairs + "\r\n", File.ReadAllText(GitIgnorePath));
+        Assert.Equal(original + "\r\n" + Updates + "\r\n" + Repairs + "\r\n" + MarkerOfAll + "\r\n", File.ReadAllText(GitIgnorePath));
     }
 
     [Fact]
@@ -172,7 +186,7 @@ public sealed class GitIgnoreOfferTests : IDisposable
 
         await UpdateSkillsAsync();
 
-        Assert.Equal(original + Updates + "\n" + Repairs + "\n", File.ReadAllText(GitIgnorePath));
+        Assert.Equal(original + Updates + "\n" + Repairs + "\n" + MarkerOfAll + "\n", File.ReadAllText(GitIgnorePath));
     }
 
     [Fact]
@@ -184,7 +198,7 @@ public sealed class GitIgnoreOfferTests : IDisposable
 
         await UpdateSkillsAsync();
 
-        Assert.Equal(original + Updates + "\n" + Repairs + "\n", File.ReadAllText(GitIgnorePath));
+        Assert.Equal(original + Updates + "\n" + Repairs + "\n" + MarkerOfAll + "\n", File.ReadAllText(GitIgnorePath));
     }
 
     [Fact]
@@ -196,7 +210,7 @@ public sealed class GitIgnoreOfferTests : IDisposable
 
         await UpdateSkillsAsync();
 
-        Assert.Equal(original + "# SPECTRA\n" + Updates + "\n" + Repairs + "\n", File.ReadAllText(GitIgnorePath));
+        Assert.Equal(original + "# SPECTRA\n" + Updates + "\n" + Repairs + "\n" + MarkerOfAll + "\n", File.ReadAllText(GitIgnorePath));
     }
 
     // ---- Real init (FR-D1: init writes the full list and records it; analysis A1) ----
@@ -208,7 +222,6 @@ public sealed class GitIgnoreOfferTests : IDisposable
 
         var text = File.ReadAllText(GitIgnorePath);
         Assert.All(SpectraGitIgnore.Patterns, p => Assert.Equal(1, Lines(text, p)));
-        Assert.True(File.Exists(ManifestPath), "init --skip-skills writes the skills manifest");
         Assert.Equal(SpectraGitIgnore.Patterns.OrderBy(p => p), Offered().OrderBy(p => p));
     }
 }

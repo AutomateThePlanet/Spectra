@@ -21,6 +21,64 @@ public sealed class SkillsManifest
     [JsonPropertyName("gitignore_offered")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? GitIgnoreOffered { get; set; }
+
+    /// <summary>
+    /// Spec 096 (analyze H1): every hash recorded for a key — several when an older manifest held the same file under two
+    /// key forms (init's relative key and update-skills' absolute key). Each was written by SPECTRA, so a file whose hash
+    /// equals any of them is unedited.
+    /// </summary>
+    [JsonIgnore]
+    public Dictionary<string, List<string>> Candidates { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Spec 096 (analyze M1): foreign keys that matched no install path and were dropped on load.</summary>
+    [JsonIgnore]
+    public int DroppedForeignKeys { get; set; }
+
+    /// <summary>Whether <paramref name="key"/> (normalised) has a record.</summary>
+    public bool IsRecorded(string key) => Candidates.ContainsKey(key) || Files.ContainsKey(key);
+
+    /// <summary>Whether <paramref name="hash"/> is one of the hashes recorded for <paramref name="key"/>.</summary>
+    public bool MatchesRecord(string key, string hash) =>
+        Candidates.TryGetValue(key, out var hashes)
+            ? hashes.Contains(hash, StringComparer.OrdinalIgnoreCase)
+            : Files.TryGetValue(key, out var single) && string.Equals(single, hash, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Records <paramref name="hash"/> as the one entry for <paramref name="key"/> (normalised).</summary>
+    public void Record(string key, string hash)
+    {
+        Files[key] = hash;
+        Candidates[key] = [hash];
+    }
+
+    /// <summary>Spec 096 (R1): rewrites the keys to the one normalised form, keeping duplicate keys' hashes as candidates.</summary>
+    internal void Normalize(string root)
+    {
+        var files = new Dictionary<string, string>(StringComparer.Ordinal);
+        Candidates.Clear();
+        DroppedForeignKeys = 0;
+        foreach (var (key, hash) in Files.OrderBy(f => f.Key, StringComparer.Ordinal))
+        {
+            var normalized = ManifestKey.Normalize(root, key);
+            if (normalized is null)
+            {
+                DroppedForeignKeys++;
+                continue;
+            }
+
+            if (!Candidates.TryGetValue(normalized, out var hashes))
+            {
+                Candidates[normalized] = hashes = [];
+                files[normalized] = hash;
+            }
+
+            if (!hashes.Contains(hash, StringComparer.OrdinalIgnoreCase))
+            {
+                hashes.Add(hash);
+            }
+        }
+
+        Files = files;
+    }
 }
 
 /// <summary>
@@ -34,11 +92,12 @@ public sealed class SkillsManifestStore
     };
 
     private readonly string _manifestPath;
+    private readonly string _root;
 
     public SkillsManifestStore(string? basePath = null)
     {
-        var root = basePath ?? Directory.GetCurrentDirectory();
-        _manifestPath = Path.Combine(root, ".spectra", "skills-manifest.json");
+        _root = basePath ?? Directory.GetCurrentDirectory();
+        _manifestPath = Path.Combine(_root, ".spectra", "skills-manifest.json");
     }
 
     public async Task<SkillsManifest> LoadAsync(CancellationToken ct = default)
@@ -49,7 +108,9 @@ public sealed class SkillsManifestStore
         try
         {
             var json = await File.ReadAllTextAsync(_manifestPath, ct);
-            return JsonSerializer.Deserialize<SkillsManifest>(json, Options) ?? new SkillsManifest();
+            var manifest = JsonSerializer.Deserialize<SkillsManifest>(json, Options) ?? new SkillsManifest();
+            manifest.Normalize(_root); // Spec 096: one key form; duplicates kept as candidates; moved keys re-rooted
+            return manifest;
         }
         catch (JsonException)
         {

@@ -231,8 +231,8 @@ internal static class CompileBatchPrompt
 
     /// <summary>
     /// R16: whether the project's <c>test-generation.md</c> is the copy SPECTRA installed — true when its hash equals the
-    /// skills manifest's record (init's relative key or update-skills' absolute key), false when it differs, null when
-    /// there is no record.
+    /// skills manifest's record, false when it differs, null when there is no record. Spec 096: the manifest is
+    /// normalised on load (one key form; duplicate records count as candidates), so one key is enough.
     /// </summary>
     private static async Task<bool?> IsUneditedCopyAsync(string root, CancellationToken ct)
     {
@@ -244,17 +244,8 @@ internal static class CompileBatchPrompt
         }
 
         var manifest = await new SkillsManifestStore(root).LoadAsync(ct);
-        string? recorded = null;
-        foreach (var key in new[] { path, relative, relative.Replace('\\', '/') })
-        {
-            if (manifest.Files.TryGetValue(key, out var hash))
-            {
-                recorded = hash;
-                break;
-            }
-        }
-
-        return recorded is null ? null : recorded == await FileHasher.ComputeFileHashAsync(path, ct);
+        var key = ManifestKey.For(root, relative);
+        return manifest.IsRecorded(key) ? manifest.MatchesRecord(key, await FileHasher.ComputeFileHashAsync(path, ct)) : null;
     }
 
     private static string Join(IEnumerable<string> items, string? focus)
