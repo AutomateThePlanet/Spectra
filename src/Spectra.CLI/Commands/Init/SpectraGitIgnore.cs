@@ -6,7 +6,8 @@ namespace Spectra.CLI.Commands.Init;
 /// The workspace-local, never-committed paths SPECTRA adds to <c>.gitignore</c>. Spec 089 (F6): one list shared by
 /// <c>spectra init</c> and <c>spectra update-skills</c>. Spec 090 (FR-D1–FR-D3): <c>update-skills</c> offers each
 /// pattern only once (so a pattern the user removed stays removed), never creates the file, checks presence by whole
-/// line, and appends without changing the file's existing bytes.
+/// line, and appends without changing the file's existing bytes. Spec 096 (FR-009): what was offered is recorded in
+/// <c>.gitignore</c> itself — <c># spectra-offered: p1, p2, …</c> lines — so it is per repository, not per clone.
 /// </summary>
 public static class SpectraGitIgnore
 {
@@ -14,6 +15,11 @@ public static class SpectraGitIgnore
     private const string Updates = ".spectra/updates/";
     private const string Repairs = ".spectra/repairs/";
     private const string GenerationPlan = ".spectra/generation-plan/";
+    private const string Verdicts = ".spectra/verdicts/";
+    private const string Dropped = ".spectra/dropped-tests.json";
+
+    /// <summary>Spec 096 (FR-009): the prefix of an offered-marker line.</summary>
+    public const string MarkerPrefix = "# spectra-offered:";
 
     public static IReadOnlyList<string> Patterns { get; } =
     [
@@ -47,6 +53,9 @@ public static class SpectraGitIgnore
         Repairs,
         // Spec 094: the per-suite generation plans (scratch, replaced by each analysis).
         GenerationPlan,
+        // Spec 096 (FR-008): critic verdicts and fingerprint records (Spec 071/090), and the drop trail (Spec 071).
+        Verdicts,
+        Dropped,
     ];
 
     /// <summary>
@@ -55,7 +64,15 @@ public static class SpectraGitIgnore
     /// pre-090 workspace is offered those too.
     /// </summary>
     public static IReadOnlyList<string> Pre090Offered { get; } =
-        Patterns.Where(p => p is not Updates and not Repairs and not GenerationPlan).ToList();
+        Patterns.Where(p => p is not Updates and not Repairs and not GenerationPlan and not Verdicts and not Dropped).ToList();
+
+    /// <summary>Spec 096 (FR-009): every pattern named by a <c># spectra-offered:</c> line.</summary>
+    public static IReadOnlyList<string> Marked(IEnumerable<string> lines) =>
+        lines.Select(l => l.Trim())
+            .Where(l => l.StartsWith(MarkerPrefix, StringComparison.Ordinal))
+            .SelectMany(l => l[MarkerPrefix.Length..].Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
 
     /// <summary>
     /// Spec 090 (FR-D2): a whole trimmed, non-comment line equal to the pattern or to the pattern without its trailing
@@ -73,55 +90,74 @@ public static class SpectraGitIgnore
         || string.Equals(line, pattern.TrimEnd('/'), StringComparison.Ordinal);
 
     /// <summary>
-    /// <c>spectra init</c>: creates <c>.gitignore</c> with the full list when absent; otherwise appends the patterns that
-    /// are neither present nor negated. Returns the patterns added.
+    /// <c>spectra init</c>: creates <c>.gitignore</c> with the full list and one marker line when absent; otherwise
+    /// appends the patterns that are neither present nor negated, plus one marker line naming every pattern not yet
+    /// marked (negated ones too). Returns the patterns added.
     /// </summary>
     public static async Task<IReadOnlyList<string>> EnsureForInitAsync(string root, CancellationToken ct = default)
     {
         var path = Path.Combine(root, ".gitignore");
         if (!File.Exists(path))
         {
-            await File.WriteAllTextAsync(path, Section + "\n" + string.Concat(Patterns.Select(p => p + "\n")), ct);
+            await File.WriteAllTextAsync(path,
+                Section + "\n" + string.Concat(Patterns.Select(p => p + "\n")) + MarkerLine(Patterns) + "\n", ct);
             return Patterns;
         }
 
         var lines = Lines(await File.ReadAllTextAsync(path, ct));
+        var marked = Marked(lines).ToHashSet(StringComparer.Ordinal);
         var missing = Patterns.Where(p => !IsPresent(lines, p) && !IsNegated(lines, p)).ToList();
-        await AppendAsync(path, missing, ct);
+        await AppendAsync(path, missing, Patterns.Where(p => !marked.Contains(p)).ToList(), ct);
         return missing;
     }
 
     /// <summary>
-    /// <c>spectra update-skills</c> (FR-D1): offers the patterns not yet offered to this workspace. With no
-    /// <c>.gitignore</c> nothing is created or recorded (<c>MissingFile</c>). Otherwise a candidate already present or
-    /// negated is recorded without being added, and the rest are appended. Returns what was added and the offered set
-    /// to record.
+    /// <c>spectra update-skills</c> (FR-D1; Spec 096 FR-009): offers the patterns not yet offered to this repository.
+    /// Offered = the marker lines ∪ the legacy per-clone record (<paramref name="legacyOffered"/>, migrated once) ∪
+    /// <see cref="Pre090Offered"/> only when neither exists. With no <c>.gitignore</c> nothing is created
+    /// (<c>MissingFile</c>). Otherwise a candidate already present or negated is not added, the rest are appended, and
+    /// one marker line names every offered pattern not marked yet. Returns what was added and the candidates.
     /// </summary>
-    public static async Task<(IReadOnlyList<string> Added, IReadOnlyList<string> Candidates, List<string> Offered, bool MissingFile)>
-        OfferNewAsync(string root, IReadOnlyList<string>? offered, CancellationToken ct = default)
+    public static async Task<(IReadOnlyList<string> Added, IReadOnlyList<string> Candidates, bool MissingFile)>
+        OfferNewAsync(string root, IReadOnlyList<string>? legacyOffered, CancellationToken ct = default)
     {
-        var already = new HashSet<string>(offered ?? Pre090Offered, StringComparer.Ordinal);
-        var candidates = Patterns.Where(p => !already.Contains(p)).ToList();
         var path = Path.Combine(root, ".gitignore");
-        if (!File.Exists(path))
+        var lines = File.Exists(path) ? Lines(await File.ReadAllTextAsync(path, ct)) : [];
+        var marked = Marked(lines);
+        var already = new HashSet<string>(marked, StringComparer.Ordinal);
+        already.UnionWith(legacyOffered ?? []);
+        if (marked.Count == 0 && legacyOffered is null)
         {
-            return ([], candidates, [.. already], true);
+            already.UnionWith(Pre090Offered);
         }
 
-        var lines = Lines(await File.ReadAllTextAsync(path, ct));
+        var candidates = Patterns.Where(p => !already.Contains(p)).ToList();
+        if (!File.Exists(path))
+        {
+            return ([], candidates, true);
+        }
+
         var add = candidates.Where(p => !IsPresent(lines, p) && !IsNegated(lines, p)).ToList();
-        await AppendAsync(path, add, ct);
         already.UnionWith(candidates);
-        return (add, candidates, Patterns.Where(already.Contains).Concat(already.Where(p => !Patterns.Contains(p))).ToList(), false);
+        var markedSet = marked.ToHashSet(StringComparer.Ordinal);
+        var toMark = Patterns.Where(already.Contains)
+            .Concat(already.Where(p => !Patterns.Contains(p)).Order(StringComparer.Ordinal))
+            .Where(p => !markedSet.Contains(p))
+            .ToList();
+        await AppendAsync(path, add, toMark, ct);
+        return (add, candidates, false);
     }
+
+    private static string MarkerLine(IEnumerable<string> patterns) => $"{MarkerPrefix} {string.Join(", ", patterns)}";
 
     /// <summary>
     /// Spec 090 (FR-D3): appends without changing the existing bytes — one newline first only when the file doesn't end
-    /// with one, the <c># SPECTRA</c> header only when absent, every line in the file's own newline style.
+    /// with one, the <c># SPECTRA</c> header only when absent, every line in the file's own newline style. Spec 096: then
+    /// one marker line for <paramref name="toMark"/>, when not empty.
     /// </summary>
-    private static async Task AppendAsync(string path, IReadOnlyList<string> patterns, CancellationToken ct)
+    private static async Task AppendAsync(string path, IReadOnlyList<string> patterns, IReadOnlyList<string> toMark, CancellationToken ct)
     {
-        if (patterns.Count == 0)
+        if (patterns.Count == 0 && toMark.Count == 0)
         {
             return;
         }
@@ -134,7 +170,7 @@ public static class SpectraGitIgnore
             sb.Append(newline);
         }
 
-        if (!Lines(text).Any(l => l.Trim() == Section))
+        if (patterns.Count > 0 && !Lines(text).Any(l => l.Trim() == Section))
         {
             sb.Append(Section).Append(newline);
         }
@@ -142,6 +178,11 @@ public static class SpectraGitIgnore
         foreach (var pattern in patterns)
         {
             sb.Append(pattern).Append(newline);
+        }
+
+        if (toMark.Count > 0)
+        {
+            sb.Append(MarkerLine(toMark)).Append(newline);
         }
 
         await File.AppendAllTextAsync(path, sb.ToString(), ct);

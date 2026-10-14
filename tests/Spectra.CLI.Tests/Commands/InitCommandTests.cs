@@ -18,6 +18,13 @@ public class InitCommandTests : IDisposable
         _logger = loggerFactory.CreateLogger<InitHandler>();
     }
 
+    /// <summary>
+    /// Spec 096: how many lines are exactly <paramref name="pattern"/>. A substring count no longer works — the
+    /// <c># spectra-offered:</c> marker line names every pattern too.
+    /// </summary>
+    private static int PatternLines(string content, string pattern) =>
+        content.Replace("\r\n", "\n").Split('\n').Count(l => l.Trim() == pattern);
+
     public void Dispose()
     {
         if (Directory.Exists(_testDir))
@@ -131,8 +138,7 @@ public class InitCommandTests : IDisposable
         Assert.Equal(ExitCodes.Success, exitCode);
 
         var content = await File.ReadAllTextAsync(gitIgnorePath);
-        var lockCount = content.Split(".spectra.lock").Length - 1;
-        Assert.Equal(1, lockCount);
+        Assert.Equal(1, PatternLines(content, ".spectra.lock"));
     }
 
     [Fact]
@@ -146,9 +152,9 @@ public class InitCommandTests : IDisposable
         Assert.Equal(ExitCodes.Success, await new InitHandler(_logger, _testDir).HandleAsync(force: true));
 
         var content = await File.ReadAllTextAsync(gitIgnorePath);
-        Assert.Equal(1, content.Split(".spectra-result.json").Length - 1);
-        Assert.Equal(1, content.Split(".spectra-progress.html").Length - 1);
-        Assert.Equal(1, content.Split(".spectra/criteria.lock").Length - 1); // Spec 079
+        Assert.Equal(1, PatternLines(content, ".spectra-result.json"));
+        Assert.Equal(1, PatternLines(content, ".spectra-progress.html"));
+        Assert.Equal(1, PatternLines(content, ".spectra/criteria.lock")); // Spec 079
     }
 
     [Fact]
@@ -461,8 +467,8 @@ public class InitCommandTests : IDisposable
         Assert.Equal(ExitCodes.Success, await new InitHandler(_logger, _testDir).HandleAsync(force: true));
 
         var content = await File.ReadAllTextAsync(gitIgnorePath);
-        Assert.Equal(1, content.Split(".spectra/baseline.lock").Length - 1);
-        Assert.Equal(1, content.Split(".spectra/update-triage.json").Length - 1);
+        Assert.Equal(1, PatternLines(content, ".spectra/baseline.lock"));
+        Assert.Equal(1, PatternLines(content, ".spectra/update-triage.json"));
         Assert.DoesNotContain("source-snapshots", content);
         Assert.DoesNotContain("_source-baseline", content);
     }

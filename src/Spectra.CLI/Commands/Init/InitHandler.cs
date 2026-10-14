@@ -261,7 +261,7 @@ public sealed class InitHandler
         {
             var skillPath = Skills.SkillInstallLayout.SkillPath(_workingDirectory, name);
             await InstallAgentFileAsync(skillPath, () => content, force, ct);
-            manifest.Files[skillPath] = Infrastructure.FileHasher.ComputeHash(content);
+            manifest.Record(Skills.ManifestKey.For(_workingDirectory, skillPath), Infrastructure.FileHasher.ComputeHash(content));
         }
 
         // Create bundled agent files (role-routed by SkillInstallLayout)
@@ -269,7 +269,7 @@ public sealed class InitHandler
         {
             var agentPath = Skills.SkillInstallLayout.AgentPath(_workingDirectory, name);
             await InstallAgentFileAsync(agentPath, () => content, force, ct);
-            manifest.Files[agentPath] = Infrastructure.FileHasher.ComputeHash(content);
+            manifest.Record(Skills.ManifestKey.For(_workingDirectory, agentPath), Infrastructure.FileHasher.ComputeHash(content));
         }
 
         await manifestStore.SaveAsync(manifest, ct);
@@ -294,7 +294,7 @@ public sealed class InitHandler
         {
             _logger.LogDebug("Usage guide already exists, skipping: {Path}", usagePath);
         }
-        manifest.Files[usageRelative] = Infrastructure.FileHasher.ComputeHash(usageContent);
+        manifest.Record(Skills.ManifestKey.For(_workingDirectory, usageRelative), Infrastructure.FileHasher.ComputeHash(usageContent));
 
         await manifestStore.SaveAsync(manifest, ct);
     }
@@ -322,7 +322,7 @@ public sealed class InitHandler
 
             await File.WriteAllTextAsync(filePath, content, ct);
             var relativePath = Path.Combine(".spectra", "prompts", $"{templateId}.md");
-            manifest.Files[relativePath] = Infrastructure.FileHasher.ComputeHash(content);
+            manifest.Record(Skills.ManifestKey.For(_workingDirectory, relativePath), Infrastructure.FileHasher.ComputeHash(content));
             _logger.LogInformation("Created prompt template: {Path}", relativePath);
         }
 
@@ -350,7 +350,7 @@ public sealed class InitHandler
         {
             _logger.LogDebug("Default profile already exists, skipping: {Path}", profilePath);
         }
-        manifest.Files[profileRelative] = Infrastructure.FileHasher.ComputeHash(profileContent);
+        manifest.Record(Skills.ManifestKey.For(_workingDirectory, profileRelative), Infrastructure.FileHasher.ComputeHash(profileContent));
 
         // CUSTOMIZATION.md (project root)
         var customizationPath = Path.Combine(_workingDirectory, "CUSTOMIZATION.md");
@@ -366,7 +366,7 @@ public sealed class InitHandler
         {
             _logger.LogDebug("Customization guide already exists, skipping: {Path}", customizationPath);
         }
-        manifest.Files[customizationRelative] = Infrastructure.FileHasher.ComputeHash(customizationContent);
+        manifest.Record(Skills.ManifestKey.For(_workingDirectory, customizationRelative), Infrastructure.FileHasher.ComputeHash(customizationContent));
 
         await manifestStore.SaveAsync(manifest, ct);
     }
@@ -374,17 +374,13 @@ public sealed class InitHandler
     private async Task UpdateGitIgnoreAsync(CancellationToken ct)
     {
         // Spec 089 (F6): the list is shared with spectra update-skills. Spec 090 (FR-D1/FR-D3): the append keeps the
-        // file's bytes, and every pattern is recorded as offered so update-skills never re-adds one the user removes.
+        // file's bytes. Spec 096 (FR-009): every pattern is recorded as offered by a marker line in .gitignore itself
+        // (committed, so per repository), so update-skills never re-adds one the team removes.
         var added = await SpectraGitIgnore.EnsureForInitAsync(_workingDirectory, ct);
         if (added.Count > 0)
         {
             _logger.LogDebug("Updated .gitignore with {Count} SPECTRA pattern(s)", added.Count);
         }
-
-        var manifestStore = new Skills.SkillsManifestStore(_workingDirectory);
-        var manifest = await manifestStore.LoadAsync(ct);
-        manifest.GitIgnoreOffered = [.. SpectraGitIgnore.Patterns];
-        await manifestStore.SaveAsync(manifest, ct);
     }
 
     private static string GetEmbeddedTemplate(string templateName)

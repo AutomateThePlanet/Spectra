@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Spectra.CLI.Commands.Delete;
+using Spectra.CLI.Generation.Plan;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
 using Spectra.CLI.Output;
@@ -39,9 +41,14 @@ public sealed class SuiteDeleteHandler
             return ExitCodes.NotFound;
         }
 
-        // Pre-flight: count automation links and external depends_on references.
+        // Pre-flight: automation links, and (Spec 096) the same plan `spectra delete` makes — dependents in other suites
+        // from frontmatter, scalar ones cleared through the lossless writer, list or unparseable ones only warned. The
+        // suite's own baseline goes with its folder, so the plan reads no baseline and takes no baseline lock.
         var (testCount, automationFiles) = await ScanSuiteAsync(suiteDir, ct).ConfigureAwait(false);
-        var externalDeps = await CountExternalDepsAsync(testCasesDir, suiteName, ct).ConfigureAwait(false);
+        var service = await TestDeletionService.LoadAsync(workspace, testCasesDir, ct).ConfigureAwait(false);
+        var plan = await service.PlanAsync(service.SuiteTargets(suiteName), includeBaseline: false, ct).ConfigureAwait(false);
+        var leftovers = Leftovers(workspace, suiteName, plan);
+        var references = plan.ScalarDependents.Count + plan.Warnings.Count;
 
         if (!force && automationFiles.Count > 0)
         {
@@ -52,11 +59,11 @@ public sealed class SuiteDeleteHandler
             return ExitCodes.AutomationLinked;
         }
 
-        if (!force && externalDeps.Count > 0)
+        if (!force && references > 0)
         {
             EmitFailure(suiteName, "EXTERNAL_DEPENDENCIES",
-                $"{externalDeps.Count} external depends_on reference(s) target tests in this suite. Use --force to proceed.",
-                externalCleanup: externalDeps);
+                $"{references} external depends_on reference(s) target tests in this suite. Use --force to proceed.",
+                externalCleanup: ExternalDependencies(testCasesDir, plan.ScalarDependents));
             return ExitCodes.ExternalDependencies;
         }
 
@@ -71,8 +78,12 @@ public sealed class SuiteDeleteHandler
                 TestsRemoved = testCount,
                 StrandedAutomationCount = automationFiles.Count,
                 StrandedAutomationFiles = automationFiles,
-                ExternalDependencyCleanup = externalDeps,
-                Message = $"Dry run: would delete suite '{suiteName}' ({testCount} tests, {externalDeps.Count} external deps cleaned)."
+                ExternalDependencyCleanup = ExternalDependencies(testCasesDir, plan.ScalarDependents),
+                DependentsCleaned = Dependents(service, testCasesDir, plan.ScalarDependents),
+                Warnings = plan.Warnings,
+                Leftovers = leftovers.Select(l => l.Relative).ToList(),
+                Message = $"Dry run: would delete suite '{suiteName}' ({testCount} tests, {plan.ScalarDependents.Count} external deps cleaned, "
+                          + $"{plan.Warnings.Count} warning(s), {leftovers.Count} leftover(s) removed)."
             };
             EmitResult(dryResult);
             return ExitCodes.Success;
@@ -80,7 +91,7 @@ public sealed class SuiteDeleteHandler
 
         if (!force && !noInteraction && _outputFormat == OutputFormat.Human)
         {
-            if (!Confirm(suiteName, testCount, automationFiles.Count, externalDeps.Count))
+            if (!Confirm(suiteName, testCount, automationFiles.Count, references))
             {
                 EmitResult(new SuiteDeleteResult
                 {
@@ -94,10 +105,14 @@ public sealed class SuiteDeleteHandler
         }
 
         // Execute
-        // 1. Cascade external depends_on cleanup
-        await CascadeRemoveDependsOnAsync(testCasesDir, suiteName, externalDeps, ct).ConfigureAwait(false);
+        // 1. Dependents (lossless writer), the tests' staging and verdict files, the test files (Spec 096: TestDeletionService)
+        var outcome = await service.ApplyAsync(plan, ct).ConfigureAwait(false);
+        var warnings = plan.Warnings.Concat(outcome.Errors.Select(e => $"{e.Id}: {e.Message}")).ToList();
 
-        // 2. Delete the suite directory recursively
+        // 2. The suite's leftovers: staging folders, generation plan, verdict files (Spec 096, FR-005)
+        var leftoversRemoved = RemoveLeftovers(leftovers, warnings);
+
+        // 3. Delete the suite directory recursively (its _index.json and _source-baseline.json with it)
         try
         {
             Directory.Delete(suiteDir, recursive: true);
@@ -108,24 +123,104 @@ public sealed class SuiteDeleteHandler
             return ExitCodes.Error;
         }
 
-        // 3. Update spectra.config.json (selections + suite-specific block)
+        // 4. Update spectra.config.json (selections + suite-specific block)
         var (selectionsUpdated, configBlockRemoved) = await UpdateConfigAsync(workspace, suiteName, ct).ConfigureAwait(false);
 
+        var failed = warnings.Count > plan.Warnings.Count;
         var result = new SuiteDeleteResult
         {
             Command = "suite delete",
-            Status = "completed",
+            Status = failed ? "failed" : "completed",
             Suite = suiteName,
             TestsRemoved = testCount,
             StrandedAutomationCount = automationFiles.Count,
             StrandedAutomationFiles = automationFiles,
-            ExternalDependencyCleanup = externalDeps,
+            ExternalDependencyCleanup = ExternalDependencies(testCasesDir, outcome.DependentsCleaned),
+            DependentsCleaned = Dependents(service, testCasesDir, outcome.DependentsCleaned),
+            Warnings = warnings,
+            LeftoversRemoved = leftoversRemoved,
             SelectionsUpdated = selectionsUpdated,
             ConfigBlockRemoved = configBlockRemoved,
-            Message = $"Deleted suite '{suiteName}' ({testCount} tests). Use Git to recover."
+            Message = $"Deleted suite '{suiteName}' ({testCount} tests, {outcome.DependentsCleaned.Count} external deps cleaned, "
+                      + $"{leftoversRemoved.Count} leftover(s) removed). Use Git to recover."
         };
         EmitResult(result);
-        return ExitCodes.Success;
+        return failed ? ExitCodes.Error : ExitCodes.Success;
+    }
+
+    private static string SuiteOf(string testCasesDir, string file) =>
+        Path.GetRelativePath(testCasesDir, file).Replace('\\', '/').Split('/')[0];
+
+    /// <summary>Cleared scalar dependents in the pre-096 <c>external_dependency_cleanup</c> shape.</summary>
+    private static List<ExternalDependencyCleanup> ExternalDependencies(string testCasesDir, IEnumerable<ScalarDependent> dependents) =>
+        dependents.Select(d => new ExternalDependencyCleanup
+        {
+            TestId = d.DependentId,
+            Suite = SuiteOf(testCasesDir, d.File),
+            RemovedDeps = [d.RemovedDep]
+        }).ToList();
+
+    private static List<SuiteDependentCleaned> Dependents(TestDeletionService service, string testCasesDir, IEnumerable<ScalarDependent> dependents) =>
+        dependents.Select(d => new SuiteDependentCleaned
+        {
+            Id = d.DependentId,
+            Suite = SuiteOf(testCasesDir, d.File),
+            File = service.Relative(d.File),
+            RemovedDep = d.RemovedDep
+        }).ToList();
+
+    /// <summary>
+    /// Spec 096 (FR-005): what the suite leaves outside its folder — <c>.spectra/updates/&lt;suite&gt;/</c>,
+    /// <c>.spectra/repairs/&lt;suite&gt;/</c>, <c>.spectra/generation-plan/&lt;suite&gt;.json</c>, and its tests' verdict
+    /// and fingerprint-record files. Only what exists.
+    /// </summary>
+    private static List<(string Path, string Relative, bool IsFolder)> Leftovers(string workspace, string suite, DeletionPlan plan)
+    {
+        var leftovers = new List<(string, string, bool)>();
+        foreach (var folder in new[] { "updates", "repairs" })
+        {
+            var path = Path.Combine(workspace, ".spectra", folder, suite);
+            if (Directory.Exists(path))
+            {
+                leftovers.Add((path, $".spectra/{folder}/{suite}/", true));
+            }
+        }
+
+        var generationPlan = GenerationPlanStore.PathFor(workspace, suite);
+        if (File.Exists(generationPlan))
+        {
+            leftovers.Add((generationPlan, GenerationPlanStore.RelativePathFor(suite), false));
+        }
+
+        leftovers.AddRange(plan.VerdictFiles.Select(f => (f, Path.GetRelativePath(workspace, f).Replace('\\', '/'), false)));
+        return leftovers;
+    }
+
+    private static List<string> RemoveLeftovers(IEnumerable<(string Path, string Relative, bool IsFolder)> leftovers, List<string> warnings)
+    {
+        var removed = new List<string>();
+        foreach (var (path, relative, isFolder) in leftovers)
+        {
+            try
+            {
+                if (isFolder)
+                {
+                    Directory.Delete(path, recursive: true);
+                }
+                else
+                {
+                    File.Delete(path);
+                }
+
+                removed.Add(relative);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                warnings.Add($"Failed to remove {relative}: {ex.Message}");
+            }
+        }
+
+        return removed;
     }
 
     private static async Task<(int TestCount, IReadOnlyList<string> AutomationFiles)> ScanSuiteAsync(string suiteDir, CancellationToken ct)
@@ -166,115 +261,6 @@ public sealed class SuiteDeleteHandler
         }
 
         return (testCount, automationFiles.ToList());
-    }
-
-    private static async Task<List<ExternalDependencyCleanup>> CountExternalDepsAsync(
-        string testCasesDir, string targetSuite, CancellationToken ct)
-    {
-        var idsInTarget = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var targetSuiteDir = Path.Combine(testCasesDir, targetSuite);
-        if (Directory.Exists(targetSuiteDir))
-        {
-            foreach (var file in Directory.EnumerateFiles(targetSuiteDir, "*.md", SearchOption.TopDirectoryOnly))
-            {
-                if (Path.GetFileName(file).StartsWith('_')) continue;
-                try
-                {
-                    var content = await File.ReadAllTextAsync(file, ct).ConfigureAwait(false);
-                    var idMatch = Regex.Match(content, @"^\s*id:\s*[""']?(?<id>[A-Za-z][A-Za-z0-9_-]*-\d+)[""']?\s*$", RegexOptions.Multiline);
-                    if (idMatch.Success)
-                    {
-                        idsInTarget.Add(idMatch.Groups["id"].Value);
-                    }
-                }
-                catch (IOException) { /* skip */ }
-            }
-        }
-
-        if (idsInTarget.Count == 0)
-        {
-            return new List<ExternalDependencyCleanup>();
-        }
-
-        var results = new Dictionary<(string Suite, string TestId), List<string>>();
-
-        foreach (var suiteDir in Directory.EnumerateDirectories(testCasesDir))
-        {
-            ct.ThrowIfCancellationRequested();
-            var suiteName = Path.GetFileName(suiteDir);
-            if (string.Equals(suiteName, targetSuite, StringComparison.OrdinalIgnoreCase)) continue;
-
-            foreach (var file in Directory.EnumerateFiles(suiteDir, "*.md", SearchOption.TopDirectoryOnly))
-            {
-                if (Path.GetFileName(file).StartsWith('_')) continue;
-                string content;
-                try { content = await File.ReadAllTextAsync(file, ct).ConfigureAwait(false); } catch (IOException) { continue; }
-
-                var idMatch = Regex.Match(content, @"^\s*id:\s*[""']?(?<id>[A-Za-z][A-Za-z0-9_-]*-\d+)[""']?\s*$", RegexOptions.Multiline);
-                if (!idMatch.Success) continue;
-                var dependentId = idMatch.Groups["id"].Value;
-
-                foreach (Match m in Regex.Matches(content, @"^\s+-\s+[""']?(?<id>[A-Za-z][A-Za-z0-9_-]*-\d+)[""']?\s*$", RegexOptions.Multiline))
-                {
-                    var dep = m.Groups["id"].Value;
-                    if (idsInTarget.Contains(dep))
-                    {
-                        var key = (suiteName, dependentId);
-                        if (!results.TryGetValue(key, out var list))
-                        {
-                            list = new List<string>();
-                            results[key] = list;
-                        }
-                        if (!list.Contains(dep))
-                        {
-                            list.Add(dep);
-                        }
-                    }
-                }
-            }
-        }
-
-        return results.Select(kv => new ExternalDependencyCleanup
-        {
-            TestId = kv.Key.TestId,
-            Suite = kv.Key.Suite,
-            RemovedDeps = kv.Value
-        }).ToList();
-    }
-
-    private static async Task CascadeRemoveDependsOnAsync(
-        string testCasesDir,
-        string targetSuite,
-        IReadOnlyList<ExternalDependencyCleanup> cleanups,
-        CancellationToken ct)
-    {
-        var idsToRemove = cleanups.SelectMany(c => c.RemovedDeps).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (idsToRemove.Count == 0) return;
-
-        foreach (var suiteDir in Directory.EnumerateDirectories(testCasesDir))
-        {
-            ct.ThrowIfCancellationRequested();
-            if (string.Equals(Path.GetFileName(suiteDir), targetSuite, StringComparison.OrdinalIgnoreCase)) continue;
-
-            foreach (var file in Directory.EnumerateFiles(suiteDir, "*.md", SearchOption.TopDirectoryOnly))
-            {
-                if (Path.GetFileName(file).StartsWith('_')) continue;
-                string content;
-                try { content = await File.ReadAllTextAsync(file, ct).ConfigureAwait(false); } catch (IOException) { continue; }
-
-                var rewritten = Regex.Replace(content,
-                    @"^(\s+-\s+[""']?)(?<id>[A-Za-z][A-Za-z0-9_-]*-\d+)([""']?\s*)$",
-                    m => idsToRemove.Contains(m.Groups["id"].Value) ? string.Empty : m.Value,
-                    RegexOptions.Multiline);
-
-                rewritten = Regex.Replace(rewritten, @"\r?\n\r?\n+", Environment.NewLine + Environment.NewLine);
-
-                if (rewritten != content)
-                {
-                    await Spectra.Core.Index.AtomicFileWriter.WriteAllTextAsync(file, rewritten, ct).ConfigureAwait(false);
-                }
-            }
-        }
     }
 
     private static async Task<(IReadOnlyList<string> SelectionsUpdated, bool ConfigBlockRemoved)> UpdateConfigAsync(
@@ -408,12 +394,43 @@ public sealed class SuiteDeleteHandler
         }
     }
 
+    /// <summary>Spec 096: the human summary — on stdout, or on stderr in JSON mode (never suppressed).</summary>
+    private static void WriteSummary(SuiteDeleteResult result, TextWriter writer)
+    {
+        if (result.Message is not null)
+        {
+            writer.WriteLine(result.Message);
+        }
+
+        var verb = result.DryRun ? "would clear" : "cleared";
+        foreach (var d in result.DependentsCleaned)
+        {
+            writer.WriteLine($"  {d.Id}: {verb} depends_on {d.RemovedDep} ({d.File})");
+        }
+
+        foreach (var w in result.Warnings)
+        {
+            writer.WriteLine($"  warning: {w}");
+        }
+
+        foreach (var l in result.Leftovers ?? result.LeftoversRemoved ?? [])
+        {
+            writer.WriteLine($"  {(result.DryRun ? "would remove" : "removed")} {l}");
+        }
+    }
+
     private void EmitResult(CommandResult result)
     {
         if (_outputFormat == OutputFormat.Json)
         {
             JsonResultWriter.Write(result);
         }
+
+        if (result is SuiteDeleteResult { Error: null } summary)
+        {
+            WriteSummary(summary, _outputFormat == OutputFormat.Json ? Console.Error : Console.Out);
+        }
+
         var resultPath = Path.Combine(Directory.GetCurrentDirectory(), ".spectra-result.json");
         try
         {

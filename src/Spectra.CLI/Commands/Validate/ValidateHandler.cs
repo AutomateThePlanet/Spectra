@@ -102,6 +102,7 @@ public sealed class ValidateHandler
         var allSuites = new List<TestSuite>();
         var totalErrors = 0;
         var totalWarnings = 0;
+        var parseErrors = new List<Results.ValidationError>();
 
         foreach (var suitePath in suitesToValidate)
         {
@@ -133,6 +134,7 @@ public sealed class ValidateHandler
                     foreach (var error in parseResult.Errors)
                     {
                         Console.Error.WriteLine($"  [{error.Code}] {error.Message}");
+                        parseErrors.Add(new Results.ValidationError { File = relativePath, Line = 0, Message = $"[{error.Code}] {error.Message}" });
                     }
                     totalErrors += parseResult.Errors.Count;
                     continue;
@@ -188,14 +190,17 @@ public sealed class ValidateHandler
         var testCount = allSuites.Sum(s => s.TestCount);
         var suiteCount = allSuites.Count;
 
+        // Spec 096 (FR-007): a test that doesn't parse, or a counted profile error, fails validation like a validator
+        // error — before 096 only the validator's own result decided the exit code.
+        var passed = result.IsValid && totalErrors == 0;
         var validateResult = new ValidateResult
         {
             Command = "validate",
-            Status = result.IsValid ? "success" : "failed",
-            Message = result.IsValid ? "Validation passed." : $"{totalErrors} error(s) found.",
+            Status = passed ? "success" : "failed",
+            Message = passed ? "Validation passed." : $"{totalErrors} error(s) found.",
             TotalFiles = testCount,
             Valid = testCount - allErrors.Count,
-            Errors = allErrors,
+            Errors = [.. parseErrors, .. allErrors],
             Notes = configNotes.Count > 0 ? configNotes : null
         };
         _progressManager.WriteResultOnly(validateResult);
@@ -203,7 +208,7 @@ public sealed class ValidateHandler
         if (_outputFormat == OutputFormat.Json)
         {
             JsonResultWriter.Write(validateResult);
-            return result.IsValid ? ExitCodes.Success : ExitCodes.Error;
+            return passed ? ExitCodes.Success : ExitCodes.Error;
         }
 
         // Human output
@@ -247,7 +252,7 @@ public sealed class ValidateHandler
             Console.WriteLine($"Errors: {totalErrors}, Warnings: {totalWarnings}");
         }
 
-        if (result.IsValid)
+        if (passed)
         {
             if (_verbosity >= VerbosityLevel.Minimal)
             {

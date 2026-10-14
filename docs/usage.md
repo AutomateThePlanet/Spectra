@@ -237,13 +237,17 @@ in `.spectra/repairs/<suite>/` and ingests them with `ingest-update <suite> --al
 that folder; the update edit step reads only `.spectra/updates/<suite>/`. A file kept after a failure is therefore
 never picked up by the other flow in the wrong baseline mode. `spectra init` (new workspaces) and
 `spectra update-skills` (existing ones) gitignore both folders. `update-skills` only adds a pattern it has never
-offered to the workspace before, so one you removed stays removed, and it never creates a `.gitignore`.
+offered to the workspace before, so one you removed stays removed, and it never creates a `.gitignore`. What was
+offered is recorded in `.gitignore` itself (`# spectra-offered: …` lines), so keep those lines when you commit it —
+then a pattern your team removed stays removed in every clone.
 
 **Deleting tests.** `spectra delete` (or the delete skill) removes the deleted ids from dependents' `depends_on` without
 touching anything else in those files, and removes the tests' baseline entries, staging files and verdict files, so a
 later triage or batch doesn't trip over them. A `depends_on` list is not supported; such a dependent is left as it is,
 with a warning. A test file that fails to
 parse keeps its baseline entry: no command prunes a suite while any of its test files can't be read, and each says so.
+`spectra suite delete` handles other suites' dependents the same way, and also removes the suite's staging folders,
+generation plan and verdict files; `--dry-run` shows everything it would change.
 
 **Commit the baseline.** Commit `test-cases/*/_source-baseline.json` and `.spectra/source-snapshots/` (the snapshots
 let triage show word diffs); `.spectra/update-triage.json` and `.spectra/baseline.lock` are gitignored by
@@ -395,7 +399,7 @@ For the complete customization reference, see [Customization](customization.md).
 
 ### A command appears stuck or waiting for input
 
-All bundled SKILLs pass non-interactive flags. If you see a hang, your installed SKILL files may be out of date, so refresh them with `spectra update-skills`. Customizations you've made to SKILL files are preserved by hash tracking.
+All bundled SKILLs pass non-interactive flags. If you see a hang, your installed SKILL files may be out of date, so refresh them with `spectra update-skills`. Customizations you've made to SKILL files are preserved by hash tracking. `update-skills` never overwrites a file you edited — a skill, agent, prompt template, `profiles/_default.yaml` or `CUSTOMIZATION.md` — and a file it has no record of is only refreshed when it already equals the bundled copy; otherwise it says `skipped (no record — it may have been edited)` and how to get the new version (`spectra prompts reset <id>`, or delete the file and run `update-skills` again).
 
 ### Stale terminology in your installed SKILLs
 

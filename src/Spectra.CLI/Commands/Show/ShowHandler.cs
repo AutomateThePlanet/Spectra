@@ -79,7 +79,14 @@ public sealed class ShowHandler
 
                 if (testEntry is not null)
                 {
-                    var testPath = Path.Combine(testsDir, testEntry.File);
+                    // Spec 096 (FR-006): the index's bare file name is relative to the suite folder (as everywhere since
+                    // 073/075); the legacy "suite/file" form is relative to the tests folder.
+                    var testPath = Path.Combine(suiteDir, testEntry.File);
+                    if (!File.Exists(testPath) && File.Exists(Path.Combine(testsDir, testEntry.File)))
+                    {
+                        testPath = Path.Combine(testsDir, testEntry.File);
+                    }
+
                     var suiteName = Path.GetFileName(suiteDir);
                     var filePath = Path.GetRelativePath(basePath, testPath).Replace('\\', '/');
                     return await DisplayTestAsync(testPath, suiteName, filePath, showRaw, ct);

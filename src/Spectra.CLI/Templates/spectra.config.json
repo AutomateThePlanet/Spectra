@@ -16,10 +16,9 @@
     "criteria_file": "docs/criteria/_criteria_index.yaml"
   },
   "ai": {
-    "_comment_ai": "Spec 069: SPECTRA no longer runs an in-process model — all inference is your Claude Code session — so there is no `providers` or `critic` block. Only the timeout/batch levers below apply.",
+    "_comment_ai": "Spec 069: SPECTRA no longer runs an in-process model — all inference is your Claude Code session — so there is no `providers` or `critic` block. Only the timeout levers below apply; the generation batch size is `generation.batch_size`.",
     "generation_timeout_minutes": 5,
-    "analysis_timeout_minutes": 2,
-    "generation_batch_size": 30
+    "analysis_timeout_minutes": 2
   },
   "generation": {
     "default_count": 15,

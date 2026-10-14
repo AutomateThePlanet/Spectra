@@ -71,7 +71,6 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 ```json
 {
   "ai": {
-    "generation_batch_size": 30,
     "generation_timeout_minutes": 5,
     "analysis_timeout_minutes": 2
   }
@@ -80,9 +79,11 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `generation_batch_size` | int | `30` | Number of tests requested per generation turn (`compile-prompt` → turn → `ingest-tests`). Larger batches mean fewer round-trips, at the cost of a bigger single response. Values ≤ 0 fall back to the default. |
 | `generation_timeout_minutes` | int | `5` | Bounds the deterministic CLI side of the generation seam (parsing, validation, index writes), not the model turn itself, which runs in your own session. |
 | `analysis_timeout_minutes` | int | `2` | Same, for the behavior-analysis seam. |
+
+`ai.generation_batch_size` is read by nothing (Spec 096): the batch size is `generation.batch_size` (see below). An
+existing config that still has it loads as before; `spectra init` no longer writes it.
 
 To choose a model, pick it the same way you'd pick a model for any other Claude Code work
 (`/model`, or your plan's default), because whatever your session is running when you drive
