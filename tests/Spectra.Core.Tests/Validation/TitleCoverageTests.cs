@@ -118,12 +118,12 @@ public class TitleCoverageTests
     [InlineData(1.0, false)]
     public void AThresholdOutsideZeroToOne_Warns(double threshold, bool warns)
     {
-        var warning = TitleCoverage.ThresholdWarning(threshold);
+        var warning = TitleCoverage.ThresholdWarning(threshold); // Spec 098 F9: the default key is coverage_threshold
 
         if (warns)
         {
             Assert.Equal(
-                $"generation.duplicate_threshold = {threshold.ToString(System.Globalization.CultureInfo.InvariantCulture)} is outside (0, 1]; "
+                $"generation.coverage_threshold = {threshold.ToString(System.Globalization.CultureInfo.InvariantCulture)} is outside (0, 1]; "
                 + "every behaviour (≤ 0) or none (> 1) is treated as covered.", warning);
         }
         else

@@ -211,7 +211,7 @@ public sealed class GenerationPlanBuilderTests
         GenerationPlanBuilder.Build("storage", null, batchSize, behaviors.Count(b => b.CoveredBy is null), behaviors,
             behaviors.Where(b => b.Ref is not null).Select(b => b.Ref!).Distinct()
                 .ToDictionary(r => r, r => "sha256:" + new string('0', 64)),
-            [], duplicateThreshold: 0.6);
+            [], coverageThreshold: 0.6);
 
     [Fact]
     public void CoveredBehaviours_KeepTheirIdsAndCoveredBy_ButAreInNoBatch()
@@ -288,7 +288,7 @@ public sealed class GenerationPlanBuilderTests
         var first = GenerationPlan.Serialize(BuildAsIngest(behaviors));
 
         Assert.Equal(first, GenerationPlan.Serialize(BuildAsIngest(behaviors)));
-        Assert.True(first.IndexOf("\"batch_size\"", StringComparison.Ordinal) < first.IndexOf("\"duplicate_threshold\": 0.6", StringComparison.Ordinal));
+        Assert.True(first.IndexOf("\"batch_size\"", StringComparison.Ordinal) < first.IndexOf("\"coverage_threshold\": 0.6", StringComparison.Ordinal)); // Spec 098 F9: renamed key
         Assert.Contains("\"covered_by\": \"TC-101\"", first);
         Assert.Contains("\"covered_by\": null", first);
         var parsed = GenerationPlan.Parse(first);

@@ -289,6 +289,10 @@ public sealed class ConfigLoader
         ("ai.critic.provider", ["ai", "critic", "provider"]),
         ("ai.critic.api_key_env", ["ai", "critic", "api_key_env"]),
         ("ai.critic.base_url", ["ai", "critic", "base_url"]),
+        // Spec 098 (F1): the other keys of the removed in-process critic.
+        ("ai.critic.enabled", ["ai", "critic", "enabled"]),
+        ("ai.critic.timeout_seconds", ["ai", "critic", "timeout_seconds"]),
+        ("ai.critic.max_concurrent", ["ai", "critic", "max_concurrent"]),
     ];
 
     /// <summary>
@@ -329,10 +333,6 @@ public sealed class ConfigLoader
         return present;
     }
 
-    /// <summary>Spec 097 (FR-020): <c>ai.critic.model</c> — first a letter or digit, then letters, digits, <c>._:[]-</c>.</summary>
-    private static readonly System.Text.RegularExpressions.Regex CriticModelPattern =
-        new(@"^[A-Za-z0-9][A-Za-z0-9._:\[\]-]{0,199}\z", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
-
     private static IReadOnlyList<ParseError> Validate(SpectraConfig config, string? filePath)
     {
         var errors = new List<ParseError>();
@@ -363,19 +363,21 @@ public sealed class ConfigLoader
                 "update.group_size must be an integer ≥ 1", filePath));
         }
 
-        // Spec 097 (FR-020): the optional critic model — one token that starts with a letter or digit, so the unquoted
-        // agent frontmatter value is always a YAML string (a missing or null key means sonnet).
-        if (config.Ai?.Critic?.Model is { } criticModel && !CriticModelPattern.IsMatch(criticModel))
-        {
-            errors.Add(new ParseError("INVALID_CRITIC_MODEL",
-                "ai.critic.model must be one word (an alias such as sonnet, a model id, or inherit)", filePath));
-        }
+        // Spec 098 (F1): ai.critic is never an error — a legacy block of the in-process critic or an invalid model is
+        // ignored with a warning where the model is used (update-skills, validate); see CriticConfig.Choose.
 
         // Spec 094: the optional generation batch size (a missing or null key means 8).
         if (config.Generation is { BatchSize: < 1 or > 50 })
         {
             errors.Add(new ParseError("INVALID_GENERATION_BATCH_SIZE",
                 "generation.batch_size must be an integer from 1 to 50", filePath));
+        }
+
+        // Spec 098 (F9, FR-019): the optional coverage threshold (a missing or null key means 0.6).
+        if (config.Generation is { CoverageThreshold: < 0 or > 1 })
+        {
+            errors.Add(new ParseError("INVALID_COVERAGE_THRESHOLD",
+                "generation.coverage_threshold must be a number from 0 to 1", filePath));
         }
 
         if (config.Update is { LightThresholdWords: < 0 })

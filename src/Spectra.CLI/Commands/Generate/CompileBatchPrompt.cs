@@ -25,7 +25,8 @@ namespace Spectra.CLI.Commands.Generate;
 /// no manifest record): count mode with the user's template, focus = the batch's titles and refs;</item>
 /// <item><c>count</c> — <c>--batch unsourced</c>: count mode, focus = the unsourced titles.</item>
 /// </list>
-/// Checks, in order: plan, batch, staleness (not for <c>unsourced</c>), criteria, size (batch mode only). Every refusal is
+/// Checks, in order: plan, batch, template mode, staleness (a refusal in batch mode only — Spec 098: a warning in
+/// <c>count_fallback</c>, none for <c>unsourced</c>), criteria, size (batch mode only). Every refusal is
 /// exit 4 in the shared failure shape; nothing is written. The prompt goes to stdout; the mode and warnings to stderr.
 /// </summary>
 internal static class CompileBatchPrompt
@@ -39,6 +40,10 @@ internal static class CompileBatchPrompt
 
     public const string ModeBatch = "batch";
     public const string ModeCountFallback = "count_fallback";
+
+    /// <summary>Spec 098 (F8): a changed section in count_fallback mode (no refusal: the generator reads the current docs).</summary>
+    public const string StaleCountModeWarning =
+        "the documentation changed since the analysis; behaviour titles may be outdated";
     public const string ModeCount = "count";
 
     public const string BundledTemplateWarning =
@@ -107,6 +112,25 @@ internal static class CompileBatchPrompt
                 ModeCount, batch.BatchId, warnings, json, ct);
         }
 
+        // Spec 098 (F8, FR-018): the template decides the mode first (never a refusal, FR-010a). In count_fallback the
+        // generator reads the current docs itself, so a changed section below is a warning, not PLAN_STALE.
+        var template = templateLoader.LoadTemplate("test-generation");
+        var countFallback = false;
+        if (BatchPromptCompiler.PredatesBatch(template))
+        {
+            var unedited = await IsUneditedCopyAsync(root, ct);
+            if (unedited == true)
+            {
+                template = BuiltInTemplates.GetTemplate("test-generation")!;
+                warnings.Add(BundledTemplateWarning);
+            }
+            else
+            {
+                warnings.Add(unedited is null ? UnrecordedTemplateWarning : CustomTemplateWarning);
+                countFallback = true;
+            }
+        }
+
         // 3. Staleness: every section of the batch, as it is now, against the plan's fingerprint.
         var context = await BaselineContext.CreateAsync(root, config, ct);
         var resolutions = new List<SectionResolution>();
@@ -126,29 +150,22 @@ internal static class CompileBatchPrompt
             resolutions.Add(now);
         }
 
+        if (countFallback)
+        {
+            if (stale.Count > 0)
+            {
+                warnings.Add($"{StaleCountModeWarning} ({string.Join("; ", stale)})");
+            }
+
+            var described = batch.BehaviorIds.Select(id => $"{plan.Behavior(id).Title} ({plan.Behavior(id).Ref})");
+            return await CompileCountModeAsync(root, config, suite, Join(described, focus), count, templateLoader,
+                profileFormat, ModeCountFallback, batch.BatchId, warnings, json, ct);
+        }
+
         if (stale.Count > 0)
         {
             return Fail(json, ErrorPlanStale,
                 [$"The documentation of batch {batch.BatchId} changed since the analysis; re-run the analysis.", .. stale], warnings);
-        }
-
-        // The template decides the mode, never a refusal (FR-010a).
-        var template = templateLoader.LoadTemplate("test-generation");
-        if (BatchPromptCompiler.PredatesBatch(template))
-        {
-            var unedited = await IsUneditedCopyAsync(root, ct);
-            if (unedited == true)
-            {
-                template = BuiltInTemplates.GetTemplate("test-generation")!;
-                warnings.Add(BundledTemplateWarning);
-            }
-            else
-            {
-                warnings.Add(unedited is null ? UnrecordedTemplateWarning : CustomTemplateWarning);
-                var described = batch.BehaviorIds.Select(id => $"{plan.Behavior(id).Title} ({plan.Behavior(id).Ref})");
-                return await CompileCountModeAsync(root, config, suite, Join(described, focus), count, templateLoader,
-                    profileFormat, ModeCountFallback, batch.BatchId, warnings, json, ct);
-            }
         }
 
         // 4. Criteria of the batch's sections.

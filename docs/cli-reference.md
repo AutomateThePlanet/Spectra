@@ -423,7 +423,7 @@ Checks, in order — plan, batch, staleness, criteria, size (for `unsourced`: pl
 |---|---|
 | `PLAN_MISSING` | no plan for the suite, or an unreadable one ("re-run the analysis") |
 | `BATCH_NOT_FOUND` | no batch with that id (the message lists the plan's ids) |
-| `PLAN_STALE` | a section of the batch changed since the analysis, or no longer resolves (one `errors` entry per section) — re-run the analysis |
+| `PLAN_STALE` | a section of the batch changed since the analysis, or no longer resolves (one `errors` entry per section) — re-run the analysis. Batch mode only: Spec 098 (F8) decides the template mode first, and in `count_fallback` (the generator reads the current docs itself) a changed section is the warning "the documentation changed since the analysis; behaviour titles may be outdated (…)" instead |
 | `MISSING_INPUT` | no acceptance criteria for the batch (`missing_input: "criteria_context"`) |
 | `PROMPT_TOO_LARGE` | the estimate exceeds `analysis.max_prompt_tokens` (default 96,000) |
 
@@ -791,8 +791,23 @@ Spec 097 (FR-004–FR-009a):
 - The generate skill's resume path calls `audit-grounding --suite <s> --action repair`, so only the tests still to
   repair reach the session.
 
+Spec 098 (F2) — **the action comes from the verdict.** A test with a fresh verdict and no grounding block needs:
+
+| Verdict | `action_needed` | What to do |
+|---|---|---|
+| `grounded` | `ground` | Only the block is missing: `ingest-grounding --suite <s> --all --ids <ids>` (no repair). |
+| `partial` | `repair` | One repair attempt (`spectra-repairer`), then the critic again. |
+| `hallucinated` | `review` | Waiting for the user's decision; never repaired automatically. |
+| anything else | `critic` | Run the critic again. |
+
+Stale verdicts stay `critic`; tests with a block stay `review` (flagged) / `none`. `--action` accepts `ground`
+(`--action must be one of critic, ground, repair, review, none`). The summary gains `pending_ground` and
+`pending_review`; `partial_pending_repair` counts only `repair` entries. (Before 098, grounded-without-block and kept
+hallucinated tests were both `repair`, so the resume path sent them to the repairer.) The generate skill's resume path
+now calls `audit-grounding --suite <s> --action ground,repair,review` and routes each id by its action.
+
 ```bash
-spectra ai audit-grounding --suite smoke --action repair --output-format json
+spectra ai audit-grounding --suite smoke --action ground,repair,review --output-format json
 spectra ai audit-grounding --suite smoke --ids TC-101,TC-102
 ```
 
@@ -876,17 +891,22 @@ Spec 097: `--dry-run` reports the same JSON (plus `"dry_run": true`), summary an
 and writes no plan file (a write failure can't be known without writing, so it isn't simulated).
 
 **Covered behaviours (Spec 095).** One rule decides, per behaviour, whether the suite's existing tests already cover it:
-an existing test whose title is at least `generation.duplicate_threshold` (default 0.6) similar to the behaviour's title
+an existing test whose title is at least `generation.coverage_threshold` (Spec 098; default 0.6) similar to the behaviour's title
 (the duplicate detector's title similarity). The behaviour's `covered_by` is the most similar test (ties → the lowest id,
 ordinal). `already_covered` = covered behaviours, `recommended` = uncovered behaviours — with or without acceptance
 criteria (before 095, a suite with any test or criterion reported its test count as `already_covered`). The breakdowns
-still count all behaviours. The plan keeps every behaviour with `covered_by` and records `duplicate_threshold`, but
+still count all behaviours. The plan keeps every behaviour with `covered_by` and records the threshold (`coverage_threshold`; a 095 plan's `duplicate_threshold` is read the same way), but
 batches only the uncovered ones: each batch's count is one per uncovered behaviour, summing to `recommended`; all
 covered → no batches. The JSON adds `covered` (`id`, `title`, `covered_by`); `unresolved` lists only uncovered
 behaviours, so a covered one appears only under `covered`, whatever its source. The summary adds one
 `covered: <title> (<covered_by>)` line each, between the batch lines and the `unresolved:` lines. A threshold outside
-(0, 1] is used as given, with the stderr warning "generation.duplicate_threshold = <v> is outside (0, 1]; every behaviour (≤ 0) or none (> 1) is treated as covered." (exit code unchanged).
-`compile-prompt --batch` never names a covered behaviour; a plan written by 094 (no `duplicate_threshold`) still
+(0, 1] is used as given, with the stderr warning "generation.coverage_threshold = <v> is outside (0, 1]; every behaviour (≤ 0) or none (> 1) is treated as covered." (exit code unchanged).
+**Spec 098 (F9):** coverage reads `generation.coverage_threshold` (0–1, `CONFIG_INVALID` outside); `duplicate_threshold`
+is duplicate detection only. For one release, a config without `coverage_threshold` whose `duplicate_threshold` is set to
+something other than 0.6 keeps using it for coverage, with the stderr notice "generation.coverage_threshold is not set;
+using generation.duplicate_threshold (<v>) for coverage as before. Set generation.coverage_threshold — this fallback will
+be removed in the next release." (the init template's 0.6 gives no notice).
+`compile-prompt --batch` never names a covered behaviour; a plan written by 094 (no threshold) still
 compiles, with the warning "the generation plan predates per-behaviour coverage; re-run the analysis for corrected
 counts".
 
@@ -1405,7 +1425,9 @@ edited test's entry (the single form and `--all`, which takes one lock for the b
 `baseline` (with `mode`) and `warnings`.
 
 **`--keep-baseline` (Spec 085)**, for both forms: the edited test's existing source-change fingerprints are not
-changed; refs and criteria the edit added get entries (a test with no entry gets one). Critic repairs
+changed; refs and criteria the edit added get entries. Spec 098 (F5): a test with **no** entry gets none — it stays
+unbaselined (triage keeps listing it) and `baseline.left_unbaselined` counts it (only when > 0), so a repair never
+baselines a test at the current docs (before 098 it created a full entry). Critic repairs
 (`spectra-generate`'s repair batch, `spectra-review-flagged`) pass it, because a repair fixes grounding, not doc drift:
 a doc change the test was never updated for stays in `update-triage`. `baseline.mode` is `"keep"` with the flag and
 `"rebuild"` without it. Baseline failures use the shared failure shape; the content, drift and schema failures (exit 5/6) keep
@@ -1643,8 +1665,9 @@ It also removes the suite's leftovers: `.spectra/updates/<suite>/`, `.spectra/re
 `.spectra/generation-plan/<suite>.json`, and the verdict and fingerprint-record files of its tests. The suite folder
 (with `_index.json` and `_source-baseline.json`) goes as before; no other baseline is touched and no baseline lock is
 taken. `--dry-run` lists all of it and writes nothing. JSON adds `dependents_cleaned` (`id`, `suite`, `file`,
-`removed_dep`), `warnings`, and `leftovers_removed` (`leftovers` in a dry run); the human summary goes to stdout, or to
-stderr in JSON mode.
+`removed_dep`), `warnings`, `leftovers_removed` (`leftovers` in a dry run: staging folders and the generation plan) and
+(Spec 098) `verdict_files_removed` — each verdict and record file is listed there once, never under the leftovers; the
+human summary goes to stdout, or to stderr in JSON mode.
 
 ### `spectra cancel [--force]`
 

@@ -105,14 +105,16 @@ public sealed class IngestAnalysisCommand : Command
         var suitePath = Path.Combine(testsPath, suite);
         var existingTests = await LoadExistingTestsAsync(suitePath, testsPath, ct);
 
-        // Spec 095 (FR-001–FR-004): one per-behaviour coverage rule at generation.duplicate_threshold. The coverage
+        // Spec 095 (FR-001–FR-004): one per-behaviour coverage rule. Spec 098 (F9): at generation.coverage_threshold
+        // (one release: a tuned duplicate_threshold when coverage_threshold is absent, with a notice). The coverage
         // snapshot no longer decides any count (it used to make the suite's test count the covered count), so the ingest
         // doesn't build it; the analysis prompt still gets its coverage context from compile-analysis-prompt.
-        var threshold = config.Generation.DuplicateThreshold;
-        var thresholdWarning = TitleCoverage.ThresholdWarning(threshold);
-        if (thresholdWarning is not null)
+        var (threshold, thresholdKey, thresholdNotice) = config.Generation.CoverageThresholdChoice();
+        var thresholdWarnings = new[] { thresholdNotice, TitleCoverage.ThresholdWarning(threshold, thresholdKey) }
+            .OfType<string>().ToList();
+        if (thresholdWarnings.Count > 0)
         {
-            BaselineCommandIO.PrintWarnings([thresholdWarning]);
+            BaselineCommandIO.PrintWarnings(thresholdWarnings);
         }
 
         var result = AnalysisRecommendationBuilder.Build(content, existingTests, snapshot: null, focus, threshold);
@@ -237,7 +239,7 @@ public sealed class IngestAnalysisCommand : Command
         // Spec 095: recommended = the uncovered behaviours, so each batch's count equals its behaviours.
         return GenerationPlanBuilder.Build(
             suite, string.IsNullOrWhiteSpace(focus) ? null : focus, config.Generation.EffectiveBatchSize,
-            result.RecommendedCount, resolved, sections, notes, config.Generation.DuplicateThreshold);
+            result.RecommendedCount, resolved, sections, notes, config.Generation.CoverageThresholdChoice().Value);
     }
 
     private static void WriteSummary(TextWriter output, AnalysisRecommendation result, GenerationPlan plan)

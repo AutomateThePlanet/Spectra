@@ -136,7 +136,8 @@ public sealed class PlanCoverageIngestTests : IDisposable
         var analysis = AnalysisJson(("Upload above the quota is refused", "docs/storage.md#upload-quota"));
 
         var (defaultThreshold, error) = await IngestAsync(analysis);
-        EditConfig(c => c["generation"]!.AsObject()["duplicate_threshold"] = 0.9);
+        // Spec 098 F9 (deliberate change): coverage reads generation.coverage_threshold (was duplicate_threshold).
+        EditConfig(c => c["generation"]!.AsObject()["coverage_threshold"] = 0.9);
         var (strict, _) = await IngestAsync(analysis);
 
         Assert.Equal(1, defaultThreshold.GetProperty("already_covered").GetInt32());
@@ -149,7 +150,9 @@ public sealed class PlanCoverageIngestTests : IDisposable
     public async Task AThresholdOutsideZeroToOne_WarnsOnStderr_WithoutRefusing()
     {
         WriteSuiteTests();
-        EditConfig(c => c["generation"]!.AsObject()["duplicate_threshold"] = 0);
+        // Spec 098 F9 (deliberate change): a pre-098 workspace (no coverage_threshold) whose duplicate_threshold is tuned
+        // keeps using it for coverage, so its out-of-range warning still names that key.
+        EditConfig(c => { c["generation"]!.AsObject().Remove("coverage_threshold"); c["generation"]!.AsObject()["duplicate_threshold"] = 0; });
 
         var (result, error) = await IngestAsync(Mixed);
 

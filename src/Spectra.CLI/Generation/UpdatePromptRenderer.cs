@@ -79,18 +79,37 @@ public static class UpdatePromptRenderer
 
     public static string Tests(UpdateContext context)
     {
+        // Spec 098 (F7): criteria the group's tests see differently get each test's own state in its block; the shared
+        // list (Criteria) keeps the strongest. A criterion every linking test sees the same way is not annotated.
+        var disagreeing = context.Tests
+            .SelectMany(b => b.CriterionIds.Select((id, i) => (Id: id, State: b.CriterionStates[i])))
+            .GroupBy(x => x.Id, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Select(x => x.State).Distinct().Count() > 1)
+            .Select(g => g.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         var sb = new StringBuilder();
         foreach (var block in context.Tests)
         {
             if (sb.Length > 0) sb.Append('\n');
             sb.Append($"### TEST {block.Test.Id}\n");
             sb.Append($"Sections: {(block.SectionLabels.Count > 0 ? string.Join(", ", block.SectionLabels) : "none")}\n");
-            sb.Append($"Criteria: {(block.CriterionIds.Count > 0 ? string.Join(", ", block.CriterionIds) : "none")}\n");
+            var criteria = block.CriterionIds.Select((id, i) => disagreeing.Contains(id) ? $"{id} ({StateLabel(block.CriterionStates[i])})" : id);
+            sb.Append($"Criteria: {(block.CriterionIds.Count > 0 ? string.Join(", ", criteria) : "none")}\n");
             sb.Append("```json\n").Append(Lf(UpdatePromptCompiler.SerializeTest(block.Test))).Append("\n```\n");
         }
 
         return sb.ToString();
     }
+
+    /// <summary>Spec 098 (F7): a test's own state of a criterion, as shown next to its id.</summary>
+    private static string StateLabel(LinkedCriterionState state) => state switch
+    {
+        LinkedCriterionState.ChangedSinceBaseline => "changed",
+        LinkedCriterionState.NotBaselined => "not baselined",
+        LinkedCriterionState.Removed => "removed",
+        _ => "unchanged"
+    };
 
     /// <summary>
     /// Appends <paramref name="heading"/>, then <paramref name="text"/> (LF, trailing newlines trimmed) in a <c>~~~~</c>

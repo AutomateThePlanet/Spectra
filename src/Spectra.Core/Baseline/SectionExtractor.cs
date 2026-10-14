@@ -16,6 +16,14 @@ public sealed record MarkdownHeading(int Level, string Text, int StartLine)
     /// <summary>The anchor key of <see cref="CleanText"/> (rule 1).</summary>
     public string TextKey => AnchorKey.Make(CleanText);
 
+    /// <summary>
+    /// Spec 098 (F6, FR-014): the anchor key of the text with Markdown images removed — GitHub builds a heading's anchor
+    /// from its rendered text, where an image renders none (<c>## ![logo](x.png) Setup</c> → <c>#-setup</c>). Rule 1
+    /// falls back to it when no heading's <see cref="TextKey"/> matches.
+    /// </summary>
+    public string ImageFreeKey { get; } =
+        AnchorKey.Make(TextNormalizer.Clean(SectionExtractor.StripImages(SectionExtractor.StripAttributeBlock(Text))));
+
     /// <summary>The anchor keys of every <c>id="…"</c> / <c>id='…'</c> in the heading and of a trailing <c>{#id}</c> (rule 2).</summary>
     public IReadOnlyList<string> ExplicitIds => SectionExtractor.ExplicitIdKeys(Text);
 }
@@ -168,6 +176,16 @@ public static partial class SectionExtractor
             return new HeadingMatch(byText[0], MatchRule.Text, byText.Count > 1);
         }
 
+        // Spec 098 (F6): GitHub's anchor of a heading with an image (the image contributes no text).
+        var byImageFree = Enumerable.Range(0, headings.Count)
+            .Where(i => headings[i].ImageFreeKey.Length > 0 && headings[i].ImageFreeKey != headings[i].TextKey
+                        && headings[i].ImageFreeKey == key)
+            .ToList();
+        if (byImageFree.Count > 0)
+        {
+            return new HeadingMatch(byImageFree[0], MatchRule.Text, byImageFree.Count > 1);
+        }
+
         for (var i = 0; i < headings.Count; i++)
         {
             if (headings[i].ExplicitIds.Contains(key))
@@ -232,6 +250,43 @@ public static partial class SectionExtractor
 
         return TextNormalizer.Normalize(string.Join('\n', lines));
     }
+
+    /// <summary>Spec 098 (F6): the comparison text of each ATX heading line outside fenced code, attribute block removed.</summary>
+    public static IReadOnlyList<string> HeadingComparisonTexts(string rawSection)
+    {
+        ArgumentNullException.ThrowIfNull(rawSection);
+        var normalised = NormalizeNewlines(rawSection);
+        var lines = normalised.Split('\n');
+        return Headings(normalised)
+            .Select(h => TextNormalizer.Normalize(StripAttributeBlock(lines[h.StartLine])))
+            .Where(t => t.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Spec 098 (F6, FR-015): an 084 snapshot (normalised text with heading attribute blocks kept and line breaks
+    /// collapsed) with the 085 rule applied — an attribute block is removed where it directly follows the full text of
+    /// one of <paramref name="headingTexts"/> (the current section's headings), at the start of the snapshot or after a
+    /// space, and is followed by a space or the end. A <c>{…}</c> anywhere else (body text) is kept.
+    /// </summary>
+    public static string SnapshotComparisonText(string snapshot, IReadOnlyList<string> headingTexts)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(headingTexts);
+        var result = snapshot;
+        foreach (var heading in headingTexts)
+        {
+            result = Regex.Replace(result,
+                @"(?<=(?:^|\s)" + Regex.Escape(heading) + @")\s*\{:?\s*[#.][^}]*\}(?=\s|$)",
+                string.Empty, RegexOptions.CultureInvariant);
+        }
+
+        return result;
+    }
+
+    /// <summary>Spec 098 (F6): removes inline (<c>![alt](src)</c>) and reference (<c>![alt][ref]</c>) Markdown images.</summary>
+    public static string StripImages(string text) => ImageRegex().Replace(text, " ");
 
     /// <summary>Removes a trailing Pandoc/kramdown attribute block (<c>{#id}</c>, <c>{: #id .cls}</c>, <c>{.cls}</c>).</summary>
     public static string StripAttributeBlock(string text) => AttributeBlockRegex().Replace(text, string.Empty);
@@ -325,8 +380,13 @@ public static partial class SectionExtractor
     [GeneratedRegex(@"#(?<id>[^\s}.#]+)", RegexOptions.CultureInvariant)]
     private static partial Regex BlockIdRegex();
 
-    [GeneratedRegex(@"\bid\s*=\s*(?:""(?<dq>[^""]*)""|'(?<sq>[^']*)')", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    // Spec 098 (F6, FR-013): `id=` only as a whole attribute name (start of the text or after whitespace), so data-id,
+    // aria-id, x-id, :id are not ids.
+    [GeneratedRegex(@"(?<!\S)id\s*=\s*(?:""(?<dq>[^""]*)""|'(?<sq>[^']*)')", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex IdAttributeRegex();
+
+    [GeneratedRegex(@"!\[[^\]]*\](?:\([^)]*\)|\[[^\]]*\])", RegexOptions.CultureInvariant)]
+    private static partial Regex ImageRegex();
 
     // A GitHub duplicate anchor: base-n with n >= 1.
     [GeneratedRegex(@"^(?<base>.+)-(?<n>[1-9]\d*)$", RegexOptions.CultureInvariant)]

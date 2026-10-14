@@ -27,8 +27,8 @@ public sealed class AuditGroundingHandler
         _testsDir = testsDir;
     }
 
-    /// <summary>Spec 097 (FR-005): the <c>--action</c> values, in the order the usage message names them.</summary>
-    public static readonly IReadOnlyList<string> Actions = ["critic", "repair", "review", "none"];
+    /// <summary>Spec 097 (FR-005) / Spec 098 (FR-007): the <c>--action</c> values, in the order the usage message names them.</summary>
+    public static readonly IReadOnlyList<string> Actions = ["critic", "ground", "repair", "review", "none"];
 
     public async Task<int> RunAsync(
         string suite, bool json, CancellationToken ct,
@@ -112,11 +112,7 @@ public sealed class AuditGroundingHandler
                 catch { /* skip grounding check on parse error */ }
             }
 
-            var actionNeeded = stale
-                ? "critic"
-                : groundingWritten
-                    ? (flaggedForReview ? "review" : "none")
-                    : "repair";
+            var actionNeeded = ActionFor(stale, groundingWritten, flaggedForReview, verdict);
 
             entries.Add(new AuditGroundingEntry
             {
@@ -168,6 +164,8 @@ public sealed class AuditGroundingHandler
             Total = entries.Count,
             GroundingWritten = entries.Count(e => e.GroundingWritten),
             PartialPendingRepair = entries.Count(e => e.ActionNeeded == "repair"),
+            PendingGround = entries.Count(e => e.ActionNeeded == "ground"),
+            PendingReview = entries.Count(e => e.ActionNeeded == "review" && !e.GroundingWritten),
             FlaggedForReview = entries.Count(e => e.FlaggedForReview),
             Unverified = entries.Count(e => e.Verdict == Unverified),
             Stale = entries.Count(e => e.Stale == true)
@@ -199,6 +197,32 @@ public sealed class AuditGroundingHandler
 
         WriteNotFound(suite, notFound, json);
         return 0;
+    }
+
+    /// <summary>
+    /// Spec 098 (FR-006): what a test with a verdict file needs. Stale → the critic again; a written block → review when
+    /// flagged, else nothing; no block → by the verdict: grounded needs only its block (<c>ground</c>), partial a repair,
+    /// hallucinated the user's decision (<c>review</c>), anything unreadable the critic again.
+    /// </summary>
+    internal static string ActionFor(bool stale, bool groundingWritten, bool flaggedForReview, string verdict)
+    {
+        if (stale)
+        {
+            return "critic";
+        }
+
+        if (groundingWritten)
+        {
+            return flaggedForReview ? "review" : "none";
+        }
+
+        return verdict.ToLowerInvariant() switch
+        {
+            "grounded" => "ground",
+            "partial" => "repair",
+            "hallucinated" => "review",
+            _ => "critic"
+        };
     }
 
     /// <summary>Spec 097 (FR-009a): one line per unknown id — stdout in human mode, stderr in JSON mode.</summary>
@@ -254,7 +278,8 @@ public sealed class AuditGroundingHandler
                 Tests = [],
                 Summary = new AuditGroundingSummary
                 {
-                    Total = 0, GroundingWritten = 0, PartialPendingRepair = 0, FlaggedForReview = 0, Unverified = 0, Stale = 0
+                    Total = 0, GroundingWritten = 0, PartialPendingRepair = 0, FlaggedForReview = 0, Unverified = 0, Stale = 0,
+                    PendingGround = 0, PendingReview = 0
                 },
                 NotFound = notFound
             });
@@ -295,6 +320,8 @@ public sealed class AuditGroundingHandler
         Console.WriteLine(
             $"Summary: {summary.Total} total | {summary.GroundingWritten} grounded | " +
             $"{summary.PartialPendingRepair} pending repair | {summary.FlaggedForReview} flagged" +
+            (summary.PendingGround > 0 ? $" | {summary.PendingGround} pending ground" : "") +
+            (summary.PendingReview > 0 ? $" | {summary.PendingReview} pending review" : "") +
             (summary.Unverified > 0 ? $" | {summary.Unverified} unverified" : "") +
             (summary.Stale > 0 ? $" | {summary.Stale} stale" : ""));
     }

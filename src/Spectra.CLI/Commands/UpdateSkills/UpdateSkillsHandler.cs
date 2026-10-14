@@ -162,7 +162,16 @@ public sealed class UpdateSkillsHandler
         var loaded = await ConfigLoader.LoadForReadAsync(currentDir, ConfigSections.None, ct);
         if (loaded.IsSuccess)
         {
-            return loaded.Config!.Ai.EffectiveCriticModel;
+            // Spec 098 (F1, FR-004): a legacy block's model or an invalid value is ignored, with one warning.
+            var choice = loaded.Config!.Ai.CriticModel;
+            if (choice.Warning is not null)
+            {
+                _progress.Warning(choice.Warning.Contains($"using {choice.Model}", StringComparison.Ordinal)
+                    ? choice.Warning
+                    : $"{choice.Warning}. Installed: {choice.Model}");
+            }
+
+            return choice.Model;
         }
 
         var firstError = loaded.Error?.Split('\n')[0].Trim() ?? "";

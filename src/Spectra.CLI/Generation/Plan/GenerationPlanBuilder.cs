@@ -34,7 +34,7 @@ public static class GenerationPlanBuilder
         IReadOnlyList<ResolvedBehavior> behaviors,
         IReadOnlyDictionary<string, string> sections,
         IReadOnlyList<string> notes,
-        double? duplicateThreshold = null)
+        double? coverageThreshold = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(batchSize, 1);
 
@@ -109,7 +109,7 @@ public static class GenerationPlanBuilder
         return new GenerationPlan(
             suite, focus, batchSize, recommended, counts.Sum(), rule, planned,
             sections.Where(s => used.Contains(s.Key)).ToDictionary(s => s.Key, s => s.Value, StringComparer.Ordinal),
-            batches, notes, duplicateThreshold);
+            batches, notes, coverageThreshold);
     }
 
     /// <summary>The count rule (R3) over the batches' behaviour counts.</summary>

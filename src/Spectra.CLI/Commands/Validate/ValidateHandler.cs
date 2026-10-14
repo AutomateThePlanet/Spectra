@@ -49,14 +49,18 @@ public sealed class ValidateHandler
                 });
 
                 // Spec 058 (FR-006): names any retired provider-config keys still present so they are
-                // surfaced (non-blocking) rather than silently ignored — never a silent drop.
+                // surfaced (non-blocking) rather than silently ignored — never a silent drop. Spec 098 (F1): the keys of
+                // the removed in-process critic make its block legacy, and its model is ignored too.
                 var deprecated = Spectra.Core.Config.ConfigLoader.DetectDeprecatedKeys(configJson);
                 if (deprecated.Count > 0)
                 {
+                    var legacyModel = config?.Ai?.Critic is { IsLegacy: true } critic && critic.Choose().Warning is not null
+                        ? $" {CriticConfig.LegacyModelWarning}."
+                        : "";
                     configNotes.Add(
                         $"spectra.config.json contains retired key(s): {string.Join(", ", deprecated)}. " +
-                        "These are ignored (Spec 058 — the critic runs as the spectra-critic subagent; " +
-                        "ai.critic.model is the only critic selector). Remove them at your convenience.");
+                        "These are ignored (the critic runs as the spectra-critic subagent). Remove them at your convenience." +
+                        legacyModel);
                 }
             }
             catch (JsonException ex)

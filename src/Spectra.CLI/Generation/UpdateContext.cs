@@ -49,8 +49,13 @@ public sealed record SectionBlock(
 /// <summary>Spec 088 (FR-005): a criterion the tests link, with its current text (null when removed).</summary>
 public sealed record CriterionBlock(string Id, string? Text, LinkedCriterionState State);
 
-/// <summary>Spec 088: one test to review, with the section labels and criterion IDs it links.</summary>
-public sealed record TestBlock(TestCase Test, IReadOnlyList<string> SectionLabels, IReadOnlyList<string> CriterionIds);
+/// <summary>
+/// Spec 088: one test to review, with the section labels and criterion IDs it links. Spec 098 (F7):
+/// <see cref="CriterionStates"/> is this test's own view of each linked criterion (parallel to <see cref="CriterionIds"/>).
+/// </summary>
+public sealed record TestBlock(
+    TestCase Test, IReadOnlyList<string> SectionLabels, IReadOnlyList<string> CriterionIds,
+    IReadOnlyList<LinkedCriterionState> CriterionStates);
 
 /// <summary>Spec 088: everything one update prompt carries. <see cref="NothingToReconcile"/> names tests with nothing to edit against.</summary>
 public sealed record UpdateContext(
@@ -84,6 +89,7 @@ public static class UpdateContextBuilder
         var criterionIds = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
         var criterionStates = new Dictionary<string, LinkedCriterionState>(StringComparer.OrdinalIgnoreCase);
         var testCriteria = new List<List<string>>();
+        var testCriterionStates = new List<List<LinkedCriterionState>>();
 
         foreach (var test in ordered)
         {
@@ -109,6 +115,7 @@ public static class UpdateContextBuilder
             testSections.Add(labels);
 
             var linked = new List<string>();
+            var linkedStates = new List<LinkedCriterionState>();
             foreach (var raw in test.Criteria.Where(c => !string.IsNullOrWhiteSpace(c)))
             {
                 var id = raw.Trim();
@@ -125,6 +132,7 @@ public static class UpdateContextBuilder
                     : entry is null || !entry.Criteria.TryGetValue(id, out var was) ? LinkedCriterionState.NotBaselined
                     : string.Equals(was, current, StringComparison.Ordinal) ? LinkedCriterionState.Unchanged
                     : LinkedCriterionState.ChangedSinceBaseline;
+                linkedStates.Add(state);
                 if (!criterionStates.TryGetValue(id, out var seen) || state > seen)
                 {
                     criterionStates[id] = state;
@@ -132,6 +140,7 @@ public static class UpdateContextBuilder
             }
 
             testCriteria.Add(linked);
+            testCriterionStates.Add(linkedStates);
         }
 
         var sections = new List<SectionBlock>(keys.Count);
@@ -149,7 +158,7 @@ public static class UpdateContextBuilder
         var nothing = new List<string>();
         for (var t = 0; t < ordered.Count; t++)
         {
-            blocks.Add(new TestBlock(ordered[t], testSections[t], testCriteria[t]));
+            blocks.Add(new TestBlock(ordered[t], testSections[t], testCriteria[t], testCriterionStates[t]));
 
             // FR-006: nothing to reconcile = no resolvable ref and no linked criterion that exists.
             var resolvable = testSections[t].Any(label => sections[LabelIndex(label)].Current is not null);

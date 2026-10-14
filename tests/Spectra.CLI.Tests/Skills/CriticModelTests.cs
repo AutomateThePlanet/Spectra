@@ -79,12 +79,14 @@ public sealed class CriticModelTests : IDisposable
         Assert.Equal("sonnet", _ws.CriticModel());
     }
 
+    // Spec 098 F1 (deliberate change): an invalid ai.critic.model no longer makes the config invalid — it is ignored with
+    // one warning and the default is installed (was: CONFIG_INVALID warning, installed model line kept).
     [Theory]
     [InlineData("two words")]
     [InlineData("")]
     [InlineData("a\"b")]
     [InlineData("[1m]")]
-    public async Task AnInvalidModel_OnlyWarns_AndKeepsTheInstalledModelLine(string model)
+    public async Task AnInvalidModel_OnlyWarns_AndInstallsTheDefault(string model)
     {
         _ws.PinnedCriticAgent();
         File.Delete(_ws.PathOf(SomeSkill));
@@ -92,10 +94,10 @@ public sealed class CriticModelTests : IDisposable
 
         var report = await UpdateSkillsAsync();
 
-        Assert.Contains("spectra.config.json is invalid (CONFIG_INVALID:", report);
-        Assert.Contains(InvalidWarning, report);
-        Assert.Equal(1, CountOf(report, InvalidWarning));
-        Assert.Equal(VerificationWorkspace.PinnedModel, _ws.CriticModel());
+        Assert.DoesNotContain("CONFIG_INVALID", report);
+        Assert.DoesNotContain(InvalidWarning, report);
+        Assert.Equal(1, CountOf(report, "using sonnet"));
+        Assert.Equal("sonnet", _ws.CriticModel());
         Assert.True(File.Exists(_ws.PathOf(SomeSkill)), "the other skills are refreshed as usual");
     }
 
@@ -107,9 +109,9 @@ public sealed class CriticModelTests : IDisposable
 
         var report = await UpdateSkillsAsync();
 
-        Assert.Contains("CONFIG_INVALID", report);
-        Assert.True(report.Contains("ai.critic.model", StringComparison.Ordinal) || report.Contains("$.ai.critic.model", StringComparison.Ordinal), report);
-        Assert.Equal(VerificationWorkspace.PinnedModel, _ws.CriticModel());
+        Assert.DoesNotContain("CONFIG_INVALID", report);
+        Assert.Contains("ai.critic.model 5 is not valid", report);
+        Assert.Equal("sonnet", _ws.CriticModel());
     }
 
     [Theory]
@@ -142,26 +144,29 @@ public sealed class CriticModelTests : IDisposable
         Assert.True(File.Exists(_ws.PathOf(SomeSkill)));
     }
 
+    // Spec 098 F1 (deliberate change): no command fails because of ai.critic (was: CONFIG_INVALID).
     [Fact]
-    public async Task CommandsThatNeedAValidConfig_RejectAModelStartingWithABracket()
+    public async Task CommandsThatNeedAValidConfig_AcceptAModelStartingWithABracket_AndUseTheDefault()
     {
         _ws.SetCriticModel("[1m]");
 
         var loaded = await ConfigLoader.LoadForWriteAsync(_ws.Root);
 
-        Assert.False(loaded.IsSuccess);
-        Assert.Equal(ConfigLoader.ErrorConfigInvalid, loaded.ErrorCode);
-        Assert.Contains("ai.critic.model", loaded.Error);
+        Assert.True(loaded.IsSuccess, loaded.Error);
+        Assert.Equal("sonnet", loaded.Config!.Ai.EffectiveCriticModel);
     }
 
+    // Spec 098 F1 (deliberate change): a retired key makes the block legacy, so the model next to it is ignored (was:
+    // honoured) — the v1.45 template wrote provider + a GitHub Models model.
     [Fact]
-    public async Task TheRetiredKeys_StillGetTheNotice_AndTheModelNextToThemIsHonoured()
+    public async Task TheRetiredKeys_StillGetTheNotice_AndTheModelNextToThemIsIgnored()
     {
         _ws.EditConfig(c => c["ai"]!["critic"] = new JsonObject { ["provider"] = "anthropic", ["model"] = "opus" });
 
         Assert.Contains("ai.critic.provider", ConfigLoader.DetectDeprecatedKeys(File.ReadAllText(_ws.PathOf("spectra.config.json"))));
-        await UpdateSkillsAsync();
-        Assert.Equal("opus", _ws.CriticModel());
+        var report = await UpdateSkillsAsync();
+        Assert.Equal("sonnet", _ws.CriticModel());
+        Assert.Contains("from the old in-process critic is ignored", report);
     }
 
     [Theory]

@@ -47,7 +47,7 @@ public sealed class SuiteDeleteHandler
         var (testCount, automationFiles) = await ScanSuiteAsync(suiteDir, ct).ConfigureAwait(false);
         var service = await TestDeletionService.LoadAsync(workspace, testCasesDir, ct).ConfigureAwait(false);
         var plan = await service.PlanAsync(service.SuiteTargets(suiteName), includeBaseline: false, ct).ConfigureAwait(false);
-        var leftovers = Leftovers(workspace, suiteName, plan);
+        var leftovers = Leftovers(workspace, suiteName);
         var references = plan.ScalarDependents.Count + plan.Warnings.Count;
 
         if (!force && automationFiles.Count > 0)
@@ -82,6 +82,7 @@ public sealed class SuiteDeleteHandler
                 DependentsCleaned = Dependents(service, testCasesDir, plan.ScalarDependents),
                 Warnings = plan.Warnings,
                 Leftovers = leftovers.Select(l => l.Relative).ToList(),
+                VerdictFilesRemoved = plan.VerdictFiles.Select(service.Relative).ToList(),
                 Message = $"Dry run: would delete suite '{suiteName}' ({testCount} tests, {plan.ScalarDependents.Count} external deps cleaned, "
                           + $"{plan.Warnings.Count} warning(s), {leftovers.Count} leftover(s) removed)."
             };
@@ -109,7 +110,8 @@ public sealed class SuiteDeleteHandler
         var outcome = await service.ApplyAsync(plan, ct).ConfigureAwait(false);
         var warnings = plan.Warnings.Concat(outcome.Errors.Select(e => $"{e.Id}: {e.Message}")).ToList();
 
-        // 2. The suite's leftovers: staging folders, generation plan, verdict files (Spec 096, FR-005)
+        // 2. The suite's leftovers: staging folders and generation plan (Spec 096, FR-005). Spec 098 (F3): the verdict
+        //    files were removed by the service in step 1 and are reported once, under verdict_files_removed.
         var leftoversRemoved = RemoveLeftovers(leftovers, warnings);
 
         // 3. Delete the suite directory recursively (its _index.json and _source-baseline.json with it)
@@ -139,6 +141,7 @@ public sealed class SuiteDeleteHandler
             DependentsCleaned = Dependents(service, testCasesDir, outcome.DependentsCleaned),
             Warnings = warnings,
             LeftoversRemoved = leftoversRemoved,
+            VerdictFilesRemoved = outcome.VerdictFilesRemoved.Select(service.Relative).ToList(),
             SelectionsUpdated = selectionsUpdated,
             ConfigBlockRemoved = configBlockRemoved,
             Message = $"Deleted suite '{suiteName}' ({testCount} tests, {outcome.DependentsCleaned.Count} external deps cleaned, "
@@ -171,10 +174,10 @@ public sealed class SuiteDeleteHandler
 
     /// <summary>
     /// Spec 096 (FR-005): what the suite leaves outside its folder — <c>.spectra/updates/&lt;suite&gt;/</c>,
-    /// <c>.spectra/repairs/&lt;suite&gt;/</c>, <c>.spectra/generation-plan/&lt;suite&gt;.json</c>, and its tests' verdict
-    /// and fingerprint-record files. Only what exists.
+    /// <c>.spectra/repairs/&lt;suite&gt;/</c> and <c>.spectra/generation-plan/&lt;suite&gt;.json</c>. Only what exists.
+    /// Spec 098 (F3): not its tests' verdict and record files — <see cref="TestDeletionService"/> removes and reports those.
     /// </summary>
-    private static List<(string Path, string Relative, bool IsFolder)> Leftovers(string workspace, string suite, DeletionPlan plan)
+    private static List<(string Path, string Relative, bool IsFolder)> Leftovers(string workspace, string suite)
     {
         var leftovers = new List<(string, string, bool)>();
         foreach (var folder in new[] { "updates", "repairs" })
@@ -192,7 +195,6 @@ public sealed class SuiteDeleteHandler
             leftovers.Add((generationPlan, GenerationPlanStore.RelativePathFor(suite), false));
         }
 
-        leftovers.AddRange(plan.VerdictFiles.Select(f => (f, Path.GetRelativePath(workspace, f).Replace('\\', '/'), false)));
         return leftovers;
     }
 
@@ -416,6 +418,12 @@ public sealed class SuiteDeleteHandler
         foreach (var l in result.Leftovers ?? result.LeftoversRemoved ?? [])
         {
             writer.WriteLine($"  {(result.DryRun ? "would remove" : "removed")} {l}");
+        }
+
+        // Spec 098 (F3): the verdict and record files, once.
+        if (result.VerdictFilesRemoved.Count > 0)
+        {
+            writer.WriteLine($"  {(result.DryRun ? "would remove" : "removed")} verdict files: {string.Join(", ", result.VerdictFilesRemoved)}");
         }
     }
 

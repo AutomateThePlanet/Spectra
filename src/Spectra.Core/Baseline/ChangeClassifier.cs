@@ -25,9 +25,22 @@ public enum CriterionState
 /// </summary>
 public sealed record CurrentSection(bool Missing, string? MissingReason, string? Fingerprint, string? Normalised)
 {
+    /// <summary>
+    /// Spec 098 (F6): the comparison text of each ATX heading line of the section (attribute block removed), used to
+    /// compare an 084 snapshot (which kept heading attribute blocks); null when unknown.
+    /// </summary>
+    public IReadOnlyList<string>? HeadingTexts { get; init; }
+
     public static CurrentSection Gone(string reason) => new(true, reason, null, null);
 
     public static CurrentSection Of(string fingerprint, string normalised) => new(false, null, fingerprint, normalised);
+
+    /// <summary>Spec 098 (F6): a section's fingerprint, comparison text and heading texts from its raw text.</summary>
+    public static CurrentSection FromRaw(string raw) =>
+        new(false, null, SourceFingerprint.OfSection(raw), SectionExtractor.ComparisonText(raw))
+        {
+            HeadingTexts = SectionExtractor.HeadingComparisonTexts(raw)
+        };
 }
 
 /// <summary>
@@ -83,7 +96,11 @@ public static class ChangeClassifier
             return new RefVerdict(sourceRef, RefState.Load, baseline, current.Fingerprint, [SnapshotMissing], []);
         }
 
-        if (string.Equals(snapshot, current.Normalised, StringComparison.Ordinal))
+        // Spec 098 (F6, FR-015): an 084 snapshot kept a heading's attribute block; compared without it, an id-only change
+        // is cosmetic.
+        if (string.Equals(snapshot, current.Normalised, StringComparison.Ordinal)
+            || (current.HeadingTexts is { Count: > 0 } headings
+                && string.Equals(SectionExtractor.SnapshotComparisonText(snapshot, headings), current.Normalised, StringComparison.Ordinal)))
         {
             return new RefVerdict(sourceRef, RefState.Cosmetic, baseline, current.Fingerprint, [], []);
         }

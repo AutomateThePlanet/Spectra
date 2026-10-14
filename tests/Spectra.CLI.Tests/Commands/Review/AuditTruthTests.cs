@@ -80,7 +80,8 @@ public sealed class AuditTruthTests : IDisposable
         var (all, _) = await AuditAsync();
         var (repair, _) = await AuditAsync("--action", "repair");
 
-        Assert.Equal(["TC-101", "TC-104"], Ids(repair));
+        // Spec 098 F2 (deliberate change): TC-101's grounded verdict without a block is `ground`, not `repair`.
+        Assert.Equal(["TC-104"], Ids(repair));
         Assert.Equal(all.GetProperty("summary").GetRawText(), repair.GetProperty("summary").GetRawText());
     }
 
@@ -100,7 +101,7 @@ public sealed class AuditTruthTests : IDisposable
         var (exit, _, error) = await _ws.RunAsync("ai", "audit-grounding", "--suite", "a", "--action", "bogus", "--output-format", "json");
 
         Assert.Equal(1, exit);
-        Assert.Contains("critic, repair, review, none", error);
+        Assert.Contains("critic, ground, repair, review, none", error); // Spec 098 F2: `ground` added
     }
 
     [Fact]
@@ -133,6 +134,7 @@ public sealed class AuditTruthTests : IDisposable
     }
 
     [Fact]
-    public void TheGenerateSkillsResumePath_AsksOnlyForRepairs() =>
-        Assert.Contains("audit-grounding --suite {suite} --action repair --output-format json", SkillContent.Generate);
+    public void TheGenerateSkillsResumePath_AsksOnlyForWhatItActsOn() =>
+        // Spec 098 F2 (deliberate change): the resume path also grounds and reports (was: `--action repair` only).
+        Assert.Contains("audit-grounding --suite {suite} --action ground,repair,review --output-format json", SkillContent.Generate);
 }

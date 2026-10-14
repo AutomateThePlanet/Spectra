@@ -73,7 +73,15 @@ public sealed class ConfigRuleMatrixTests : IDisposable
         // Spec 084 FR-029: the optional update-triage keys.
         ["update null"] = FromTemplate(r => r["update"] = null),
         ["update.group_size null"] = FromTemplate(r => r["update"] = new JsonObject { ["group_size"] = null }),
-        ["update.group_size 0"] = FromTemplate(r => r["update"] = new JsonObject { ["group_size"] = 0 })
+        ["update.group_size 0"] = FromTemplate(r => r["update"] = new JsonObject { ["group_size"] = 0 }),
+        // Spec 098 F1: the pre-069 critic block (v1.45 template) and a GitHub Models value never fail a command.
+        ["pre-069 critic block (v1.45)"] = FromTemplate(r => r["ai"]!["critic"] = new JsonObject
+            { ["enabled"] = true, ["provider"] = "github-models", ["model"] = "gpt-5-mini" }),
+        ["ai.critic.model openai/gpt-4.1"] = FromTemplate(r => r["ai"]!["critic"] = new JsonObject { ["model"] = "openai/gpt-4.1" }),
+        // Spec 098 F9: the optional coverage threshold (0–1).
+        ["generation.coverage_threshold null"] = FromTemplate(r => r["generation"]!["coverage_threshold"] = null),
+        ["generation.coverage_threshold missing (pre-098)"] = FromTemplate(r => r["generation"]!.AsObject().Remove("coverage_threshold")),
+        ["generation.coverage_threshold 2"] = FromTemplate(r => r["generation"]!["coverage_threshold"] = 2)
     };
 
     public static TheoryData<string, int, string?, int, int, string?, int> Rows => new()
@@ -96,7 +104,12 @@ public sealed class ConfigRuleMatrixTests : IDisposable
         { "generation / Generation duplicate", 1, "CONFIG_INVALID", 0,      1, "CONFIG_INVALID", 0 },
         { "update null",                      0, null, 0,                   0, null, 0 },
         { "update.group_size null",           0, null, 0,                   0, null, 0 },
-        { "update.group_size 0",              1, "CONFIG_INVALID", 0,       1, "CONFIG_INVALID", 0 }
+        { "update.group_size 0",              1, "CONFIG_INVALID", 0,       1, "CONFIG_INVALID", 0 },
+        { "pre-069 critic block (v1.45)",     0, null, 0,                   0, null, 0 },
+        { "ai.critic.model openai/gpt-4.1",   0, null, 0,                   0, null, 0 },
+        { "generation.coverage_threshold null", 0, null, 0,                 0, null, 0 },
+        { "generation.coverage_threshold missing (pre-098)", 0, null, 0,    0, null, 0 },
+        { "generation.coverage_threshold 2",  1, "CONFIG_INVALID", 0,       1, "CONFIG_INVALID", 0 }
     };
 
     private void UseConfig(string row)

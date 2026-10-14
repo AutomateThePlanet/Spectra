@@ -85,12 +85,19 @@ public sealed class SuiteDeleteResult : CommandResult
     [JsonPropertyName("warnings")]
     public IReadOnlyList<string> Warnings { get; init; } = Array.Empty<string>();
 
-    /// <summary>Spec 096 (dry run): the suite's staging folders, generation plan and verdict files that would go.</summary>
+    /// <summary>
+    /// Spec 098 (F3): the suite's tests' verdict and fingerprint-record files that were (or would be) removed — listed
+    /// here only, never under the leftovers.
+    /// </summary>
+    [JsonPropertyName("verdict_files_removed")]
+    public IReadOnlyList<string> VerdictFilesRemoved { get; init; } = Array.Empty<string>();
+
+    /// <summary>Spec 096 (dry run): the suite's staging folders and generation plan that would go.</summary>
     [JsonPropertyName("leftovers")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<string>? Leftovers { get; init; }
 
-    /// <summary>Spec 096: the suite's staging folders, generation plan and verdict files that were removed.</summary>
+    /// <summary>Spec 096: the suite's staging folders and generation plan that were removed.</summary>
     [JsonPropertyName("leftovers_removed")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<string>? LeftoversRemoved { get; init; }

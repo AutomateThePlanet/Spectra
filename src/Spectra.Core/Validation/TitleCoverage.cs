@@ -150,12 +150,13 @@ public static class TitleCoverage
     }
 
     /// <summary>
-    /// Analyze L1: the warning for a <c>generation.duplicate_threshold</c> outside (0, 1] (used as given), or null.
+    /// Analyze L1: the warning for a coverage threshold outside (0, 1] (used as given), or null. Spec 098 (F9):
+    /// <paramref name="key"/> names the config key the value came from.
     /// </summary>
-    public static string? ThresholdWarning(double threshold) =>
+    public static string? ThresholdWarning(double threshold, string key = "generation.coverage_threshold") =>
         threshold is > 0 and <= 1
             ? null
-            : $"generation.duplicate_threshold = {threshold.ToString(CultureInfo.InvariantCulture)} is outside (0, 1]; "
+            : $"{key} = {threshold.ToString(CultureInfo.InvariantCulture)} is outside (0, 1]; "
               + "every behaviour (≤ 0) or none (> 1) is treated as covered.";
 
     /// <summary>

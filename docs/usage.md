@@ -332,6 +332,15 @@ The audit lists only the suite's own tests, and marks a verdict the ingest would
 critic again for it. The skills write grounding blocks only for the tests the critic confirmed (`--ids`), so a test
 reported "unverified" never gets one (Spec 097).
 
+What each test needs comes from its verdict (Spec 098): a confirmed (`grounded`) test whose block isn't written yet is
+`ground` — it only needs `ingest-grounding --all --ids`, never a repair; a `partial` test is `repair`; a `hallucinated`
+test is `review` — it waits for your decision and is never repaired automatically. When the generate skill resumes an
+interrupted run it asks the audit for `--action ground,repair,review` and handles each list that way:
+
+```bash
+spectra ai audit-grounding --suite smoke --action ground,repair,review --output-format json
+```
+
 **Choosing the critic's model.** The critic runs on `ai.critic.model` (default `sonnet`), independent of the model you
 generate with. Set it in `spectra.config.json` (an alias such as `opus`, a model id, or `inherit` for your session's
 model) and run `spectra update-skills`; an agent file you edited by hand is never overwritten.
