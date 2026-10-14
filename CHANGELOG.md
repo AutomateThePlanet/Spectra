@@ -538,7 +538,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`ai.generation_batch_size`** is no longer written by `init`; it was read by nothing. `generation.batch_size` (094)
   is the batch size. An existing config that has it still loads.
 
+### Fixed (Spec 097 — verification hardening, Phase 6 part 2)
+
+- **Grounding blocks only for confirmed tests.** The generate skill's critic step and the update skill's re-verify step
+  now call `ingest-grounding --all --ids <the tests the critic confirmed>` (skipped when there are none). Before, the
+  call had no ids: a test reported unverified still got a `grounded` block, and leftover verdicts of other tests were
+  written too, inflating `written` (a false "expected N" warning).
+- **`audit-grounding` tells the truth and stays small.** It lists only the suite's indexed tests (other suites' and stray
+  verdicts were listed before), flags a verdict the ingest would refuse as stale (`stale: true`, `action_needed:
+  critic`, `summary.stale`), and gains `--action critic|repair|review|none` and `--ids` filters (the summary keeps
+  covering the whole suite). The generate skill resumes with `--action repair`, so only the tests to repair reach the
+  session.
+- **No repair from a stale verdict.** `compile-repair-prompt` refuses it with `VERDICT_STALE` (exit 4);
+  `compile-repair-batch` leaves it out of its manifest and lists it on stderr under `stale`.
+- **One clock.** A verdict is compared with its fingerprint record's own file time (the same file system as the
+  verdict), not with `compiled_at` (the CLI's clock). On a network share or container mount with a skewed clock, every
+  new verdict was refused as stale.
+- **An empty `--ids` means "not given"** in `ingest-grounding` and `ingest-verdict` (it processed nothing before); with
+  `--repaired` it is still `IDS_REQUIRED`.
+- **`--dry-run` works** on `ingest-grounding --all`, `ingest-verdict` and `ingest-analysis`: the same JSON (plus
+  `dry_run: true`) and exit code, nothing written. The global flag was accepted and ignored before — these commands
+  wrote anyway. `ingest-grounding --test … --dry-run` is refused (exit 1).
+- **The critic's model is configurable:** `ai.critic.model` (default `sonnet`; an alias, a model id, or `inherit`) is
+  written into the installed critic agent by `init` and `update-skills`. The agent used to pin `claude-sonnet-4-6`, and
+  nothing selected it. The dead in-process critic classes (`CriticFactory`, `CriticModelResolver`, `ICriticRuntime`)
+  and the unused `ai.critic` members are removed.
+
 ### Notes
+
+- **`audit-grounding` (Spec 097)** no longer lists other suites' tests or verdicts of ids in no index. A stale verdict
+  shows as `critic (stale)` instead of its old action.
+- **`update-skills` (Spec 097) reads `spectra.config.json`** for `ai.critic.model`. An invalid config never fails it:
+  one warning, the critic agent keeps its installed model line, everything else is refreshed. A critic agent installed
+  before 097 and never edited moves from `claude-sonnet-4-6` to `sonnet`; an edited one is kept.
+- **`--dry-run` (Spec 097)** on `ingest-grounding --all` and `ingest-analysis` now writes nothing; a script that passed
+  the flag and relied on the writes must drop it.
+- **Verdict freshness (Spec 097)** compares file times; a verdict written within 2 s before its record is still fresh.
 
 - **Changed meaning (Spec 095):** `already_covered` is now the number of covered *behaviours*, `recommended` the number
   of uncovered ones. A plan written by 094 still compiles, with a warning to re-run the analysis for the corrected

@@ -329,6 +329,10 @@ public sealed class ConfigLoader
         return present;
     }
 
+    /// <summary>Spec 097 (FR-020): <c>ai.critic.model</c> — first a letter or digit, then letters, digits, <c>._:[]-</c>.</summary>
+    private static readonly System.Text.RegularExpressions.Regex CriticModelPattern =
+        new(@"^[A-Za-z0-9][A-Za-z0-9._:\[\]-]{0,199}\z", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
     private static IReadOnlyList<ParseError> Validate(SpectraConfig config, string? filePath)
     {
         var errors = new List<ParseError>();
@@ -357,6 +361,14 @@ public sealed class ConfigLoader
         {
             errors.Add(new ParseError("INVALID_UPDATE_GROUP_SIZE",
                 "update.group_size must be an integer ≥ 1", filePath));
+        }
+
+        // Spec 097 (FR-020): the optional critic model — one token that starts with a letter or digit, so the unquoted
+        // agent frontmatter value is always a YAML string (a missing or null key means sonnet).
+        if (config.Ai?.Critic?.Model is { } criticModel && !CriticModelPattern.IsMatch(criticModel))
+        {
+            errors.Add(new ParseError("INVALID_CRITIC_MODEL",
+                "ai.critic.model must be one word (an alias such as sonnet, a model id, or inherit)", filePath));
         }
 
         // Spec 094: the optional generation batch size (a missing or null key means 8).

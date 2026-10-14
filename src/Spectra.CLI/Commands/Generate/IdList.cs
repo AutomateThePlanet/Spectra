@@ -14,4 +14,10 @@ internal static class IdList
         (value ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+    /// <summary>
+    /// Spec 097 (FR-016): whether <c>--ids</c> was given — a value that is empty after trimming (including only commas
+    /// and spaces) counts as not given.
+    /// </summary>
+    public static bool IsGiven(string? value) => Parse(value).Count > 0;
 }

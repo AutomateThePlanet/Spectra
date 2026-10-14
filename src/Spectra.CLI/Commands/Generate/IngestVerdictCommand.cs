@@ -49,10 +49,13 @@ public sealed class IngestVerdictCommand : Command
             var from = context.ParseResult.GetValueForOption(fromOption);
             var suite = context.ParseResult.GetValueForOption(suiteOption);
             var all = context.ParseResult.GetValueForOption(allFlag);
-            var idsGiven = context.ParseResult.FindResultFor(idsOption) is not null;
+            var idsGiven = IdList.IsGiven(context.ParseResult.GetValueForOption(idsOption)); // Spec 097: empty = not given
             var ids = IdList.Parse(context.ParseResult.GetValueForOption(idsOption));
             var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
             var json = outputFormat == OutputFormat.Json;
+            // Spec 097 (FR-018): ingest-verdict only reads and classifies — it writes nothing in either form — so
+            // --dry-run is accepted in both and only marks the JSON.
+            var dryRun = context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption);
 
             // Spec 093 (FR-017): --ids belongs to the batch form only (the 091 rule of ingest-grounding).
             if (idsGiven && !all)
@@ -76,16 +79,16 @@ public sealed class IngestVerdictCommand : Command
                     context.ExitCode = ExitError;
                     return;
                 }
-                context.ExitCode = await RunBatchAsync(suite, idsGiven ? ids : null, json, context.GetCancellationToken());
+                context.ExitCode = await RunBatchAsync(suite, idsGiven ? ids : null, json, dryRun, context.GetCancellationToken());
             }
             else
             {
-                context.ExitCode = await RunAsync(from, json, context.GetCancellationToken());
+                context.ExitCode = await RunAsync(from, json, dryRun, context.GetCancellationToken());
             }
         });
     }
 
-    private static async Task<int> RunAsync(string? from, bool json, CancellationToken ct)
+    private static async Task<int> RunAsync(string? from, bool json, bool dryRun, CancellationToken ct)
     {
         string content;
         if (!string.IsNullOrWhiteSpace(from))
@@ -120,13 +123,13 @@ public sealed class IngestVerdictCommand : Command
             var verdict = result.Result!.Verdict.ToString().ToLowerInvariant();
             if (json)
             {
-                Console.Out.WriteLine(JsonSerializer.Serialize(new
+                Console.Out.WriteLine(DryRunJson.Serialize(new
                 {
                     outcome = result.Outcome.ToString(),
                     verdict,
                     score = result.Result.Score,
                     drop = result.Drops
-                }));
+                }, dryRun));
             }
             else
             {
@@ -155,7 +158,7 @@ public sealed class IngestVerdictCommand : Command
         return result.Outcome == VerdictIngestOutcome.EmptyResponse ? ExitEmpty : ExitParseInvalid;
     }
 
-    private static async Task<int> RunBatchAsync(string suite, IReadOnlyList<string>? ids, bool json, CancellationToken ct)
+    private static async Task<int> RunBatchAsync(string suite, IReadOnlyList<string>? ids, bool json, bool dryRun, CancellationToken ct)
     {
         var currentDir = Directory.GetCurrentDirectory();
         var testsDir = await ResolveTestsDirAsync(currentDir, ct);
@@ -179,7 +182,7 @@ public sealed class IngestVerdictCommand : Command
         var verdictDir = Path.Combine(currentDir, ".spectra", "verdicts");
         if (!Directory.Exists(verdictDir))
         {
-            EmitBatchResult(json, suite, 0, 0, 0, 0, [], [], notFound);
+            EmitBatchResult(json, dryRun, suite, 0, 0, 0, 0, [], [], notFound);
             return ExitSuccess;
         }
 
@@ -237,7 +240,7 @@ public sealed class IngestVerdictCommand : Command
                 testId, result.Result.Verdict.ToString().ToLowerInvariant(), result.Result.Score, result.Drops ? "drop" : "pass"));
         }
 
-        EmitBatchResult(json, suite, grounded, partial, hallucinated, errors, stale, results, notFound);
+        EmitBatchResult(json, dryRun, suite, grounded, partial, hallucinated, errors, stale, results, notFound);
         return ExitSuccess;
     }
 
@@ -248,13 +251,13 @@ public sealed class IngestVerdictCommand : Command
         [property: JsonPropertyName("score")] double Score,
         [property: JsonPropertyName("gate")] string Gate);
 
-    private static void EmitBatchResult(bool json, string suite,
+    private static void EmitBatchResult(bool json, bool dryRun, string suite,
         int grounded, int partial, int hallucinated, int errors, IReadOnlyList<string> stale,
         IReadOnlyList<VerdictResult> results, IReadOnlyList<string> notFound)
     {
         if (json)
         {
-            Console.Out.WriteLine(JsonSerializer.Serialize(new
+            Console.Out.WriteLine(DryRunJson.Serialize(new
             {
                 command = "ingest-verdict",
                 mode = "batch",
@@ -267,7 +270,7 @@ public sealed class IngestVerdictCommand : Command
                 stale,
                 results,
                 not_found = notFound
-            }));
+            }, dryRun));
         }
 
         // The human summary: stdout in human mode, stderr in JSON mode (never suppressed; the 091 rule).

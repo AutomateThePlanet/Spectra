@@ -60,17 +60,19 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 
 ## `ai` — Generation Pacing (no provider/model routing anymore)
 
-> `ai.providers` and `ai.critic` (as a config block) were removed entirely along
-> with the GitHub Copilot SDK. SPECTRA makes no model calls of its own. Generation and analysis
-> run as ordinary turns in your interactive Claude Code session, and the critic runs as the
-> `spectra-critic` subagent. There is nothing left here to route to a provider or pick a generator
-> model; a legacy config with `ai.providers`/`ai.critic` still loads (the keys are simply ignored).
+> `ai.providers` and the in-process critic were removed entirely along with the GitHub Copilot SDK.
+> SPECTRA makes no model calls of its own. Generation and analysis run as ordinary turns in your
+> interactive Claude Code session, and the critic runs as the `spectra-critic` subagent, on the model
+> `ai.critic.model` names (Spec 097, below). There is nothing left here to route to a provider or pick a
+> generator model; a legacy config with `ai.providers` or old `ai.critic.*` keys still loads (those keys
+> are ignored).
 > See [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) and the
 > [AI Models & Cost Guide](ai-models-cost-guide.md).
 
 ```json
 {
   "ai": {
+    "critic": { "model": "sonnet" },
     "generation_timeout_minutes": 5,
     "analysis_timeout_minutes": 2
   }
@@ -79,6 +81,7 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
+| `critic.model` | string | `sonnet` | Spec 097: the model the `spectra-critic` subagent runs on — an alias (`sonnet`, `opus`, `haiku`), a model id, or `inherit` (the session's model). One word that starts with a letter or digit (letters, digits, `.`, `-`, `_`, `:`, `[`, `]`); anything else is `CONFIG_INVALID`. Optional (missing → `sonnet`). |
 | `generation_timeout_minutes` | int | `5` | Bounds the deterministic CLI side of the generation seam (parsing, validation, index writes), not the model turn itself, which runs in your own session. |
 | `analysis_timeout_minutes` | int | `2` | Same, for the behavior-analysis seam. |
 
@@ -91,9 +94,12 @@ To choose a model, pick it the same way you'd pick a model for any other Claude 
 [AI Models & Cost Guide](ai-models-cost-guide.md#choosing-a-session-model) for guidance on
 Haiku/Sonnet/Opus trade-offs.
 
-The critic model is fixed by the `model:` frontmatter field in
-`.claude/agents/spectra-critic.agent.md` (shipped as `claude-sonnet-4-6`), not by
-`spectra.config.json`. Edit that file directly to change it.
+The critic model is `ai.critic.model` (Spec 097). `spectra init` and `spectra update-skills` write it into the
+`model:` frontmatter field of `.claude/agents/spectra-critic.agent.md`, which is what Claude Code reads. After changing
+the key, run `spectra update-skills`: an unedited agent file is rewritten with the new model, an edited one is never
+overwritten (it is reported as customized). By default the critic runs on `sonnet`, independent of the model your
+session generates with (dual-model verification); `inherit` makes it use the session's model. `update-skills` never fails
+because of the config: when it is invalid, it warns, keeps the agent's installed model and refreshes everything else.
 
 #### `.spectra-debug.log` — no longer tracks per-call AI timing
 
@@ -110,14 +116,14 @@ the [AI Models & Cost Guide](ai-models-cost-guide.md#tracking-what-youve-spent).
 AI call), so `TESTIMIZE DISABLED/HEALTHY/DISPOSED` etc. still log normally when `debug.enabled` is
 set.
 
-### `ai.critic` — removed
+### `ai.critic` — only `model`
 
-There is no `ai.critic` config block anymore. Grounding verification runs as the `spectra-critic`
-subagent (`.claude/agents/spectra-critic.agent.md`), whose `model:` frontmatter field is the only
-model selector, and whose `timeout`/concurrency come from how Claude Code itself schedules subagent
-calls, not from `spectra.config.json`. See [Grounding Verification](grounding-verification.md)
-and [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md). A legacy config
-that still carries `ai.critic.*` loads unchanged; the keys are ignored.
+Grounding verification runs as the `spectra-critic` subagent (`.claude/agents/spectra-critic.agent.md`). Its model is
+`ai.critic.model` (above); its timeout and concurrency come from how Claude Code itself schedules subagent calls, not
+from `spectra.config.json`. The other `ai.critic.*` keys of the removed in-process critic (`enabled`, `timeout_seconds`,
+`max_concurrent`, …) are ignored; the retired provider keys (`provider`, `api_key_env`, `base_url`) are ignored with a
+`spectra validate` notice. See [Grounding Verification](grounding-verification.md) and
+[Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md).
 
 ## `generation` — Test Case Generation Settings
 

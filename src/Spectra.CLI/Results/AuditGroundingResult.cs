@@ -12,6 +12,11 @@ public sealed class AuditGroundingResult : CommandResult
 
     [JsonPropertyName("summary")]
     public required AuditGroundingSummary Summary { get; init; }
+
+    /// <summary>Spec 097 (FR-006): <c>--ids</c> not in the suite's index; only when <c>--ids</c> was given.</summary>
+    [JsonPropertyName("not_found")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? NotFound { get; init; }
 }
 
 public sealed class AuditGroundingEntry
@@ -37,6 +42,14 @@ public sealed class AuditGroundingEntry
     [JsonPropertyName("file")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? File { get; init; }
+
+    /// <summary>
+    /// Spec 097 (FR-007): true when the verdict fails the 090/091 freshness check (the ingest would refuse it as
+    /// <c>VERDICT_STALE</c>); then <see cref="ActionNeeded"/> is <c>critic</c>. Omitted otherwise.
+    /// </summary>
+    [JsonPropertyName("stale")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Stale { get; init; }
 }
 
 public sealed class AuditGroundingSummary
@@ -56,4 +69,8 @@ public sealed class AuditGroundingSummary
     /// <summary>Spec 090 (FR-A7): tests with neither a verdict file nor a grounding block.</summary>
     [JsonPropertyName("unverified")]
     public int Unverified { get; init; }
+
+    /// <summary>Spec 097 (FR-007): entries whose verdict is stale.</summary>
+    [JsonPropertyName("stale")]
+    public int Stale { get; init; }
 }

@@ -184,20 +184,6 @@ public class VerificationIntegrationTests
     }
 
     [Fact]
-    public void VerificationPipeline_CriticFactory_ValidatesProviders()
-    {
-        // Spec 039: canonical 5 providers + legacy 'github' alias.
-        Assert.True(CriticFactory.IsSupported("openai"));
-        Assert.True(CriticFactory.IsSupported("anthropic"));
-        Assert.True(CriticFactory.IsSupported("github-models"));
-        Assert.True(CriticFactory.IsSupported("azure-openai"));
-        Assert.True(CriticFactory.IsSupported("azure-anthropic"));
-        Assert.True(CriticFactory.IsSupported("github"));   // legacy alias still recognized
-        Assert.False(CriticFactory.IsSupported("google"));  // hard-rejected post-039
-        Assert.False(CriticFactory.IsSupported("unknown"));
-    }
-
-    [Fact]
     public void VerificationPipeline_PromptBuilder_HandlesEmptyDocs()
     {
         var promptBuilder = new CriticPromptBuilder();

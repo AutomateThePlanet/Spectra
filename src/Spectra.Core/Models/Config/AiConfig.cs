@@ -7,10 +7,18 @@ namespace Spectra.Core.Models.Config;
 /// </summary>
 public sealed class AiConfig
 {
-    // Spec 069: `ai.providers` and `ai.critic` were removed — SPECTRA no longer runs an in-process
-    // model (all inference is the user's Claude Code session), so the config carries no provider or
-    // critic block. Legacy configs that still carry those keys deserialize cleanly (unmapped members
-    // are ignored). Only the surviving cost/telemetry levers remain below.
+    // Spec 069: `ai.providers` and the in-process critic were removed — SPECTRA no longer runs an in-process
+    // model (all inference is the user's Claude Code session), so the config carries no provider block.
+    // Legacy configs that still carry those keys deserialize cleanly (unmapped members are ignored).
+    // Spec 097: `ai.critic.model` is back, as the model the spectra-critic subagent runs on.
+
+    /// <summary>Spec 097 (FR-020): the optional <c>ai.critic</c> block.</summary>
+    [JsonPropertyName("critic")]
+    public CriticConfig? Critic { get; init; }
+
+    /// <summary>Spec 097: the critic's model — <c>ai.critic.model</c>, or <see cref="CriticConfig.DefaultModel"/>.</summary>
+    [JsonIgnore]
+    public string EffectiveCriticModel => Critic?.Model ?? CriticConfig.DefaultModel;
 
     /// <summary>
     /// Per-batch timeout for the AI generation SDK call, in minutes. Default 5.

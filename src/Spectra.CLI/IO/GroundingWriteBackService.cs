@@ -30,14 +30,16 @@ public sealed class GroundingWriteBackService
     }
 
     /// <summary>
-    /// Classifies the verdict JSON, builds GroundingMetadata, and rewrites the test file.
+    /// Classifies the verdict JSON, builds GroundingMetadata, and rewrites the test file. Spec 097 (FR-017): with
+    /// <paramref name="dryRun"/> the same result is returned and nothing is written.
     /// </summary>
     public async Task<WriteBackResult> WriteAsync(
         string testFilePath,
         string verdictJson,
         int repairAttempts = 0,
         bool repaired = false,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool dryRun = false)
     {
         if (!File.Exists(testFilePath))
             return new WriteBackResult { Outcome = WriteBackOutcome.TestNotFound, ErrorMessage = $"Test file not found: {testFilePath}" };
@@ -98,7 +100,10 @@ public sealed class GroundingWriteBackService
 
         // `with` keeps every other field (and the source layout), so only the grounding block changes.
         var updated = original with { Grounding = grounding };
-        await _writer.WriteAsync(testFilePath, updated, ct);
+        if (!dryRun)
+        {
+            await _writer.WriteAsync(testFilePath, updated, ct);
+        }
 
         return new WriteBackResult { Outcome = WriteBackOutcome.Success, Grounding = grounding };
     }

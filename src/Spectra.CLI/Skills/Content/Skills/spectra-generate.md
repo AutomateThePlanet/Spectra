@@ -68,7 +68,7 @@ In the main flow (Spec 093/094), `compile-analysis-prompt` and `ingest-analysis`
 | `ingest-tests {suite} --from {file}` | Validates and persists the tests you generated (fail-loud). Omit `--from` to read stdin. |
 | `ingest-analysis --suite {name} --from {file}` | Turns your behavior JSON into a recommendation (deterministic accounting). |
 | `config --raw` | Returns the resolved config JSON — use this instead of `cat spectra.config.json` (command already exists, no shell needed). |
-| `audit-grounding --suite {name}` | **Spec 072** Per-test grounding state: id, verdict, grounding_written, flagged, action_needed, summary counts. Use instead of `ls .spectra/verdicts/` improvisation. |
+| `audit-grounding --suite {name} [--action critic,repair,review,none] [--ids a,b]` | **Spec 072/097** Per-test grounding state of the suite's indexed tests: id, verdict, grounding_written, flagged, action_needed, `stale` (a verdict the ingest would refuse — action `critic`), summary counts (whole suite). Filter with `--action` / `--ids` to keep the output small. Use instead of `ls .spectra/verdicts/` improvisation. |
 | `ingest-grounding --suite {name} --all` | **Spec 073** Batch form: write grounding blocks for all eligible tests in one call. Without `--repaired`: writes grounded verdicts only (partial-pre-repair filter). With `--repaired --repair-attempts N`: writes all ungrounded tests after repair. Idempotent — skips already-written blocks. |
 | `ingest-verdict --suite {name} --all` | **Spec 077** Batch form: classify all verdict files for the suite in one call; emits summary `{grounded, partial, hallucinated, errors}`. Replaces per-test `--from` loops. Advisory-gate only — no file writes. |
 | `ingest-update {suite} --all --keep-baseline` | **Spec 077** Batch form: ingest all staged repairs from `.spectra/repairs/{suite}/repaired-{id}.json` in one call (**Spec 089:** repairs have their own folder; this call never reads `.spectra/updates/`); emits `{written, unchanged, skipped_no_original, errors, results}`; exit `8` when a staged file failed (read `results`, retry). Replaces per-entry `--test-id` loops. **Spec 085:** repairs always pass `--keep-baseline` — a repair fixes grounding, not doc drift, so the test's source-change baseline must not move (a pending doc change stays in `update-triage`). |
@@ -215,7 +215,7 @@ For each created id, update `.spectra/progress.json` before invoking the critic:
 spectra ai ingest-verdict --suite {suite} --all --ids <created ids> --output-format json
 ```
 Route each test by its entry in `results` — the verdict the CLI classified, not the critic's line:
-2. **`grounded` (gate `pass`):** Add to kept-grounded count. (Grounding blocks are written in one batch call — see below.)
+2. **`grounded` (gate `pass`):** Add the id to the kept-grounded list (`kept-grounded` = its length). Only these tests get a grounding block, in one batch call — see below. A test reported **unverified** (rows 5 and 6) is never in the list.
 3. **`partial`:** Note the id for the repair in 8b.
 4. **`hallucinated` (gate `drop`)** — only when the critic's line agrees or there is no line:
    ```
@@ -227,11 +227,11 @@ Route each test by its entry in `results` — the verdict the CLI classified, no
 5. **No `results` entry** (the critic's compile was refused, its verdict JSON stayed damaged, or the CLI lists the test as stale or not found): invoke the critic once more for that test and run the verdict ingest for it again. If there is still no entry, the test is kept as **unverified**: it is never counted as kept-grounded, never gets a grounding block, is never regenerated or deleted, and is listed in Step 9 under "Unverified (critic could not judge)".
 6. **The critic's line disagrees with the CLI's verdict** → the test is kept as **unverified** and reported with both — never dropped. (A test kept with a `hallucinated` verdict is later listed under `skipped_hallucinated` by the grounding batch; that is expected, not a failure.)
 
-**After batch verdict-ingest — batch grounding-ingest for grounded tests (one call, no loop):**
+**After batch verdict-ingest — batch grounding-ingest for the kept-grounded tests (one call, no loop; Spec 097):**
 ```
-spectra ai ingest-grounding --suite {suite} --all --output-format json
+spectra ai ingest-grounding --suite {suite} --all --ids {kept-grounded ids} --output-format json
 ```
-Writes grounding blocks for all grounded tests in one pass; skips partial tests (pre-repair filter — their blocks are written after 8b). Test files are at `test-cases/{suite}/{id}.md` (never use `find` or `cat` to locate them).
+Skip this call when no test was kept as grounded (and skip the check below). `--ids` names exactly the kept-grounded tests, so a test reported unverified, or a verdict left over from another run, never gets a block. Partial tests get theirs after 8b. Test files are at `test-cases/{suite}/{id}.md` (never use `find` or `cat` to locate them).
 `skipped_hallucinated` / `hallucinated` (Spec 091) lists tests that were kept with a hallucinated verdict — for example by the update flow, which leaves that decision to the user. That is not a failure and not part of `written`: report the ids and continue.
 
 **After batch grounding-ingest — check the result before proceeding to 8b (MANDATORY):**
@@ -269,7 +269,7 @@ spectra ai ingest-grounding --suite {suite} --all --repaired --repair-attempts 1
 ```
 `{ids}` is the comma-separated list of the tests re-critiqued in this round — those whose repair ingest reported `written` or `unchanged` in `results` — minus any test dropped in the re-critic phase. A repair that failed is never in it (Spec 091: `--all --repaired` refuses without `--ids` with `IDS_REQUIRED`, so a test whose repair didn't land is never marked repaired). If the list is empty, skip this call. Writes grounding blocks for those tests: `grounded` blocks for successfully repaired tests, `partial` blocks (`flagged_for_review: true` unless repaired) for those still unresolved.
 
-**Resume note:** If the repair is interrupted (session end, cancellation), re-invoke the generate skill and run `spectra ai audit-grounding --suite {suite} --output-format json`: the ids with `action_needed: repair` are the partial tests still to repair — hand them to the `spectra-repairer` subagent and continue with the re-critic phase. Tests whose grounding block is already written are never re-processed.
+**Resume note:** If the repair is interrupted (session end, cancellation), re-invoke the generate skill and run `spectra ai audit-grounding --suite {suite} --action repair --output-format json` (Spec 097: only the entries that need a repair reach this conversation): the ids it lists — `action_needed: repair` — are the partial tests still to repair — hand them to the `spectra-repairer` subagent and continue with the re-critic phase. Tests whose grounding block is already written are never re-processed.
 
 Update `.spectra/progress.json`: `{"active":8}` (marks Step 9 active — complete sentinel is `active >= 9`).
 

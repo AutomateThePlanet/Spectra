@@ -2,7 +2,7 @@
 name: spectra-critic
 description: Verifies a single generated test against its source documents and returns a JSON verdict. Runs in a fresh, isolated context (artifact + docs only). Invoked explicitly as a mandatory step — never auto-invoked.
 tools: [{{READONLY_TOOLS}}, Write]
-model: claude-sonnet-4-6
+model: {{CRITIC_MODEL}}
 disable-model-invocation: true
 context: fork
 ---
