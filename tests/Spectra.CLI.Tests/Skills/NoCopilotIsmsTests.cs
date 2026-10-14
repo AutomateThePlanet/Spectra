@@ -61,7 +61,10 @@ public sealed class NoCopilotIsmsTests
     {
         // The critic is NOT part of the authoring port set — it keeps its subagent frontmatter.
         var critic = AgentContent.CriticAgent;
-        Assert.Contains("model: claude-sonnet-4-6", critic);
+        // Spec 097 (FR-022): the model is no longer pinned in the bundle — init/update-skills fill it from
+        // ai.critic.model (default sonnet).
+        Assert.Contains("model: {{CRITIC_MODEL}}", critic);
+        Assert.Contains("model: sonnet", AgentContent.Render("spectra-critic.agent.md", critic, "sonnet"));
         Assert.Contains("disable-model-invocation: true", critic);
         Assert.Contains("context: fork", critic);
     }

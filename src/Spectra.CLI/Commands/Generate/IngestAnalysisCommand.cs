@@ -54,13 +54,14 @@ public sealed class IngestAnalysisCommand : Command
             var from = context.ParseResult.GetValueForOption(fromOption);
             var focus = context.ParseResult.GetValueForOption(focusOption);
             var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
+            var dryRun = context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption);
             context.ExitCode = await RunAsync(
-                suite, from, focus, outputFormat == OutputFormat.Json, context.GetCancellationToken());
+                suite, from, focus, outputFormat == OutputFormat.Json, dryRun, context.GetCancellationToken());
         });
     }
 
     private static async Task<int> RunAsync(
-        string? suite, string? from, string? focus, bool json, CancellationToken ct)
+        string? suite, string? from, string? focus, bool json, bool dryRun, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(suite))
         {
@@ -122,7 +123,11 @@ public sealed class IngestAnalysisCommand : Command
             var plan = await BuildPlanAsync(currentDir, config, suite, focus, result, ct);
             try
             {
-                await GenerationPlanStore.SaveAsync(currentDir, plan, ct);
+                // Spec 097 (FR-017): a dry run reports the same plan and writes no file.
+                if (!dryRun)
+                {
+                    await GenerationPlanStore.SaveAsync(currentDir, plan, ct);
+                }
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -133,7 +138,7 @@ public sealed class IngestAnalysisCommand : Command
 
             if (json)
             {
-                Console.Out.WriteLine(JsonSerializer.Serialize(new Dictionary<string, object?>
+                Console.Out.WriteLine(DryRunJson.Serialize(new Dictionary<string, object?>
                 {
                     ["outcome"] = result.Outcome.ToString(),
                     ["already_covered"] = result.AlreadyCovered,
@@ -173,7 +178,7 @@ public sealed class IngestAnalysisCommand : Command
                         ["reason"] = b.Reason
                     }),
                     ["notes"] = plan.Notes
-                }, CriteriaCommandIO.Json));
+                }, dryRun, CriteriaCommandIO.Json));
             }
 
             // The human summary: stdout in human mode, stderr in JSON mode (never suppressed).

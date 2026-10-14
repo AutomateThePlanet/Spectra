@@ -81,6 +81,7 @@ public sealed class CompileRepairBatchCommand : Command
 
         var parser = new TestCaseParser();
         var entries = new List<RepairBatchEntry>();
+        var stale = new List<(string Id, string Reason)>();
 
         var verdictFiles = Directory.GetFiles(verdictDir, "critic-verdict-*.json")
             .OrderBy(f => f);
@@ -128,6 +129,13 @@ public sealed class CompileRepairBatchCommand : Command
             if (!testParsed.IsSuccess || testParsed.Value is null) continue;
             var test = testParsed.Value;
 
+            // Spec 097 (FR-011): a stale verdict gets no prompt; it is listed on stderr instead.
+            if (VerdictFreshness.Check(currentDir, testId, test, vf) is { IsStale: true } staleResult)
+            {
+                stale.Add((testId, staleResult.Message(testId)));
+                continue;
+            }
+
             var nonGrounded = verResult.Findings
                 .Where(f => f.Status != FindingStatus.Grounded)
                 .ToList();
@@ -156,6 +164,21 @@ public sealed class CompileRepairBatchCommand : Command
         });
 
         Console.Out.WriteLine(json);
+
+        // Spec 097 (FR-011): stdout stays the array; stale tests go to stderr as one JSON line plus a human line each.
+        if (stale.Count > 0)
+        {
+            Console.Error.WriteLine(JsonSerializer.Serialize(new
+            {
+                command = "compile-repair-batch",
+                stale = stale.Select(s => new { id = s.Id, reason = s.Reason })
+            }));
+            foreach (var (id, _) in stale)
+            {
+                Console.Error.WriteLine($"{id}: stale verdict — run the critic again");
+            }
+        }
+
         return ExitSuccess;
     }
 

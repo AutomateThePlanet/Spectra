@@ -73,7 +73,7 @@ Execution 228, Integration 8; 4 known warnings.
 | I. Git as source of truth | Tests are still written only by `ingest-tests`. The plan is scratch (gitignored) and derived from the docs; no committed format changes | ✅ |
 | II. Deterministic execution | Model-free CLI. The plan and prompts are byte-identical for identical inputs; staleness is detected by fingerprint, never guessed | ✅ |
 | III. Orchestrator-agnostic, minimal output | `--batch` and the plan are plain CLI/JSON usable by any orchestrator. The agents are Claude Code packaging of the same seams (Spec 056) | ✅ |
-| IV. CLI-first; validated writes; `--dry-run` | `compile-prompt` writes nothing. `ingest-analysis` now writes the scratch plan and has no `--dry-run` — tracked in Complexity Tracking | ⚠ tracked |
+| IV. CLI-first; validated writes; `--dry-run` | `compile-prompt` writes nothing. `ingest-analysis` now writes the scratch plan and has no `--dry-run` — tracked in Complexity Tracking | ✅ (resolved by 097: `--dry-run` added) |
 | V. Simplicity | Reuses the 084 resolver, 088 fence/token/template rules and the 083 loader. Two placeholders, no engine change | ✅ |
 | Test-required discipline | T1–T9 (tasks.md), each proven against `55b541f`; 3 deliberate 093 row changes | ✅ |
 
@@ -168,6 +168,4 @@ tests/Spectra.CLI.Tests/Skills/BatchGenerationAgentTests.cs           # T9 (+ re
 
 ## Complexity Tracking
 
-| Gap | Why it is accepted now | Simpler alternative rejected |
-|---|---|---|
-| IV: `ingest-analysis` writes the generation plan and has no `--dry-run` | The plan is scratch, overwritten per analysis, never committed; deferred with the other `--dry-run` gaps (091's `ingest-grounding --all`) to Phase 6 | Adding `--dry-run` now would make the analyst choose a mode for a scratch file nobody reviews |
+None. The constitution IV row tracked here was resolved by Spec 097 (`--dry-run` on the batch ingests).

@@ -313,7 +313,7 @@ spectra ai review-flagged --suite checkout --no-interaction --output-format json
 
 When a batch has many partials, the `spectra-generate` skill runs a **manifest-driven** repair loop that completes reliably across sessions, batching the mechanical steps instead of looping per test:
 
-1. `spectra ai compile-repair-batch --suite <s>` reads all partial verdict JSONs, filters to those still missing a grounding block, and compiles every repair prompt into one JSON manifest, deterministically and with no model call.
+1. `spectra ai compile-repair-batch --suite <s>` reads all partial verdict JSONs, filters to those still missing a grounding block, and compiles every repair prompt into one JSON manifest, deterministically and with no model call. A test whose verdict is stale (it changed since the critic saw it, or the critic prompt was compiled again) gets no prompt; it is listed on stderr and needs the critic again (Spec 097).
 2. For each manifest entry, the assistant patches the test in-session and writes the corrected test JSON to `.spectra/repairs/<suite>/repaired-<id>.json`.
 3. Once all repairs are staged, they're ingested in one batch call: `spectra ai ingest-update <suite> --all --keep-baseline`. A repair that fails is kept as `failed-<id>.json` and retried at most twice.
 4. Each repaired test that landed (`written` or `unchanged`) is re-verified by the `spectra-critic` subagent, then all resulting verdicts are classified in one batch call: `spectra ai ingest-verdict --suite <s> --all`.
@@ -323,9 +323,18 @@ When a batch has many partials, the `spectra-generate` skill runs a **manifest-d
 To check resume state or inspect grounding status directly:
 
 ```bash
-spectra ai audit-grounding --suite smoke --output-format json   # resume checkpoint: grounding_written==false → still needs repair
-spectra ai compile-repair-batch --suite smoke                   # re-run: emits only the remaining ungrounded partials
+spectra ai audit-grounding --suite smoke --action repair --output-format json   # only the tests still to repair
+spectra ai audit-grounding --suite smoke                                         # the whole suite, stale verdicts marked
+spectra ai compile-repair-batch --suite smoke                                    # re-run: emits only the remaining ungrounded partials
 ```
+
+The audit lists only the suite's own tests, and marks a verdict the ingest would refuse as `critic (stale)` — run the
+critic again for it. The skills write grounding blocks only for the tests the critic confirmed (`--ids`), so a test
+reported "unverified" never gets one (Spec 097).
+
+**Choosing the critic's model.** The critic runs on `ai.critic.model` (default `sonnet`), independent of the model you
+generate with. Set it in `spectra.config.json` (an alias such as `opus`, a model id, or `inherit` for your session's
+model) and run `spectra update-skills`; an agent file you edited by hand is never overwritten.
 
 ---
 

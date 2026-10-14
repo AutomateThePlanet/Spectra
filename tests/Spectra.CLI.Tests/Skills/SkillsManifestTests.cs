@@ -658,7 +658,8 @@ public class SkillsManifestTests : IDisposable
         Assert.Contains("spectra ai compile-critic-prompt --suite <suite> --test <id>", AgentContent.All["spectra-critic.agent.md"]);
         // Spec 093 (FR-015): the verdict ingest names the tests it routes.
         Assert.Contains("spectra ai ingest-verdict --suite <suite> --all --ids <id1>,<id2> --output-format json", step);
-        Assert.Contains("spectra ai ingest-grounding --suite <suite> --all --output-format json", step);
+        // Spec 097 (FR-002): the grounding batch names the group's grounded tests.
+        Assert.Contains("spectra ai ingest-grounding --suite <suite> --all --ids <grounded ids> --output-format json", step);
         Assert.Contains("spectra ai compile-repair-prompt --suite <suite> --test <id>", RepairerAgent);
         Assert.Contains("`.spectra/repairs/<suite>/repaired-<id>.json`", RepairerAgent);
         Assert.Contains("spectra ai ingest-update <suite> --all --keep-baseline", RepairerAgent);

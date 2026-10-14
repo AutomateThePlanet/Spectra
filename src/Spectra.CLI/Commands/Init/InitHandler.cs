@@ -264,8 +264,11 @@ public sealed class InitHandler
             manifest.Record(Skills.ManifestKey.For(_workingDirectory, skillPath), Infrastructure.FileHasher.ComputeHash(content));
         }
 
-        // Create bundled agent files (role-routed by SkillInstallLayout)
-        foreach (var (name, content) in Skills.AgentContent.All)
+        // Create bundled agent files (role-routed by SkillInstallLayout). Spec 097 (FR-022): the critic is installed
+        // with ai.critic.model from the config init has just written (the template's value).
+        var loaded = await ConfigLoader.LoadForReadAsync(_workingDirectory, ConfigSections.None, ct);
+        var criticModel = loaded.IsSuccess ? loaded.Config!.Ai.EffectiveCriticModel : CriticConfig.DefaultModel;
+        foreach (var (name, content) in Skills.AgentContent.Rendered(criticModel))
         {
             var agentPath = Skills.SkillInstallLayout.AgentPath(_workingDirectory, name);
             await InstallAgentFileAsync(agentPath, () => content, force, ct);

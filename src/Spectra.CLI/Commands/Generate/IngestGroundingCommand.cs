@@ -71,10 +71,11 @@ public sealed class IngestGroundingCommand : Command
             var from = context.ParseResult.GetValueForOption(fromOption);
             var repaired = context.ParseResult.GetValueForOption(repairedFlag);
             var repairAttempts = context.ParseResult.GetValueForOption(repairAttemptsOption);
-            var idsGiven = context.ParseResult.FindResultFor(idsOption) is not null;
+            var idsGiven = IdList.IsGiven(context.ParseResult.GetValueForOption(idsOption)); // Spec 097: empty = not given
             var ids = ParseIds(context.ParseResult.GetValueForOption(idsOption));
             var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
             var json = outputFormat == OutputFormat.Json;
+            var dryRun = context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption);
 
             // Spec 091 (FR-006a, FR-007): argument checks, in order, before any config, index or verdict is read.
             if (all && !string.IsNullOrEmpty(testId))
@@ -92,6 +93,12 @@ public sealed class IngestGroundingCommand : Command
                 Console.Error.WriteLine(NeitherMessage);
                 context.ExitCode = ExitError;
             }
+            else if (!all && dryRun)
+            {
+                // Spec 097 (FR-018): a dry run never writes, and only the batch form supports it.
+                Console.Error.WriteLine(DryRunJson.RequiresAllMessage);
+                context.ExitCode = ExitError;
+            }
             else if (all && repaired && ids.Count == 0)
             {
                 CriteriaCommandIO.WriteFailure(json, "ingest-grounding", ErrorIdsRequired,
@@ -101,7 +108,7 @@ public sealed class IngestGroundingCommand : Command
             else if (all)
             {
                 context.ExitCode = await RunBatchAsync(
-                    suite, repaired, repairAttempts, idsGiven ? ids : null, json, context.GetCancellationToken());
+                    suite, repaired, repairAttempts, idsGiven ? ids : null, json, dryRun, context.GetCancellationToken());
             }
             else
             {
@@ -114,7 +121,7 @@ public sealed class IngestGroundingCommand : Command
     internal static IReadOnlyList<string> ParseIds(string? value) => IdList.Parse(value);
 
     private static async Task<int> RunBatchAsync(
-        string suite, bool repaired, int repairAttempts, IReadOnlyList<string>? ids, bool json, CancellationToken ct)
+        string suite, bool repaired, int repairAttempts, IReadOnlyList<string>? ids, bool json, bool dryRun, CancellationToken ct)
     {
         var currentDir = Directory.GetCurrentDirectory();
         var testsDir = await ResolveTestsDirAsync(currentDir, ct);
@@ -138,7 +145,7 @@ public sealed class IngestGroundingCommand : Command
         var verdictDir = Path.Combine(currentDir, ".spectra", "verdicts");
         if (!Directory.Exists(verdictDir))
         {
-            EmitBatchResult(json, suite, 0, 0, 0, 0, [], [], [], notFound);
+            EmitBatchResult(json, dryRun, suite, 0, 0, 0, 0, [], [], [], notFound);
             return ExitSuccess;
         }
 
@@ -223,12 +230,12 @@ public sealed class IngestGroundingCommand : Command
             }
 
             // Write grounding block — reuses same service as per-test mode (no code duplication)
-            var result = await service.WriteAsync(testFilePath, verdictJson, repairAttempts, repaired, ct);
+            var result = await service.WriteAsync(testFilePath, verdictJson, repairAttempts, repaired, ct, dryRun);
             if (result.IsSuccess) written++;
             else errors++;
         }
 
-        EmitBatchResult(json, suite, written, skippedAlreadyWritten, skippedPartialPreRepair, errors, manual, stale, hallucinated, notFound);
+        EmitBatchResult(json, dryRun, suite, written, skippedAlreadyWritten, skippedPartialPreRepair, errors, manual, stale, hallucinated, notFound);
         return ExitSuccess;
     }
 
@@ -249,14 +256,14 @@ public sealed class IngestGroundingCommand : Command
         }
     }
 
-    private static void EmitBatchResult(bool json, string suite, int written,
+    private static void EmitBatchResult(bool json, bool dryRun, string suite, int written,
         int skippedAlreadyWritten, int skippedPartialPreRepair, int errors,
         IReadOnlyList<string> manual, IReadOnlyList<string> stale, IReadOnlyList<string> hallucinated,
         IReadOnlyList<string> notFound)
     {
         if (json)
         {
-            Console.Out.WriteLine(JsonSerializer.Serialize(new
+            Console.Out.WriteLine(DryRunJson.Serialize(new
             {
                 command = "ingest-grounding",
                 mode = "batch",
@@ -272,7 +279,7 @@ public sealed class IngestGroundingCommand : Command
                 skipped_hallucinated = hallucinated.Count,
                 hallucinated,
                 not_found = notFound
-            }));
+            }, dryRun));
         }
 
         // The human summary: stdout in human mode, stderr in JSON mode (never suppressed).

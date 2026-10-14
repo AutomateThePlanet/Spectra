@@ -3,6 +3,8 @@ using Spectra.CLI.Output;
 using Spectra.CLI.Profile;
 using Spectra.CLI.Prompts;
 using Spectra.CLI.Skills;
+using Spectra.Core.Config;
+using Spectra.Core.Models.Config;
 
 namespace Spectra.CLI.Commands.UpdateSkills;
 
@@ -51,8 +53,10 @@ public sealed class UpdateSkillsHandler
             await ProcessFileAsync(currentDir, skillPath, content, DeleteAdvice, manifest, updated, unchanged, skipped, skippedNoRecord, ct);
         }
 
-        // Process agent files
-        foreach (var (name, content) in AgentContent.All)
+        // Process agent files. Spec 097 (FR-022, FR-022a): the critic is rendered with ai.critic.model; the config is
+        // read only for that value, so an invalid one never fails the command.
+        var criticModel = await CriticModelAsync(currentDir, ct);
+        foreach (var (name, content) in AgentContent.Rendered(criticModel))
         {
             var agentPath = SkillInstallLayout.AgentPath(currentDir, name);
             await ProcessFileAsync(currentDir, agentPath, content, DeleteAdvice, manifest, updated, unchanged, skipped, skippedNoRecord, ct);
@@ -146,6 +150,43 @@ public sealed class UpdateSkillsHandler
         }
 
         return ExitCodes.Success;
+    }
+
+    /// <summary>
+    /// Spec 097 (FR-022a): the critic's model. No config → the default; a valid config → <c>ai.critic.model</c> or the
+    /// default; a config invalid for any reason → one warning, and the model line of the installed critic agent is kept
+    /// (the default when the agent isn't installed or has no model line).
+    /// </summary>
+    private async Task<string> CriticModelAsync(string currentDir, CancellationToken ct)
+    {
+        var loaded = await ConfigLoader.LoadForReadAsync(currentDir, ConfigSections.None, ct);
+        if (loaded.IsSuccess)
+        {
+            return loaded.Config!.Ai.EffectiveCriticModel;
+        }
+
+        var firstError = loaded.Error?.Split('\n')[0].Trim() ?? "";
+        if (firstError.StartsWith(ConfigLoader.InvalidConfigPrefix, StringComparison.Ordinal))
+        {
+            firstError = firstError[ConfigLoader.InvalidConfigPrefix.Length..];
+        }
+
+        _progress.Warning($"spectra.config.json is invalid ({loaded.ErrorCode}: {firstError}); the critic agent's model was not changed");
+        return InstalledCriticModel(currentDir) ?? CriticConfig.DefaultModel;
+    }
+
+    /// <summary>The <c>model:</c> value in the installed critic agent's frontmatter, or null.</summary>
+    private static string? InstalledCriticModel(string currentDir)
+    {
+        var path = SkillInstallLayout.AgentPath(currentDir, "spectra-critic.agent.md");
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        var match = System.Text.RegularExpressions.Regex.Match(
+            File.ReadAllText(path), @"\A---\r?\n(?:.*\r?\n)*?model:[ \t]*(?<model>\S+)[ \t]*\r?\n");
+        return match.Success ? match.Groups["model"].Value : null;
     }
 
     /// <summary>

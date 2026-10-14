@@ -175,6 +175,14 @@ Spec 096 adds `.spectra/verdicts/` and `.spectra/dropped-tests.json`):
 
 Plain `spectra init` still refuses on an existing workspace, so this is how existing workspaces get new entries.
 
+Spec 097 (FR-022, FR-022a): the critic agent (`.claude/agents/spectra-critic.agent.md`) is installed with
+`model: <ai.critic.model>` (default `sonnet`). After changing the key, run `update-skills`: an unedited critic agent is
+rewritten with the new model; an edited one is skipped as customized. `update-skills` reads the config only for this
+value and never fails on it — no config → `sonnet`; a config that is invalid for any reason → one warning
+`spectra.config.json is invalid (<error_code>: <first error>); the critic agent's model was not changed`, the critic keeps
+its installed model line, everything else is refreshed, exit `0`. An agent installed before 097 (pinned
+`claude-sonnet-4-6`, unedited) moves to `sonnet`.
+
 Reports a summary of updated, unchanged, and skipped files.
 
 ---
@@ -565,6 +573,11 @@ spectra ai compile-critic-prompt --test ./tc-900.json --docs ./docs/checkout
   the prompt but wrote no verdict never revives an older one. Nothing is deleted or renamed.
 - Compiling the whole suite (`--suite S` without `--test`) records `compiled_at` for every test, so every verdict
   written before it — including partial verdicts waiting for repair — becomes stale and needs a new critic run.
+- Spec 097 (FR-013): the time a verdict is compared with is the **record file's own write time**, set by the same file
+  system as the verdict file, so a CLI clock that differs from the file system's (a network share, a container mount)
+  no longer refuses new verdicts. `compiled_at` still marks a 091+ record (a 090 record keeps the fingerprint-only rule)
+  and is used only when the record's file time can't be read. Every compile rewrites the record, so its file time
+  always marks the last compile.
 
 ### `spectra ai ingest-verdict` (fail-loud boundary)
 
@@ -604,6 +617,12 @@ spectra ai ingest-verdict --suite storage --all --ids TC-101,TC-102 --output-for
 The batch's human summary — the counts line, then `TC-101: grounded 0.92 (pass)` per result and `TC-999: not found in
 suite 'storage'` per unknown id — goes to stdout in human mode and to stderr in JSON mode (Spec 093). The single
 `--from` / stdin form is unchanged.
+
+Spec 097:
+- An `--ids` value that is empty after trimming (`""`, `" , "`) counts as not given: every verdict of the suite is
+  classified (before, an empty list classified none).
+- `--dry-run` is accepted in both forms. `ingest-verdict` only reads and classifies — it writes nothing either way — so
+  the result is the same, plus `"dry_run": true`.
 
 ### `spectra ai ingest-grounding` (durable verdict write-back)
 
@@ -662,6 +681,15 @@ Spec 091:
   user), not written and not an error. Unreadable or unparseable verdict files and refused writes still count as
   `errors`; a test whose file is gone (dropped by the generation flow) is skipped as before.
 
+Spec 097:
+- **Empty `--ids` counts as not given** (FR-016): `--all --ids ""` processes every eligible test, as `--all` alone;
+  `--all --repaired` with an empty list is still `IDS_REQUIRED`. Without `--all`, an empty `--ids` is no usage error.
+- **`--all --dry-run`** (FR-017): the same JSON (plus `"dry_run": true`), human summary and exit code as a real run;
+  no test file is written. `--test <id> --dry-run` → exit `1`, `--dry-run requires --all` (plain stderr).
+- The skills pass `--ids` with exactly the tests they confirmed: the generate skill's critic step the kept-grounded ids,
+  the update skill's re-verify step the group's grounded ids (skipped when there are none), so a test reported
+  unverified never gets a block.
+
 - **grounded** → condensed "verified clean" block (`verdict: grounded`, `score`, `verified_at`).
 - **partial** → block with condensed findings + `flagged_for_review: true` (unless `--repaired`; the `spectra-review-flagged` skill then dispositions flagged tests).
 - **hallucinated** → `--test` refuses (exit 4); use `record-drop` + `spectra delete` instead. `--all` lists it under `hallucinated` (Spec 091).
@@ -697,7 +725,11 @@ spectra ai compile-repair-prompt --suite reporting --test TC-113 \
   `partial` and `hallucinated` verdicts — the update flow repairs a hallucinated edit once instead of dropping a test
   that existed before (the generation flow still record-drops hallucinated tests before any repair).
 - The agent patches in-session, then `ingest-update` + re-critic + `ingest-grounding` close the loop.
-- Exit code is `0` when emitted, `4` when refused (grounded / no findings), `5` when the verdict is empty, `6` on a parse failure, and `1` on error.
+- Spec 097 (FR-010): a **stale** verdict (the 090/091 freshness check the ingest applies) is refused before any prompt
+  is compiled: stderr `VERDICT_STALE: <the ingest's message>`, exit `4` — a stale verdict never spends the test's repair
+  attempt. A verdict without a fingerprint record is accepted, as before. With a custom `--from`, only the fingerprint
+  rule applies (the record describes the default verdict file).
+- Exit code is `0` when emitted, `4` when refused (grounded / no findings / stale verdict), `5` when the verdict is empty, `6` on a parse failure, and `1` on error.
 
 ### `spectra ai review-flagged` (human review phase)
 
@@ -745,6 +777,25 @@ files):
 
 The summary gains `unverified` (tests with verdict `none`).
 
+Spec 097 (FR-004–FR-009a):
+- **One suite.** Only the suite's indexed tests are listed: verdict files of other suites' tests and stray verdicts (an
+  id in no index) are ignored. (Before, every `critic-verdict-*.json` was listed, a stray one with `action_needed:
+  repair`.)
+- **Stale verdicts.** An entry whose verdict fails the freshness check the ingest applies gets `"stale": true` and
+  `action_needed: critic` (shown as `critic (stale)`); `summary.stale` counts them. Fresh entries and entries without a
+  record have no `stale` field.
+- **Filters.** `--action critic|repair|review|none` (repeatable or comma-separated, case-insensitive; anything else →
+  exit `1`, `--action must be one of critic, repair, review, none (got '<v>').`) and `--ids a,b` (the 091 parsing; empty
+  = not given; ids not in the suite → `not_found` and `<id>: not found in suite '<s>'` — on stderr in JSON mode). They
+  narrow `tests` only: the summary still covers the whole suite.
+- The generate skill's resume path calls `audit-grounding --suite <s> --action repair`, so only the tests still to
+  repair reach the session.
+
+```bash
+spectra ai audit-grounding --suite smoke --action repair --output-format json
+spectra ai audit-grounding --suite smoke --ids TC-101,TC-102
+```
+
 ### `spectra ai compile-repair-batch` (deterministic batch repair manifest)
 
 Reads all partial verdict JSONs for the suite, **filters to those without a grounding block** (the
@@ -764,6 +815,9 @@ Re-running `compile-repair-batch` after an interrupted session emits only the
 remaining ungrounded tests. The grounding block in `.md` frontmatter is the done-marker, so a test is
 skipped once its block is written. Never double-processes a completed test; never restarts from scratch.
 
+- Spec 097 (FR-011): a partial test whose verdict is **stale** gets no prompt. Stdout stays the JSON array (without
+  it); stderr gets one line `{"command":"compile-repair-batch","stale":[{"id":"TC-102","reason":"…"}]}` and
+  `TC-102: stale verdict — run the critic again`, only when a test is stale.
 - Exit code is `0` when the manifest is emitted (possibly empty) and `1` when the suite index is not found.
 
 > There is no longer a `spectra ai generate` command; generation runs **in
@@ -771,8 +825,9 @@ skipped once its block is written. Never double-processes a completed test; neve
 > deterministic model-free seam below: the CLI compiles a grounded prompt, Claude generates
 > in-session, and the CLI ingests/validates the result, with the `spectra-critic` subagent verifying
 > every test. The retired critic keys (`ai.critic.provider`/`api_key_env`/`base_url`,
-> `ai.fallback_strategy`) are ignored with a non-blocking `spectra validate` notice;
-> `ai.critic.model` (default `claude-sonnet-4-6`) is the only critic selector.
+> `ai.fallback_strategy`) are ignored with a non-blocking `spectra validate` notice.
+> Spec 097: `ai.critic.model` (default `sonnet`; an alias, a model id, or `inherit`) is the model the `spectra-critic`
+> subagent runs on — `spectra init` / `spectra update-skills` write it into the installed agent's frontmatter.
 > `ai.providers` and the GitHub Copilot SDK are gone entirely, and criteria extraction runs on this
 > same seam too (`spectra docs changed` → `compile-extraction-prompt` → in-session turn →
 > `ingest-criteria`), so there is no `spectra auth`/Copilot authentication step anymore.
@@ -787,21 +842,21 @@ supporting `--output-format json`) are:
 | Command | Role |
 |---------|------|
 | `spectra ai compile-analysis-prompt --suite <s> [--doc-suite <id>] [--focus <text>]` | Emit the behavior-analysis prompt (analyze-first step). |
-| `spectra ai ingest-analysis --suite <s> [--from <file>]` | Turn the agent's behavior JSON into a recommendation (already-covered = behaviours an existing test covers, recommended = the uncovered ones, category + ISTQB technique breakdowns) and save the suite's generation plan (Spec 094/095, below). |
+| `spectra ai ingest-analysis --suite <s> [--from <file>] [--dry-run]` | Turn the agent's behavior JSON into a recommendation (already-covered = behaviours an existing test covers, recommended = the uncovered ones, category + ISTQB technique breakdowns) and save the suite's generation plan (Spec 094/095, below). |
 | `spectra ai compile-prompt --suite <s> --batch <id> [--count <n>] [--focus <text>]` | Emit the prompt for one batch of the generation plan: its behaviours, doc sections and their criteria (Spec 094, above). |
 | `spectra ai compile-prompt --suite <s> --count <n> [--focus <text>]` | Emit the bulk generation prompt for `<n>` tests (count mode: the model reads the docs). |
 | `spectra ai compile-prompt --suite <s> --from-description "<text>" [--context <text>]` | Emit a single-test prompt from a plain-language description (count forced to 1; matching criteria injected). |
 | `spectra ai ingest-tests <suite> [--from <file>]` | Validate and persist the agent-generated tests, failing loud with exit `5` for content-invalid and `6` for schema-invalid. |
 | `spectra ai compile-critic-prompt` / `spectra ai ingest-verdict` | The mandatory `spectra-critic` verification step. |
 | `spectra ai ingest-grounding --suite <s> --test <id> [--repaired] [--repair-attempts <n>]` | Write the durable condensed verdict block into the test `.md` frontmatter. |
-| `spectra ai ingest-grounding --suite <s> --all [--repaired] [--repair-attempts <n>]` | In batch form, writes grounding blocks for all eligible tests in one pass; without `--repaired` only grounded tests are written, and with `--repaired` all ungrounded tests (grounded plus partial re-verdicts) are written. Idempotent. |
-| `spectra ai ingest-verdict --suite <s> --all` | In batch form, classifies all `.spectra/verdicts/critic-verdict-*.json` files for the suite in one call, emitting a `{grounded, partial, hallucinated, errors}` summary. Advisory-gate only, so no files are written; replaces per-test `--from` loops. |
+| `spectra ai ingest-grounding --suite <s> --all [--ids a,b] [--repaired] [--repair-attempts <n>] [--dry-run]` | In batch form, writes grounding blocks for all eligible tests (or only `--ids`) in one pass; without `--repaired` only grounded tests are written, and with `--repaired --ids` the listed re-critiqued tests. Idempotent. `--dry-run` writes nothing (Spec 097). |
+| `spectra ai ingest-verdict --suite <s> --all [--ids a,b] [--dry-run]` | In batch form, classifies all `.spectra/verdicts/critic-verdict-*.json` files for the suite in one call, emitting a `{grounded, partial, hallucinated, errors}` summary. Advisory-gate only, so no files are written; replaces per-test `--from` loops. |
 | `spectra ai ingest-update <suite> --all` | In batch form, ingests all staged update files from `.spectra/updates/<suite>/updated-<id>.json` in one call, emitting `{written, unchanged, unchanged_pending, skipped_no_original, errors, results}`; consumed staging files are deleted, failed ones kept (Spec 088); exit 8 when a file failed, and `--all --keep-baseline` reads `.spectra/repairs/<suite>/repaired-<id>.json` instead (Spec 089). Per-entry `--test-id --from` mode unchanged. |
 | `spectra ai compile-repair-prompt --suite <s> --test <id>` | Emit a repair prompt for a partial test (critic findings + source docs); plain text to stdout. |
 | `spectra ai record-drop --suite <s> --test <id> [--reason user_decided]` | Append a drop-trail entry before deleting a hallucinated or user-decided-to-drop test. |
 | `spectra ai review-flagged [--suite <s>]` | List and disposition flagged (still-partial) tests: accept, delete, or (via skill) retry repair. |
 | `spectra ai compile-repair-batch --suite <s>` | Compile a batch repair manifest for all ungrounded partials (model-free, resume-aware). |
-| `spectra ai audit-grounding --suite <s> [--output-format json]` | Report per-test grounding state (id, verdict, grounding_written, flagged, action_needed); serves as the resume oracle plus inspection view. |
+| `spectra ai audit-grounding --suite <s> [--action a,b] [--ids a,b] [--output-format json]` | Report per-test grounding state of the suite's indexed tests (id, verdict, grounding_written, flagged, action_needed, `stale`); serves as the resume oracle plus inspection view. |
 
 **The generation plan (Spec 094).** On success `ingest-analysis` resolves each behaviour's `source` — the most specific
 `doc#anchor` it comes from, as tests use in `source_refs`, or a bare document path for the whole document — with the
@@ -817,6 +872,8 @@ summary — on stderr in JSON mode — adds one `batch <id> | count <k> | <refs>
 title shown as `/`) and one `unresolved: <id> <title> — <reason>` line each. A failed analysis (exit 5/6) writes no
 plan; a plan that can't be written is exit 1 `PLAN_WRITE_FAILED`. The command loads `spectra.config.json` as a write
 command reading `source` (missing → `CONFIG_MISSING`; `generation.batch_size` outside 1–50 → `CONFIG_INVALID`).
+Spec 097: `--dry-run` reports the same JSON (plus `"dry_run": true`), summary and exit code — config refusals included —
+and writes no plan file (a write failure can't be known without writing, so it isn't simulated).
 
 **Covered behaviours (Spec 095).** One rule decides, per behaviour, whether the suite's existing tests already cover it:
 an existing test whose title is at least `generation.duplicate_threshold` (default 0.6) similar to the behaviour's title
@@ -850,8 +907,8 @@ schema/parse damage, or `1` on a config/IO error. The skill drives a bounded reg
 
 When `debug.enabled: true`, failures during the still-in-process criteria
 extraction (`ai analyze --extract-criteria` / `docs index`) write full entries to `.spectra-errors.log`.
-Duplicate detection (>80% title similarity) and the `ai.critic.max_concurrent` critic-throughput lever
-continue to apply to the verification path.
+Duplicate detection (>80% title similarity) continues to apply to the verification path. (`ai.critic.max_concurrent`
+and the other keys of the removed in-process critic are ignored — Spec 097.)
 
 ### `spectra ai update-triage` (Spec 084)
 

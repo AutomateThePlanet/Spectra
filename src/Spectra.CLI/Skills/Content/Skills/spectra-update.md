@@ -236,11 +236,10 @@ critic step). The critic compiles its prompt and writes its verdict file; its fi
 verdict file. When every test of the group has been through the critic, run with the Bash tool:
 ```
 spectra ai ingest-verdict --suite <suite> --all --ids <id1>,<id2> --output-format json
-spectra ai ingest-grounding --suite <suite> --all --output-format json
 ```
 Route each test by its entry in the verdict ingest's `results` — the verdict the CLI classified
 (Spec 093), not the critic's line:
-- `grounded` → done;
+- `grounded` → add the id to the group's grounded ids;
 - `partial` or `hallucinated` → collect the id for one repair attempt (below);
 - no `results` entry (the critic's compile was refused, its verdict stayed damaged, or the CLI
   lists the test as stale or not found) → invoke the critic once more for that test and run the
@@ -249,6 +248,13 @@ Route each test by its entry in the verdict ingest's `results` — the verdict t
   `spectra ai audit-grounding --suite <suite>`, where it shows as `none` / `critic`);
 - the critic's final line disagrees with the CLI's verdict → the test is **unverified**; report
   both.
+
+Then write the grounding blocks of the group's grounded tests only (Spec 097) — skip this call when
+no test of the group is `grounded`:
+```
+spectra ai ingest-grounding --suite <suite> --all --ids <grounded ids> --output-format json
+```
+An **unverified** test is never in `--ids`, so it never gets a block.
 
 **Repair.** If any ids were collected, invoke the `spectra-repairer` subagent once with the Task
 tool, passing `suite: <suite>` and `ids: <id1>,<id2>`. It patches only what the critic flagged,

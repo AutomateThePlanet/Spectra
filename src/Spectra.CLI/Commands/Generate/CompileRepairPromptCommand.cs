@@ -107,6 +107,15 @@ public sealed class CompileRepairPromptCommand : Command
             return ExitVerdictEmpty;
         }
 
+        // Spec 097 (FR-010): a stale verdict never drives the test's repair attempt — the same check and message as the
+        // ingest. The record-time rule applies to the verdict file the record describes (the default path); a custom
+        // --from gets the fingerprint rule only.
+        if (VerdictFreshness.Check(currentDir, testId, test, from is null ? verdictPath : null) is { IsStale: true } stale)
+        {
+            Console.Error.WriteLine($"{VerdictFreshness.ErrorVerdictStale}: {stale.Message(testId)}");
+            return ExitRefused;
+        }
+
         var verdictJson = await File.ReadAllTextAsync(verdictPath, ct);
         if (string.IsNullOrWhiteSpace(verdictJson))
         {

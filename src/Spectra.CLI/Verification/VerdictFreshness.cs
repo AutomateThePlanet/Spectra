@@ -36,7 +36,10 @@ public enum StaleReason
     /// <summary>Spec 090: the test changed since the critic prompt was compiled.</summary>
     ContentChanged,
 
-    /// <summary>Spec 091 (FR-002): the verdict file was written before the last critic prompt for the test.</summary>
+    /// <summary>
+    /// Spec 091 (FR-002): the verdict file was written before the last critic prompt for the test. Spec 097 (FR-013): "the
+    /// last critic prompt" is the record file's write time.
+    /// </summary>
     OlderThanPrompt
 }
 
@@ -46,14 +49,15 @@ public sealed record FreshnessResult(
     string? Current = null,
     StaleReason Reason = StaleReason.ContentChanged,
     DateTime? VerdictWrittenAt = null,
-    DateTimeOffset? CompiledAt = null)
+    DateTimeOffset? CompiledAt = null,
+    DateTime? ReferenceAt = null)
 {
     public bool IsStale => State == Freshness.Stale;
 
     /// <summary>The refusal message for a stale verdict.</summary>
     public string Message(string id) => Reason == StaleReason.OlderThanPrompt
         ? $"The verdict for {id} is older than the last critic prompt for {id} "
-          + $"(verdict written {VerdictWrittenAt:u}, prompt compiled {CompiledAt?.UtcDateTime:u}); run the critic for {id} again."
+          + $"(verdict written {VerdictWrittenAt:u}, prompt compiled {ReferenceAt ?? CompiledAt?.UtcDateTime:u}); run the critic for {id} again."
         : $"The verdict for {id} was given to different content (recorded {Recorded}, now {Current}); "
           + $"run the critic for {id} again.";
 }
@@ -64,8 +68,8 @@ public static class VerdictFreshness
     public const string ErrorVerdictStale = "VERDICT_STALE";
 
     /// <summary>
-    /// Spec 091 (FR-002): how much older than <c>compiled_at</c> a verdict file may look and still be fresh — coarse
-    /// file-system timestamps and the gap between the process clock and the file-system clock.
+    /// Spec 091 (FR-002): how much older than the reference time a verdict file may look and still be fresh — coarse
+    /// file-system timestamps. Spec 097: both times now come from the file system, so no clock gap needs covering.
     /// </summary>
     public static readonly TimeSpan TimestampAllowance = TimeSpan.FromSeconds(2);
 
@@ -110,7 +114,10 @@ public static class VerdictFreshness
     /// Checks the verdict of <paramref name="id"/> against the test's current content (Spec 090) and, when the record
     /// has <c>compiled_at</c> and <paramref name="verdictPath"/> is the file being ingested, against the time the
     /// critic prompt was compiled (Spec 091): a verdict written more than <see cref="TimestampAllowance"/> before it is
-    /// stale. A 090 record, or a verdict without a file (stdin), gets the fingerprint rule only.
+    /// stale. Spec 097 (FR-013): that time is the record file's own write time — set by the same file system as the
+    /// verdict file — and <c>compiled_at</c> only when the record's file time can't be read, so a CLI clock that differs
+    /// from the file system's (a network share, a container mount) no longer decides. A 090 record (no
+    /// <c>compiled_at</c>), or a verdict without a file (stdin), gets the fingerprint rule only.
     /// </summary>
     public static FreshnessResult Check(string root, string id, TestCase current, string? verdictPath = null)
     {
@@ -129,13 +136,28 @@ public static class VerdictFreshness
         if (record.CompiledAt is { } compiledAt && verdictPath is not null && System.IO.File.Exists(verdictPath))
         {
             var writtenAt = System.IO.File.GetLastWriteTimeUtc(verdictPath);
-            if (writtenAt < compiledAt.UtcDateTime - TimestampAllowance)
+            var reference = RecordWrittenAt(root, id) ?? compiledAt.UtcDateTime;
+            if (writtenAt < reference - TimestampAllowance)
             {
-                return new FreshnessResult(Freshness.Stale, record.Fingerprint, now, StaleReason.OlderThanPrompt, writtenAt, compiledAt);
+                return new FreshnessResult(Freshness.Stale, record.Fingerprint, now, StaleReason.OlderThanPrompt, writtenAt, compiledAt, reference);
             }
         }
 
         return new FreshnessResult(Freshness.Fresh, record.Fingerprint, now);
+    }
+
+    /// <summary>Spec 097 (FR-013): the record file's write time, or null when it can't be read.</summary>
+    private static DateTime? RecordWrittenAt(string root, string id)
+    {
+        try
+        {
+            var path = RecordPath(root, id);
+            return File.Exists(path) ? File.GetLastWriteTimeUtc(path) : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     /// <summary>Checks against the test file the record names (single-form <c>ingest-verdict --from</c>).</summary>

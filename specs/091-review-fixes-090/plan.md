@@ -53,7 +53,7 @@ assertion changes (research R8).
 | I. Git as source of truth | No test-file format change; grounding blocks are written only for the tests the skill names. Nothing touches git | ✅ |
 | II. Deterministic execution | Engine untouched. Freshness is a pure function of the record, the test content and the verdict file's time | ✅ |
 | III. Orchestrator-agnostic, minimal output | Model-free. `compiled_at` is written by the CLI, never by the model. JSON additions are one count and two id lists | ✅ |
-| IV. CLI-first, deterministic exit codes | `IDS_REQUIRED` exits 4 (refusal) with a named code; `not_found` and `skipped_hallucinated` don't change exit codes. `ingest-grounding --all` / `ingest-verdict --all` have no `--dry-run` / `--no-review` (pre-existing; see Complexity Tracking) | ⚠ pre-existing gap, tracked |
+| IV. CLI-first, deterministic exit codes | `IDS_REQUIRED` exits 4 (refusal) with a named code; `not_found` and `skipped_hallucinated` don't change exit codes. `ingest-grounding --all` / `ingest-verdict --all` have no `--dry-run` / `--no-review` (pre-existing; see Complexity Tracking) | ✅ (resolved by 097: `--dry-run` added) |
 | V. Simplicity | One freshness function gains one comparison; one batch loop gains a filter and one branch; no new command | ✅ |
 | Test-required discipline | T1–T8 from the spec; each fix proven against `5c10c44` (T1, T4–T6, T7, T8); T2/T3 are guards | ✅ |
 
@@ -118,6 +118,4 @@ tests/Spectra.CLI.Tests/
 
 ## Complexity Tracking
 
-| Violation | Why needed | Simpler alternative rejected because |
-|---|---|---|
-| Constitution IV: `ingest-grounding --all` (and `ingest-verdict --all`) have no `--dry-run` / `--no-review` | Pre-existing since 073/077; deferred to Phase 6 by decision (091 analyze D1). 091 adds no new write path: it only narrows `--all` with `--ids` and moves hallucinated verdicts from `errors` to a skipped count | Adding batch `--dry-run` here widens a review-fix spec beyond its four findings; the user scheduled it for Phase 6 |
+None. The constitution IV row tracked here was resolved by Spec 097 (`--dry-run` on the batch ingests).
