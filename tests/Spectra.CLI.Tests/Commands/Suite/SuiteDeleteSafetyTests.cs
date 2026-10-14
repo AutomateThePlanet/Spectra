@@ -107,11 +107,14 @@ public sealed class SuiteDeleteSafetyTests : IDisposable
         var result = BaselineTestWorkspace.Json(output);
         Assert.Contains(result.GetProperty("dependents_cleaned").EnumerateArray(), d => d.GetProperty("id").GetString() == "TC-201");
         Assert.Contains(Strings(result.GetProperty("warnings")), w => w.Contains("TC-202"));
-        var leftovers = Strings(result.GetProperty("leftovers"));
+        // Spec 098 F3 (deliberate change): verdict and record files are listed under verdict_files_removed, not leftovers.
+        var leftovers = Strings(result.GetProperty("leftovers")).Concat(Strings(result.GetProperty("verdict_files_removed"))).ToList();
         foreach (var file in Leftovers)
         {
             Assert.Contains(leftovers, l => file.StartsWith(l.TrimEnd('/'), StringComparison.Ordinal));
         }
+
+        Assert.DoesNotContain(Strings(result.GetProperty("leftovers")), l => l.StartsWith(".spectra/verdicts/", StringComparison.Ordinal));
 
         Assert.Equal(before, HashTree());
     }

@@ -17,6 +17,9 @@ public sealed class BaselineWriteSummary
     public int AutoAcked { get; set; }
     public int SnapshotsWritten { get; set; }
 
+    /// <summary>Spec 098 (F5): keep-baseline tests without an entry, left unbaselined (no entry created).</summary>
+    public int LeftUnbaselined { get; set; }
+
     /// <summary>Spec 085: how an ingest recorded its entries; emitted as <c>mode</c> when set.</summary>
     public RecordMode? Mode { get; set; }
 
@@ -35,16 +38,23 @@ public sealed class BaselineWriteSummary
             json["mode"] = mode == RecordMode.KeepBaseline ? "keep" : "rebuild";
         }
 
+        if (LeftUnbaselined > 0)
+        {
+            json["left_unbaselined"] = LeftUnbaselined;
+        }
+
         return json;
     }
 
     public string ToHuman() =>
-        $"Baseline: created {Created}, updated {Updated}, unchanged {Unchanged}, snapshots written {SnapshotsWritten}";
+        $"Baseline: created {Created}, updated {Updated}, unchanged {Unchanged}, snapshots written {SnapshotsWritten}"
+        + (LeftUnbaselined > 0 ? $", left unbaselined {LeftUnbaselined}" : "");
 }
 
 /// <summary>
 /// Spec 085 F5: <see cref="Rebuild"/> recomputes an ingested test's entry (keeping dead refs, F3);
-/// <see cref="KeepBaseline"/> (critic repairs) never changes an existing fingerprint and only adds missing keys.
+/// <see cref="KeepBaseline"/> (critic repairs) never changes an existing fingerprint and only adds missing keys; Spec 098
+/// (F5): it never creates an entry, so a never-baselined test stays unbaselined.
 /// </summary>
 public enum RecordMode
 {
@@ -178,6 +188,13 @@ public static class BaselineRecorder
         var snapshots = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var test in persisted)
         {
+            // Spec 098 (F5, FR-012): a repair never baselines a test — the user decides when its baseline starts.
+            if (mode == RecordMode.KeepBaseline && !baseline.Tests.ContainsKey(test.Id))
+            {
+                summary.LeftUnbaselined++;
+                continue;
+            }
+
             var computed = await ComputeAsync(test, context, ct);
             var needed = mode == RecordMode.KeepBaseline
                 ? Complete(baseline, test.Id, computed, summary)

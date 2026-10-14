@@ -16,9 +16,16 @@ public sealed class AiConfig
     [JsonPropertyName("critic")]
     public CriticConfig? Critic { get; init; }
 
-    /// <summary>Spec 097: the critic's model — <c>ai.critic.model</c>, or <see cref="CriticConfig.DefaultModel"/>.</summary>
+    /// <summary>
+    /// Spec 098 (F1): the critic's model and, when the configured one was ignored (a legacy block of the in-process
+    /// critic, or an invalid value), the warning to show.
+    /// </summary>
     [JsonIgnore]
-    public string EffectiveCriticModel => Critic?.Model ?? CriticConfig.DefaultModel;
+    public CriticModelChoice CriticModel => Critic?.Choose() ?? new CriticModelChoice(CriticConfig.DefaultModel, null);
+
+    /// <summary>Spec 097/098: the critic's model — a valid new-style <c>ai.critic.model</c>, else <see cref="CriticConfig.DefaultModel"/>.</summary>
+    [JsonIgnore]
+    public string EffectiveCriticModel => CriticModel.Model;
 
     /// <summary>
     /// Per-batch timeout for the AI generation SDK call, in minutes. Default 5.

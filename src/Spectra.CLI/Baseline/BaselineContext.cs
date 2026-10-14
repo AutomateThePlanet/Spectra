@@ -164,7 +164,7 @@ public sealed class BaselineContext
                 {
                     var raw = lookup.RawText!;
                     result = new RefSection(sourceRef, resolved.RelativePath, resolved.FullPath,
-                        CurrentSection.Of(SourceFingerprint.OfSection(raw), SectionExtractor.ComparisonText(raw)), lookup.Ambiguous);
+                        CurrentSection.FromRaw(raw), lookup.Ambiguous);
                     if (lookup.Ambiguous)
                     {
                         _notes.Add($"{sourceRef}: more than one heading shares the anchor key '{lookup.AnchorKey}'; the first was used");

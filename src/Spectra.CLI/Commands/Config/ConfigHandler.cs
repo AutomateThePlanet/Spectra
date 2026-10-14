@@ -204,6 +204,7 @@ public sealed class ConfigHandler
             Console.WriteLine($"  Default count:   {config.Generation?.DefaultCount ?? 15}");
             Console.WriteLine($"  Require review:  {config.Generation?.RequireReview ?? true}");
             Console.WriteLine($"  Dup threshold:   {config.Generation?.DuplicateThreshold ?? 0.6}");
+            Console.WriteLine($"  Cov threshold:   {config.Generation?.CoverageThresholdChoice().Value ?? 0.6}");
 
             Console.WriteLine();
             Console.WriteLine("Validation:");

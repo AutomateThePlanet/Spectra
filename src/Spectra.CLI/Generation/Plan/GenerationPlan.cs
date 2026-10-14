@@ -34,7 +34,7 @@ public sealed record GenerationPlan(
     IReadOnlyDictionary<string, string> Sections,
     IReadOnlyList<PlannedBatch> Batches,
     IReadOnlyList<string> Notes,
-    double? DuplicateThreshold = null)
+    double? CoverageThreshold = null)
 {
     public const int CurrentVersion = 1;
 
@@ -50,10 +50,11 @@ public sealed record GenerationPlan(
     public PlannedBatch? FindBatch(string id) => Batches.FirstOrDefault(b => b.BatchId == id);
 
     /// <summary>
-    /// Spec 095: the plan records per-behaviour coverage (written with <c>duplicate_threshold</c>). A 094 plan doesn't —
-    /// all its behaviours count as uncovered.
+    /// Spec 095: the plan records per-behaviour coverage (written with its threshold — Spec 098: <c>coverage_threshold</c>;
+    /// a 095 plan's <c>duplicate_threshold</c> is read the same way). A 094 plan doesn't — all its behaviours count as
+    /// uncovered.
     /// </summary>
-    public bool CoverageKnown => DuplicateThreshold is not null;
+    public bool CoverageKnown => CoverageThreshold is not null;
 
     public PlannedBehavior Behavior(string id) => Behaviors.First(b => b.Id == id);
 
@@ -71,9 +72,9 @@ public sealed record GenerationPlan(
             w.WriteString("suite", plan.Suite);
             w.WriteString("focus", plan.Focus);
             w.WriteNumber("batch_size", plan.BatchSize);
-            if (plan.DuplicateThreshold is { } threshold)
+            if (plan.CoverageThreshold is { } threshold)
             {
-                w.WriteNumber("duplicate_threshold", threshold);
+                w.WriteNumber("coverage_threshold", threshold);
             }
 
             w.WriteNumber("recommended", plan.Recommended);
@@ -174,7 +175,7 @@ public sealed record GenerationPlan(
             return new GenerationPlan(
                 Str(root, "suite"), NullableStr(root, "focus"), Int(root, "batch_size"), Int(root, "recommended"),
                 Int(root, "planned_total"), Str(root, "count_rule"), behaviors, sections, batches, Strings(root, "notes"),
-                OptionalNumber(root, "duplicate_threshold"));
+                OptionalNumber(root, "coverage_threshold") ?? OptionalNumber(root, "duplicate_threshold"));
         }
         catch (JsonException ex)
         {

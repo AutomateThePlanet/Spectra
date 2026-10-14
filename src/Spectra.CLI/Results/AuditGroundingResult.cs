@@ -70,6 +70,14 @@ public sealed class AuditGroundingSummary
     [JsonPropertyName("unverified")]
     public int Unverified { get; init; }
 
+    /// <summary>Spec 098 (FR-007): tests with a fresh grounded verdict whose block isn't written yet (<c>ground</c>).</summary>
+    [JsonPropertyName("pending_ground")]
+    public int PendingGround { get; init; }
+
+    /// <summary>Spec 098 (FR-007): tests with a fresh hallucinated verdict and no block — waiting for the user (<c>review</c>).</summary>
+    [JsonPropertyName("pending_review")]
+    public int PendingReview { get; init; }
+
     /// <summary>Spec 097 (FR-007): entries whose verdict is stale.</summary>
     [JsonPropertyName("stale")]
     public int Stale { get; init; }

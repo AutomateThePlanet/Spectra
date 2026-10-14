@@ -69,6 +69,7 @@ public static partial class SectionRef
         yield return earlier == 0 ? slug : $"{slug}-{earlier}";
     }
 
-    [GeneratedRegex(@"(?:\{[^}]*#(?<id>[^\s}]+)[^}]*\}\s*$)|(?:\bid\s*=\s*[""'](?<id>[^""']+)[""'])")]
+    // Spec 098 (F6, FR-013): `id=` only as a whole attribute name, as in SectionExtractor.
+    [GeneratedRegex(@"(?:\{[^}]*#(?<id>[^\s}]+)[^}]*\}\s*$)|(?:(?<!\S)id\s*=\s*[""'](?<id>[^""']+)[""'])", RegexOptions.IgnoreCase)]
     private static partial Regex ExplicitIdRegex();
 }

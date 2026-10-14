@@ -44,6 +44,31 @@ public static partial class ManifestKey
     }
 
     /// <summary>
+    /// Spec 098 (F4): how new a pre-096 record under <paramref name="key"/> is — 3 an absolute key under
+    /// <paramref name="root"/> (written by update-skills, which runs after init), 2 an absolute key from another location
+    /// (a moved workspace), 1 a relative key (init).
+    /// </summary>
+    public static int Rank(string root, string key)
+    {
+        if (!IsAbsolute(key))
+        {
+            return 1;
+        }
+
+        if (Path.IsPathRooted(key))
+        {
+            var relative = Path.GetRelativePath(Path.GetFullPath(root), Path.GetFullPath(key));
+            if (!Path.IsPathRooted(relative) && relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                && !relative.StartsWith("../", StringComparison.Ordinal))
+            {
+                return 3;
+            }
+        }
+
+        return 2;
+    }
+
+    /// <summary>
     /// Analyze M1: the install path a foreign absolute key ends with — <c>.claude/skills/&lt;name&gt;/SKILL.md</c>,
     /// <c>.claude/agents/&lt;file&gt;</c>, <c>.spectra/prompts/&lt;id&gt;.md</c>, <c>profiles/_default.yaml</c>,
     /// <c>CUSTOMIZATION.md</c> or <c>USAGE.md</c> — matched on the last segments (case-insensitive on Windows), or null.

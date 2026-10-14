@@ -38,7 +38,10 @@ public class ProviderRetirementTests
         // carries them deserializes cleanly (unmapped members ignored) and validates. (Retired
         // assertion: Assert.Equal("claude-sonnet-4-6", Ai.Critic.Model).)
         Assert.True(result.IsSuccess);
-        Assert.Empty(ConfigLoader.DetectDeprecatedKeys(json));
+        // Spec 098 F1 (deliberate change): `enabled` is a key of the removed in-process critic, so the block is legacy:
+        // the notice names it and its model is ignored (was: no notice).
+        Assert.Equal(["ai.critic.enabled"], ConfigLoader.DetectDeprecatedKeys(json));
+        Assert.Equal(CriticConfig.DefaultModel, result.Value!.Ai.EffectiveCriticModel);
     }
 
     [Fact]
@@ -101,8 +104,9 @@ public class ProviderRetirementTests
     public void DetectDeprecatedKeys_CleanConfig_ReturnsEmpty()
     {
         const string json = """
-        { "ai": { "providers": [], "critic": { "enabled": true, "model": "claude-sonnet-4-6" } } }
+        { "ai": { "providers": [], "critic": { "model": "claude-sonnet-4-6" } } }
         """;
+        // Spec 098 F1 (deliberate change): `enabled` is now a retired key, so a clean block has only `model`.
         Assert.Empty(ConfigLoader.DetectDeprecatedKeys(json));
     }
 
@@ -184,6 +188,10 @@ public class ProviderRetirementTests
         // Spec 069: these demo configs still carry legacy ai.providers/ai.critic; they load cleanly
         // (unmapped members ignored) and validate. (Retired assertions: config.Ai.Critic.Model.)
         Assert.True(result.IsSuccess);
-        Assert.Empty(ConfigLoader.DetectDeprecatedKeys(json));
+        // Spec 098 F1 (deliberate change): `enabled` / `max_concurrent` are keys of the removed in-process critic — the
+        // notice names only those critic keys (was: none), and the block's model is ignored.
+        Assert.All(ConfigLoader.DetectDeprecatedKeys(json), k => Assert.Contains(k, new[] { "ai.critic.enabled", "ai.critic.max_concurrent" }));
+        Assert.Contains("ai.critic.enabled", ConfigLoader.DetectDeprecatedKeys(json));
+        Assert.Equal(CriticConfig.DefaultModel, result.Value!.Ai.EffectiveCriticModel);
     }
 }

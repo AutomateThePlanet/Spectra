@@ -564,6 +564,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nothing selected it. The dead in-process critic classes (`CriticFactory`, `CriticModelResolver`, `ICriticRuntime`)
   and the unused `ai.critic` members are removed.
 
+### Fixed (Spec 098 — correctness fixes, Phase 6 part 3)
+
+- **Pre-069 configs work again.** An `ai.critic` block with a key of the removed in-process critic (`provider`,
+  `api_key_env`, `base_url`, `enabled`, `timeout_seconds`, `max_concurrent`) is legacy: its `model` (e.g. the v1.45
+  template's `gpt-5-mini`) is ignored with a notice and the critic runs on `sonnet`. An invalid `ai.critic.model` (e.g.
+  `openai/gpt-4.1`, a number) is a warning, never `CONFIG_INVALID` — before, it failed every command that loads the
+  config, and `update-skills` installed `gpt-5-mini` as the critic's model.
+- **`audit-grounding` actions come from the verdict:** no block + grounded → `ground` (only the block is missing),
+  partial → `repair`, hallucinated → `review`. `--action ground` is new; the summary gains `pending_ground` /
+  `pending_review`. The generate skill's resume path grounds, repairs and reports by action — it used to repair all
+  three.
+- **`suite delete` reports each verdict file once**, under the new `verdict_files_removed`; `leftovers` /
+  `leftovers_removed` list only staging folders and the generation plan.
+- **`update-skills` keeps the newest manifest record.** A file recorded under two pre-096 keys keeps the hash SPECTRA
+  wrote last (or every candidate, in a new `candidates` field, when that can't be told); a user who restores that
+  content gets the file updated again instead of "customized" forever.
+- **A critic repair never baselines a test.** `ingest-update --keep-baseline` leaves a never-baselined test without an
+  entry (`baseline.left_unbaselined`), so triage keeps listing it; it used to record a full entry at the current docs.
+- **Heading anchors.** Only a whole `id=` attribute is a heading id (`data-id`, `aria-id` were ids); a heading with an
+  image also matches GitHub's anchor (`## ![logo](x.png) Setup` ↔ `#setup`); an id-only heading change against a
+  snapshot stored by 084 is cosmetic.
+- **Group update prompts** show each test's own state of a criterion (`AC-1 (unchanged)` / `AC-1 (not baselined)`)
+  when the group's tests see it differently.
+- **`compile-prompt --batch` in `count_fallback`** warns "the documentation changed since the analysis; behaviour
+  titles may be outdated" instead of refusing with `PLAN_STALE`; batch mode still refuses.
+- **`generation.coverage_threshold`** (default 0.6, 0–1) decides per-behaviour coverage; `duplicate_threshold` is
+  duplicate detection only (one release of fallback, with a notice, for a tuned `duplicate_threshold`). The init
+  template writes it.
+
 ### Notes
 
 - **`audit-grounding` (Spec 097)** no longer lists other suites' tests or verdicts of ids in no index. A stale verdict

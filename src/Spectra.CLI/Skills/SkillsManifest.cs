@@ -30,6 +30,19 @@ public sealed class SkillsManifest
     [JsonIgnore]
     public Dictionary<string, List<string>> Candidates { get; } = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Spec 098 (F4, FR-010): the saved form of <see cref="Candidates"/> for keys whose newest record can't be told
+    /// apart (two records of the same rank with different hashes). Written only for those keys (null otherwise, so a
+    /// manifest without ambiguity is saved as before); read back into <see cref="Candidates"/> on load.
+    /// </summary>
+    [JsonPropertyName("candidates")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, List<string>>? SavedCandidates { get; set; }
+
+    /// <summary>Spec 098 (F4): keys whose newest record can't be told apart; <see cref="Record"/> clears a key.</summary>
+    [JsonIgnore]
+    public HashSet<string> Ambiguous { get; } = new(StringComparer.Ordinal);
+
     /// <summary>Spec 096 (analyze M1): foreign keys that matched no install path and were dropped on load.</summary>
     [JsonIgnore]
     public int DroppedForeignKeys { get; set; }
@@ -48,13 +61,35 @@ public sealed class SkillsManifest
     {
         Files[key] = hash;
         Candidates[key] = [hash];
+        Ambiguous.Remove(key);
     }
 
-    /// <summary>Spec 096 (R1): rewrites the keys to the one normalised form, keeping duplicate keys' hashes as candidates.</summary>
+    /// <summary>Spec 098 (F4): sets <see cref="SavedCandidates"/> from the keys still ambiguous (null when none).</summary>
+    internal void PrepareForSave()
+    {
+        SavedCandidates = Ambiguous.Count == 0
+            ? null
+            : Ambiguous.Where(Candidates.ContainsKey)
+                .OrderBy(k => k, StringComparer.Ordinal)
+                .ToDictionary(k => k, k => Candidates[k].ToList(), StringComparer.Ordinal);
+        if (SavedCandidates is { Count: 0 })
+        {
+            SavedCandidates = null;
+        }
+    }
+
+    /// <summary>
+    /// Spec 096 (R1): rewrites the keys to the one normalised form, keeping duplicate keys' hashes as candidates.
+    /// Spec 098 (F4, FR-010): the recorded hash of a key with several records is the newest one — an absolute key under
+    /// the current root (update-skills before 096) before a re-rooted absolute key (a moved workspace) before a relative
+    /// key (init before 096). When the newest rank holds different hashes, the key is <see cref="Ambiguous"/> and every
+    /// candidate is saved. Candidates saved by an earlier run are merged back in.
+    /// </summary>
     internal void Normalize(string root)
     {
-        var files = new Dictionary<string, string>(StringComparer.Ordinal);
+        var best = new Dictionary<string, (int Rank, List<string> Hashes)>(StringComparer.Ordinal);
         Candidates.Clear();
+        Ambiguous.Clear();
         DroppedForeignKeys = 0;
         foreach (var (key, hash) in Files.OrderBy(f => f.Key, StringComparer.Ordinal))
         {
@@ -68,16 +103,53 @@ public sealed class SkillsManifest
             if (!Candidates.TryGetValue(normalized, out var hashes))
             {
                 Candidates[normalized] = hashes = [];
-                files[normalized] = hash;
             }
 
             if (!hashes.Contains(hash, StringComparer.OrdinalIgnoreCase))
             {
                 hashes.Add(hash);
             }
+
+            var rank = ManifestKey.Rank(root, key);
+            if (!best.TryGetValue(normalized, out var top) || rank > top.Rank)
+            {
+                best[normalized] = (rank, [hash]);
+            }
+            else if (rank == top.Rank && !top.Hashes.Contains(hash, StringComparer.OrdinalIgnoreCase))
+            {
+                top.Hashes.Add(hash);
+            }
         }
 
-        Files = files;
+        Files = best.ToDictionary(b => b.Key, b => b.Value.Hashes[0], StringComparer.Ordinal);
+        Ambiguous.UnionWith(best.Where(b => b.Value.Hashes.Count > 1).Select(b => b.Key));
+
+        foreach (var (rawKey, saved) in SavedCandidates ?? [])
+        {
+            var key = ManifestKey.Normalize(root, rawKey);
+            if (key is null || saved is null)
+            {
+                continue;
+            }
+
+            if (!Candidates.TryGetValue(key, out var hashes))
+            {
+                Candidates[key] = hashes = [];
+            }
+
+            foreach (var hash in saved.Where(h => !hashes.Contains(h, StringComparer.OrdinalIgnoreCase)))
+            {
+                hashes.Add(hash);
+            }
+
+            Files.TryAdd(key, hashes[0]);
+            if (hashes.Count > 1)
+            {
+                Ambiguous.Add(key);
+            }
+        }
+
+        SavedCandidates = null;
     }
 }
 
@@ -124,6 +196,7 @@ public sealed class SkillsManifestStore
         if (!Directory.Exists(dir))
             Directory.CreateDirectory(dir);
 
+        manifest.PrepareForSave(); // Spec 098 (F4): keep every candidate of a key whose newest record is unknown
         var json = JsonSerializer.Serialize(manifest, Options);
         await File.WriteAllTextAsync(_manifestPath, json, ct);
     }

@@ -19,7 +19,7 @@ public sealed class AuditGroundingCommand : Command
 
         // Spec 097 (FR-005, FR-006): filters for the listed entries; the summary still covers the whole suite.
         var actionOption = new Option<string[]>("--action",
-            "Only entries needing this action: critic, repair, review, none (repeatable or comma-separated)")
+            "Only entries needing this action: critic, ground, repair, review, none (repeatable or comma-separated)")
         { AllowMultipleArgumentsPerToken = false };
         var idsOption = new Option<string?>("--ids", "Only these tests (comma-separated); ids not in the suite are reported");
 
