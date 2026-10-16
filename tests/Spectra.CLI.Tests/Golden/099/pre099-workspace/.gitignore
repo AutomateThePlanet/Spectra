@@ -1,0 +1,27 @@
+# SPECTRA
+.execution/*.db
+.execution/*.db-*
+.spectra.lock
+.spectra/.pid
+.spectra/.cancel
+.spectra/id-allocator.lock
+.spectra/id-allocator.json
+.spectra/progress.json
+.spectra/analysis.json
+.spectra/generated.json
+.spectra/updated.json
+.spectra/criteria.json
+.spectra/critic-verdict.json
+.spectra/seam-progress.html
+.spectra/skills-manifest.json
+.spectra-result.json
+.spectra-progress.html
+.spectra/criteria.lock
+.spectra/baseline.lock
+.spectra/update-triage.json
+.spectra/updates/
+.spectra/repairs/
+.spectra/generation-plan/
+.spectra/verdicts/
+.spectra/dropped-tests.json
+# spectra-offered: .execution/*.db, .execution/*.db-*, .spectra.lock, .spectra/.pid, .spectra/.cancel, .spectra/id-allocator.lock, .spectra/id-allocator.json, .spectra/progress.json, .spectra/analysis.json, .spectra/generated.json, .spectra/updated.json, .spectra/criteria.json, .spectra/critic-verdict.json, .spectra/seam-progress.html, .spectra/skills-manifest.json, .spectra-result.json, .spectra-progress.html, .spectra/criteria.lock, .spectra/baseline.lock, .spectra/update-triage.json, .spectra/updates/, .spectra/repairs/, .spectra/generation-plan/, .spectra/verdicts/, .spectra/dropped-tests.json

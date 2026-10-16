@@ -117,7 +117,7 @@ public sealed class IngestAnalysisCommand : Command
             BaselineCommandIO.PrintWarnings(thresholdWarnings);
         }
 
-        var result = AnalysisRecommendationBuilder.Build(content, existingTests, snapshot: null, focus, threshold);
+        var result = AnalysisRecommendationBuilder.Build(content, existingTests, focus, threshold);
 
         if (result.IsSuccess)
         {
@@ -307,7 +307,7 @@ public sealed class IngestAnalysisCommand : Command
         if (!Directory.Exists(suitePath))
             return tests;
 
-        var parser = new TestCaseParser();
+        var parser = new TestCaseParser(captureLayout: false);
         var files = Directory.GetFiles(suitePath, "*.md")
             .Where(f => !Path.GetFileName(f).StartsWith('_'));
 

@@ -47,6 +47,44 @@ public sealed class SubmoduleNotCheckedOutTests : IDisposable
     /// </summary>
     private async Task ClonedAsync(bool baselined = true, Action? beforeCommit = null, Action<string>? childSetup = null)
     {
+        if (baselined && beforeCommit is null && childSetup is null)
+        {
+            // Spec 099 F7: the default setup is built once per test process and its clone copied here (the tests that
+            // use it only touch the clone; its origin and submodule URLs point at the template's repositories, which
+            // live until the process exits).
+            GitFixture.DeleteTree(_clone.Root);
+            CopyTree(await DefaultClone.Value, _clone.Root);
+            Assert.Empty(Directory.EnumerateFileSystemEntries(_clone.PathOf("docs/sub")));
+            return;
+        }
+
+        await BuildAsync(baselined, beforeCommit, childSetup);
+    }
+
+    private static readonly Lazy<Task<string>> DefaultClone = new(async () =>
+    {
+        var template = new SubmoduleNotCheckedOutTests();
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => template.Dispose();
+        await template.BuildAsync(baselined: true, beforeCommit: null, childSetup: null);
+        return template._clone.Root;
+    });
+
+    private static void CopyTree(string from, string to)
+    {
+        foreach (var dir in Directory.GetDirectories(from, "*", SearchOption.AllDirectories))
+        {
+            Directory.CreateDirectory(Path.Combine(to, Path.GetRelativePath(from, dir)));
+        }
+
+        Directory.CreateDirectory(to);
+        foreach (var file in Directory.GetFiles(from, "*", SearchOption.AllDirectories))
+        {
+            File.Copy(file, Path.Combine(to, Path.GetRelativePath(from, file)));
+        }
+    }
+
+    private async Task BuildAsync(bool baselined, Action? beforeCommit, Action<string>? childSetup)
+    {
         _super.InitGit();
         var child = Repo("child", ("guide.md", "Guide"), ("setup.md", "Setup"));
         childSetup?.Invoke(child);

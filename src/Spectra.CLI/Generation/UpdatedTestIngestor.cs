@@ -59,8 +59,19 @@ public sealed class UpdatedTestIngestor
     /// <param name="suite">Suite the edited test belongs to.</param>
     /// <param name="originalTest">The on-disk test being edited — the source of truth for invariants.</param>
     /// <param name="existingTests">Existing suite tests, used to regenerate the index.</param>
-    public async Task<IngestResult> IngestAsync(
+    public Task<IngestResult> IngestAsync(
         string? content,
+        string testsPath,
+        string suite,
+        TestCase originalTest,
+        IReadOnlyList<TestCase> existingTests,
+        CancellationToken ct = default,
+        bool persist = true) =>
+        IngestAsync(GeneratedTestIngestor.Extract(content), testsPath, suite, originalTest, existingTests, ct, persist);
+
+    /// <summary>Spec 099 F4: the edit's JSON already extracted and parsed once by the caller.</summary>
+    internal async Task<IngestResult> IngestAsync(
+        GeneratedTestIngestor.ExtractedContent content,
         string testsPath,
         string suite,
         TestCase originalTest,

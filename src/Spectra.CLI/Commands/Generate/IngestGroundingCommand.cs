@@ -149,7 +149,7 @@ public sealed class IngestGroundingCommand : Command
             return ExitSuccess;
         }
 
-        var parser = new TestCaseParser();
+        var parser = new TestCaseParser(captureLayout: false);
         var service = new GroundingWriteBackService(new TestFileWriter());
         int written = 0, skippedAlreadyWritten = 0, skippedPartialPreRepair = 0, errors = 0;
         var manual = new List<string>();
@@ -347,7 +347,7 @@ public sealed class IngestGroundingCommand : Command
         }
 
         // Spec 090 (FR-A3, FR-A2): never overwrite a Manual verdict; never write a verdict given to other content.
-        var current = new TestCaseParser().Parse(await File.ReadAllTextAsync(testFilePath, ct), entry.File);
+        var current = new TestCaseParser(captureLayout: false).Parse(await File.ReadAllTextAsync(testFilePath, ct), entry.File);
         if (current.IsSuccess && current.Value!.Grounding?.Verdict == VerificationVerdict.Manual)
         {
             CriteriaCommandIO.WriteFailure(json, "ingest-grounding", ErrorManualVerdict,

@@ -91,7 +91,7 @@ public sealed class CompileRepairPromptCommand : Command
 
         var fileContent = await File.ReadAllTextAsync(testFilePath, ct);
         var relativePath = Path.GetRelativePath(currentDir, testFilePath);
-        var parsed = new TestCaseParser().Parse(fileContent, relativePath);
+        var parsed = new TestCaseParser(captureLayout: false).Parse(fileContent, relativePath);
         if (!parsed.IsSuccess || parsed.Value is null)
         {
             Console.Error.WriteLine($"Could not parse test file: {testFilePath}");

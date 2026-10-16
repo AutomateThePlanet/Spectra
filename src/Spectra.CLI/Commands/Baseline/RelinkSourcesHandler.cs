@@ -64,7 +64,8 @@ public static class RelinkSourcesHandler
             var renames = context.CreateRenameResolver(minSimilarity);
             foreach (var name in suites)
             {
-                var tests = await BaselineCommandIO.LoadSuiteTestsAsync(root, testsPath, name, warnings, ct);
+                // Spec 099 F3: relink rewrites refs in these tests, so the lossless writer needs their layout.
+                var tests = await BaselineCommandIO.LoadSuiteTestsAsync(root, testsPath, name, warnings, ct, captureLayout: true);
                 var suitePlan = new List<TestPlan>();
                 foreach (var test in tests.Tests)
                 {

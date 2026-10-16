@@ -6,8 +6,8 @@ namespace Spectra.CLI.Verification;
 
 /// <summary>
 /// The fail-loud verdict-ingest boundary (Spec 055 FR-006/FR-007). Classifies an agent-produced
-/// critic response into a typed <see cref="VerdictIngestResult"/>. Reuses the
-/// <see cref="Spectra.CLI.Agent.Critic.CriticResponseParser"/> JSON-extraction <i>shape</i>
+/// critic response into a typed <see cref="VerdictIngestResult"/>. Reuses the retired in-process critic parser's
+/// JSON-extraction <i>shape</i>
 /// (markdown-fence strip + first<c>{</c>…last<c>}</c> slice) but <b>changes the missing-field
 /// defaults</b>: a missing/unparseable <c>verdict</c> or <c>score</c> is a typed
 /// <see cref="VerdictIngestOutcome.ParseFailure"/> with a specific error — never the old silent
@@ -83,7 +83,7 @@ public static partial class VerdictIngestor
 
     /// <summary>
     /// Extracts the JSON object from a response that may be wrapped in a markdown code block.
-    /// Reuses the <c>CriticResponseParser</c> extraction shape (fence strip + first<c>{</c>…last<c>}</c>).
+    /// The retired in-process critic parser's extraction shape (fence strip + first<c>{</c>…last<c>}</c>).
     /// </summary>
     private static string ExtractJson(string response)
     {

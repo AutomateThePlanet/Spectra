@@ -30,9 +30,7 @@ public static class GitWorkspace
     {
         GitFixture.DeleteTree(target.Root);
         GitFixture.Git(Path.GetDirectoryName(target.Root)!, "clone", "-q", source.Root, target.Root);
-        GitFixture.Git(target.Root, "config", "user.name", "Spectra Test");
-        GitFixture.Git(target.Root, "config", "user.email", "test@example.com");
-        GitFixture.Git(target.Root, "config", "core.autocrlf", "false");
+        GitFixture.AppendIdentityConfig(target.Root);
     }
 
     /// <summary>Checks out the submodules of <paramref name="ws"/> (not recursive). A fixture command.</summary>

@@ -1,7 +1,6 @@
 using System.Text;
 using Spectra.CLI.Profile;
 using Spectra.CLI.Prompts;
-using Spectra.Core.Models.Testimize;
 
 namespace Spectra.CLI.Generation;
 
@@ -37,8 +36,7 @@ public static class PromptCompiler
         int requestedCount,
         string? criteriaContext,
         PromptTemplateLoader? templateLoader = null,
-        string? profileFormat = null,
-        TestimizeDataset? testimizeData = null)
+        string? profileFormat = null)
     {
         if (string.IsNullOrWhiteSpace(userPrompt))
         {
@@ -68,8 +66,7 @@ public static class PromptCompiler
             requestedCount,
             criteriaContext,
             templateLoader,
-            profileFormat,
-            testimizeData);
+            profileFormat);
 
         return PromptCompileResult.Success(prompt);
     }
@@ -85,8 +82,7 @@ public static class PromptCompiler
         int requestedCount,
         string? criteriaContext = null,
         PromptTemplateLoader? templateLoader = null,
-        string? profileFormat = null,
-        TestimizeDataset? testimizeData = null)
+        string? profileFormat = null)
     {
         // The JSON output schema sent to the AI. Prefer the caller-supplied profileFormat
         // (resolved from profiles/_default.yaml on disk or the embedded default by
@@ -94,19 +90,15 @@ public static class PromptCompiler
         // embedded default to keep behavior identical.
         var jsonExample = profileFormat ?? ProfileFormatLoader.LoadFormat(Directory.GetCurrentDirectory());
 
-        // Render the optional Testimize dataset as a YAML-ish block only when present and
-        // non-empty. When null or empty, both placeholders are empty strings and the
-        // {{#if testimize_dataset}} block in test-generation.md collapses to nothing.
-        var testimizeBlock = FormatTestimizeDataset(testimizeData);
-        var testimizeStrategyName = testimizeData?.Strategy ?? "";
-
         if (templateLoader is not null)
         {
             var template = templateLoader.LoadTemplate("test-generation");
             var values = new Dictionary<string, string>
             {
-                ["testimize_dataset"] = testimizeBlock,
-                ["testimize_strategy_name"] = testimizeStrategyName,
+                // Spec 099 F5: the in-process Testimize dataset is gone (its only producer was the Copilot-era
+                // generator); the placeholders stay empty, so {{#if testimize_dataset}} collapses as before.
+                ["testimize_dataset"] = "",
+                ["testimize_strategy_name"] = "",
                 ["behaviors"] = userPrompt,
                 ["suite_name"] = "",
                 ["existing_tests"] = "",
@@ -161,74 +153,4 @@ public static class PromptCompiler
             3. MANDATORY: For each test, populate the "criteria" array with IDs of acceptance criteria it verifies (e.g. ["AC-REPORTING-001", "AC-REPORTING-003"]). Never leave criteria empty when acceptance criteria are provided above.
             """;
     }
-
-    /// <summary>
-    /// Renders a <see cref="TestimizeDataset"/> as a compact YAML-ish block for embedding in
-    /// the test-generation prompt. Returns an empty string when the dataset is null or contains
-    /// no rows, which causes the <c>{{#if testimize_dataset}}</c> block in
-    /// <c>test-generation.md</c> to collapse to nothing.
-    /// </summary>
-    public static string FormatTestimizeDataset(TestimizeDataset? dataset)
-    {
-        if (dataset is null || dataset.TestCases.Count == 0)
-            return "";
-
-        var sb = new StringBuilder();
-        sb.AppendLine("```yaml");
-        sb.AppendLine($"strategy: {dataset.Strategy}");
-        sb.AppendLine($"field_count: {dataset.FieldCount}");
-        sb.AppendLine($"test_data_sets: {dataset.TestCases.Count}");
-        sb.AppendLine("fields:");
-        foreach (var f in dataset.Fields)
-        {
-            sb.AppendLine($"  - name: {f.Name}");
-            sb.AppendLine($"    type: {f.Type}");
-            if (f.Required) sb.AppendLine("    required: true");
-            if (f.Min is not null) sb.AppendLine($"    min: {f.Min}");
-            if (f.Max is not null) sb.AppendLine($"    max: {f.Max}");
-            if (f.MinLength is not null) sb.AppendLine($"    min_length: {f.MinLength}");
-            if (f.MaxLength is not null) sb.AppendLine($"    max_length: {f.MaxLength}");
-            if (!string.IsNullOrWhiteSpace(f.MinDate)) sb.AppendLine($"    min_date: {f.MinDate}");
-            if (!string.IsNullOrWhiteSpace(f.MaxDate)) sb.AppendLine($"    max_date: {f.MaxDate}");
-            if (f.AllowedValues is { Count: > 0 })
-                sb.AppendLine($"    allowed_values: [{string.Join(", ", f.AllowedValues.Select(v => $"\"{v}\""))}]");
-            if (!string.IsNullOrWhiteSpace(f.ExpectedInvalidMessage))
-                sb.AppendLine($"    expected_invalid_message: \"{EscapeYaml(f.ExpectedInvalidMessage)}\"");
-        }
-        sb.AppendLine("test_cases:");
-        for (var i = 0; i < dataset.TestCases.Count; i++)
-        {
-            var row = dataset.TestCases[i];
-            sb.AppendLine($"  - id: {i + 1}");
-            if (row.Score > 0) sb.AppendLine($"    score: {row.Score:F2}");
-            sb.AppendLine("    values:");
-            foreach (var cell in row.Values)
-            {
-                sb.AppendLine($"      - field: {cell.FieldName}");
-                sb.AppendLine($"        value: {FormatYamlValue(cell.Value)}");
-                sb.AppendLine($"        category: {cell.Category}");
-                if (!string.IsNullOrWhiteSpace(cell.ExpectedInvalidMessage))
-                    sb.AppendLine($"        expected_invalid_message: \"{EscapeYaml(cell.ExpectedInvalidMessage)}\"");
-            }
-        }
-        sb.AppendLine("```");
-        return sb.ToString();
-    }
-
-    private static string FormatYamlValue(object? value)
-    {
-        if (value is null) return "null";
-        if (value is string s) return $"\"{EscapeYaml(s)}\"";
-        if (value is bool b) return b ? "true" : "false";
-        if (value is DateTime dt) return $"\"{dt:yyyy-MM-dd}\"";
-        if (value is System.Collections.IEnumerable en && value is not string)
-        {
-            var items = new List<string>();
-            foreach (var item in en) items.Add(FormatYamlValue(item));
-            return $"[{string.Join(", ", items)}]";
-        }
-        return value.ToString() ?? "null";
-    }
-
-    private static string EscapeYaml(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
 }

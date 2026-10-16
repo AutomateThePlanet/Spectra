@@ -189,7 +189,7 @@ public sealed class IngestVerdictCommand : Command
         int grounded = 0, partial = 0, hallucinated = 0, errors = 0;
         var stale = new List<string>();
         var results = new List<VerdictResult>();
-        var parser = new TestCaseParser();
+        var parser = new TestCaseParser(captureLayout: false);
 
         var verdictFiles = Directory.GetFiles(verdictDir, "critic-verdict-*.json").OrderBy(f => f);
         foreach (var vf in verdictFiles)

@@ -17,16 +17,15 @@ Last updated: 2026-06-20 | Version history in `CHANGELOG.md`
 src/
   Spectra.CLI/          # CLI app
     Commands/           # Analyze, Dashboard, Docs, Generate, Update, Run (Spec 065 execution surface)
-    Agent/              # Critic/ (subagent prompt builders), Tools/, Testimize/ — Copilot SDK removed (Spec 069)
+    Agent/              # Critic/ (subagent prompt builders), Tools/ (batch read/propose for legacy update), Analysis/ — Copilot-era code removed (Specs 069, 099)
     Analysis/           # Model-free analysis helpers (AnalyzerInputBuilder, DocumentTools, …)
     Extraction/         # Model-free criteria seam (ExtractionPromptCompiler, CriteriaIngestor, CriteriaResponseClassifier)
     Source/             # Document map, index service
     Index/              # _index.json ops
     Validation/         # Dedup, DuplicateDetector
-    Review/             # Interactive terminal UI
-    Interactive/        # Selectors, session, UserDescriptionPrompt
+    Review/             # Update review UI (UpdateReviewer, DiffPresenter)
+    Interactive/        # SuiteSelector, SuiteScanner
     Prompts/            # Template engine (PlaceholderResolver, TemplateLoader, BuiltIns)
-    Session/            # SessionStore, SuggestionBuilder
     Skills/             # Bundled SKILL content, AgentContent, SkillsManifest
     Results/            # Typed JSON result models (CommandResult, GenerateResult, etc.)
     Output/             # Progress reporters, presenters, NextStepHints, JsonResultWriter
@@ -156,6 +155,12 @@ system-under-test is unrelated to SPECTRA's removed execution adapter.
 - File-based (Markdown/YAML/JSON in `test-cases/`, `docs/_index/`, `docs/criteria/`, `_index.json`, `_manifest.yaml`, `_checksums.json`, `_criteria_index.yaml`) (045-doc-index-restructure)
 
 ## Recent Changes
+- **099-performance-cleanup (v2.6.0, unreleased)**: Phase 6 part 4 — performance and cleanup; no behaviour change (golden check `Golden/GoldenOutputTests`, captured on c24d23e, `Golden/099/**` is `-text`).
+  - **Counts, not timings:** `Spectra.Core.Diagnostics.ParseCounter` (internal, `AsyncLocal` scope: `FullParses`, `LayoutCaptures`, `DocumentHeadingScans`, `JsonParses`); Core grants internals to `Spectra.CLI.Tests`.
+  - **F1:** `Baseline/SuiteScanBuilder` (`ReadAsync`, `Build`) — ingest-tests / ingest-update read the suite once and hand the scan (+ the files they wrote) to `BaselineRecorder.RecordPersistedAsync(…, scan)`; `ScanSuiteAsync` uses the same builder. N parses, was 2N. **F2:** `BaselineContext` caches each document's normalised text + headings (internal `SectionExtractor.Extract(normalised, headings, anchor)`). **F3:** `TestCaseParser(captureLayout = true)`; read-only callers pass `false` (sets internal `TestCase.LayoutOmitted`); `TestFileWriter` throws on a `LayoutOmitted` test (new in-memory tests still canonical). **F4:** `GeneratedTestIngestor.Extract` → `ExtractedContent` parsed once per staged file (K, was 3K).
+  - **F5:** 058/059/069/070 dead code deleted (agent tool chain, Testimize generation chain, selectors, Session/, presenters, CriticResponseParser, Copilot helpers, `Microsoft.Extensions.AI.Abstractions`); `Build`'s snapshot parameter and `CountCoveredBehaviors` gone. **F6:** 4 warnings fixed; `TreatWarningsAsErrors` (CLI, Core; NU1901–NU1904 stay warnings).
+  - **F7:** `TemplateWorkspaces` (one real init per process, copied), `GitFixture` with fewer processes, `SubmoduleNotCheckedOutTests` default-setup template, `DeletePerformanceTests` parallel. CLI suite 597 s → 418–445 s.
+  - Core 1228 / CLI 2280 (0 failures) / Execution 228 / Integration 8.
 - **098-correctness-fixes (v2.6.0, unreleased)**: Phase 6 part 3 — deferred correctness findings from 085–097; no features.
   - **F1:** `CriticConfig` has its own converter (any JSON); a block with a retired key (`provider`, `api_key_env`, `base_url`, `enabled`, `timeout_seconds`, `max_concurrent`) is legacy → model ignored, `sonnet`; an invalid model → warning + `sonnet`; `AiConfig.CriticModel` = (model, warning); `INVALID_CRITIC_MODEL` removed — no command fails on `ai.critic`. Warning in `update-skills`, notice in `validate`.
   - **F2:** audit `action_needed` without a block = by verdict (grounded `ground`, partial `repair`, hallucinated `review`, other `critic`); `--action ground`; summary `pending_ground`/`pending_review`; generate resume routes by action.

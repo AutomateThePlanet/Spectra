@@ -54,7 +54,7 @@ public sealed class ReviewFlaggedHandler
             suiteDirs = Directory.GetDirectories(testsPath);
         }
 
-        var parser = new TestCaseParser();
+        var parser = new TestCaseParser(captureLayout: false);
         foreach (var suiteDir in suiteDirs)
         {
             var suiteName = Path.GetFileName(suiteDir);

@@ -3,8 +3,7 @@ using Spectra.Core.Index;
 namespace Spectra.Core.IdAllocation;
 
 /// <summary>
-/// Cross-process-safe wrapper over the in-memory
-/// <see cref="TestIdAllocator"/>. Owns the file lock + high-water-mark file
+/// Cross-process-safe test ID allocator. Owns the file lock + high-water-mark file
 /// + filesystem frontmatter scan, and guarantees globally unique test IDs
 /// even under concurrent generation runs.
 /// </summary>

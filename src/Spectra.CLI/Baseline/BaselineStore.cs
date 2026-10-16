@@ -110,36 +110,14 @@ public static class BaselineStore
     }
 
     /// <summary>
-    /// Spec 085 FR-007: the suite's test files as they are on disk — every <c>*.md</c> not starting with <c>_</c>,
-    /// parsed in ordinal order — with the repo-relative paths of the files that failed to parse.
+    /// Spec 085 FR-007: the suite's test files as they are on disk — every <c>*.md</c> not starting with <c>_</c> —
+    /// with the repo-relative paths of the files that failed to parse. Spec 099 F1: built by
+    /// <see cref="SuiteScanBuilder"/>, the same code an ingest uses to derive the scan from the files it already read.
+    /// Spec 099 F3: the tests are parsed for reading unless <paramref name="captureLayout"/> (a caller that rewrites them).
     /// </summary>
-    public static async Task<SuiteScan> ScanSuiteAsync(string repoRoot, string testsPath, string suite, CancellationToken ct)
-    {
-        var suitePath = Path.Combine(testsPath, suite);
-        var tests = new List<TestCase>();
-        var unparseable = new List<string>();
-        if (Directory.Exists(suitePath))
-        {
-            var parser = new TestCaseParser();
-            foreach (var file in Directory.GetFiles(suitePath, "*.md")
-                         .Where(f => !Path.GetFileName(f).StartsWith('_'))
-                         .OrderBy(f => f, StringComparer.Ordinal))
-            {
-                var parsed = parser.Parse(await File.ReadAllTextAsync(file, ct), Path.GetRelativePath(suitePath, file));
-                if (parsed.IsSuccess)
-                {
-                    tests.Add(parsed.Value!);
-                }
-                else
-                {
-                    unparseable.Add(Relative(repoRoot, file));
-                }
-            }
-        }
-
-        var ordered = tests.OrderBy(t => t.Id, StringComparer.Ordinal).ToList();
-        return new SuiteScan(ordered, ordered.Select(t => t.Id).ToHashSet(StringComparer.Ordinal), unparseable);
-    }
+    public static async Task<SuiteScan> ScanSuiteAsync(
+        string repoRoot, string testsPath, string suite, CancellationToken ct, bool captureLayout = false) =>
+        SuiteScanBuilder.Build(repoRoot, await SuiteScanBuilder.ReadAsync(Path.Combine(testsPath, suite), captureLayout, ct));
 
     /// <summary>
     /// Saves a suite's baseline. Spec 085 FR-007/FR-008: entries for tests that no longer exist are dropped only when

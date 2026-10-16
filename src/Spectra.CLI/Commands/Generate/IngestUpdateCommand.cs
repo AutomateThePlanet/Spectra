@@ -139,7 +139,9 @@ public sealed class IngestUpdateCommand : Command
         var testsDir = config.Tests?.Dir ?? "test-cases";
         var testsPath = Path.Combine(currentDir, testsDir);
         var suitePath = Path.Combine(testsPath, suite);
-        var existingTests = await LoadExistingTestsAsync(suitePath, testsPath, ct);
+        // Spec 099 F3: the original is edited and written back losslessly, so the suite is read with layout.
+        var suiteFiles = await SuiteScanBuilder.ReadAsync(suitePath, captureLayout: true, ct);
+        var existingTests = SuiteScanBuilder.Tests(suiteFiles);
 
         var original = existingTests.FirstOrDefault(t =>
             string.Equals(t.Id, testId, StringComparison.OrdinalIgnoreCase));
@@ -183,7 +185,8 @@ public sealed class IngestUpdateCommand : Command
                 if (ingested.IsSuccess && record.Count > 0 && !dryRun)
                 {
                     (baselineSummary, afterPersist) = await RecordAsync(
-                        currentDir, config, testsPath, suite, baseline, record, mode, warnings, ct);
+                        currentDir, config, testsPath, suite, baseline, record, mode, warnings, suiteFiles,
+                        ingested.Unchanged ? [] : ingested.PersistedTests, ct);
                 }
 
                 return ingested;
@@ -360,7 +363,9 @@ public sealed class IngestUpdateCommand : Command
         var testsDir = config.Tests?.Dir ?? "test-cases";
         var testsPath = Path.Combine(currentDir, testsDir);
         var suitePath = Path.Combine(testsPath, suite);
-        var existingTests = await LoadExistingTestsAsync(suitePath, testsPath, ct);
+        // Spec 099 F3: the originals are edited and written back losslessly, so the suite is read with layout.
+        var suiteFiles = await SuiteScanBuilder.ReadAsync(suitePath, captureLayout: true, ct);
+        var existingTests = SuiteScanBuilder.Tests(suiteFiles);
 
         var persistence = new TestPersistenceService(
             new TestFileWriter(), new IndexGenerator(), new IndexWriter());
@@ -388,8 +393,9 @@ public sealed class IngestUpdateCommand : Command
                     .ToList();
                 if (record.Count > 0 && !dryRun)
                 {
+                    var written = outcomes.Where(o => o.Outcome == StagedOutcome.Written).Select(o => o.Test!).ToList();
                     (baselineSummary, afterPersist) = await RecordAsync(
-                        currentDir, config, testsPath, suite, baseline, record, mode, warnings, ct);
+                        currentDir, config, testsPath, suite, baseline, record, mode, warnings, suiteFiles, written, ct);
                 }
 
                 return 0;
@@ -484,7 +490,9 @@ public sealed class IngestUpdateCommand : Command
                 }
 
                 // Spec 089 (F2): more than one object is MULTIPLE_TESTS, whatever the first one's id.
-                var objects = GeneratedTestIngestor.ArrayObjects(content);
+                // Spec 099 F4: the JSON is parsed once here and handed to the checks and the ingestor.
+                var extracted = GeneratedTestIngestor.Extract(content);
+                var objects = GeneratedTestIngestor.ArrayObjects(extracted);
                 if (objects is { Count: > 1 })
                 {
                     outcomes.Add(StagedOutcome.Fail(original.Id, sf, file, UpdatedTestIngestor.MultipleTests,
@@ -502,7 +510,7 @@ public sealed class IngestUpdateCommand : Command
                 IngestResult result;
                 try
                 {
-                    result = await ingestor.IngestAsync(content, testsPath, suite, original, existingTests, ct, persist: !dryRun);
+                    result = await ingestor.IngestAsync(extracted, testsPath, suite, original, existingTests, ct, persist: !dryRun);
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
@@ -587,14 +595,21 @@ public sealed class IngestUpdateCommand : Command
     internal static string PendingText(string bucket) =>
         $"returned unchanged — {bucket} change still pending (acknowledge with update-ack or edit again)";
 
-    /// <summary>Spec 084: records the persisted tests' entries; an I/O failure here is reported, not thrown.</summary>
+    /// <summary>
+    /// Spec 084: records the persisted tests' entries; an I/O failure here is reported, not thrown. Spec 099 F1: the
+    /// suite scan is the suite as read before persisting plus the files <paramref name="written"/> (at their
+    /// <c>{id}.md</c> paths), so the suite is not parsed again.
+    /// </summary>
     private static async Task<(BaselineWriteSummary?, BaselineStoreException?)> RecordAsync(
         string root, SpectraConfig config, string testsPath, string suite, Spectra.Core.Baseline.SourceBaseline baseline,
-        IReadOnlyList<TestCase> persisted, RecordMode mode, List<string> warnings, CancellationToken ct)
+        IReadOnlyList<TestCase> persisted, RecordMode mode, List<string> warnings, IReadOnlyList<SuiteFile> suiteFiles,
+        IEnumerable<TestCase> written, CancellationToken ct)
     {
         try
         {
-            return (await BaselineRecorder.RecordPersistedAsync(root, config, testsPath, suite, baseline, persisted, mode, warnings, ct), null);
+            var scan = SuiteScanBuilder.Build(root, suiteFiles,
+                written.Select(t => new SuiteFile(TestFileWriter.GetFilePath(testsPath, suite, t.Id), t)));
+            return (await BaselineRecorder.RecordPersistedAsync(root, config, testsPath, suite, baseline, persisted, mode, warnings, ct, scan), null);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or BaselineStoreException)
         {
@@ -661,29 +676,6 @@ public sealed class IngestUpdateCommand : Command
                 warnings = warnings ?? []
             }));
         }
-    }
-
-    private static async Task<List<TestCase>> LoadExistingTestsAsync(
-        string suitePath, string testsPath, CancellationToken ct)
-    {
-        var tests = new List<TestCase>();
-        if (!Directory.Exists(suitePath))
-            return tests;
-
-        var parser = new TestCaseParser();
-        var files = Directory.GetFiles(suitePath, "*.md")
-            .Where(f => !Path.GetFileName(f).StartsWith('_'));
-
-        foreach (var file in files)
-        {
-            var fileContent = await File.ReadAllTextAsync(file, ct);
-            var relativePath = Path.GetRelativePath(suitePath, file);
-            var parsed = parser.Parse(fileContent, relativePath);
-            if (parsed.IsSuccess)
-                tests.Add(parsed.Value!);
-        }
-
-        return tests;
     }
 }
 

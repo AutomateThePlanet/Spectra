@@ -160,20 +160,21 @@ public class BehaviorAnalyzerTests
     }
 
     [Fact]
-    public void CountCoveredBehaviors_NoExistingTests_ReturnsZero()
+    public void CoveredCount_NoExistingTests_IsZero()
     {
         var behaviors = new List<IdentifiedBehavior>
         {
             new() { Category = "happy_path", Title = "Successful checkout", Source = "a.md" }
         };
 
-        var result = AnalysisRecommendationBuilder.CountCoveredBehaviors(behaviors, []);
+        // Spec 099 F5: CountCoveredBehaviors (test-only) is gone; the same rule is Build's covered count.
+        var result = AnalysisRecommendationBuilder.Build(AnalysisJson(behaviors), [], focusArea: null).AlreadyCovered;
 
         Assert.Equal(0, result);
     }
 
     [Fact]
-    public void CountCoveredBehaviors_MatchingTest_ReturnsCoveredCount()
+    public void CoveredCount_MatchingTest_CountsIt()
     {
         var behaviors = new List<IdentifiedBehavior>
         {
@@ -194,7 +195,7 @@ public class BehaviorAnalyzerTests
             }
         };
 
-        var result = AnalysisRecommendationBuilder.CountCoveredBehaviors(behaviors, existingTests);
+        var result = AnalysisRecommendationBuilder.Build(AnalysisJson(behaviors), existingTests, focusArea: null).AlreadyCovered;
 
         // First behavior matches (similar title), second does not
         Assert.Equal(1, result);
@@ -440,4 +441,11 @@ public class BehaviorAnalyzerTests
         Assert.Equal("keyboard_interaction", result[0].Category);
         Assert.Equal("Tab navigation works", result[0].Title);
     }
+
+    /// <summary>The analysis JSON the agent returns for <paramref name="behaviors"/>.</summary>
+    private static string AnalysisJson(IEnumerable<IdentifiedBehavior> behaviors) =>
+        System.Text.Json.JsonSerializer.Serialize(new
+        {
+            behaviors = behaviors.Select(b => new { category = b.Category, title = b.Title, source = b.Source, technique = "EP" })
+        });
 }

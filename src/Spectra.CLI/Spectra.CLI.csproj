@@ -11,9 +11,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Spec 069: provides Microsoft.Extensions.AI.AIFunction (tool metadata) — was a transitive
-         dependency of the removed GitHub.Copilot.SDK; now referenced directly. -->
-    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.2.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.5" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.5" />
     <PackageReference Include="Spectre.Console" Version="0.55.0" />
@@ -44,6 +41,13 @@
     <PackageOutputPath>./nupkg</PackageOutputPath>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <!-- Spec 099 F6: new warnings fail the build (all configurations). NuGet vulnerability advisories stay warnings:
+         one published after the fact must not break a build that changed nothing. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+  </PropertyGroup>
+
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
@@ -71,9 +75,8 @@
     <EmbeddedResource Include="Templates\spectra.config.json" />
     <!-- v1.48.3: Testimize's FakerFactory reads testimizeSettings.json from
          the assembly base directory at runtime. We ship our own copy (based
-         on the NuGet contentFiles sample) so the in-process TestimizeRunner
-         can call TestimizeEngine.Configure(...) without crashing on a null
-         Settings root. -->
+         on the NuGet contentFiles sample) so TestimizeEngine (used by
+         `spectra testimize check`) doesn't crash on a null Settings root. -->
     <None Include="Templates\testimizeSettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>testimizeSettings.json</Link>

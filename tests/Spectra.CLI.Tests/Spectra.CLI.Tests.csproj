@@ -26,7 +26,7 @@
 
   <ItemGroup>
     <!-- v1.48.3: mirror the settings file into the test output so
-         TestimizeRunner tests that invoke TestimizeEngine don't crash on
+         tests that invoke TestimizeEngine (testimize check) don't crash on
          FakerFactory.Initialize seeing a null Settings root. -->
     <None Include="..\..\src\Spectra.CLI\Templates\testimizeSettings.json">
       <Link>testimizeSettings.json</Link>

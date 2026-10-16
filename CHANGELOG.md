@@ -593,6 +593,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   duplicate detection only (one release of fallback, with a notice, for a tuned `duplicate_threshold`). The init
   template writes it.
 
+### Changed (Spec 099 — performance and cleanup, Phase 6 part 4)
+
+No behaviour change: every command writes the same files and prints the same JSON, text and exit codes (a golden check
+over a real-init workspace, captured on the 098 build, guards it).
+
+- **Ingest reads the suite once.** `ai ingest-tests` and `ai ingest-update` (single, `--all`, `--keep-baseline`) parse
+  each test file of the suite once per call; recording the baseline used to parse the whole suite again (N instead of
+  2N parses).
+- **Each document's headings are scanned once per run** by triage, update prompts, batch prompts and plan resolution
+  (one scan per document instead of one per ref and per lookup).
+- **Read-only commands no longer capture the lossless-writer layout** (`validate`, `show`, `index`, triage, audit,
+  coverage, dashboard, the compile commands, `ingest-analysis`, `ingest-verdict`, `review-flagged` listing). Commands
+  that rewrite tests keep it, and the writer now refuses a test read without it instead of rewriting the file
+  canonically.
+- **`ai ingest-update --all` parses each staged file's JSON once** (it was parsed three times).
+- **Dead code removed** — what the in-process generator, the Copilot SDK, the in-process critic and the MCP adapter
+  (Specs 058/059/069/070) left behind: the agent tool registry and its tools, the Testimize generation chain, the
+  interactive selectors, the session store, presenters, the critic response parser, the Copilot auth/usage helpers,
+  and the `Microsoft.Extensions.AI.Abstractions` package reference.
+- **Build:** the four compiler warnings are fixed, and the CLI and Core projects treat warnings as errors in every
+  configuration (NuGet vulnerability advisories stay warnings).
+- **Tests:** the CLI test suite runs in about 7 minutes again (597 s → 418–445 s on the reference machine): shared
+  init and git fixtures start fewer processes; no test was weakened, and only tests of deleted code were removed.
+
 ### Notes
 
 - **`audit-grounding` (Spec 097)** no longer lists other suites' tests or verdicts of ids in no index. A stale verdict

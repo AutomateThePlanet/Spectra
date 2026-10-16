@@ -1,0 +1,23 @@
+# step: 22-validate spectra validate --output-format json
+# exit: 1
+## stdout
+{
+  "total_files": 7,
+  "valid": 7,
+  "errors": [
+    {
+      "file": "payments\\TC-106.md",
+      "line": 0,
+      "message": "[MISSING_TITLE] No H1 title found in test case"
+    }
+  ],
+  "command": "validate",
+  "status": "failed",
+  "timestamp": "<mask:timestamp>",
+  "message": "1 error(s) found."
+}
+
+## stderr
+Parse error in payments\TC-106.md:
+  [MISSING_TITLE] No H1 title found in test case
+

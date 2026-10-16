@@ -44,13 +44,15 @@ public sealed class TestFileWriter
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentNullException.ThrowIfNull(testCase);
 
+        // Format first: a refused test (Spec 099 F3) leaves no trace.
+        var content = FormatTestCase(testCase);
+
         var directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
         {
             Directory.CreateDirectory(directory);
         }
 
-        var content = FormatTestCase(testCase);
         await File.WriteAllTextAsync(path, content, ct);
     }
 
@@ -59,6 +61,14 @@ public sealed class TestFileWriter
     /// </summary>
     public string FormatTestCase(TestCase testCase)
     {
+        // Spec 099 F3: a test parsed for reading only would be written canonically and lose what only its layout
+        // holds (unknown keys, comments, sections). That is a programming error in the caller, never a user outcome.
+        if (testCase.LayoutOmitted)
+        {
+            throw new InvalidOperationException(
+                $"Test {testCase.Id} was parsed without layout; a writer path must parse with layout capture.");
+        }
+
         var layout = testCase.Layout;
         var sb = new StringBuilder();
 

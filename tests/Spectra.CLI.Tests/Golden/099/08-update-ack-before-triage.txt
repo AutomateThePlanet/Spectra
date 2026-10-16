@@ -1,0 +1,7 @@
+# step: 08-update-ack-before-triage spectra ai update-ack --suite payments --group G1 --output-format json
+# exit: 4
+## stdout
+
+## stderr
+{"command":"update-ack","success":false,"error_code":"TRIAGE_MISSING","errors":["No triage to resolve group G1 from: run 'spectra ai update-triage --suite payments' first."],"warnings":["test-cases/payments/TC-106.md could not be parsed and was skipped."]}
+

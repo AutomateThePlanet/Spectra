@@ -152,4 +152,13 @@ public sealed record TestCase
     [JsonIgnore]
     [YamlIgnore]
     public TestCaseLayout? Layout { get; init; }
+
+    /// <summary>
+    /// Spec 099 F3: true when the test was parsed from a file for reading only (no <see cref="Layout"/> captured). The
+    /// writer refuses such a test: written canonically it would lose the file's unknown keys, comments and sections.
+    /// A test built in memory (no file) has no layout and is not marked. Carried by <c>with</c> copies.
+    /// </summary>
+    [JsonIgnore]
+    [YamlIgnore]
+    internal bool LayoutOmitted { get; init; }
 }

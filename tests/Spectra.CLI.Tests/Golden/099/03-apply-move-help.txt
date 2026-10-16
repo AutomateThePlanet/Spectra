@@ -1,0 +1,24 @@
+# step: 03-apply-move-help spectra docs apply-move --help
+# exit: 0
+## stdout
+Description:
+  Apply a document move reported by 'docs changed' (keeps criteria and IDs)
+
+Usage:
+  testhost docs apply-move [options]
+
+Options:
+  --from <from> (REQUIRED)                                    The document's old path
+  --to <to> (REQUIRED)                                        The document's new path
+  --dry-run                                                   Report what would change, but write nothing
+  -v, --verbosity <Detailed|Diagnostic|Minimal|Normal|Quiet>  Output verbosity: quiet, minimal, normal, detailed, diagnostic [default: Normal]
+  --dry-run                                                   Preview changes without executing [default: False]
+  --no-review                                                 Skip interactive review (CI mode) [default: False]
+  --output-format <Human|Json>                                Output format: human (default) or json [default: Human]
+  --no-interaction                                            Disable interactive prompts (for CI/automation) [default: False]
+  -?, -h, --help                                              Show help and usage information
+
+
+
+## stderr
+

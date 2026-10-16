@@ -176,7 +176,7 @@ public static class VerdictFreshness
             return new FreshnessResult(Freshness.NoRecord);
         }
 
-        var parsed = new TestCaseParser().Parse(await File.ReadAllTextAsync(path, ct), Path.GetFileName(path));
+        var parsed = new TestCaseParser(captureLayout: false).Parse(await File.ReadAllTextAsync(path, ct), Path.GetFileName(path));
         return parsed.IsSuccess ? Check(root, id, parsed.Value!, verdictPath) : new FreshnessResult(Freshness.NoRecord);
     }
 

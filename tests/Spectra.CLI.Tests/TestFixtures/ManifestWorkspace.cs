@@ -17,15 +17,8 @@ public static class ManifestWorkspace
     public const string SkillFile = ".claude/skills/spectra-generate/SKILL.md";
 
     /// <summary>The real <c>spectra init</c> (embedded template) with skills and agents.</summary>
-    public static async Task InitWithSkillsAsync(this BaselineTestWorkspace ws)
-    {
-        var logger = LoggingSetup.CreateLoggerFactory(VerbosityLevel.Quiet).CreateLogger<InitHandler>();
-        var exit = await new InitHandler(logger, ws.Root).HandleAsync(force: false, skipSkills: false);
-        if (exit != ExitCodes.Success)
-        {
-            throw new Xunit.Sdk.XunitException($"spectra init exited {exit}");
-        }
-    }
+    public static Task InitWithSkillsAsync(this BaselineTestWorkspace ws) =>
+        TemplateWorkspaces.InitAsync(ws, skipSkills: false); // Spec 099 F7: a copy of one real init per test process
 
     public static string ManifestPath(this BaselineTestWorkspace ws) => ws.PathOf(".spectra/skills-manifest.json");
 

@@ -1,0 +1,11 @@
+# step: 17-ingest-verdict-all spectra ai ingest-verdict --suite payments --all --output-format json
+# exit: 0
+## stdout
+{"command":"ingest-verdict","mode":"batch","suite":"payments","grounded":1,"partial":1,"hallucinated":1,"errors":0,"skipped_stale":0,"stale":[],"results":[{"id":"TC-101","verdict":"grounded","score":0.9,"gate":"pass"},{"id":"TC-104","verdict":"partial","score":0.9,"gate":"pass"},{"id":"TC-105","verdict":"hallucinated","score":0.9,"gate":"drop"}],"not_found":[]}
+
+## stderr
+Batch verdict-ingest for suite 'payments': grounded=1 partial=1 hallucinated=1 errors=0
+TC-101: grounded 0.9 (pass)
+TC-104: partial 0.9 (pass)
+TC-105: hallucinated 0.9 (drop)
+

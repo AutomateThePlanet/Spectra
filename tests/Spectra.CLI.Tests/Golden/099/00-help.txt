@@ -1,0 +1,43 @@
+# step: 00-help spectra --help
+# exit: 0
+## stdout
+Description:
+  Spectra - AI-native test generation and execution framework
+
+Usage:
+  testhost [command] [options]
+
+Options:
+  -v, --verbosity <Detailed|Diagnostic|Minimal|Normal|Quiet>  Output verbosity: quiet, minimal, normal, detailed, diagnostic [default: Normal]
+  --dry-run                                                   Preview changes without executing [default: False]
+  --no-review                                                 Skip interactive review (CI mode) [default: False]
+  --output-format <Human|Json>                                Output format: human (default) or json [default: Human]
+  --no-interaction                                            Disable interactive prompts (for CI/automation) [default: False]
+  --version                                                   Show version information
+  -?, -h, --help                                              Show help and usage information
+
+Commands:
+  init                  Initialize SPECTRA in this repository
+  validate              Validate test files against schema rules
+  index                 Generate or update test metadata indexes
+  dashboard             Generate a static dashboard from test indexes and execution reports
+  docs                  Documentation management commands
+  ai                    AI-powered test generation and analysis commands
+  list                  List all tests or tests in a specific suite
+  show <test-id>        Show details of a specific test
+  config <key> <value>  View or modify spectra configuration [, ]
+  init-profile          Create or update a test generation profile
+  profile               View and manage test generation profiles
+  update-skills         Update bundled SKILL and agent files to the latest version
+  prompts               View and manage prompt templates for AI operations
+  testimize             Optional Testimize integration commands
+  doctor                Diagnose and repair workspace health issues
+  cancel                Cancel an in-progress SPECTRA operation in the workspace
+  delete <test-ids>     Delete test cases (with automation and dependency safety checks)
+  suite                 Manage test suites (list, rename, delete)
+  run                   Drive deterministic test execution from the CLI (no MCP server required)
+  open <path>           Open a file or URL in the default application
+
+
+## stderr
+

@@ -1,0 +1,149 @@
+# step: 25-coverage spectra ai analyze --coverage --format json --output-format json
+# exit: 0
+## stdout
+Analyzing test coverage...
+{
+  "generated_at": "<mask:timestamp>",
+  "documentation_coverage": {
+    "total_docs": 4,
+    "covered_docs": 3,
+    "percentage": 75,
+    "undocumented_test_count": 0,
+    "undocumented_test_ids": [],
+    "details": [
+      {
+        "doc": "docs/_index/groups/payments.index.md",
+        "test_count": 0,
+        "covered": false,
+        "test_ids": []
+      },
+      {
+        "doc": "docs/payments/checkout.md",
+        "test_count": 4,
+        "covered": true,
+        "test_ids": [
+          "TC-101",
+          "TC-102",
+          "TC-103",
+          "TC-105"
+        ]
+      },
+      {
+        "doc": "docs/payments/receipts.md",
+        "test_count": 1,
+        "covered": true,
+        "test_ids": [
+          "TC-107"
+        ]
+      },
+      {
+        "doc": "docs/payments/refunds.md",
+        "test_count": 2,
+        "covered": true,
+        "test_ids": [
+          "TC-104",
+          "TC-108"
+        ]
+      }
+    ]
+  },
+  "acceptance_criteria_coverage": {
+    "total_criteria": 3,
+    "covered_criteria": 3,
+    "percentage": 100,
+    "has_criteria_file": false,
+    "details": [
+      {
+        "id": "AC-PAY-001",
+        "text": null,
+        "tests": [
+          "TC-101"
+        ],
+        "covered": true
+      },
+      {
+        "id": "AC-PAY-002",
+        "text": null,
+        "tests": [
+          "TC-103"
+        ],
+        "covered": true
+      },
+      {
+        "id": "AC-REF-001",
+        "text": null,
+        "tests": [
+          "TC-104",
+          "TC-108"
+        ],
+        "covered": true
+      }
+    ]
+  },
+  "automation_coverage": {
+    "total_tests": 7,
+    "automated": 0,
+    "percentage": 0,
+    "by_suite": [
+      {
+        "suite": "payments",
+        "total": 7,
+        "automated": 0,
+        "coverage_percentage": 0
+      }
+    ],
+    "unlinked_tests": [
+      {
+        "test_id": "TC-101",
+        "suite": "payments",
+        "title": "Large card payment is confirmed",
+        "priority": "high"
+      },
+      {
+        "test_id": "TC-102",
+        "suite": "payments",
+        "title": "Payment attempts are limited",
+        "priority": "high"
+      },
+      {
+        "test_id": "TC-103",
+        "suite": "payments",
+        "title": "Refund inside the window",
+        "priority": "high"
+      },
+      {
+        "test_id": "TC-104",
+        "suite": "payments",
+        "title": "Partial refund is capped",
+        "priority": "high"
+      },
+      {
+        "test_id": "TC-105",
+        "suite": "payments",
+        "title": "Checkout page shows the rules",
+        "priority": "high"
+      },
+      {
+        "test_id": "TC-107",
+        "suite": "payments",
+        "title": "Receipt shows the currency",
+        "priority": "medium"
+      },
+      {
+        "test_id": "TC-108",
+        "suite": "payments",
+        "title": "Second partial refund is capped",
+        "priority": "low"
+      }
+    ],
+    "orphaned_automation": [],
+    "broken_links": []
+  }
+}
+
+Documentation Coverage:        75.0% (3/4 documents)
+Acceptance Criteria Coverage:  100.0% (3/3 acceptance criteria)
+Automation Coverage:           0.0% (0/7 tests)
+
+## stderr
+

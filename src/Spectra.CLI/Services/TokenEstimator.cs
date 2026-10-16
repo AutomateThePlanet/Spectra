@@ -2,9 +2,8 @@ namespace Spectra.CLI.Services;
 
 /// <summary>
 /// Rough token-count estimate using the <c>text.Length / 4</c> heuristic
-/// (Spec 040 follow-up). Used as a fallback when the Copilot SDK's
-/// <c>AssistantUsageEvent</c> does not arrive within the grace window after
-/// a request — see <see cref="CopilotUsageObserver"/>.
+/// (Spec 040 follow-up). Originally the fallback for the Copilot SDK's usage events (removed in Spec 069); now used
+/// for the prompt-size checks.
 ///
 /// Accuracy: good enough for cost ballparking on English GPT-family prompts
 /// (cl100k / o200k tokenizers average ~4 characters per token). Can be off

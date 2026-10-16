@@ -1,0 +1,17 @@
+# step: 26-dashboard-dry-run spectra dashboard --output site --dry-run --output-format json
+# exit: 0
+## stdout
+Branding: Applying "SPECTRA" branding
+Collecting dashboard data...
+  Suites: 1
+  Tests: 7
+  Runs: 0
+
+Would generate dashboard to: <mask:workspace-root>\site
+  index.html with 7 tests embedded
+  styles/main.css
+  scripts/app.js
+  branding: SPECTRA
+
+## stderr
+

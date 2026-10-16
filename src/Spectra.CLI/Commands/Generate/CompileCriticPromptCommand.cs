@@ -308,7 +308,7 @@ public sealed class CompileCriticPromptCommand : Command
         if (fullPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
         {
             var rel = Path.GetRelativePath(currentDir, fullPath);
-            var parsed = new TestCaseParser().Parse(content, rel);
+            var parsed = new TestCaseParser(captureLayout: false).Parse(content, rel);
             return parsed.IsSuccess ? parsed.Value : null;
         }
 

@@ -54,7 +54,7 @@ public sealed class RunServices : IAsyncDisposable
         ReportWriter = new ReportWriter(reportsPath);
 
         var indexWriter = new IndexWriter();
-        var parser = new TestCaseParser();
+        var parser = new TestCaseParser(captureLayout: false);
         var basePath2 = BasePath;
 
         IndexLoader = suite =>

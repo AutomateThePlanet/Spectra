@@ -91,7 +91,8 @@ public sealed class IngestTestsCommand : Command
         var testsDir = config.Tests?.Dir ?? "test-cases";
         var testsPath = Path.Combine(currentDir, testsDir);
         var suitePath = Path.Combine(testsPath, suite);
-        var existingTests = await LoadExistingTestsAsync(suitePath, testsPath, ct);
+        var suiteFiles = await SuiteScanBuilder.ReadAsync(suitePath, captureLayout: false, ct);
+        var existingTests = SuiteScanBuilder.Tests(suiteFiles);
 
         var persistence = new TestPersistenceService(
             new TestFileWriter(), new IndexGenerator(), new IndexWriter());
@@ -113,8 +114,11 @@ public sealed class IngestTestsCommand : Command
                 {
                     try
                     {
+                        // Spec 099 F1: the suite as read above plus the files just written — no second parse.
+                        var scan = SuiteScanBuilder.Build(currentDir, suiteFiles, ingested.PersistedTests
+                            .Select(t => new SuiteFile(TestFileWriter.GetFilePath(testsPath, suite, t.Id), t)));
                         baselineSummary = await BaselineRecorder.RecordPersistedAsync(
-                            currentDir, config, testsPath, suite, baseline, ingested.PersistedTests, RecordMode.Rebuild, warnings, ct);
+                            currentDir, config, testsPath, suite, baseline, ingested.PersistedTests, RecordMode.Rebuild, warnings, ct, scan);
                     }
                     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or BaselineStoreException)
                     {
@@ -183,28 +187,5 @@ public sealed class IngestTestsCommand : Command
         }
 
         return result.ErrorCode == IngestErrorCode.SchemaInvalid ? ExitSchemaInvalid : ExitContentInvalid;
-    }
-
-    private static async Task<List<TestCase>> LoadExistingTestsAsync(
-        string suitePath, string testsPath, CancellationToken ct)
-    {
-        var tests = new List<TestCase>();
-        if (!Directory.Exists(suitePath))
-            return tests;
-
-        var parser = new TestCaseParser();
-        var files = Directory.GetFiles(suitePath, "*.md")
-            .Where(f => !Path.GetFileName(f).StartsWith('_'));
-
-        foreach (var file in files)
-        {
-            var fileContent = await File.ReadAllTextAsync(file, ct);
-            var relativePath = Path.GetRelativePath(suitePath, file);
-            var parsed = parser.Parse(fileContent, relativePath);
-            if (parsed.IsSuccess)
-                tests.Add(parsed.Value!);
-        }
-
-        return tests;
     }
 }

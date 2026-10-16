@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Spectra.CLI.IO;
+using Spectra.Core.Diagnostics;
 using Spectra.Core.Models;
 using Spectra.Core.Validation;
 
@@ -67,20 +68,27 @@ public sealed class GeneratedTestIngestor
     /// (not yet persisted) or a fail-loud result. Exposed for token-free unit testing of the
     /// boundary contract.
     /// </summary>
-    public static IngestResult ParseAndValidate(string? content, TestValidator validator)
+    public static IngestResult ParseAndValidate(string? content, TestValidator validator) =>
+        ParseAndValidate(Extract(content), validator);
+
+    /// <summary>
+    /// Spec 099 F4: <see cref="ParseAndValidate(string?, TestValidator)"/> over content already extracted, so a caller
+    /// that also needs <see cref="ArrayObjects(ExtractedContent)"/> parses the JSON once.
+    /// </summary>
+    internal static IngestResult ParseAndValidate(ExtractedContent extracted, TestValidator validator)
     {
         ArgumentNullException.ThrowIfNull(validator);
 
-        if (string.IsNullOrWhiteSpace(content))
+        if (extracted.Blank)
             return IngestResult.Failure(IngestErrorCode.EmptyContent,
                 "Agent returned no content.");
 
-        var json = ExtractJson(content);
+        var json = extracted.Json;
         if (string.IsNullOrWhiteSpace(json))
             return IngestResult.Failure(IngestErrorCode.EmptyContent,
                 "No JSON array found in the agent response.");
 
-        if (!TryParseArray(json, out var array))
+        if (extracted.Array is not { } array)
         {
             // No salvage (FR-006). Distinguish a token-truncated array (opened '[', never
             // closed) from genuinely malformed JSON so the skill can re-prompt precisely.
@@ -95,7 +103,7 @@ public sealed class GeneratedTestIngestor
         }
 
         var tests = new List<TestCase>();
-        foreach (var element in array.Value.EnumerateArray())
+        foreach (var element in array.EnumerateArray())
         {
             var test = ParseTestCase(element);
             if (test is not null)
@@ -146,15 +154,32 @@ public sealed class GeneratedTestIngestor
     /// <see cref="ParseAndValidate"/> finds the array; null for an object without a string id. Counts objects, not valid
     /// tests. Returns null when the content holds no parseable array (the regular codes then apply).
     /// </summary>
-    public static IReadOnlyList<string?>? ArrayObjects(string? content)
+    internal static IReadOnlyList<string?>? ArrayObjects(ExtractedContent extracted)
     {
-        if (string.IsNullOrWhiteSpace(content) || !TryParseArray(ExtractJson(content), out var array))
+        if (extracted.Array is not { } array)
             return null;
 
-        return array.Value.EnumerateArray()
+        return array.EnumerateArray()
             .Where(e => e.ValueKind == JsonValueKind.Object)
             .Select(e => e.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String ? id.GetString() : null)
             .ToList();
+    }
+
+    /// <summary>
+    /// Spec 099 F4: the content's JSON, found and parsed once — <see cref="Blank"/> for empty content (nothing parsed),
+    /// <see cref="Json"/> the extracted array text, <see cref="Array"/> its parsed root or null when it doesn't parse as
+    /// an array.
+    /// </summary>
+    internal sealed record ExtractedContent(bool Blank, string Json, JsonElement? Array);
+
+    /// <summary>Spec 099 F4: extracts and parses the content's JSON array once (see <see cref="ExtractedContent"/>).</summary>
+    internal static ExtractedContent Extract(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return new ExtractedContent(true, "", null);
+
+        var json = ExtractJson(content);
+        return new ExtractedContent(false, json, TryParseArray(json, out var array) ? array : null);
     }
 
     // --- Relocated parse pipeline (Spec 053). No TryRepairTruncatedArray. ---
@@ -183,6 +208,7 @@ public sealed class GeneratedTestIngestor
     private static bool TryParseArray(string json, [NotNullWhen(true)] out JsonElement? array)
     {
         array = null;
+        ParseCounter.JsonParse();
         try
         {
             var doc = JsonDocument.Parse(json);

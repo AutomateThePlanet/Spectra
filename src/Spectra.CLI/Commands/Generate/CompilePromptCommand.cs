@@ -144,8 +144,7 @@ public sealed class CompilePromptCommand : Command
                 requestedCount: 1,
                 criteriaContext: criteria.Context,
                 templateLoader: templateLoader,
-                profileFormat: profileFormat,
-                testimizeData: null);
+                profileFormat: profileFormat);
 
             Console.Out.Write(fromDescPrompt);
             if (!fromDescPrompt.EndsWith('\n')) Console.Out.WriteLine();
@@ -159,8 +158,7 @@ public sealed class CompilePromptCommand : Command
             requestedCount: count,
             criteriaContext: criteria.Context,
             templateLoader: templateLoader,
-            profileFormat: profileFormat,
-            testimizeData: null);
+            profileFormat: profileFormat);
 
         if (!result.IsSuccess)
         {
@@ -186,7 +184,7 @@ public sealed class CompilePromptCommand : Command
         if (!Directory.Exists(suitePath))
             return [];
 
-        var parser = new TestCaseParser();
+        var parser = new TestCaseParser(captureLayout: false);
         var ids = new List<string>();
         foreach (var file in Directory.GetFiles(suitePath, "*.md")
                      .Where(f => !Path.GetFileName(f).StartsWith('_')))

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(spectra *)",
+      "Write(.spectra/**)",
+      "Edit(.spectra/**)"
+    ]
+  }
+}

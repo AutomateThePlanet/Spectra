@@ -53,7 +53,7 @@ public sealed class AuditGroundingHandler
 
         var verdictDir = Path.Combine(_currentDir, ".spectra", "verdicts");
 
-        var parser = new TestCaseParser();
+        var parser = new TestCaseParser(captureLayout: false);
         var indexLookup = index.Tests
             .ToDictionary(t => t.Id, t => t, StringComparer.OrdinalIgnoreCase);
 

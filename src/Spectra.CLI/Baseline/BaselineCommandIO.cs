@@ -107,12 +107,12 @@ public static class BaselineCommandIO
 
     /// <summary>
     /// Parses the suite's tests (<c>*.md</c> without a leading <c>_</c>), ordered by ID. Files that don't parse are
-    /// skipped with a warning naming them.
+    /// skipped with a warning naming them. Spec 099 F3: parsed for reading unless <paramref name="captureLayout"/>.
     /// </summary>
     public static async Task<SuiteTests> LoadSuiteTestsAsync(
-        string repoRoot, string testsPath, string suite, List<string> warnings, CancellationToken ct)
+        string repoRoot, string testsPath, string suite, List<string> warnings, CancellationToken ct, bool captureLayout = false)
     {
-        var scan = await BaselineStore.ScanSuiteAsync(repoRoot, testsPath, suite, ct);
+        var scan = await BaselineStore.ScanSuiteAsync(repoRoot, testsPath, suite, ct, captureLayout);
         foreach (var file in scan.UnparseableFiles)
         {
             warnings.Add($"{file} could not be parsed and was skipped.");
