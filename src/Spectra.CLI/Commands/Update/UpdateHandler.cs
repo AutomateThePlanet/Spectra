@@ -182,7 +182,7 @@ public sealed class UpdateHandler
             {
                 _progress.Error("No test suites found.");
                 Console.Error.WriteLine();
-                Console.Error.WriteLine("Run 'spectra ai generate' first to create tests.");
+                Console.Error.WriteLine("Ask your assistant to generate tests first (the spectra-generate skill).");
                 return ExitCodes.Error;
             }
 
@@ -339,7 +339,7 @@ public sealed class UpdateHandler
                     $"{unlinkedCriteria.Count} acceptance criteria for '{suite}' have no linked tests: " +
                     string.Join(", ", unlinkedCriteria.Select(c => c.Id)));
                 _progress.Info(
-                    $"Run 'spectra ai generate {suite}' to generate tests covering these criteria.");
+                    $"Ask your assistant to generate tests for '{suite}' (the spectra-generate skill) to cover these criteria.");
             }
         }
 

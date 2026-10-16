@@ -143,7 +143,7 @@ public static class RunSummaryPresenter
             grid.AddRow("[grey]Errors[/]", errorTracker.Errors.ToString(CultureInfo.InvariantCulture));
             var rl = errorTracker.RateLimits;
             var rlText = rl > 0
-                ? $"{rl}  [yellow](consider reducing ai.critic.max_concurrent)[/]"
+                ? $"{rl}  [yellow](rate limited)[/]"
                 : rl.ToString(CultureInfo.InvariantCulture);
             grid.AddRow("[grey]Rate limits[/]", rlText);
         }

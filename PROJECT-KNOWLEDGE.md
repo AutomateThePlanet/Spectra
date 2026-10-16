@@ -1,5 +1,9 @@
 # SPECTRA Project Knowledge
 
+> **Historical document** — describes SPECTRA v1 (before specs 058–070: the GitHub Copilot SDK runtime, the
+> MCP execution server, `spectra ai generate`), all since removed. Current guidance: [`CLAUDE.md`](CLAUDE.md)
+> and [`docs/`](docs/).
+
 ## What is SPECTRA?
 
 SPECTRA is an AI-native test case generation and execution framework. It reads product documentation, extracts testable behaviors, generates structured manual test cases (as Markdown files with YAML frontmatter), executes them through an MCP server with AI agent orchestration, and produces coverage reports and dashboards.

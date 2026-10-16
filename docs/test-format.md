@@ -63,7 +63,7 @@ grounding:
 | `component` | string | No | Feature area or component name |
 | `description` | string | No | Short description of what the test verifies (indexed and searchable) |
 | `estimated_duration` | string | No | Estimated execution time (e.g., `5m`, `1h 30m`) |
-| `depends_on` | string[] | No | Test IDs that must pass first |
+| `depends_on` | string | No | One test ID that must pass first (e.g. `depends_on: TC-101`). A list is not supported and makes the file unparseable — `spectra validate` reports it and `spectra delete` warns about it |
 
 ## Documentation & Traceability Fields
 

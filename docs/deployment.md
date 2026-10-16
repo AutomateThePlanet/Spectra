@@ -7,7 +7,7 @@ permalink: /deployment
 
 # Deployment
 
-Guides for deploying the SPECTRA dashboard and configuring external integrations (Cloudflare Pages, Copilot Spaces).
+Guides for deploying the SPECTRA dashboard and configuring external integrations (Cloudflare Pages).
 
 ## Two distinct deployment models that should not be conflated
 

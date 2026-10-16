@@ -7,8 +7,8 @@ permalink: /execution-agents
 # Execution Agents
 
 How AI-driven test execution works in SPECTRA v2: a native Claude Code skill orchestrates
-`spectra run`, and manual verdicts are recorded through a local browser console, not through any
-MCP server or client-specific setup.
+`spectra run`, and manual verdicts are recorded through a local browser console — there is no server or
+client-specific setup.
 
 Related: [CLI Reference](cli-reference.md) (`spectra run …`)
 
@@ -93,6 +93,5 @@ backward compatible with older reports and JSON consumers (e.g. the dashboard).
 ## The SEPARATE BELLATRIX/Nova MCP
 
 None of the above is related to BELLATRIX/Nova, the MCP server that drives your **system under
-test** during automation. That MCP is a peer tool, unaffected by anything in this page; if
-`spectra init` finds an existing `.vscode/mcp.json` with a BELLATRIX/Nova entry, it merges by key
-and leaves it untouched.
+test** during automation. That MCP is a peer tool, unaffected by anything in this page; `spectra init`
+never writes or changes `.vscode/mcp.json`, so a BELLATRIX/Nova entry there is left untouched.

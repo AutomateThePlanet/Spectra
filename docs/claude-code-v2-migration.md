@@ -28,7 +28,7 @@ SPECTRA then validates and persists whatever comes back.
 
 ## Architecture: before / after
 
-**v1 (in-process SDK session):**
+**v1 (in-process SDK session — removed in v2.4.0):**
 
 ```
 spectra ai generate checkout --count 20

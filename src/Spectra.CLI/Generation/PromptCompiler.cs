@@ -57,8 +57,7 @@ public static class PromptCompiler
             return PromptCompileResult.MissingRequired(
                 "criteria_context",
                 "No acceptance-criteria context was resolved for this suite. Refusing to emit a "
-                + "prompt without grounding criteria. Run 'spectra ai analyze --extract-criteria' "
-                + "(or 'spectra docs index') first.");
+                + "prompt without grounding criteria. Extract criteria first (the spectra-criteria skill).");
         }
 
         var prompt = Assemble(

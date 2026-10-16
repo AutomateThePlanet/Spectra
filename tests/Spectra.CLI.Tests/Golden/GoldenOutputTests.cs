@@ -15,6 +15,12 @@ namespace Spectra.CLI.Tests.Golden;
 /// this class on the build to capture. The test uses only fixtures that exist on c24d23e.</para>
 /// <para>The golden files hold the platform's newlines (Windows), so the comparison runs on Windows only; the folder is
 /// <c>-text</c> in <c>.gitattributes</c> so git keeps the bytes.</para>
+/// <para>Spec 100 (research R8): 100 changes text that <c>init</c> writes (<c>CUSTOMIZATION.md</c>, the criteria file
+/// comments), so the two runs no longer share one file tree. The fresh run compares with <c>files.txt</c> (re-captured on
+/// 100); the pre-099 run — whose init-written files are the c24d23e inputs — compares with <c>files-pre099.txt</c>, a
+/// byte copy of the 099 capture, which proves every command still writes byte-identical files on an existing workspace.
+/// The record mode never rewrites <c>pre099-workspace/</c> or <c>files-pre099.txt</c>: both are frozen c24d23e
+/// fixtures.</para>
 /// </remarks>
 [Collection(CriteriaCommandsCollection.Name)]
 public sealed class GoldenOutputTests : IDisposable
@@ -22,6 +28,8 @@ public sealed class GoldenOutputTests : IDisposable
     private const string RecordVariable = "SPECTRA_GOLDEN_RECORD";
     private const string Suite = "payments";
     private const string FilesRecord = "files.txt";
+    private const string Pre099FilesRecord = "files-pre099.txt";
+    private const string Pre099Workspace = "pre099-workspace";
     private const string InitStep = "05-init";
 
     private readonly BaselineTestWorkspace _ws = new(writeConfig: false);
@@ -34,6 +42,15 @@ public sealed class GoldenOutputTests : IDisposable
     /// <summary>The 083 rule: the same sequence on the workspace c24d23e's init produced (captured with the golden files).</summary>
     [WindowsFact]
     public Task Pre099Workspace_MatchesTheGoldenOutput() => RunAsync(fromPre099: true);
+
+    /// <summary>Spec 100 (C3): the frozen c24d23e workspace still holds 099's init output, so no re-capture replaced it.</summary>
+    [Fact]
+    public void Pre099Workspace_IsTheFrozenC24d23eCapture()
+    {
+        var customization = File.ReadAllText(Path.Combine(GoldenDirectory(), Pre099Workspace, "CUSTOMIZATION.md"));
+        Assert.Contains("Re-run `spectra ai generate`", customization, StringComparison.Ordinal);
+        Assert.True(File.Exists(Path.Combine(GoldenDirectory(), Pre099FilesRecord)), "files-pre099.txt is missing");
+    }
 
     private async Task RunAsync(bool fromPre099)
     {
@@ -56,21 +73,11 @@ public sealed class GoldenOutputTests : IDisposable
 
         if (fromPre099)
         {
-            CopyTree(Path.Combine(GoldenDirectory(), "pre099-workspace"), _ws.Root);
+            CopyTree(Path.Combine(GoldenDirectory(), Pre099Workspace), _ws.Root);
         }
         else
         {
             await Step(InitStep, "init", "--skip-skills", "--output-format", "json");
-            if (recording)
-            {
-                var target = Path.Combine(RecordDirectory(record!), "pre099-workspace");
-                if (Directory.Exists(target))
-                {
-                    Directory.Delete(target, recursive: true);
-                }
-
-                CopyTree(_ws.Root, target);
-            }
         }
 
         WriteFixture();
@@ -120,7 +127,8 @@ public sealed class GoldenOutputTests : IDisposable
             return;
         }
 
-        Compare(GoldenDirectory(), masked, skip: fromPre099 ? InitStep + ".txt" : null);
+        Compare(GoldenDirectory(), masked, skip: fromPre099 ? InitStep + ".txt" : null,
+            filesRecord: fromPre099 ? Pre099FilesRecord : FilesRecord);
     }
 
     // ------------------------------------------------------------------ fixture
@@ -278,7 +286,7 @@ public sealed class GoldenOutputTests : IDisposable
     private static void Write(string dir, IReadOnlyDictionary<string, string> records)
     {
         Directory.CreateDirectory(dir);
-        foreach (var old in Directory.GetFiles(dir, "*.txt"))
+        foreach (var old in Directory.GetFiles(dir, "*.txt").Where(f => Path.GetFileName(f) != Pre099FilesRecord))
         {
             File.Delete(old);
         }
@@ -289,9 +297,12 @@ public sealed class GoldenOutputTests : IDisposable
         }
     }
 
-    private static void Compare(string dir, IReadOnlyDictionary<string, string> actual, string? skip)
+    private static void Compare(string dir, IReadOnlyDictionary<string, string> actual, string? skip, string filesRecord)
     {
-        var expectedNames = Directory.GetFiles(dir, "*.txt").Select(f => Path.GetFileName(f)!).Where(n => n != skip)
+        // The file tree is compared with the record for this run (files.txt or files-pre099.txt), under its own name.
+        var expectedNames = Directory.GetFiles(dir, "*.txt").Select(f => Path.GetFileName(f)!)
+            .Where(n => n != skip && n != FilesRecord && n != Pre099FilesRecord)
+            .Append(FilesRecord)
             .OrderBy(n => n, StringComparer.Ordinal).ToList();
         var actualNames = actual.Keys.Where(n => n != skip).ToList();
         Assert.Equal(expectedNames, actualNames);
@@ -299,7 +310,8 @@ public sealed class GoldenOutputTests : IDisposable
         var failures = new List<string>();
         foreach (var name in expectedNames)
         {
-            var expected = Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(dir, name)));
+            var source = name == FilesRecord ? filesRecord : name;
+            var expected = Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(dir, source)));
             if (!string.Equals(expected, actual[name], StringComparison.Ordinal))
             {
                 failures.Add($"{name}:\n{FirstDifference(expected, actual[name])}");

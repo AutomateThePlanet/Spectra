@@ -26,7 +26,7 @@ docs/_index/
     └── ...
 ```
 
-The manifest is small and always loaded; per-suite files are lazy-loaded only for the suite the user is working with. This is what unblocks `spectra ai generate` on large corpora, because the analyzer no longer carries every document's preview into every prompt.
+The manifest is small and always loaded; per-suite files are lazy-loaded only for the suite the user is working with. This is what unblocks generation (`spectra ai compile-analysis-prompt`) on large corpora, because the analyzer no longer carries every document's preview into every prompt.
 
 ## How It Works
 
@@ -72,9 +72,11 @@ spectra docs list-suites --output-format json
 spectra docs show-suite checkout
 ```
 
-## Auto-refresh
+## Refreshing the index
 
-The document index is automatically refreshed (incremental) before every `spectra ai generate` and `spectra ai analyze` run. During `spectra init`, an initial full index build is performed if documentation files exist.
+During `spectra init`, an initial full index build is performed if documentation files exist. After that, run
+`spectra docs index` (incremental) when the documentation changes; the analysis and generation commands
+(`spectra ai compile-analysis-prompt`, `compile-prompt`) read the index as it is and do not refresh it.
 
 ## Manifest format (`_manifest.yaml`)
 
@@ -227,7 +229,9 @@ See the [Document Index migration guide](migration-040.md) for full details.
 
 ## Pre-flight token budget
 
-When running `spectra ai generate` (or any AI command that loads documentation context), Spectra estimates the prompt size before sending it to the model. If the estimate exceeds `ai.analysis.max_prompt_tokens` (default 96,000), the command fails fast with exit code `4` and an actionable message:
+When `spectra ai compile-analysis-prompt` compiles an analysis prompt that inlines documentation, Spectra estimates the
+prompt size before your session sends it to the model. If the estimate exceeds `analysis.max_prompt_tokens` (default
+96,000), the command fails fast with exit code `4` and an actionable message:
 
 ```
 Analyzer prompt would be ~187,234 tokens, exceeding the configured 96,000-token budget.
@@ -237,9 +241,8 @@ Candidate suites (sorted by token cost):
   POS_UG_Topics        7,400 tokens
   ... 9 more ...
 Suggested:
-  spectra ai generate --suite SM_GSG_Topics
-  spectra ai generate --analyze-only
-Or raise ai.analysis.max_prompt_tokens in spectra.config.json.
+  spectra ai compile-analysis-prompt --suite <suite> --doc-suite SM_GSG_Topics
+Or raise analysis.max_prompt_tokens in spectra.config.json.
 ```
 
 This replaces the raw `400 prompt token count exceeds the limit of 128000` error from the model on large corpora.

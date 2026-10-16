@@ -285,7 +285,7 @@ Bot:  [rewrites 4 test cases, shows diff for each]
 
 ---
 
-## Workflow 9: Execute Test Cases via MCP
+## Workflow 9: Execute Test Cases
 
 **Tell the user to say:**
 

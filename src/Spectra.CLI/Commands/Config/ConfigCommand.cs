@@ -14,7 +14,7 @@ public sealed class ConfigCommand : Command
         var keyArgument = new Argument<string?>(
             "key",
             () => null,
-            "Configuration key (e.g., 'source.dir', 'ai.defaultProvider')");
+            "Configuration key (e.g., 'source.local_dir', 'tests.dir')");
 
         var valueArgument = new Argument<string?>(
             "value",

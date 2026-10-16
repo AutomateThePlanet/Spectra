@@ -16,7 +16,7 @@ Options:
   -?, -h, --help                                              Show help and usage information
 
 Commands:
-  update <suite>             Update test cases based on documentation changes []
+  update <suite>             Legacy word-overlap classifier — use update-triage for documentation changes []
   analyze                    Analyze test coverage across documentation
   compile-prompt <suite>     Compile a grounded generation prompt (deterministic, no model call) []
   ingest-tests <suite>       Validate and persist agent-generated test content (fail-loud)

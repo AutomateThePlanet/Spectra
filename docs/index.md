@@ -30,7 +30,7 @@ From documentation to verified, grounded test cases, automatically.
 ## How it works
 
 ```
-Your docs → spectra ai generate → AI analysis → critic verification → test-cases/*.md
+Your docs → spectra-generate skill (analysis → batches) → critic verification → test-cases/*.md
 ```
 
 Or just say it in Claude Code: **"Generate test cases for checkout"**
@@ -40,6 +40,8 @@ Or just say it in Claude Code: **"Generate test cases for checkout"**
 - **AI Test Case Generation** driven from your Claude Code session, with independent critic verification
 - **Acceptance Criteria Extraction** using MUST/SHOULD/MAY from docs with SHA-256 change tracking
 - **Three-Dimensional Coverage** spanning docs, criteria, and automation in one dashboard
+- **Doc-Change Updates** that find the tests a doc change touches, edit them and re-verify them — see
+  [When documentation changes](usage.md#when-documentation-changes)
 - **CLI-Native Execution** through `spectra run`, plus an optional local web console for manual verdicts
 - **Testimize Integration** for optional algorithmic test data optimization (BVA, EP, pairwise)
 - **Git-native** storage as Markdown and YAML, with no database and no vendor lock-in

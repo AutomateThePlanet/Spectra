@@ -12,7 +12,9 @@ public class NextStepHintsTests
 
         Assert.Contains(hints, h => h.Contains("spectra-generate skill"));
         Assert.Contains(hints, h => h.Contains("spectra init-profile"));
-        Assert.Contains(hints, h => h.Contains("Copilot Space"));
+        // Spec 100 F4: criteria come from the spectra-criteria skill; the Copilot Spaces hint is gone.
+        Assert.Contains(hints, h => h.Contains("spectra-criteria skill"));
+        Assert.DoesNotContain(hints, h => h.Contains("Copilot") || h.Contains("--extract-criteria"));
     }
 
     [Fact]

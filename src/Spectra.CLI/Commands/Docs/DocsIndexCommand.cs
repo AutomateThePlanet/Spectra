@@ -17,7 +17,7 @@ public sealed class DocsIndexCommand : Command
 
         var skipCriteriaOption = new Option<bool>(
             ["--skip-criteria"],
-            "Skip automatic acceptance criteria extraction after indexing");
+            "Accepted and ignored: docs index no longer extracts criteria (use the spectra-criteria skill)");
 
         var noMigrateOption = new Option<bool>(
             ["--no-migrate"],
@@ -25,7 +25,7 @@ public sealed class DocsIndexCommand : Command
 
         var includeArchivedOption = new Option<bool>(
             ["--include-archived"],
-            "Include suites flagged skip_analysis: true in any auto-extracted criteria step");
+            "Accepted and ignored: docs index no longer extracts criteria (use the spectra-criteria skill)");
 
         var suitesOption = new Option<string?>(
             ["--suites"],

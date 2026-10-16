@@ -147,11 +147,11 @@ subagent invoked by the generation skill after generation, not an in-process mod
 something `ai.providers`/`ai.critic` route to. (A legacy config that still carries those keys loads
 unchanged; `spectra validate` surfaces a non-blocking notice naming them.)
 
-The critic model is set by the `model:` field in `.claude/agents/spectra-critic.agent.md` (shipped as
-`claude-sonnet-4-6`). Edit that file directly to change it, and re-apply the edit after
-`spectra update-skills` if you've customized it. There's no separate provider/timeout/concurrency
-config; Claude Code itself schedules subagent calls.
+The critic model is `ai.critic.model` in `spectra.config.json` (default `sonnet`; an alias such as `opus`, a model
+id, or `inherit` for your session's model). `spectra init` and `spectra update-skills` write it into
+`.claude/agents/spectra-critic.agent.md`; an agent file you edited by hand is never overwritten. There's no separate
+provider/timeout/concurrency config; Claude Code itself schedules subagent calls.
 
 The generator isn't configurable either. Generation runs as an ordinary turn in your own Claude
 Code session, driven by the `spectra-generate` skill over the compile→ingest seam. See
-[Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) for the full picture.
+[Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) for the history (the SDK was removed).

@@ -38,7 +38,7 @@ spectra ai compile-analysis-prompt --suite <suite> --doc-suite <doc_suite> --foc
 ```
 (Omit `--focus` when there is none.)
 - Exit 0 → stdout is the compiled analysis prompt. Go to step 2.
-- Exit 4 → refused — usually the pre-flight token budget (`ai.analysis.max_prompt_tokens`) was
+- Exit 4 → refused — usually the pre-flight token budget (`analysis.max_prompt_tokens`) was
   exceeded. End with `refused: <error_code>` and one `refusal: <line>` per line of the CLI's message,
   verbatim — the candidate doc suites and the remedies (narrow with `--doc-suite`, or raise the
   budget). No recommendation.

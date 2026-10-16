@@ -17,7 +17,7 @@ Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md)
 
 > SPECTRA can optionally integrate with [Testimize](testimize-integration.md) for *algorithmic*
 > test data optimization (BVA, EP, pairwise, ABC). It's disabled by default, and runs **in-process**
-> as a NuGet dependency, with no separate install or MCP server needed (v1.48.3 moved it off the old
+> as a NuGet dependency, with no separate install or server needed (v1.48.3 moved it off the old
 > `Testimize.MCP.Server` child-process model). Set `testimize.enabled` to `true` in
 > `spectra.config.json`, then verify with `spectra testimize check`. SPECTRA works fine without it.
 
@@ -123,17 +123,18 @@ Edit `spectra.config.json` to point to your docs. See [Configuration Reference](
     "dir": "test-cases/"
   },
   "ai": {
-    "generation_batch_size": 30,
-    "generation_timeout_minutes": 5,
-    "analysis_timeout_minutes": 2
+    "critic": { "model": "sonnet" }
+  },
+  "generation": {
+    "batch_size": 8
   }
 }
 ```
 
-> There's no generator/critic model to pick here anymore. The `ai` block only paces the
-> deterministic CLI side of generation (batch size, timeouts); the model doing the actual work is
-> whatever your Claude Code session is running. The `spectra-critic` subagent's model is set in
-> `.claude/agents/spectra-critic.agent.md`. See [Configuration Reference](configuration.md#ai--generation-pacing-no-providermodel-routing-anymore).
+> There's no generator model to pick here: the model doing the generation is whatever your Claude Code session is
+> running. `ai.critic.model` is the `spectra-critic` subagent's model (run `spectra update-skills` after changing it),
+> and `generation.batch_size` is the most behaviors per generation batch. See
+> [Configuration Reference](configuration.md).
 
 ## First Run
 
