@@ -18,7 +18,7 @@ public sealed class DocsRetireCommand : Command
 {
     public const string ErrorNotIndexed = "NOT_INDEXED";
     public const string ErrorDocStillExists = "DOC_STILL_EXISTS";
-    private const string Name = "docs-retire";
+    private const string CommandName = "docs-retire";
 
     public DocsRetireCommand()
         : base("retire", "Retire a deleted document's acceptance criteria (explicit; --dry-run to preview)")
@@ -43,7 +43,7 @@ public sealed class DocsRetireCommand : Command
         var loaded = await CriteriaCommandIO.LoadConfigAsync(root, ConfigSections.Tests, ct);
         if (!loaded.IsSuccess)
         {
-            CriteriaCommandIO.WriteFailure(json, Name, loaded.ErrorCode, loaded.Error!);
+            CriteriaCommandIO.WriteFailure(json, CommandName, loaded.ErrorCode, loaded.Error!);
             return ExitCodes.Error;
         }
         var config = loaded.Config!;
@@ -52,7 +52,7 @@ public sealed class DocsRetireCommand : Command
         var normalized = CriteriaPaths.NormalizeSourceDoc(docArg, root);
         if (!normalized.IsSuccess)
         {
-            CriteriaCommandIO.WriteFailure(json, Name, normalized.ErrorCode, $"The document path must be inside the repository: {docArg}", configWarnings);
+            CriteriaCommandIO.WriteFailure(json, CommandName, normalized.ErrorCode, $"The document path must be inside the repository: {docArg}", configWarnings);
             return ExitCodes.Error;
         }
 
@@ -108,7 +108,7 @@ public sealed class DocsRetireCommand : Command
 
             if (outcome.ErrorCode is not null)
             {
-                CriteriaCommandIO.WriteFailure(json, Name, outcome.ErrorCode, outcome.Message!, configWarnings);
+                CriteriaCommandIO.WriteFailure(json, CommandName, outcome.ErrorCode, outcome.Message!, configWarnings);
                 return ExitCodes.NotFound; // 4: refused
             }
 
@@ -116,7 +116,7 @@ public sealed class DocsRetireCommand : Command
             {
                 Console.Out.WriteLine(JsonSerializer.Serialize(new
                 {
-                    command = Name,
+                    command = CommandName,
                     success = true,
                     doc,
                     dry_run = dryRun,
@@ -137,7 +137,7 @@ public sealed class DocsRetireCommand : Command
         }
         catch (CriteriaStoreException ex)
         {
-            CriteriaCommandIO.WriteFailure(json, Name, ex.ErrorCode, ex.Message, configWarnings);
+            CriteriaCommandIO.WriteFailure(json, CommandName, ex.ErrorCode, ex.Message, configWarnings);
             return ExitCodes.Error;
         }
     }

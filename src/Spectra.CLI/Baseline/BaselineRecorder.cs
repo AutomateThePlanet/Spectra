@@ -177,11 +177,14 @@ public static class BaselineRecorder
     /// Spec 084 FR-027 / Spec 085: records entries for tests an ingest just persisted (<paramref name="mode"/>: a full
     /// rebuild, or keep-baseline for critic repairs), writes their snapshots, and saves the suite baseline. The suite
     /// is scanned after persisting, so pruning sees the new files and is skipped when any test file fails to parse
-    /// (the warning goes to <paramref name="warnings"/>). Runs inside the caller's baseline lock.
+    /// (the warning goes to <paramref name="warnings"/>). Runs inside the caller's baseline lock. Spec 099 F1: a caller
+    /// that already read the suite passes <paramref name="scan"/> (built with <see cref="SuiteScanBuilder"/> from its
+    /// read plus the files it wrote), and the suite is not parsed again.
     /// </summary>
     public static async Task<BaselineWriteSummary> RecordPersistedAsync(
         string root, Spectra.Core.Models.Config.SpectraConfig config, string testsPath, string suite,
-        SourceBaseline baseline, IEnumerable<TestCase> persisted, RecordMode mode, List<string> warnings, CancellationToken ct)
+        SourceBaseline baseline, IEnumerable<TestCase> persisted, RecordMode mode, List<string> warnings, CancellationToken ct,
+        SuiteScan? scan = null)
     {
         var summary = new BaselineWriteSummary { Mode = mode };
         var context = await BaselineContext.CreateAsync(root, config, ct);
@@ -206,7 +209,7 @@ public static class BaselineRecorder
         }
 
         await WriteSnapshotsAsync(root, snapshots, summary, ct);
-        var scan = await BaselineStore.ScanSuiteAsync(root, testsPath, suite, ct);
+        scan ??= await BaselineStore.ScanSuiteAsync(root, testsPath, suite, ct);
         await BaselineStore.SaveSuiteAsync(testsPath, suite, baseline, scan, warnings, ct);
         return summary;
     }

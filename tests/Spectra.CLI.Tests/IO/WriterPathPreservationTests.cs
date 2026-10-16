@@ -156,8 +156,10 @@ public sealed class WriterPathPreservationTests : IDisposable
     }
 
     [Fact]
-    public async Task BatchWriteTool_NewTest_RoundTripsEveryTypedField()
+    public async Task PersistenceService_NewTest_RoundTripsEveryTypedField()
     {
+        // Spec 099 F5: was BatchWriteTestsTool (deleted, no production caller); new tests reach the writer through the
+        // persistence service.
         // Custom holds strings only: YAML scalars read back untyped as strings.
         var inMemory = FullFieldTestCase.Parse(FullFieldTestCase.Markdown) with
         {
@@ -166,9 +168,8 @@ public sealed class WriterPathPreservationTests : IDisposable
         };
         var suitePath = Path.Combine(_ws.TestCasesDir, "batch");
 
-        var result = await new BatchWriteTestsTool(new TestFileWriter()).ExecuteAsync(suitePath, [inMemory]);
+        await Persistence().PersistAsync(_ws.TestCasesDir, "batch", [inMemory], [inMemory]);
 
-        Assert.True(result.Success);
         var written = FullFieldTestCase.Parse(File.ReadAllText(Path.Combine(suitePath, "TC-100.md")));
         TestCaseEquivalence.AssertEquivalent(inMemory, written, includeLayout: false);
     }

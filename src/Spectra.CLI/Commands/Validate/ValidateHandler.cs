@@ -102,7 +102,7 @@ public sealed class ValidateHandler
 
         // Parse and validate each suite
         var orchestrator = new ValidationOrchestrator(config?.Validation);
-        var parser = new TestCaseParser();
+        var parser = new TestCaseParser(captureLayout: false);
         var allSuites = new List<TestSuite>();
         var totalErrors = 0;
         var totalWarnings = 0;

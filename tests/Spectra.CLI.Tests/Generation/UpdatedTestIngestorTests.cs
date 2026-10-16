@@ -334,11 +334,12 @@ public sealed class UpdatedTestIngestorTests : IDisposable
     [Fact]
     public void ArrayObjects_CountsObjects_NotValidTests()
     {
-        Assert.Equal(["TC-1", null], GeneratedTestIngestor.ArrayObjects("[{\"id\":\"TC-1\",\"title\":\"t\"},{\"title\":\"no id\"}]"));
-        Assert.Equal(["TC-1"], GeneratedTestIngestor.ArrayObjects("```json\n[{\"id\":\"TC-1\"}]\n```"));
-        Assert.Empty(GeneratedTestIngestor.ArrayObjects("[]")!);
-        Assert.Null(GeneratedTestIngestor.ArrayObjects("not json"));
-        Assert.Null(GeneratedTestIngestor.ArrayObjects(null));
+        // Spec 099 F4: the string overload had no production caller left; the rows read the extracted content.
+        Assert.Equal(["TC-1", null], GeneratedTestIngestor.ArrayObjects(GeneratedTestIngestor.Extract("[{\"id\":\"TC-1\",\"title\":\"t\"},{\"title\":\"no id\"}]")));
+        Assert.Equal(["TC-1"], GeneratedTestIngestor.ArrayObjects(GeneratedTestIngestor.Extract("```json\n[{\"id\":\"TC-1\"}]\n```")));
+        Assert.Empty(GeneratedTestIngestor.ArrayObjects(GeneratedTestIngestor.Extract("[]"))!);
+        Assert.Null(GeneratedTestIngestor.ArrayObjects(GeneratedTestIngestor.Extract("not json")));
+        Assert.Null(GeneratedTestIngestor.ArrayObjects(GeneratedTestIngestor.Extract(null)));
     }
 
     [Fact]

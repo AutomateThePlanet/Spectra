@@ -79,7 +79,7 @@ public sealed class CompileRepairBatchCommand : Command
         var indexLookup = index.Tests
             .ToDictionary(t => t.Id, t => t, StringComparer.OrdinalIgnoreCase);
 
-        var parser = new TestCaseParser();
+        var parser = new TestCaseParser(captureLayout: false);
         var entries = new List<RepairBatchEntry>();
         var stale = new List<(string Id, string Reason)>();
 

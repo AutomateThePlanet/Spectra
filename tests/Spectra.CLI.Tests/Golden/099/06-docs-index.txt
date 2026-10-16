@@ -1,0 +1,29 @@
+# step: 06-docs-index spectra docs index --output-format json
+# exit: 0
+## stdout
+{
+  "documents_indexed": 3,
+  "documents_updated": 3,
+  "documents_skipped": 0,
+  "documents_new": 3,
+  "documents_total": 3,
+  "index_path": "docs/_index/_manifest.yaml",
+  "suites": [
+    {
+      "id": "payments",
+      "document_count": 3,
+      "tokens_estimated": 103,
+      "skip_analysis": false,
+      "excluded_by": "none",
+      "index_file": "docs/_index/groups/payments.index.md"
+    }
+  ],
+  "manifest": "docs/_index/_manifest.yaml",
+  "command": "docs-index",
+  "status": "completed",
+  "timestamp": "<mask:timestamp>",
+  "message": "Documentation index updated"
+}
+
+## stderr
+

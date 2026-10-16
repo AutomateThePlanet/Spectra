@@ -27,7 +27,7 @@ public static class CriteriaLayoutMigrator
         var documentSources = ws.Index.Sources.Where(CriteriaPaths.IsDocumentSource).ToList();
 
         // Normalised doc per source (computed up front so a dry run can report without mutating).
-        var normalizedDoc = documentSources.ToDictionary(
+        var normalizedDoc = documentSources.ToDictionary<CriteriaSource, CriteriaSource, string>(
             s => s,
             s => CriteriaPaths.NormalizeSourceDoc(s.SourceDoc, ws.RepoRoot).Path ?? CriteriaPaths.NormalizeLexical(s.SourceDoc),
             ReferenceEqualityComparer.Instance);

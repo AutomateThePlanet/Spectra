@@ -128,13 +128,25 @@ public static partial class SectionExtractor
     public static SectionLookup Extract(string text, string? anchor)
     {
         var normalised = NormalizeNewlines(text);
+        return string.IsNullOrEmpty(anchor)
+            ? new SectionLookup(SectionOutcome.WholeFile, normalised, false, string.Empty)
+            : Extract(normalised, Headings(normalised), anchor);
+    }
+
+    /// <summary>
+    /// Spec 099 F2: <see cref="Extract(string, string?)"/> over a document already normalised
+    /// (<see cref="NormalizeNewlines"/>) and scanned (<see cref="Headings"/>), so a caller that resolves many refs into
+    /// one document scans it once.
+    /// </summary>
+    internal static SectionLookup Extract(string normalisedText, IReadOnlyList<MarkdownHeading> headings, string? anchor)
+    {
+        var normalised = normalisedText;
         if (string.IsNullOrEmpty(anchor))
         {
             return new SectionLookup(SectionOutcome.WholeFile, normalised, false, string.Empty);
         }
 
         var key = AnchorKey.FromAnchor(anchor);
-        var headings = Headings(normalised);
         var match = Match(headings, anchor);
         if (match is null)
         {

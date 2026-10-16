@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Spectra.Core.Diagnostics;
 using Spectra.Core.Models;
 
 namespace Spectra.Core.Parsing;
@@ -10,6 +11,14 @@ namespace Spectra.Core.Parsing;
 public sealed partial class TestCaseParser
 {
     private readonly MarkdownFrontmatterParser _frontmatterParser = new();
+    private readonly bool _captureLayout;
+
+    /// <summary>
+    /// Spec 099 F3: <paramref name="captureLayout"/> false parses for reading only — the 078 layout (what the lossless
+    /// writer needs) is not captured and the test is marked <see cref="TestCase.LayoutOmitted"/>, which the writer
+    /// refuses. Callers that may write the test keep the default.
+    /// </summary>
+    public TestCaseParser(bool captureLayout = true) => _captureLayout = captureLayout;
 
     [GeneratedRegex(@"^#\s+(.+)$", RegexOptions.Multiline)]
     private static partial Regex TitleRegex();
@@ -43,6 +52,7 @@ public sealed partial class TestCaseParser
     /// <returns>ParseResult containing the TestCase or errors</returns>
     public ParseResult<TestCase> Parse(string markdown, string filePath)
     {
+        ParseCounter.FullParse();
         var parseResult = _frontmatterParser.Parse<TestCaseFrontmatter>(markdown, filePath);
 
         if (parseResult.IsFailure)
@@ -120,7 +130,8 @@ public sealed partial class TestCaseParser
             OrphanedDate = ParseOrphanedDate(frontmatter.OrphanedDate)
         };
 
-        return ParseResult<TestCase>.Success(AttachLayout(testCase, markdown));
+        return ParseResult<TestCase>.Success(
+            _captureLayout ? AttachLayout(testCase, markdown) : testCase with { LayoutOmitted = true });
     }
 
     /// <summary>
@@ -131,6 +142,7 @@ public sealed partial class TestCaseParser
 
     private TestCase AttachLayout(TestCase baseline, string markdown)
     {
+        ParseCounter.LayoutCapture();
         if (!_frontmatterParser.TrySplitRaw(markdown, out var frontmatterText, out var rawBody))
         {
             return baseline;

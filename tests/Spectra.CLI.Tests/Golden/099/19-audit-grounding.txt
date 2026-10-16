@@ -1,0 +1,87 @@
+# step: 19-audit-grounding spectra ai audit-grounding --suite payments --output-format json
+# exit: 0
+## stdout
+{
+  "suite": "payments",
+  "tests": [
+    {
+      "id": "TC-101",
+      "verdict": "grounded",
+      "score": 0.9,
+      "grounding_written": true,
+      "flagged_for_review": false,
+      "action_needed": "none",
+      "file": "test-cases/payments/TC-101.md"
+    },
+    {
+      "id": "TC-104",
+      "verdict": "partial",
+      "score": 0.9,
+      "grounding_written": false,
+      "flagged_for_review": false,
+      "action_needed": "repair",
+      "file": "test-cases/payments/TC-104.md"
+    },
+    {
+      "id": "TC-105",
+      "verdict": "hallucinated",
+      "score": 0.9,
+      "grounding_written": false,
+      "flagged_for_review": false,
+      "action_needed": "review",
+      "file": "test-cases/payments/TC-105.md"
+    },
+    {
+      "id": "TC-102",
+      "verdict": "none",
+      "score": 0,
+      "grounding_written": false,
+      "flagged_for_review": false,
+      "action_needed": "critic",
+      "file": "test-cases/payments/TC-102.md"
+    },
+    {
+      "id": "TC-103",
+      "verdict": "none",
+      "score": 0,
+      "grounding_written": false,
+      "flagged_for_review": false,
+      "action_needed": "critic",
+      "file": "test-cases/payments/TC-103.md"
+    },
+    {
+      "id": "TC-107",
+      "verdict": "none",
+      "score": 0,
+      "grounding_written": false,
+      "flagged_for_review": false,
+      "action_needed": "critic",
+      "file": "test-cases/payments/TC-107.md"
+    },
+    {
+      "id": "TC-108",
+      "verdict": "none",
+      "score": 0,
+      "grounding_written": false,
+      "flagged_for_review": false,
+      "action_needed": "critic",
+      "file": "test-cases/payments/TC-108.md"
+    }
+  ],
+  "summary": {
+    "total": 7,
+    "grounding_written": 1,
+    "partial_pending_repair": 1,
+    "flagged_for_review": 0,
+    "unverified": 4,
+    "pending_ground": 0,
+    "pending_review": 1,
+    "stale": 0
+  },
+  "command": "audit-grounding",
+  "status": "success",
+  "timestamp": "<mask:timestamp>"
+}
+
+## stderr
+

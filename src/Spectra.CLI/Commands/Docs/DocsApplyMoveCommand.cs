@@ -18,7 +18,7 @@ public sealed class DocsApplyMoveCommand : Command
     public const string ErrorTargetMissing = "TARGET_MISSING";
     public const string ErrorTargetIndexed = "TARGET_INDEXED";
     public const string ErrorContentChanged = "CONTENT_CHANGED";
-    private const string Name = "docs-apply-move";
+    private const string CommandName = "docs-apply-move";
 
     public DocsApplyMoveCommand()
         : base("apply-move", "Apply a document move reported by 'docs changed' (keeps criteria and IDs)")
@@ -46,7 +46,7 @@ public sealed class DocsApplyMoveCommand : Command
         var loaded = await CriteriaCommandIO.LoadConfigAsync(root, ConfigSections.None, ct);
         if (!loaded.IsSuccess)
         {
-            CriteriaCommandIO.WriteFailure(json, Name, loaded.ErrorCode, loaded.Error!);
+            CriteriaCommandIO.WriteFailure(json, CommandName, loaded.ErrorCode, loaded.Error!);
             return ExitCodes.Error;
         }
         var config = loaded.Config!;
@@ -55,7 +55,7 @@ public sealed class DocsApplyMoveCommand : Command
         var toResult = CriteriaPaths.NormalizeSourceDoc(toArg, root);
         if (!fromResult.IsSuccess || !toResult.IsSuccess)
         {
-            CriteriaCommandIO.WriteFailure(json, Name, CriteriaPaths.ErrorInvalidDocPath, "Both paths must be inside the repository.");
+            CriteriaCommandIO.WriteFailure(json, CommandName, CriteriaPaths.ErrorInvalidDocPath, "Both paths must be inside the repository.");
             return ExitCodes.Error;
         }
 
@@ -125,7 +125,7 @@ public sealed class DocsApplyMoveCommand : Command
 
             if (outcome.ErrorCode is not null)
             {
-                CriteriaCommandIO.WriteFailure(json, Name, outcome.ErrorCode, outcome.Message!);
+                CriteriaCommandIO.WriteFailure(json, CommandName, outcome.ErrorCode, outcome.Message!);
                 return outcome.Refused ? ExitCodes.NotFound : ExitCodes.Error;
             }
 
@@ -133,7 +133,7 @@ public sealed class DocsApplyMoveCommand : Command
             {
                 Console.Out.WriteLine(JsonSerializer.Serialize(new
                 {
-                    command = Name,
+                    command = CommandName,
                     success = true,
                     from,
                     to,
@@ -154,7 +154,7 @@ public sealed class DocsApplyMoveCommand : Command
         }
         catch (CriteriaStoreException ex)
         {
-            CriteriaCommandIO.WriteFailure(json, Name, ex.ErrorCode, ex.Message);
+            CriteriaCommandIO.WriteFailure(json, CommandName, ex.ErrorCode, ex.Message);
             return ExitCodes.Error;
         }
     }

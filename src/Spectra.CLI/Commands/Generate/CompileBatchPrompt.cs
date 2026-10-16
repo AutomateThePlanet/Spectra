@@ -234,8 +234,7 @@ internal static class CompileBatchPrompt
             requestedCount: count,
             criteriaContext: criteria.Context,
             templateLoader: templateLoader,
-            profileFormat: profileFormat,
-            testimizeData: null);
+            profileFormat: profileFormat);
         if (!result.IsSuccess)
         {
             return Fail(json, ErrorMissingInput, [result.Message!], warnings,

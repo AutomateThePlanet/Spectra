@@ -69,16 +69,12 @@ public static class UpdatePromptWorkspace
         this BaselineTestWorkspace ws, string suite = "storage", params string[] extra) =>
         ws.RunAsync(["ai", "ingest-update", suite, "--all", .. extra, "--output-format", "json"]);
 
-    /// <summary>Spec 089: runs the real <c>spectra init</c> (embedded template, no skills) in the workspace.</summary>
-    public static async Task InitWithRealTemplateAsync(this BaselineTestWorkspace ws)
-    {
-        var logger = LoggingSetup.CreateLoggerFactory(VerbosityLevel.Quiet).CreateLogger<InitHandler>();
-        var exit = await new InitHandler(logger, ws.Root).HandleAsync(force: false, skipSkills: true);
-        if (exit != ExitCodes.Success)
-        {
-            throw new Xunit.Sdk.XunitException($"spectra init exited {exit}");
-        }
-    }
+    /// <summary>
+    /// Spec 089: the real <c>spectra init</c> (embedded template, no skills) in the workspace. Spec 099 F7: a copy of
+    /// that init's output, made once per test process (<see cref="TemplateWorkspaces"/>), when the workspace is new.
+    /// </summary>
+    public static Task InitWithRealTemplateAsync(this BaselineTestWorkspace ws) =>
+        TemplateWorkspaces.InitAsync(ws, skipSkills: true);
 
     /// <summary>The test as it is on disk.</summary>
     public static TestCase Load(this BaselineTestWorkspace ws, string suite, string id)

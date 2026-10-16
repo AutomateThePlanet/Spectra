@@ -23,14 +23,11 @@ public static class AnalysisRecommendationBuilder
     /// Classifies the agent content into a recommendation. Spec 095 (FR-001–FR-003): one per-behaviour coverage rule —
     /// a behaviour is covered when an existing test's title is at least <paramref name="duplicateThreshold"/> similar
     /// (<see cref="TitleCoverage"/>); <c>AlreadyCovered</c> counts covered behaviours, <c>RecommendedCount</c> the
-    /// uncovered ones, and <c>CoveredBy</c> names the covering test per behaviour. <paramref name="snapshot"/> no longer
-    /// affects any count (it used to make the suite's test count the covered count); it only feeds the analysis prompt's
-    /// coverage context elsewhere.
+    /// uncovered ones, and <c>CoveredBy</c> names the covering test per behaviour.
     /// </summary>
     public static AnalysisRecommendation Build(
         string agentContent,
         IReadOnlyList<TestCase> existingTests,
-        CoverageSnapshot? snapshot,
         string? focusArea,
         double duplicateThreshold = 0.6)
     {
@@ -375,10 +372,4 @@ public static class AnalysisRecommendationBuilder
                 threshold)
             .Select(m => m?.TestId)
             .ToList();
-
-    /// <summary>The number of covered behaviours at the default threshold (Spec 095: the same rule as <see cref="Build"/>).</summary>
-    internal static int CountCoveredBehaviors(
-        IReadOnlyList<IdentifiedBehavior> behaviors,
-        IReadOnlyList<TestCase> existingTests) =>
-        CoveredBy(behaviors, existingTests, 0.6).Count(id => id is not null);
 }

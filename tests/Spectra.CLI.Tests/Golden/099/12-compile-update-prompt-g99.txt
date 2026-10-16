@@ -1,0 +1,7 @@
+# step: 12-compile-update-prompt-g99 spectra ai compile-update-prompt --suite payments --group G99 --output-format json
+# exit: 4
+## stdout
+
+## stderr
+{"command":"compile-update-prompt","success":false,"error_code":"GROUP_NOT_FOUND","errors":["Group G99 is not in the last triage."],"warnings":["test-cases/payments/TC-106.md could not be parsed and was skipped."]}
+

@@ -1,0 +1,8 @@
+# step: 15-ingest-update-test spectra ai ingest-update payments --test-id TC-101 --from .spectra/golden/edit-TC-101.json --output-format json
+# exit: 0
+## stdout
+{"success":true,"dry_run":false,"outcome":"written","persisted":1,"unchanged":false,"manual_verdict_kept":false,"id":"TC-101","baseline":{"created":0,"updated":1,"unchanged":0,"snapshots_written":1,"mode":"rebuild"},"warnings":["test-cases/payments/TC-106.md could not be parsed; no baseline entries were pruned in suite \u0027payments\u0027."]}
+
+## stderr
+Warning: test-cases/payments/TC-106.md could not be parsed; no baseline entries were pruned in suite 'payments'.
+

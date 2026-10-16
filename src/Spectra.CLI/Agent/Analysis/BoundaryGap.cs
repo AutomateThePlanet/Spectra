@@ -8,8 +8,7 @@ namespace Spectra.CLI.Agent.Analysis;
 /// empty/null, overflow, timeout) but that the planned/existing tests do not cover.
 ///
 /// Deserialized from one element of the top-level <c>boundary_gaps</c> array the agent emits
-/// alongside <c>behaviors</c> (mirroring how <c>field_specs</c> rides alongside in
-/// <see cref="BehaviorAnalysisResult"/>). Advisory — never persisted, never mutates the
+/// alongside <c>behaviors</c>. Advisory — never persisted, never mutates the
 /// generated tests, never blocks generation.
 ///
 /// Validity is enforced fail-loud in <see cref="Spectra.CLI.Generation.AnalysisRecommendationBuilder"/>

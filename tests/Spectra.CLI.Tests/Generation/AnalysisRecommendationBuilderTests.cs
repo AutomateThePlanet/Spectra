@@ -23,7 +23,7 @@ public sealed class AnalysisRecommendationBuilderTests
     [Fact]
     public void Build_WellFormed_NoExistingTests_RecommendsAll()
     {
-        var result = AnalysisRecommendationBuilder.Build(Behaviors, [], snapshot: null, focusArea: null);
+        var result = AnalysisRecommendationBuilder.Build(Behaviors, [], focusArea: null);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(AnalysisIngestOutcome.Recommendation, result.Outcome);
@@ -35,7 +35,7 @@ public sealed class AnalysisRecommendationBuilderTests
     [Fact]
     public void Build_BuildsCategoryAndTechniqueBreakdowns()
     {
-        var result = AnalysisRecommendationBuilder.Build(Behaviors, [], snapshot: null, focusArea: null);
+        var result = AnalysisRecommendationBuilder.Build(Behaviors, [], focusArea: null);
 
         Assert.Equal(1, result.Breakdown["happy_path"]);
         Assert.Equal(1, result.Breakdown["negative"]);
@@ -61,21 +61,7 @@ public sealed class AnalysisRecommendationBuilderTests
         });
 
     [Fact]
-    public void Build_ASnapshot_NoLongerDecidesTheCoveredCount()
-    {
-        var snapshot = new CoverageSnapshot { ExistingTestCount = 5 };
-
-        var withSnapshot = AnalysisRecommendationBuilder.Build(Behaviors, [], snapshot, focusArea: null);
-        var withoutSnapshot = AnalysisRecommendationBuilder.Build(Behaviors, [], snapshot: null, focusArea: null);
-
-        Assert.Equal(0, withSnapshot.AlreadyCovered);
-        Assert.Equal(3, withSnapshot.RecommendedCount);
-        Assert.Equal(withoutSnapshot.AlreadyCovered, withSnapshot.AlreadyCovered);
-        Assert.Equal(withoutSnapshot.RecommendedCount, withSnapshot.RecommendedCount);
-    }
-
-    [Fact]
-    public void Build_FiftyTests_TwelveGaps_RecommendsTwelve_WithAndWithoutASnapshot()
+    public void Build_FiftyTests_TwelveGaps_RecommendsTwelve()
     {
         var tests = Enumerable.Range(1, 50).Select(i => Test($"TC-{i:D3}", $"Existing behaviour number {i} of the archive module")).ToList();
         var titles = new List<string>
@@ -87,15 +73,11 @@ public sealed class AnalysisRecommendationBuilderTests
         titles.AddRange(Enumerable.Range(1, 12).Select(i => $"Quota warning banner variant {(char)('A' + i)} turns red"));
         var content = Analysis([.. titles]);
 
-        var withSnapshot = AnalysisRecommendationBuilder.Build(content, tests, new CoverageSnapshot { ExistingTestCount = 50 }, focusArea: null);
-        var withoutSnapshot = AnalysisRecommendationBuilder.Build(content, tests, snapshot: null, focusArea: null);
+        var result = AnalysisRecommendationBuilder.Build(content, tests, focusArea: null);
 
-        foreach (var result in new[] { withSnapshot, withoutSnapshot })
-        {
-            Assert.Equal(3, result.AlreadyCovered);
-            Assert.Equal(12, result.RecommendedCount);
-            Assert.Equal(15, result.TotalBehaviors);
-        }
+        Assert.Equal(3, result.AlreadyCovered);
+        Assert.Equal(12, result.RecommendedCount);
+        Assert.Equal(15, result.TotalBehaviors);
     }
 
     [Fact]
@@ -104,8 +86,8 @@ public sealed class AnalysisRecommendationBuilderTests
         var tests = new[] { Test("TC-101", "Upload above quota is refused now") };
         var content = Analysis("Upload above the quota is refused");
 
-        Assert.Equal(1, AnalysisRecommendationBuilder.Build(content, tests, null, null).AlreadyCovered);
-        Assert.Equal(0, AnalysisRecommendationBuilder.Build(content, tests, null, null, duplicateThreshold: 0.9).AlreadyCovered);
+        Assert.Equal(1, AnalysisRecommendationBuilder.Build(content, tests, null).AlreadyCovered);
+        Assert.Equal(0, AnalysisRecommendationBuilder.Build(content, tests, null, duplicateThreshold: 0.9).AlreadyCovered);
     }
 
     [Fact]
@@ -113,7 +95,7 @@ public sealed class AnalysisRecommendationBuilderTests
     {
         var tests = new[] { Test("TC-120", "Quota shown in settings"), Test("TC-105", "Quota shown in settings") };
 
-        var result = AnalysisRecommendationBuilder.Build(Analysis("Quota shown in settings", "Folder nested twenty levels deep"), tests, null, null);
+        var result = AnalysisRecommendationBuilder.Build(Analysis("Quota shown in settings", "Folder nested twenty levels deep"), tests, null);
 
         Assert.Equal(new string?[] { "TC-105", null }, result.CoveredBy);
         Assert.Equal(1, result.AlreadyCovered);
@@ -125,7 +107,7 @@ public sealed class AnalysisRecommendationBuilderTests
     {
         var tests = new[] { Test("TC-101", "Quota shown in settings") };
 
-        var result = AnalysisRecommendationBuilder.Build(Analysis("Quota shown in settings", "Folder nested twenty levels deep"), tests, null, null);
+        var result = AnalysisRecommendationBuilder.Build(Analysis("Quota shown in settings", "Folder nested twenty levels deep"), tests, null);
 
         Assert.Equal(1, result.Breakdown["happy_path"]);
         Assert.Equal(1, result.Breakdown["negative"]);
@@ -137,7 +119,7 @@ public sealed class AnalysisRecommendationBuilderTests
     [InlineData("   ")]
     public void Build_EmptyContent_IsEmptyResponse_FailLoud(string content)
     {
-        var result = AnalysisRecommendationBuilder.Build(content, [], snapshot: null, focusArea: null);
+        var result = AnalysisRecommendationBuilder.Build(content, [], focusArea: null);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(AnalysisIngestOutcome.EmptyResponse, result.Outcome);
@@ -149,7 +131,7 @@ public sealed class AnalysisRecommendationBuilderTests
     [InlineData("{\"behaviors\":[]}")]
     public void Build_NoBehaviors_IsParseFailure_FailLoud(string content)
     {
-        var result = AnalysisRecommendationBuilder.Build(content, [], snapshot: null, focusArea: null);
+        var result = AnalysisRecommendationBuilder.Build(content, [], focusArea: null);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(AnalysisIngestOutcome.ParseFailure, result.Outcome);
@@ -161,7 +143,7 @@ public sealed class AnalysisRecommendationBuilderTests
     {
         // Spec 062: the legacy behaviors-only payload still produces a clean (empty) boundary set
         // alongside the existing technique_breakdown — additive, backward-compatible.
-        var result = AnalysisRecommendationBuilder.Build(Behaviors, [], snapshot: null, focusArea: null);
+        var result = AnalysisRecommendationBuilder.Build(Behaviors, [], focusArea: null);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(result.BoundaryGaps);
@@ -171,8 +153,8 @@ public sealed class AnalysisRecommendationBuilderTests
     [Fact]
     public void Build_IsDeterministic_IdenticalInputsProduceIdenticalAccounting()
     {
-        var a = AnalysisRecommendationBuilder.Build(Behaviors, [], null, null);
-        var b = AnalysisRecommendationBuilder.Build(Behaviors, [], null, null);
+        var a = AnalysisRecommendationBuilder.Build(Behaviors, [], null);
+        var b = AnalysisRecommendationBuilder.Build(Behaviors, [], null);
 
         Assert.Equal(a.TotalBehaviors, b.TotalBehaviors);
         Assert.Equal(a.RecommendedCount, b.RecommendedCount);

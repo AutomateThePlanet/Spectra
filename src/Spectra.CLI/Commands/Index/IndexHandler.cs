@@ -81,7 +81,7 @@ public sealed class IndexHandler
             return ExitCodes.Error;
         }
 
-        var parser = new TestCaseParser();
+        var parser = new TestCaseParser(captureLayout: false);
         var generator = new IndexGenerator();
         var writer = new IndexWriter();
 

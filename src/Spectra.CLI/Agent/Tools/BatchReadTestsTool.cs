@@ -10,9 +10,11 @@ public sealed class BatchReadTestsTool
 {
     private readonly TestCaseParser _parser;
 
-    public BatchReadTestsTool()
+    /// <param name="captureLayout">Spec 099 F3: false for callers that only read the tests (coverage analysis); the
+    /// legacy update path keeps the default because it writes orphan marks back through the lossless writer.</param>
+    public BatchReadTestsTool(bool captureLayout = true)
     {
-        _parser = new TestCaseParser();
+        _parser = new TestCaseParser(captureLayout);
     }
 
     /// <summary>

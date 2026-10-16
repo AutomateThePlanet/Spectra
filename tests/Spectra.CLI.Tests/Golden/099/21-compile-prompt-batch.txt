@@ -1,0 +1,121 @@
+# step: 21-compile-prompt-batch spectra ai compile-prompt --suite payments --batch 1 --output-format json
+# exit: 0
+## stdout
+
+
+
+You are a test case generation expert that creates DOCUMENT-GROUNDED test cases.
+
+## CRITICAL RULES
+
+1. NEVER generate generic test patterns. Every test MUST trace to specific documentation.
+2. Every step and expected result MUST come from the documentation — never from memory or assumptions.
+
+
+
+
+## SOURCE SECTIONS
+
+The sections below are the complete source for this batch — do not read any other documentation. Ground every step and
+expected result in these sections. Set each test's "source_refs" to the section refs (the `###` lines below, exactly as
+written) of the behaviors it covers. Test IDs are assigned when the tests are ingested — do not invent them.
+
+### docs/payments/receipts.md#currency
+~~~~markdown
+## Currency
+
+The receipt shows the currency of the payment.
+~~~~
+
+
+## TEST DESIGN TECHNIQUE RULES
+
+When writing test steps and expected results, apply these rules based on the
+ISTQB technique tag attached to each behavior (BVA, EP, DT, ST, EG, UC).
+
+### For BVA-tagged behaviors
+
+- Use EXACT boundary values in steps, not generic descriptions
+- WRONG: "Enter a very long username"
+- RIGHT: "Enter a username with exactly 21 characters (one above the 20-char maximum)"
+
+### For EP-tagged behaviors
+
+- Name the equivalence class explicitly
+- WRONG: "Enter invalid input"
+- RIGHT: "Enter a negative number (-5) which is outside the valid range 0-999"
+
+### For DT-tagged behaviors
+
+- State all condition values explicitly in preconditions
+- WRONG: "Test discount calculation"
+- RIGHT: "User is a member (condition 1: true), order total is $50 (condition 2: below $100 threshold)"
+
+### For ST-tagged behaviors
+
+- State the starting state, the action, and the expected resulting state
+- WRONG: "Verify order processing"
+- RIGHT: "Starting in 'Payment Pending' state, click 'Cancel Order'. Verify state changes to 'Cancelled' and refund is initiated"
+
+### For EG-tagged behaviors
+
+- Describe the specific error scenario concretely
+- WRONG: "Test with special characters"
+- RIGHT: "Enter '√(−1)' in the calculator input and verify error handling"
+
+
+
+## OUTPUT FORMAT
+
+Your FINAL message must contain ONLY a JSON array of test cases.
+Do NOT include any explanatory text before or after the JSON. Output ONLY the JSON array.
+
+The JSON array must follow this exact schema:
+
+```json
+[
+  {
+    "id": "TC-XXX",
+    "title": "Descriptive title based on documentation",
+    "priority": "high|medium|low",
+    "tags": ["tag1", "tag2"],
+    "component": "component-name",
+    "preconditions": "Setup requirements",
+    "steps": ["Step 1", "Step 2", "Step 3"],
+    "expected_result": "Specific outcome from documentation",
+    "test_data": "Test data if needed",
+    "source_refs": ["docs/file.md#Section-Name"],
+    "scenario_from_doc": "Quote or paraphrase the documented behavior",
+    "estimated_duration": "5m",
+    "criteria": ["AC-ID-1", "AC-ID-2"]
+  }
+]
+
+```
+
+---
+
+## YOUR TASK
+
+Generate 1 new manual test cases based on this request:
+
+- B4 [happy_path · EP] Currency shown on the receipt (docs/payments/receipts.md#currency)
+
+
+## ACCEPTANCE CRITERIA — MANDATORY
+
+You MUST map each test case to matching acceptance criteria below. Every test MUST have at least one criterion ID in its "criteria" array. If a test doesn't match any criterion, use the closest related one.
+
+- **AC-RCP-001** [MUST] The receipt MUST show the payment currency
+  Component: payments
+
+
+
+IMPORTANT:
+1. Only generate tests that are grounded in the documentation
+2. Your FINAL response must be ONLY the JSON array — no other text
+3. MANDATORY: For each test, populate the "criteria" array with IDs of acceptance criteria it verifies. Never leave criteria empty when acceptance criteria are provided above.
+
+## stderr
+{"command":"compile-prompt","success":true,"mode":"batch","batch":"1","warnings":[]}
+

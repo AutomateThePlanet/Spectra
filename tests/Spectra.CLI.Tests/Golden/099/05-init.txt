@@ -1,0 +1,29 @@
+# step: 05-init spectra init --skip-skills --output-format json
+# exit: 0
+## stdout
+info: Spectra.CLI.Commands.Init.InitHandler[0] Initializing SPECTRA in <mask:workspace-root>
+info: Spectra.CLI.Commands.Init.InitHandler[0] Created prompt template: .spectra\prompts\behavior-analysis.md
+info: Spectra.CLI.Commands.Init.InitHandler[0] Created prompt template: .spectra\prompts\test-generation.md
+info: Spectra.CLI.Commands.Init.InitHandler[0] Created prompt template: .spectra\prompts\criteria-extraction.md
+info: Spectra.CLI.Commands.Init.InitHandler[0] Created prompt template: .spectra\prompts\critic-verification.md
+info: Spectra.CLI.Commands.Init.InitHandler[0] Created prompt template: .spectra\prompts\test-update.md
+info: Spectra.CLI.Commands.Init.InitHandler[0] Created default profile: profiles\_default.yaml
+info: Spectra.CLI.Commands.Init.InitHandler[0] Created customization guide: CUSTOMIZATION.md
+info: Spectra.CLI.Commands.Init.InitHandler[0] SPECTRA initialized successfully!
+info: Spectra.CLI.Commands.Init.InitHandler[0] Created:
+info: Spectra.CLI.Commands.Init.InitHandler[0]   - spectra.config.json
+info: Spectra.CLI.Commands.Init.InitHandler[0]   - docs/
+info: Spectra.CLI.Commands.Init.InitHandler[0]   - test-cases/
+info: Spectra.CLI.Commands.Init.InitHandler[0]   - .claude/skills/spectra-execute/SKILL.md
+info: Spectra.CLI.Commands.Init.InitHandler[0]   - .github/workflows/deploy-dashboard.yml
+info: Spectra.CLI.Commands.Init.InitHandler[0]
+info: Spectra.CLI.Commands.Init.InitHandler[0]   - templates/bug-report.md
+info: Spectra.CLI.Commands.Init.InitHandler[0]
+info: Spectra.CLI.Commands.Init.InitHandler[0] Bug report template created at templates/bug-report.md
+info: Spectra.CLI.Commands.Init.InitHandler[0]   Customize it or delete it — the execution agent adapts automatically.
+info: Spectra.CLI.Commands.Init.InitHandler[0]
+info: Spectra.CLI.Commands.Init.InitHandler[0] Dashboard auto-deployment workflow created.
+info: Spectra.CLI.Commands.Init.InitHandler[0] See docs/deployment/cloudflare-pages-setup.md for setup instructions.
+
+## stderr
+

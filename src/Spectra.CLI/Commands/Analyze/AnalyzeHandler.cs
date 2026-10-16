@@ -107,7 +107,7 @@ public sealed class AnalyzeHandler
             {
                 foreach (var suiteDir in Directory.GetDirectories(testsDir))
                 {
-                    var batchReader = new BatchReadTestsTool();
+                    var batchReader = new BatchReadTestsTool(captureLayout: false);
                     var readResult = await batchReader.ExecuteAsync(suiteDir, ct: ct);
 
                     if (readResult.Success && readResult.Tests is not null)
@@ -648,7 +648,7 @@ public sealed class AnalyzeHandler
             {
                 foreach (var suiteDir in Directory.GetDirectories(testsDir))
                 {
-                    var batchReader = new BatchReadTestsTool();
+                    var batchReader = new BatchReadTestsTool(captureLayout: false);
                     var readResult = await batchReader.ExecuteAsync(suiteDir, ct: ct);
 
                     if (readResult.Success && readResult.Tests is not null)

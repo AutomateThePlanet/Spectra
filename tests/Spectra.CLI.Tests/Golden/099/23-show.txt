@@ -1,0 +1,29 @@
+# step: 23-show spectra show TC-103 --output-format json
+# exit: 0
+## stdout
+{
+  "test": {
+    "id": "TC-103",
+    "title": "Refund inside the window",
+    "priority": "high",
+    "suite": "payments",
+    "file": "test-cases/payments/TC-103.md",
+    "tags": [],
+    "source_refs": [
+      "docs/payments/checkout.md#refund-window"
+    ],
+    "steps": [
+      "Open checkout",
+      "Ask for a refund on day 29"
+    ],
+    "expected_results": [
+      "The refund is accepted within thirty days"
+    ]
+  },
+  "command": "show",
+  "status": "success",
+  "timestamp": "<mask:timestamp>"
+}
+
+## stderr
+

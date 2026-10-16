@@ -2,6 +2,7 @@ using Spectra.CLI.Criteria;
 using Spectra.Core.Baseline;
 using Spectra.Core.Coverage;
 using Spectra.Core.Criteria;
+using Spectra.Core.Diagnostics;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Text;
 
@@ -20,6 +21,7 @@ public sealed class BaselineContext
     private readonly string _repoRoot;
     private readonly SourceRefResolver _resolver;
     private readonly Dictionary<string, string?> _files = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ScannedDocument?> _documents = new(StringComparer.Ordinal);
     private readonly Dictionary<string, RefSection> _sections = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _criteria;
     private readonly Dictionary<string, string> _criteriaText;
@@ -148,14 +150,14 @@ public sealed class BaselineContext
         else
         {
             var resolved = resolution.Resolved[0];
-            var text = await ReadFileAsync(resolved.FullPath, ct);
-            if (text is null)
+            var document = await DocumentAsync(resolved.FullPath, ct);
+            if (document is null)
             {
                 result = new RefSection(sourceRef, resolved.RelativePath, resolved.FullPath, CurrentSection.Gone("unreadable"), false);
             }
             else
             {
-                var lookup = SectionExtractor.Extract(text, SectionExtractor.AnchorOf(sourceRef));
+                var lookup = Extract(document, SectionExtractor.AnchorOf(sourceRef));
                 if (lookup.Outcome == SectionOutcome.AnchorNotFound)
                 {
                     result = new RefSection(sourceRef, resolved.RelativePath, resolved.FullPath, CurrentSection.Gone("anchor not found"), false);
@@ -190,13 +192,13 @@ public sealed class BaselineContext
             return null;
         }
 
-        var text = await ReadFileAsync(section.FullPath, ct);
-        if (text is null)
+        var document = await DocumentAsync(section.FullPath, ct);
+        if (document is null)
         {
             return null;
         }
 
-        var lookup = SectionExtractor.Extract(text, SectionExtractor.AnchorOf(sourceRef));
+        var lookup = Extract(document, SectionExtractor.AnchorOf(sourceRef));
         return lookup.Outcome == SectionOutcome.AnchorNotFound ? null : lookup.RawText;
     }
 
@@ -206,9 +208,62 @@ public sealed class BaselineContext
     /// <summary>The headings of a resolved document (empty when unreadable).</summary>
     public async Task<IReadOnlyList<MarkdownHeading>> GetHeadingsAsync(string fullPath, CancellationToken ct)
     {
-        var text = await ReadFileAsync(fullPath, ct);
-        return text is null ? [] : SectionExtractor.Headings(text);
+        var document = await DocumentAsync(fullPath, ct);
+        if (document is null)
+        {
+            return [];
+        }
+
+        // A document starting with two BOMs: section extraction has always scanned it with both removed, this lookup
+        // with one (it scanned the raw text). Kept as it was; such a document is scanned twice.
+        if (document.Normalised.Length > 0 && document.Normalised[0] == '﻿')
+        {
+            ParseCounter.DocumentHeadingScan();
+            return SectionExtractor.Headings((await ReadFileAsync(fullPath, ct))!);
+        }
+
+        return HeadingsOf(document);
     }
+
+    /// <summary>
+    /// Spec 099 F2: a document's normalised text, cached per path like the file text; its headings are scanned on first
+    /// use and kept, so every ref into the document and every heading lookup share one scan.
+    /// </summary>
+    private sealed class ScannedDocument(string normalised)
+    {
+        public string Normalised { get; } = normalised;
+
+        public IReadOnlyList<MarkdownHeading>? Headings { get; set; }
+    }
+
+    private async Task<ScannedDocument?> DocumentAsync(string fullPath, CancellationToken ct)
+    {
+        if (!_documents.TryGetValue(fullPath, out var document))
+        {
+            var text = await ReadFileAsync(fullPath, ct);
+            document = text is null ? null : new ScannedDocument(SectionExtractor.NormalizeNewlines(text));
+            _documents[fullPath] = document;
+        }
+
+        return document;
+    }
+
+    private static IReadOnlyList<MarkdownHeading> HeadingsOf(ScannedDocument document)
+    {
+        if (document.Headings is null)
+        {
+            ParseCounter.DocumentHeadingScan();
+            document.Headings = SectionExtractor.Headings(document.Normalised);
+        }
+
+        return document.Headings;
+    }
+
+    /// <summary><see cref="SectionExtractor.Extract(string, string?)"/> over the cached document (no scan without an anchor).</summary>
+    private static SectionLookup Extract(ScannedDocument document, string? anchor) =>
+        string.IsNullOrEmpty(anchor)
+            ? SectionExtractor.Extract(document.Normalised, [], anchor)
+            : SectionExtractor.Extract(document.Normalised, HeadingsOf(document), anchor);
 
     /// <summary>Whether criterion <paramref name="id"/> exists, and its current fingerprint.</summary>
     public (bool Exists, string? Fingerprint) GetCriterion(string id) =>

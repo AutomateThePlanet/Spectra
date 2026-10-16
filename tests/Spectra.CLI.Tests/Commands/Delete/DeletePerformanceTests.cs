@@ -10,8 +10,9 @@ namespace Spectra.CLI.Tests.Commands.Delete;
 /// frontmatter; only the targets and their scalar dependents are parsed in full — a deterministic count, not a timing.
 /// The time is only logged (SC-005 is a recorded measurement, 23aa08c vs 096). The parity row pins the plan's results
 /// (a guard: same on 23aa08c). On 23aa08c every file was parsed in full and the counter didn't exist.
+/// Spec 099 F7: not in a serial collection — it calls <c>TestDeletionService</c> on an explicit root (no current
+/// directory, no console, no static override), so it runs in parallel with the other classes.
 /// </summary>
-[Collection(CriteriaCommandsCollection.Name)]
 public sealed class DeletePerformanceTests(ITestOutputHelper output) : IDisposable
 {
     private readonly BaselineTestWorkspace _ws = new();

@@ -43,16 +43,25 @@ public static class GitFixture
         return stdout.Result;
     }
 
+    /// <summary>The identity and LF content settings every fixture repository gets.</summary>
+    private const string IdentityConfig =
+        "[user]\n\tname = Spectra Test\n\temail = test@example.com\n[core]\n\tautocrlf = false\n";
+
     /// <summary><c>git init</c> with a fixed identity, LF content and no hooks of the user's environment.</summary>
+    /// <remarks>Spec 099 F7: the settings are appended to <c>.git/config</c> (the file <c>git config</c> writes) in one
+    /// write instead of four <c>git config</c> processes; git merges repeated sections, so the values are the same.</remarks>
     public static void Init(string dir)
     {
         Directory.CreateDirectory(dir);
         Git(dir, "init", "-q", "-b", "main");
-        Git(dir, "config", "user.name", "Spectra Test");
-        Git(dir, "config", "user.email", "test@example.com");
-        Git(dir, "config", "core.autocrlf", "false");
-        Git(dir, "config", "commit.gpgsign", "false");
+        AppendConfig(dir, IdentityConfig + "[commit]\n\tgpgsign = false\n");
     }
+
+    /// <summary>Spec 099 F7: the identity and LF settings (what <c>CloneInto</c> sets), in one write.</summary>
+    public static void AppendIdentityConfig(string dir) => AppendConfig(dir, IdentityConfig);
+
+    private static void AppendConfig(string dir, string text) =>
+        File.AppendAllText(Path.Combine(dir, ".git", "config"), text);
 
     /// <summary>Stages everything and commits, optionally at a fixed date. Returns the commit hash.</summary>
     public static string Commit(string dir, string message, DateTimeOffset? date = null)
@@ -66,6 +75,30 @@ public static class GitFixture
             }
             : null;
         Git(dir, env, "commit", "-q", "--allow-empty", "-m", message);
+        return HeadHash(dir);
+    }
+
+    /// <summary>
+    /// Spec 099 F7: the commit HEAD points at, read from the loose ref git just wrote (no process); <c>git rev-parse</c>
+    /// when HEAD isn't a branch with a loose ref in a <c>.git</c> folder (a packed ref, a <c>.git</c> file).
+    /// </summary>
+    private static string HeadHash(string dir)
+    {
+        var gitDir = Path.Combine(dir, ".git");
+        var headFile = Path.Combine(gitDir, "HEAD");
+        if (Directory.Exists(gitDir) && File.Exists(headFile))
+        {
+            var head = File.ReadAllText(headFile).Trim();
+            if (head.StartsWith("ref: ", StringComparison.Ordinal))
+            {
+                var refFile = Path.Combine(gitDir, head[5..].Replace('/', Path.DirectorySeparatorChar));
+                if (File.Exists(refFile))
+                {
+                    return File.ReadAllText(refFile).Trim();
+                }
+            }
+        }
+
         return Git(dir, "rev-parse", "HEAD").Trim();
     }
 

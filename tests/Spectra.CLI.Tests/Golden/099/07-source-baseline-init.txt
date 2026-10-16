@@ -1,0 +1,12 @@
+# step: 07-source-baseline-init spectra ai source-baseline --init --all-suites --output-format json
+# exit: 0
+## stdout
+{"command":"source-baseline","success":true,"scope":{"all_suites":true},"dry_run":false,"force":false,"suites":[{"suite":"payments","created":5,"completed":0,"unchanged":0,"recomputed":0}],"snapshots_written":5,"notes":["docs/payments/checkout.md#limits: more than one heading shares the anchor key 'limits'; the first was used"],"warnings":["test-cases/payments/TC-106.md could not be parsed and was skipped.","test-cases/payments/TC-106.md could not be parsed; no baseline entries were pruned in suite 'payments'."]}
+
+## stderr
+Warning: test-cases/payments/TC-106.md could not be parsed and was skipped.
+Warning: test-cases/payments/TC-106.md could not be parsed; no baseline entries were pruned in suite 'payments'.
+Source baseline — payments: 5 created, 0 completed, 0 unchanged
+Snapshots: 5 were written.
+  note: docs/payments/checkout.md#limits: more than one heading shares the anchor key 'limits'; the first was used
+

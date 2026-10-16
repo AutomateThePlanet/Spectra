@@ -137,7 +137,7 @@ public sealed class ShowHandler
         }
 
         // Parse and display formatted
-        var parser = new TestCaseParser();
+        var parser = new TestCaseParser(captureLayout: false);
         var result = parser.Parse(content, testPath);
 
         if (!result.IsSuccess)
