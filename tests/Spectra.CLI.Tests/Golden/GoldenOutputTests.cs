@@ -203,13 +203,13 @@ public sealed class GoldenOutputTests : IDisposable
         _ws.RebuildIndex(Suite);
 
         Directory.CreateDirectory(_ws.PathOf(".spectra/golden"));
-        File.WriteAllText(_ws.PathOf(".spectra/golden/new-tests.json"), """
+        WriteLf(_ws.PathOf(".spectra/golden/new-tests.json"), """
             [
               {"id": "TC-107", "title": "Receipt shows the currency", "priority": "medium", "steps": ["Pay", "Open the receipt"], "expected_result": "The currency is shown", "source_refs": ["docs/payments/receipts.md#currency"], "criteria": []},
               {"id": "TC-108", "title": "Second partial refund is capped", "priority": "low", "steps": ["Refund part", "Refund the rest"], "expected_result": "The total never exceeds the paid amount", "source_refs": ["docs/payments/refunds.md#partial-refunds"], "criteria": ["AC-REF-001"]}
             ]
             """);
-        File.WriteAllText(_ws.PathOf(".spectra/golden/edit-TC-101.json"), """
+        WriteLf(_ws.PathOf(".spectra/golden/edit-TC-101.json"), """
             [
               {"id": "TC-101", "title": "Large card payment is confirmed", "priority": "high", "steps": ["Open checkout", "Pay 3001 EUR"], "expected_result": "The payment asks for confirmation above 3000 EUR", "source_refs": ["docs/payments/checkout.md#cards"], "criteria": ["AC-PAY-001"]}
             ]
@@ -220,23 +220,29 @@ public sealed class GoldenOutputTests : IDisposable
     {
         var dir = _ws.PathOf($".spectra/updates/{Suite}");
         Directory.CreateDirectory(dir);
-        File.WriteAllText(Path.Combine(dir, "updated-TC-103.json"), """
+        WriteLf(Path.Combine(dir, "updated-TC-103.json"), """
             [
               {"id": "TC-103", "title": "Refund inside the window", "priority": "high", "steps": ["Open checkout", "Ask for a refund on day 29"], "expected_result": "The refund is accepted within thirty days", "source_refs": ["docs/payments/checkout.md#refund-window"], "criteria": ["AC-PAY-002"]}
             ]
             """);
-        File.WriteAllText(Path.Combine(dir, "updated-TC-104.json"), """
+        WriteLf(Path.Combine(dir, "updated-TC-104.json"), """
             [
               {"id": "TC-104", "title": "Partial refund is capped", "priority": "high", "steps": ["Refund"], "expected_result": "Capped", "source_refs": ["docs/payments/refunds.md#partial-refunds"], "criteria": []},
               {"id": "TC-109", "title": "Another test", "priority": "high", "steps": ["Refund"], "expected_result": "Capped", "source_refs": [], "criteria": []}
             ]
             """);
-        File.WriteAllText(Path.Combine(dir, "updated-TC-105.json"), """
+        WriteLf(Path.Combine(dir, "updated-TC-105.json"), """
             [
               {"id": "TC-999", "title": "Checkout page shows the rules", "priority": "high", "steps": ["Open checkout"], "expected_result": "Rules shown", "source_refs": ["docs/payments/checkout.md"], "criteria": []}
             ]
             """);
     }
+
+    /// <summary>
+    /// Writes a raw-string fixture with LF line endings. A raw string literal takes its newlines from this source file,
+    /// which git checks out with CRLF under core.autocrlf=true, so the golden inputs must not depend on it.
+    /// </summary>
+    private static void WriteLf(string path, string text) => File.WriteAllText(path, text.ReplaceLineEndings("\n"));
 
     // ------------------------------------------------------------------ records
 
