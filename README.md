@@ -6,7 +6,6 @@
 <!-- Badges -->
 <p align="center">
   <a href="https://www.nuget.org/packages/Spectra.CLI"><img src="https://img.shields.io/nuget/v/Spectra.CLI?label=CLI&color=blue" alt="NuGet CLI"></a>
-  <a href="https://www.nuget.org/packages/Spectra.MCP"><img src="https://img.shields.io/nuget/v/Spectra.MCP?label=MCP&color=blue" alt="NuGet MCP"></a>
   <a href="https://github.com/AutomateThePlanet/Spectra/actions/workflows/ci.yml"><img src="https://github.com/AutomateThePlanet/Spectra/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License: Apache 2.0"></a>
   <a href="https://dotnet.microsoft.com/download"><img src="https://img.shields.io/badge/.NET-8.0+-purple" alt=".NET 8.0+"></a>
@@ -36,11 +35,11 @@ It also reads as a backronym:
 In practice it's a single product with two halves that can be used independently:
 
 1. An **AI test-generation CLI** that turns product documentation into versioned Markdown test cases.
-2. An **MCP execution engine** that drives those tests through any AI orchestrator with a deterministic state machine.
+2. A **deterministic execution engine** (`spectra run`) that drives those tests through a state machine any assistant or terminal can step through.
 
 ## Why SPECTRA?
 
-SPECTRA reads your product documentation, generates comprehensive test suites, and executes them through a deterministic AI-orchestrated protocol. It doesn't replace your existing tools — it adds an AI layer.
+SPECTRA reads your product documentation, generates comprehensive test suites, keeps them current as the docs change, and executes them through a deterministic protocol. It doesn't replace your existing tools — it adds an AI layer.
 
 - **Reads your documentation** — Point SPECTRA at your product docs and it generates comprehensive test suites automatically.
 
@@ -48,7 +47,7 @@ SPECTRA reads your product documentation, generates comprehensive test suites, a
 
 - **Test cases as Markdown** — Test cases are plain Markdown files with YAML frontmatter. They live in GitHub, versioned alongside your code.
 
-- **Deterministic execution** — An MCP-based execution engine provides a state machine that any AI orchestrator can drive without holding state.
+- **Deterministic execution** — `spectra run` provides a state machine that an assistant (or you, in a terminal) drives without holding state.
 
 - **Coverage visibility** — Three-dimensional coverage analysis: documentation, acceptance criteria, and automation. Visual dashboard included.
 
@@ -58,21 +57,30 @@ SPECTRA reads your product documentation, generates comprehensive test suites, a
 
 ### AI Test Generation
 
-Generate test cases from product documentation through an iterative session.
-The AI analyzes your docs, identifies testable behaviors, generates structured test cases, suggests additional tests for uncovered areas, and lets you describe undocumented behaviors — all in one continuous flow.
+Generate test cases from product documentation by asking Claude Code — the bundled `spectra-generate` skill runs the
+flow in your session: it analyzes your docs, identifies testable behaviors, shows what existing tests already cover,
+generates structured test cases batch by batch, and lets you describe undocumented behaviors. SPECTRA itself makes no
+model call: every step is a deterministic `spectra ai compile-*` / `ingest-*` command, and the model work happens in
+your own Claude Code session.
 
 Behavior analysis applies six **ISTQB test design techniques** systematically (Equivalence Partitioning, Boundary Value Analysis, Decision Table, State Transition, Error Guessing, Use Case) so the produced suites have meaningful boundary and negative coverage instead of happy-path-only scenarios. Analysis output exposes both a category breakdown and a per-technique breakdown.
 
-```bash
-spectra ai generate                    # Interactive session
-spectra ai generate checkout           # Direct mode
-spectra ai generate checkout --auto-complete --output-format json  # CI mode
-```
+> "Generate test cases for checkout"
+> "Generate 15 test cases for checkout focusing on error handling"
+> "Add a test case for a session timeout after 30 minutes"
 
 ### Grounding Verification
 
-Every generated test is verified by a second AI model against the source documentation.
-Hallucinated steps are caught and rejected automatically.
+Every generated or edited test is verified by the `spectra-critic` subagent (on its own model, `ai.critic.model`)
+against the source documentation. Hallucinated steps are caught and rejected; partial tests get one repair.
+
+### Keeping Tests Current When Docs Change
+
+When documentation changes, SPECTRA tells you which tests are affected and why — without a model: `spectra ai
+update-triage` compares each test's referenced doc sections and criteria with their recorded baseline and groups the
+tests by what changed. The `spectra-update` skill then relinks renamed docs, edits the affected tests group by group,
+re-verifies them with the critic, and acknowledges the rest. See
+[When documentation changes](docs/usage.md#when-documentation-changes) for the whole flow with a worked example.
 
 ### Coverage Analysis
 
@@ -96,19 +104,20 @@ spectra dashboard --output ./site
 
 ### Execution Engine (`spectra run`)
 
-Execute tests from the CLI with `spectra run` — no MCP server required.
+Execute tests from the CLI with `spectra run` — nothing to configure or host.
 Deterministic state machine with pause/resume, durable SQLite state with crash recovery, and three
 report formats (JSON, Markdown, HTML). Run state survives process exits (each short-lived command
 reconstructs the queue from a durable snapshot), so the agent loop is just commands between turns.
 
-### Copilot Chat Integration
+### Claude Code Integration
 
-Bundled SKILL files let you use SPECTRA through natural language in Copilot Chat.
-Say "generate test cases for checkout" and the SKILL handles CLI invocation, JSON parsing, and result presentation.
+Bundled skills (`.claude/skills/`) and subagents (`.claude/agents/`) let you use SPECTRA through natural language in
+Claude Code. Say "generate test cases for checkout" and the skill runs the CLI commands, reads their JSON, and presents
+the results; the heavy reading happens in subagents, so your conversation stays small.
 
 ```bash
-spectra init                  # Creates 12 SKILLs + 2 agent prompts
-spectra update-skills         # Update SKILLs when CLI is upgraded
+spectra init                  # Creates the config, folders, 16 skills and 6 subagents
+spectra update-skills         # Update skills and agents when the CLI is upgraded (edited files are kept)
 ```
 
 ### Generation Profiles
@@ -123,19 +132,13 @@ Customize AI output with natural language profiles — detail level, negative sc
 # Install
 dotnet tool install -g Spectra.CLI
 
-# Initialize (creates config, dirs, SKILL files, agent prompts)
+# Initialize (creates config, folders, skills and subagents)
 spectra init
 
-# Build the document index (also extracts acceptance criteria automatically)
+# Build the document index
 spectra docs index
 
-# Generate tests — interactive session with analysis, suggestions, and more
-spectra ai generate
-
-# Or direct mode for a specific suite
-spectra ai generate checkout --count 10
-
-# Validate generated tests
+# Validate test files
 spectra validate
 
 # Analyze coverage
@@ -145,19 +148,29 @@ spectra ai analyze --coverage
 spectra dashboard --output ./site
 ```
 
-**For CI/SKILL workflows** — all commands support `--output-format json` and `--no-interaction`:
+Then open Claude Code in the project and ask:
+
+> "Extract acceptance criteria from my documentation"
+> "Generate test cases for checkout"
+
+Generation, criteria extraction, updates and verification need a model, so they run in your Claude Code session (the
+skills drive the CLI). Everything else is a plain command.
+
+**For CI** — the deterministic commands support `--output-format json` and `--no-interaction`:
 
 ```bash
-spectra ai generate checkout --auto-complete --output-format json
-spectra ai analyze --coverage --output-format json
 spectra validate --output-format json --no-interaction
+spectra ai update-triage --all-suites --dry-run --output-format json
+spectra ai audit-grounding --suite checkout --output-format json
+spectra ai analyze --coverage --output-format json
+spectra dashboard --output ./site
 ```
 
-See [Getting Started](docs/getting-started.md) for auth setup and detailed instructions.
+See [Getting Started](docs/getting-started.md) for detailed instructions.
 
-### Using SPECTRA from VS Code Copilot Chat
+### Using SPECTRA from Claude Code
 
-After `spectra init`, the bundled `spectra-quickstart` SKILL turns Copilot Chat into a guided onboarding entry point. Open Copilot Chat in VS Code and ask:
+After `spectra init`, the bundled `spectra-quickstart` skill is a guided onboarding entry point. Open Claude Code in the project and ask:
 
 > "Help me get started"
 
@@ -168,23 +181,23 @@ The assistant walks you through every workflow (test generation, criteria extrac
 ```
 docs/                        <- Source documentation
   |
-docs/_index.md               <- Pre-built document index (incremental)
+docs/_index/                 <- Document index (manifest + per-suite files, incremental)
   |
-AI Test Generation CLI       <- GitHub Copilot SDK (sole AI runtime)
-  |                            Supports: github-models, azure-openai,
-test-cases/                  <-          azure-anthropic, openai, anthropic
+spectra CLI                  <- Deterministic: compiles prompts, validates and persists results
+  |                            (no model call; the model work runs in your Claude Code session)
+Claude Code skills/subagents <- spectra-generate, spectra-criteria, spectra-update, spectra-critic, ...
   |
-MCP Execution Engine         <- Deterministic state machine
+test-cases/                  <- Markdown test cases + _index.json + _source-baseline.json
   |
-LLM Orchestrator             <- Copilot Chat, Claude, any MCP client
+spectra run                  <- Deterministic execution state machine (.execution/spectra.db)
   | (as needed)
-Azure DevOps / Jira / Teams  <- Bug logging, notifications via their MCPs
+Azure DevOps / Jira / Teams  <- Bug logging and notifications through their own integrations
 ```
 
 | Subsystem | Purpose | Independent? |
 |-----------|---------|:------------:|
-| **AI CLI** | Generate, update, and analyze test cases from documentation | Yes |
-| **MCP Engine** | Execute tests through deterministic AI-orchestrated protocol | Yes |
+| **Authoring** (`spectra ai …` + skills) | Generate, update, verify and analyze test cases from documentation | Yes |
+| **Execution** (`spectra run`) | Execute tests through a deterministic, resumable state machine | Yes |
 
 ## Ecosystem
 
@@ -211,7 +224,7 @@ SPECTRA is part of the [Automate The Planet](https://www.automatetheplanet.com/)
 
 | Guide | Description |
 |-------|-------------|
-| [Getting Started](docs/getting-started.md) | Install, prerequisites, auth setup, first run |
+| [Getting Started](docs/getting-started.md) | Install, prerequisites, first run |
 | [CLI Reference](docs/cli-reference.md) | All commands, flags, and options |
 | [Configuration](docs/configuration.md) | Full `spectra.config.json` reference |
 | [Test Format](docs/test-format.md) | Markdown format, YAML frontmatter, metadata schema |
@@ -219,11 +232,12 @@ SPECTRA is part of the [Automate The Planet](https://www.automatetheplanet.com/)
 | [Generation Profiles](docs/generation-profiles.md) | Customize AI output style and quality |
 | [Grounding Verification](docs/grounding-verification.md) | Dual-model critic for hallucination detection |
 | [Document Index](docs/document-index.md) | Pre-built doc index for efficient generation |
-| [Skills Integration](docs/skills-integration.md) | Copilot Chat SKILLs and agent prompts |
-| [Usage (Copilot Chat)](docs/usage.md) | Workflow-by-workflow guide for driving SPECTRA via Copilot Chat |
+| [Skills Integration](docs/skills-integration.md) | Claude Code skills and subagents |
+| [Usage (Claude Code)](docs/usage.md) | Workflow-by-workflow guide for driving SPECTRA from Claude Code |
+| [When documentation changes](docs/usage.md#when-documentation-changes) | Bringing tests up to date after a doc change, end to end |
 | [Customization](docs/customization.md) | Every customization knob — config, profiles, prompts, palettes |
 | [Testimize Integration](docs/testimize-integration.md) | Optional algorithmic test data optimization (BVA / EP / pairwise / ABC) |
-| [Execution Agent](docs/execution-agent/overview.md) | MCP tools and AI-driven test execution |
+| [Execution Agents](docs/execution-agents.md) | Driving test execution with `spectra run` |
 | [Architecture](docs/architecture/overview.md) | System design and key decisions |
 | [Development Guide](docs/DEVELOPMENT.md) | Building, testing, and running locally |
 
@@ -232,7 +246,7 @@ SPECTRA is part of the [Automate The Planet](https://www.automatetheplanet.com/)
 SPECTRA is in active development.
 
 - **Phase 1: AI Test Generation CLI** ✓
-- **Phase 2: MCP Execution Engine** ✓
+- **Phase 2: Execution Engine** ✓
 - **Phase 3: Dashboard & Coverage Analysis** ✓
 - **Phase 4: Test Generation Profiles** ✓
 - **Phase 5: Grounding Verification** ✓

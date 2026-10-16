@@ -56,15 +56,18 @@ public class PreFlightTokenCheckerTests
                 estimatedTokens: 200_000,
                 budgetTokens: 96_000,
                 overflowingSuites: suites,
-                commandHint: "spectra ai generate"));
+                commandHint: "spectra ai compile-analysis-prompt"));
 
         Assert.Equal(200_000, ex.EstimatedTokens);
         Assert.Equal(96_000, ex.BudgetTokens);
         Assert.Equal(2, ex.OverflowingSuites.Count);
         Assert.Contains("SM_GSG_Topics", ex.Message);
         Assert.Contains("RD_Topics", ex.Message);
-        Assert.Contains("--analyze-only", ex.Message);
-        Assert.Contains("ai.analysis.max_prompt_tokens", ex.Message);
+        // Spec 100 F4: the suggestion names a real command and the real key (was `--analyze-only`, `ai.analysis.…`).
+        Assert.Contains("spectra ai compile-analysis-prompt --suite <suite> --doc-suite SM_GSG_Topics", ex.Message);
+        Assert.DoesNotContain("--analyze-only", ex.Message);
+        Assert.Contains("Or raise analysis.max_prompt_tokens", ex.Message);
+        Assert.DoesNotContain("ai.analysis.", ex.Message);
     }
 
     [Fact]

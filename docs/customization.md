@@ -21,11 +21,11 @@ output format to AI reasoning strategy.
 | AI reasoning (analysis, generation, verification) | `.spectra/prompts/*.md` | Edit markdown prompt templates |
 | Behavior categories | `spectra.config.json` → `analysis.categories` | Add/remove categories with descriptions |
 | Coverage settings | `spectra.config.json` → `coverage` | Configure dirs, patterns, criteria paths |
-| Generation pacing (batch size, timeouts) | `spectra.config.json` → `ai` | `generation_batch_size`, `generation_timeout_minutes`, `analysis_timeout_minutes` |
+| Generation batches | `spectra.config.json` → `generation` | `batch_size` (behaviors per generation batch, default 8) |
 | Session model used for generation/analysis | Your Claude Code session | Pick the model for your session (`/model`); generation runs as a turn in it, so there's no separate config |
-| Critic model | `.claude/agents/spectra-critic.agent.md` → `model:` frontmatter | Edit the subagent file directly (re-apply after `spectra update-skills` if customized) |
+| Critic model | `spectra.config.json` → `ai.critic.model` | An alias (`sonnet`, `opus`), a model id, or `inherit`; run `spectra update-skills` to apply it |
 | Dashboard branding | `spectra.config.json` → `dashboard.branding` | Logo, colors, company name, theme |
-| Claude Code integration | `.claude/skills/<name>/SKILL.md`, `.claude/agents/spectra-critic.agent.md` | Edit authoring SKILL files / critic subagent |
+| Claude Code integration | `.claude/skills/<name>/SKILL.md`, `.claude/agents/*.agent.md` | Edit the skill files and subagents |
 
 ---
 
@@ -41,7 +41,7 @@ To customize it:
 
 1. Open `profiles/_default.yaml`.
 2. Edit the `format` field, which is the JSON template the AI receives.
-3. Re-run `spectra ai generate` so new test cases follow the new schema.
+3. Generate again (ask the assistant to generate tests) so new test cases follow the new schema.
 
 Common modifications include:
 
@@ -87,11 +87,11 @@ The relevant files are `.spectra/prompts/*.md`.
 
 | Template | Controls | Used by |
 |----------|----------|---------|
-| `behavior-analysis.md` | How docs are read, what counts as "testable" | `spectra ai generate` (analysis phase) |
-| `test-generation.md` | How test cases are written from analyzed behaviors | `spectra ai generate` (generation phase) |
-| `criteria-extraction.md` | How acceptance criteria are pulled from docs | `spectra ai analyze --extract-criteria` |
-| `critic-verification.md` | How generated test cases are verified against sources | Grounding verification |
-| `test-update.md` | How existing test cases are classified and rewritten | `spectra ai update` |
+| `behavior-analysis.md` | How docs are read, what counts as "testable" | `spectra ai compile-analysis-prompt` (the `spectra-generate` skill's analysis) |
+| `test-generation.md` | How test cases are written from analyzed behaviors | `spectra ai compile-prompt` (the `spectra-generate` skill's batches) |
+| `criteria-extraction.md` | How acceptance criteria are pulled from docs | `spectra ai compile-extraction-prompt` (the `spectra-criteria` skill) |
+| `critic-verification.md` | How generated test cases are verified against sources | `spectra ai compile-critic-prompt` (the `spectra-critic` subagent) |
+| `test-update.md` | How existing test cases are edited after a doc change | `spectra ai compile-update-prompt` (the `spectra-update` skill) |
 
 To customize, edit any `.md` file directly. The prompt body uses
 `{{placeholders}}` for dynamic content injected at runtime, and available
@@ -222,39 +222,32 @@ Key settings include:
 
 ## 5. AI Model & Batch Tuning
 
-This section controls how generation/analysis turns are shaped and paced, and which model
-verifies them.
+This section controls how generation batches are sized and which model verifies the tests.
 
-The relevant file is `spectra.config.json`, under `ai`.
-
-> There is no provider or model-routing config here anymore. The GitHub Copilot
-> SDK, `ai.providers`, and `ai.critic` (as a config block) were removed outright, since SPECTRA makes no
-> model calls of its own. Generation and analysis run as ordinary turns in your own Claude Code
-> session; the model is whatever your session is using (`/model`), not something
-> `spectra.config.json` selects. See
-> [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) and the
-> [AI Models & Cost Guide](ai-models-cost-guide.md) for the full picture. A pre-v2 config with
-> `ai.providers`/`ai.critic` still loads; the keys are simply ignored.
+> SPECTRA makes no model calls of its own, so there is no provider or model-routing config. The GitHub Copilot SDK
+> and `ai.providers` were removed in Spec 069; a config that still has them loads, and the keys are ignored.
+> Generation and analysis run as ordinary turns in your own Claude Code session; the model is whatever your session is
+> using (`/model`). See [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) and the
+> [AI Models & Cost Guide](ai-models-cost-guide.md) for the history.
 
 ```json
 {
   "ai": {
-    "generation_batch_size": 30,
-    "generation_timeout_minutes": 5,
-    "analysis_timeout_minutes": 2
+    "critic": { "model": "sonnet" }
+  },
+  "generation": {
+    "batch_size": 8
   }
 }
 ```
 
-- `generation_batch_size` sets the number of tests requested per generation turn (default 30).
-  Fewer, larger batches mean fewer `compile-prompt`/`ingest-tests` round-trips.
-- `generation_timeout_minutes` / `analysis_timeout_minutes` bound the deterministic CLI side of
-  the seam (parsing, validation, index writes), not the model turn itself.
-
-The critic model, meaning the `spectra-critic` subagent's model, is a static `model:` field in
-`.claude/agents/spectra-critic.agent.md` (shipped as `claude-sonnet-4-6`), not a
-`spectra.config.json` setting. Edit that file directly to change it, and re-apply your edit after
-`spectra update-skills` if you've customized it.
+- `ai.critic.model` is the model the `spectra-critic` subagent runs on: an alias such as `sonnet` or `opus`, a model
+  id, or `inherit` (your session's model). `spectra init` and `spectra update-skills` write it into
+  `.claude/agents/spectra-critic.agent.md`; an agent file you edited by hand is never overwritten.
+- `generation.batch_size` is the most behaviors one generation batch holds (default 8, 1–50); the analysis's
+  generation plan groups neighbouring doc sections into batches of this size.
+- `ai.generation_timeout_minutes` / `ai.analysis_timeout_minutes` are still accepted, but nothing reads them since the
+  in-process generator was removed (Spec 069).
 
 ---
 
@@ -295,18 +288,20 @@ This section controls how Claude Code interacts with the SPECTRA CLI.
 
 The relevant files are:
 - `.claude/skills/<name>/SKILL.md`, the authoring SKILL files (one per command group)
-- `.claude/agents/spectra-critic.agent.md`, the critic subagent (`context: fork`), run as a mandatory step by the generation SKILL
-- `.vscode/mcp.json`, the MCP server connection for the execution agent
+- `.claude/agents/*.agent.md`, the subagents (`context: fork`): the critic (`spectra-critic`, a mandatory step of
+  generation and update) and the analyst, generator, updater, repairer and extractor the skills delegate to
 
-**SKILLs** (bundled, authoring set): `spectra-generate`, `spectra-update`, `spectra-coverage`,
-`spectra-dashboard`, `spectra-validate`, `spectra-list`, `spectra-init-profile`,
-`spectra-help`, `spectra-criteria`, `spectra-docs`, `spectra-prompts`, `spectra-quickstart`.
+**Skills** (bundled): `spectra-generate`, `spectra-update`, `spectra-criteria`, `spectra-coverage`,
+`spectra-dashboard`, `spectra-validate`, `spectra-list`, `spectra-init-profile`, `spectra-help`, `spectra-docs`,
+`spectra-prompts`, `spectra-quickstart`, `spectra-review-flagged`, `spectra-delete`, `spectra-suite`,
+`spectra-execute`.
 
-The bundled critic subagent is `spectra-critic`, which performs independent verification of generated tests.
+**Subagents** (bundled): `spectra-critic` (independent verification), `spectra-analyst`, `spectra-generator`,
+`spectra-updater`, `spectra-repairer`, `spectra-extractor`.
 
 > The test **execution** agent is a Claude Code main-session skill at `.claude/skills/spectra-execute/SKILL.md`.
 
-To customize, edit any `SKILL.md` or the critic subagent file to change how Claude Code
+To customize, edit any `SKILL.md` or subagent file to change how Claude Code
 invokes CLI commands, presents results, or handles multi-step workflows.
 
 Updates are safe here too, using the same hash-tracking as prompt templates: `spectra update-skills`

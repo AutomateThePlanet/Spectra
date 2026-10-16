@@ -66,7 +66,7 @@ public sealed class AnalyzerInputBuilder
     /// <c>SourceDocumentLoader.LoadAllAsync</c>).</param>
     /// <param name="suiteFilter">User's <c>--suite</c> arg (or null).</param>
     /// <param name="focusFilter">User's <c>--focus</c> arg (or null).</param>
-    /// <param name="budgetTokens">From <c>ai.analysis.max_prompt_tokens</c>.</param>
+    /// <param name="budgetTokens">From <c>analysis.max_prompt_tokens</c>.</param>
     /// <param name="includeArchived">User's <c>--include-archived</c> flag.</param>
     public async Task<AnalyzerInputResult> BuildAsync(
         string basePath,
@@ -156,7 +156,7 @@ public sealed class AnalyzerInputBuilder
             estimatedTokens: estimated,
             budgetTokens: budgetTokens,
             overflowingSuites: suiteEstimates,
-            commandHint: "spectra ai generate");
+            commandHint: "spectra ai compile-analysis-prompt");
     }
 
     private async Task<HashSet<string>> CollectAllowedPathsAsync(

@@ -86,7 +86,7 @@ spectra init
 ```
 
 Creates `spectra.config.json` (including a `coverage` section with `criteria_dir: docs/criteria` and `criteria_file:
-docs/criteria/_criteria_index.yaml`), `docs/`, `test-cases/`, `docs/criteria/_criteria_index.yaml`, `profiles/_default.yaml`, `.spectra/prompts/` (5 templates), `.claude/skills/` (12 bundled SKILLs), `.claude/agents/` (6 subagents: `spectra-critic`; `spectra-updater`, `spectra-repairer`, `spectra-extractor` for the update and criteria skills — Spec 092; `spectra-analyst`, `spectra-generator` for the generate skill — Spec 093), `CUSTOMIZATION.md`, and `USAGE.md`.
+docs/criteria/_criteria_index.yaml`), `docs/`, `test-cases/`, `docs/criteria/_criteria_index.yaml`, `profiles/_default.yaml`, `.spectra/prompts/` (5 templates), `.claude/skills/` (16 bundled skills), `.claude/agents/` (6 subagents: `spectra-critic`; `spectra-updater`, `spectra-repairer`, `spectra-extractor` for the update and criteria skills — Spec 092; `spectra-analyst`, `spectra-generator` for the generate skill — Spec 093), `CUSTOMIZATION.md`, and `USAGE.md`.
 
 **Options:**
 
@@ -114,6 +114,51 @@ didn't parse reported "Validation passed"). Warnings alone exit `0`.
 
 Shows one test. The file is found through its suite folder plus the `_index.json` entry's bare `file` (as every
 command writes it since 073); the legacy `suite/file` form still works (Spec 096).
+
+### `spectra list`
+
+Lists the tests of every suite, or of one suite.
+
+```bash
+spectra list
+spectra list --suite checkout
+spectra list --suite checkout --all     # every test's details, not just the summary
+```
+
+### `spectra config`
+
+Shows or sets `spectra.config.json` values by dotted key, and manages the automation code directories that coverage
+analysis scans for `automated_by` links.
+
+```bash
+spectra config                          # the whole configuration
+spectra config tests.dir                # one value
+spectra config source.local_dir docs/   # set a value
+spectra config --raw                    # raw JSON
+spectra config add-automation-dir tests/e2e
+spectra config remove-automation-dir tests/e2e
+spectra config list-automation-dirs
+```
+
+### `spectra open <path>`
+
+Opens a file or URL in the default application (used by the skills to open generated pages such as the dashboard).
+
+```bash
+spectra open site/index.html
+```
+
+### `spectra prompts list|show|validate|reset`
+
+Manages the prompt templates in `.spectra/prompts/` (analysis, generation, criteria extraction, critic verification,
+update).
+
+```bash
+spectra prompts list                       # every template and whether it is customised
+spectra prompts show test-update [--raw]   # the template, placeholders resolved (or raw)
+spectra prompts validate test-update       # syntax and unknown placeholders
+spectra prompts reset test-update          # back to the built-in default (or --all)
+```
 
 ### `spectra index`
 
@@ -194,13 +239,11 @@ Reports a summary of updated, unchanged, and skipped files.
 Build or incrementally update the v2 documentation index (manifest + per-suite files + checksum store under `docs/_index/`), then automatically extract acceptance criteria.
 
 ```bash
-spectra docs index                # Incremental update + auto-extract acceptance criteria
-spectra docs index --force        # Full rebuild + auto-extract acceptance criteria
-spectra docs index --skip-criteria  # Index only, skip criteria extraction
+spectra docs index                # Incremental update
+spectra docs index --force        # Full rebuild
 spectra docs index --no-interaction --output-format json  # SKILL/CI mode
 spectra docs index --suites checkout,payments  # Re-index only the named suites
 spectra docs index --no-migrate  # Refuse to migrate a legacy _index.md (errors if found)
-spectra docs index --include-archived  # Include skip_analysis suites in criteria extraction
 ```
 
 The index now lives at `docs/_index/`:
@@ -211,11 +254,10 @@ The index now lives at `docs/_index/`:
 
 On first run after upgrading from a release that used the single-file `docs/_index.md`, the indexer automatically migrates: parses the legacy file, splits entries by suite, writes the new layout, and renames the legacy file to `docs/_index.md.bak` for safekeeping. No flag required.
 
-After indexing, acceptance criteria are automatically extracted from the analyzable documents (skip-analysis suites are excluded by default; pass `--include-archived` to override). Merged into `_criteria_index.yaml`. Use `--skip-criteria` to skip extraction entirely.
-
-Extraction iterates documents one at a time with a 2-minute per-document deadline, so a single slow document no longer aborts the whole corpus. On a per-document timeout the command emits a scoped warning naming the document and suggesting `spectra ai analyze --extract-criteria` as a retry path for that document specifically. Previously, a 60-second corpus-wide deadline silently truncated extraction on large projects.
-
-When the run indexes at least one document but extracts zero acceptance criteria across the whole corpus, the command emits a prominent non-blocking warning naming the recovery command and writes a matching `criteria_warning` field into the JSON result. The exit code remains success, and the warning is suppressed when `--skip-criteria` is passed.
+`docs index` only indexes. Acceptance criteria are extracted by the `spectra-criteria` skill (`docs changed` →
+`compile-extraction-prompt` → your session → `ingest-criteria`, below); the automatic extraction step after indexing was
+removed in Spec 069, together with its `criteria_warning`. `--skip-criteria` and `--include-archived` are still accepted
+and do nothing.
 
 In SKILL/CI mode, the command writes `.spectra-result.json` (structured result with per-suite breakdown and migration metadata) and `.spectra-progress.html` (live progress page).
 
@@ -541,12 +583,9 @@ cat ./criteria.json | spectra ai ingest-criteria --doc docs/payment.md
   `7` for `INVALID_CRITERION_ID`, and `1` for other errors (`CRITERIA_FILE_UNREADABLE`,
   `CRITERIA_FILE_COLLISION`, `INVALID_DOC_PATH`, `LOCK_TIMEOUT`, config errors).
 
-> `spectra docs index` and `spectra ai analyze
-> --extract-criteria` still run their extraction in-process today; the
-> model-free compile/ingest surface above runs alongside them (matching the
-> generation surface) and unifies the legacy extractor's
-> failure semantics, so a single empty/slow/malformed document is now reported as
-> an inconclusive document rather than throwing and aborting the corpus.
+> This compile/ingest pair is the only criteria extraction. The in-process extraction that `spectra docs index` and
+> `spectra ai analyze` used to run was removed in Spec 069; an empty or malformed response is reported per document
+> (exit `5` / `6`) instead of aborting the corpus.
 
 ### `spectra ai compile-critic-prompt` (critic subagent)
 
@@ -847,6 +886,16 @@ skipped once its block is written. Never double-processes a completed test; neve
 > same seam too (`spectra docs changed` → `compile-extraction-prompt` → in-session turn →
 > `ingest-criteria`), so there is no `spectra auth`/Copilot authentication step anymore.
 
+### `spectra ai init-seam-progress`
+
+Writes `.spectra/seam-progress.html`, a throwaway page that polls the seam's progress file so you can watch a long
+skill-driven run (generation, criteria, update) in the browser. The skills call it; it is gitignored.
+
+```bash
+spectra ai init-seam-progress            # write the page and open it
+spectra ai init-seam-progress --no-open  # CI / headless: write it only
+```
+
 ### Generation (in-session via the `spectra-generate` skill)
 
 Test generation is **skill-driven**, not a direct CLI command; ask Claude Code (e.g. *"generate test
@@ -917,7 +966,7 @@ analysis prompt. `--include-archived` includes `skip_analysis` suites in the ana
 Because `compile-analysis-prompt` inlines
 documentation, pass `--doc-suite <id>` when the test-suite name doesn't match a doc-suite ID;
 otherwise it loads the full corpus and may exit `4` (estimated prompt exceeds
-`ai.analysis.max_prompt_tokens`, default 96,000) with an actionable message naming candidate suites and
+`analysis.max_prompt_tokens`, default 96,000) with an actionable message naming candidate suites and
 token costs. `spectra docs list-suites` shows available IDs and their token estimates. `compile-prompt`
 (generation) is criteria-grounded and not subject to the inlined-doc budget.
 
@@ -925,10 +974,8 @@ Compile commands exit `0` when emitted and `4` when refused (missing input or bu
 on a config/IO error. Ingest commands exit `0` when persisted/classified, `5` for empty content, `6` for
 schema/parse damage, or `1` on a config/IO error. The skill drives a bounded regenerate-and-retry on `5`/`6`.
 
-When `debug.enabled: true`, failures during the still-in-process criteria
-extraction (`ai analyze --extract-criteria` / `docs index`) write full entries to `.spectra-errors.log`.
-Duplicate detection (>80% title similarity) continues to apply to the verification path. (`ai.critic.max_concurrent`
-and the other keys of the removed in-process critic are ignored — Spec 097.)
+Duplicate detection (>80% title similarity) continues to apply to the verification path. (The keys of the removed
+in-process critic — `max_concurrent` and the others — are ignored; Spec 097.)
 
 ### `spectra ai update-triage` (Spec 084)
 
@@ -1543,6 +1590,7 @@ Drive a full manual loop from the shell:
 
 ```bash
 spectra run list-suites                         # what's runnable
+spectra run list-active                         # runs in progress
 spectra run start <suite> [--priorities high] [--tags …] [--components …]
 spectra run start --test-ids TC-1 TC-2 --output-format json
 spectra run start --selection smoke

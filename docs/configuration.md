@@ -40,9 +40,9 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `mode` | string | `"local"` | Source mode (`local` or `spaces`) |
+| `mode` | string | `"local"` | Source mode; `local` is the only working value |
 | `local_dir` | string | `"docs/"` | Path to documentation directory |
-| `space_name` | string | — | Copilot Space name (when `mode: "spaces"`) |
+| `space_name` | string | — | Accepted and ignored — the Copilot Spaces lookup was removed in Spec 070 |
 | `doc_index_dir` | string | `"docs/_index"` | Directory containing the v2 index layout (`_manifest.yaml`, `_checksums.json`, `groups/{suite}.index.md`). |
 | `doc_index` | string | — | Legacy single-file path. Used only by the auto-migrator on first run after upgrading. New writes always use `doc_index_dir`. |
 | `group_overrides` | object | `{}` | Per-document suite overrides: `{ "docs/path.md": "suite-id" }`. Consulted after frontmatter overrides and before the directory-default rule. |
@@ -82,8 +82,8 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `critic.model` | string | `sonnet` | Spec 097: the model the `spectra-critic` subagent runs on — an alias (`sonnet`, `opus`, `haiku`), a model id, or `inherit` (the session's model). One word that starts with a letter or digit (letters, digits, `.`, `-`, `_`, `:`, `[`, `]`). Spec 098: anything else is ignored with a warning and `sonnet` is used — never `CONFIG_INVALID`. Optional (missing → `sonnet`). |
-| `generation_timeout_minutes` | int | `5` | Bounds the deterministic CLI side of the generation seam (parsing, validation, index writes), not the model turn itself, which runs in your own session. |
-| `analysis_timeout_minutes` | int | `2` | Same, for the behavior-analysis seam. |
+| `generation_timeout_minutes` | int | `5` | Accepted; nothing reads it since the in-process generator was removed (Spec 069). |
+| `analysis_timeout_minutes` | int | `2` | Accepted; nothing reads it since the in-process analysis was removed (Spec 069). |
 
 `ai.generation_batch_size` is read by nothing (Spec 096): the batch size is `generation.batch_size` (see below). An
 existing config that still has it loads as before; `spectra init` no longer writes it.
@@ -149,7 +149,7 @@ No command ever fails because of `ai.critic` (a non-object block or a non-string
 ## `analysis` — Behavior Analysis Categories
 
 Controls how the AI categorizes testable behaviors during the analysis phase
-(`spectra ai generate` runs this automatically before generation). See
+(the `spectra-generate` skill runs it before generation, through `spectra ai compile-analysis-prompt`). See
 [Customization > Behavior Categories](customization.md#3-behavior-categories)
 for domain-specific examples.
 
@@ -248,7 +248,7 @@ See [Coverage](coverage.md) for how these settings are used.
 | `criteria_import.auto_split` | bool | `true` | Automatically split compound criteria into atomic ones during import |
 | `criteria_import.normalize_rfc2119` | bool | `true` | Normalize RFC 2119 keywords (MUST, SHALL, SHOULD) in imported criteria |
 | `criteria_import.id_prefix` | string | `"AC"` | Prefix for auto-generated acceptance criteria IDs |
-| `analysis_exclude_patterns` | string[] | see below | Glob patterns whose matched documents are still indexed and counted in coverage but whose suites are flagged `skip_analysis: true` and excluded from AI analyzer prompts by default. Pass `--include-archived` on `spectra ai generate` / `spectra ai analyze` / `spectra docs index` to override. The list **replaces** rather than merges with defaults; set to `[]` to disable all default exclusions. |
+| `analysis_exclude_patterns` | string[] | see below | Glob patterns whose matched documents are still indexed and counted in coverage but whose suites are flagged `skip_analysis: true` and excluded from AI analyzer prompts by default. Pass `--include-archived` on `spectra ai compile-analysis-prompt` / `spectra ai analyze` to override. The list **replaces** rather than merges with defaults; set to `[]` to disable all default exclusions. |
 | `coverage_exclude_patterns` | string[] | `[]` (empty) | Glob patterns whose matched documents are dropped from the **documentation-coverage denominator only**. Excluded docs remain fully present in the document map for generation, analysis, and indexing, and are reported with a distinct `excluded` status. Defaults to empty (no implicit patterns), so unconfigured workspaces see unchanged coverage output. See [the three exclusion mechanisms](#the-three-exclusion-mechanisms) below. |
 | `max_suite_tokens` | int | `80000` | Spillover threshold. When a single suite's `tokens_estimated` exceeds this, the indexer additionally writes per-doc files at `docs/_index/docs/{sanitized}.index.md` so finer-grained loading is possible. |
 

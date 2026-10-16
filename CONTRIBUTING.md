@@ -13,7 +13,7 @@ See [Development Guide](docs/DEVELOPMENT.md) for detailed build and run instruct
 
 ### AI Runtime
 
-SPECTRA uses the GitHub Copilot SDK as its sole AI runtime. All AI generation and verification flows through the Copilot SDK, which supports multiple providers (github-models, azure-openai, azure-anthropic, openai, anthropic) via configuration.
+SPECTRA makes no model calls of its own: generation, criteria extraction, updates and verification run in the user's Claude Code session through the bundled skills and subagents, which drive deterministic `spectra ai compile-*` / `ingest-*` commands. There is no provider configuration.
 
 ## How to Contribute
 

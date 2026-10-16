@@ -1396,7 +1396,7 @@ function getEmptyState(label, sectionData, total, pct) {
             return `<div class="coverage-empty-state">
                 <span class="empty-icon">&#9432;</span>
                 <div class="empty-text"><strong>No acceptance criteria tracked yet.</strong>
-                Add a <code>criteria</code> field to test YAML frontmatter, or run <code>spectra ai analyze --extract-criteria</code> to extract from documentation.</div>
+                Add a <code>criteria</code> field to test YAML frontmatter, or ask your assistant to extract them from the documentation (<code>spectra-criteria</code> skill).</div>
             </div>`;
         }
         return null;

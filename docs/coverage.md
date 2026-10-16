@@ -138,7 +138,7 @@ Tests created with `spectra ai compile-prompt --suite <s> --from-description "..
 
 ### Criteria File Format
 
-Create `docs/criteria/_criteria_index.yaml` (or use `spectra ai analyze --extract-criteria` to auto-generate):
+Create `docs/criteria/_criteria_index.yaml` by hand, or ask the assistant to extract criteria from your docs (the `spectra-criteria` skill writes it):
 
 ```yaml
 criteria:
@@ -175,21 +175,28 @@ Tests link to criteria by ID (`criteria:` in the frontmatter), so IDs are kept s
 
 ### Resilience
 
-`ai analyze --extract-criteria` runs per-document with bounded retries on inconclusive AI responses:
+Criteria extraction is the `spectra-criteria` skill: `spectra docs changed` lists the documents to (re-)extract,
+`spectra ai compile-extraction-prompt` builds each document's prompt, your session extracts, and
+`spectra ai ingest-criteria` validates and persists the result, one document at a time:
 
-- A genuine empty result (the AI returns a valid empty list, or the source document is empty) is cached normally, so the next run skips the document.
-- An empty AI response or unparseable response triggers a single retry (1.5 s backoff). If still inconclusive, the document is reported under `failed_documents` and re-attempted on the next run. No cache hash is written, so the next non-`--force` run will not skip it.
-- A thrown exception or per-document timeout is logged to `.spectra-errors.log` and the document is reported as failed; no retry is performed.
-- `--force` bypasses the cache and re-extracts every document, regardless of any prior cache entry.
+- A genuine empty result (a valid empty list) is recorded, so the document no longer shows as changed.
+- An empty response (exit `5`) or an unparseable one (exit `6`) writes nothing; the skill retries the document once,
+  and a document that is still inconclusive keeps showing in `docs changed` until it succeeds.
+- Asking for a full re-extraction makes the skill pass `docs changed --include-unchanged` and process every document.
 
 ### Coverage guards
 
 Each persisted entry in `_criteria_index.yaml` carries an `outcome` field that distinguishes a genuine extraction outcome from inconclusive states. Today the only value written is `extracted`, because the cache-write gate guarantees only genuine extraction results are persisted. The field exists so future guards can distinguish affirmed-empty entries (`criteria_count: 0` with `outcome: extracted`, meaning the AI legitimately found nothing) from inconclusive ones without re-deriving the distinction heuristically. **An entry with `criteria_count: 0` and `outcome: extracted` is an affirmed empty, not a failure.** Legacy entries written before this field was introduced lack it and deserialize as `extracted` by default; no migration step is required.
 
-Two non-blocking guards surface coverage-linkage gaps:
+Generation never runs without criteria by accident:
 
-- The `spectra docs index` zero-criteria warning triggers when the run indexed at least one document but extracted zero acceptance criteria across the whole corpus: the command emits a prominent warning naming the recovery command (`spectra ai analyze --extract-criteria`) and writes a matching `criteria_warning` string into the JSON result. The command still exits success; the warning is suppressed when `--skip-criteria` is passed.
-- The no-match note appears when a generation run targets a suite for which no acceptance criteria match by component, source-doc, or file-name: the run completes normally but attaches a non-blocking note to the result's `notes` array (e.g. `"No acceptance criteria matched suite 'checkout' …"`). The note is present in the JSON regardless of console verbosity; only the human-facing console echo is suppressed under `--verbosity quiet`. No interactive prompts are introduced anywhere.
+- `spectra ai compile-prompt` refuses (exit `4`, `MISSING_INPUT` for `criteria_context`) when no acceptance criteria
+  resolve for the suite, naming the `spectra-criteria` skill as the fix.
+- A generation batch whose doc sections have no criteria of their own uses all criteria of its documents, with a warning
+  (Spec 094).
+
+The `docs index` zero-criteria warning (`criteria_warning`) and the generation "no criteria matched" note of Spec 048
+were removed in Spec 069 together with the in-process extraction they reported on.
 
 ## Automation Coverage
 

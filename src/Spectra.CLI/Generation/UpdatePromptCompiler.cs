@@ -102,7 +102,7 @@ public static class UpdatePromptCompiler
                 "changed_context",
                 "No changed source or acceptance-criteria context was resolved for this suite. "
                 + "Refusing to emit an update prompt without anything to reconcile the test against. "
-                + "Run 'spectra docs index' / 'spectra ai analyze --extract-criteria' first.");
+                + "Run 'spectra docs index' and extract criteria (the spectra-criteria skill) first.");
         }
 
         var prompt = Assemble(originalTest, sourceContext, criteriaContext, templateLoader, profileFormat);

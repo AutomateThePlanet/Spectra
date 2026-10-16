@@ -19,7 +19,7 @@ namespace Spectra.CLI.Index;
 /// window. The 32K margin covers response (~8K), prompt template (~4K),
 /// existing-test frontmatter (~5K), coverage snapshot (~5K), category and
 /// technique guidance (~5K), and retry buffer (~5K). Tune via
-/// <c>ai.analysis.max_prompt_tokens</c>.</para>
+/// <c>analysis.max_prompt_tokens</c>.</para>
 /// </remarks>
 public sealed class PreFlightTokenChecker
 {
@@ -37,9 +37,9 @@ public sealed class PreFlightTokenChecker
     /// <param name="legacyIndexPath">Path to <c>docs/_index.md</c>.
     /// File-not-found is treated as zero tokens (no overflow possible).</param>
     /// <param name="budgetTokens">Configured budget (e.g. from
-    /// <c>ai.analysis.max_prompt_tokens</c>). Negative or zero means no check.</param>
+    /// <c>analysis.max_prompt_tokens</c>). Negative or zero means no check.</param>
     /// <param name="commandHint">A free-form hint surfaced in the error message,
-    /// e.g. <c>"spectra ai generate"</c>. Used to compose the suggestion block.</param>
+    /// e.g. <c>"spectra ai compile-analysis-prompt"</c>. Used to compose the suggestion block.</param>
     public async Task<int> EnforceBudgetFromLegacyIndexAsync(
         string legacyIndexPath,
         int budgetTokens,
@@ -147,14 +147,13 @@ public sealed class PreFlightBudgetExceededException : InvalidOperationException
         {
             // Pick the largest suite as the example narrowing arg.
             var largest = suites.OrderByDescending(s => s.Tokens).First();
-            sb.AppendLine($"  {commandHint} --suite {largest.Id}");
+            sb.AppendLine($"  {commandHint} --suite <suite> --doc-suite {largest.Id}");
         }
         else
         {
-            sb.AppendLine($"  {commandHint} --suite <id>");
+            sb.AppendLine($"  {commandHint} --suite <suite> --doc-suite <id>");
         }
-        sb.AppendLine($"  {commandHint} --analyze-only");
-        sb.Append("Or raise ai.analysis.max_prompt_tokens in spectra.config.json.");
+        sb.Append("Or raise analysis.max_prompt_tokens in spectra.config.json.");
 
         return sb.ToString();
     }

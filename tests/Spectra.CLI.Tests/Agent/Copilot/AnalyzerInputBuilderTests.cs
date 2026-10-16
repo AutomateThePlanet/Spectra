@@ -212,8 +212,11 @@ public class AnalyzerInputBuilderTests : IDisposable
 
         Assert.True(ex.EstimatedTokens > 96_000);
         Assert.Contains("many", ex.Message);
-        Assert.Contains("--analyze-only", ex.Message);
-        Assert.Contains("ai.analysis.max_prompt_tokens", ex.Message);
+        // Spec 100 F4: the suggestion names a real command and the real key (was `--analyze-only`, `ai.analysis.…`).
+        Assert.Contains("spectra ai compile-analysis-prompt --suite <suite> --doc-suite", ex.Message);
+        Assert.DoesNotContain("--analyze-only", ex.Message);
+        Assert.Contains("analysis.max_prompt_tokens", ex.Message);
+        Assert.DoesNotContain("ai.analysis.", ex.Message);
     }
 
     [Fact]

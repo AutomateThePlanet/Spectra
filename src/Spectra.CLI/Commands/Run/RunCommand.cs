@@ -10,7 +10,7 @@ namespace Spectra.CLI.Commands.Run;
 /// </summary>
 public sealed class RunCommand : Command
 {
-    public RunCommand() : base("run", "Drive deterministic test execution from the CLI (no MCP server required)")
+    public RunCommand() : base("run", "Drive deterministic test execution from the CLI")
     {
         AddCommand(BuildStart());
         AddCommand(BuildStatus());

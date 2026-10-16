@@ -2,24 +2,35 @@
 ================================================================================
 SYNC IMPACT REPORT
 ================================================================================
-Version Change: 1.1.0 → 2.0.0 (Spec 070: de-MCP / de-provider redefinition of Principles II & III)
+Version Change: 2.0.0 → 2.1.0 (Spec 100: the constitution states the rules the code already follows)
 
-Rationale for MAJOR: Principles II and III were redefined to remove the now-removed MCP execution
-adapter (Spec 070) and the in-process provider chain / BYOK model (Specs 058/059/069). Principle II
-"Deterministic Execution" now describes the engine + `spectra run` CLI with durable, reconstructable
-state; Principle III "Orchestrator-Agnostic Design" now describes the model-free, command-driven CLI
-surface (no MCP API, no provider chain). No principles added or removed; II & III redefined.
+Rationale for MINOR: Principle III gains a normative clause (the human summary in JSON mode); the other
+changes clarify wording to match the product as it is since Specs 070–099. No principle is removed or
+redefined.
 
-Added Sections:
-  - Core Principles (5 principles)
-  - Quality Gates
-  - Development Workflow
-  - Governance
+Modified Principles:
+  - III. Orchestrator-Agnostic Design — new clause: in JSON mode stdout is only the JSON document; the
+    human summary is never suppressed and goes to stderr (the rule since Spec 079, applied by every
+    batch command since).
+  - IV. CLI-First Interface — "The AI agent MUST never write to the filesystem directly" replaced by the
+    precise rule: the agent writes only staging inputs under `.spectra/` that a validated CLI ingest
+    command reads; every persisted artefact is written by a CLI command. This is a clarification of
+    existing behaviour (staging since Specs 077/088), not a change.
+  - IV. CLI-First Interface — batch bullet notes that the batch ingest commands support `--dry-run`
+    (Specs 090/097) and that `--no-review` is a global option, a no-op where nothing prompts.
 
-Templates Requiring Updates:
+Modified Sections:
+  - Development Workflow › Test-Required Discipline: "MCP tool contracts" → "CLI command contracts
+    (JSON output and exit codes)".
+  - Development Workflow › Code Review Requirements: "new MCP tools" → "new CLI commands".
+  - Governance › Compliance Review: runtime development guidance is `CLAUDE.md` (AGENTS.md points to it).
+
+Added Sections: none. Removed Sections: none.
+
+Templates Requiring Updates (checked: no MCP / provider / Copilot wording):
   - .specify/templates/plan-template.md: ✅ Compatible (Constitution Check section exists)
-  - .specify/templates/spec-template.md: ✅ Compatible (requirements structure aligns)
-  - .specify/templates/tasks-template.md: ✅ Compatible (phase structure supports principles)
+  - .specify/templates/spec-template.md: ✅ Compatible
+  - .specify/templates/tasks-template.md: ✅ Compatible
 
 Follow-up TODOs: None
 ================================================================================
@@ -58,6 +69,7 @@ SPECTRA's surface MUST work with any LLM orchestrator (Claude Code, custom agent
 
 - Commands MUST be self-contained — an orchestrator need not remember prior calls; each invocation re-derives the state it needs
 - Command output MUST remain minimal and structured (`--output-format json`) to avoid context overflow
+- In JSON mode stdout MUST be only the JSON document; the human summary is never suppressed — it goes to stderr, so the user always sees what happened
 - No bidirectional sync with external test management systems — one-directional integration only
 - SPECTRA MUST NOT run an in-process model — all inference is the user's own agent session (the model-free generation/criteria/critic seams of Specs 058/059/069); there is no provider chain or API key to manage
 
@@ -69,8 +81,8 @@ All functionality MUST be exposed via CLI commands before any UI:
 
 - Every operation is a named command with explicit parameters — no chat loops
 - Commands MUST be CI-friendly with deterministic exit codes
-- The AI agent MUST never write to the filesystem directly — all output goes through validated tool handlers
-- Batch operations MUST support `--dry-run` and `--no-review` flags for automation
+- The AI agent MUST NOT write tests, criteria, indexes, baselines or grounding directly. It writes only staging inputs under `.spectra/` (e.g. `.spectra/updates|repairs/<suite>/*.json`, `.spectra/generated.json`, `.spectra/analysis.json`, `.spectra/criteria.json`, critic verdict files) that a validated CLI ingest command reads; every persisted artefact is written by a CLI command
+- Batch operations MUST support `--dry-run` and `--no-review` flags for automation: the batch ingest commands (`ingest-update --all`, `ingest-verdict --all`, `ingest-grounding --all`, `ingest-analysis`) support `--dry-run` (Specs 090/097); `--no-review` is a global option and a no-op for commands that never prompt
 
 **Rationale**: CLI enables automation, scripting, and CI/CD pipelines. GUIs can be built on top of a solid CLI foundation.
 
@@ -106,7 +118,7 @@ All code and artifacts MUST pass these gates before merge:
 Tests MUST exist for all public APIs and critical paths:
 
 - Tests are required but MAY be written after implementation (not strict TDD)
-- Integration tests MUST cover: MCP tool contracts, state machine transitions, CLI command workflows
+- Integration tests MUST cover: CLI command contracts (JSON output and exit codes), state machine transitions, CLI command workflows
 - Unit tests MUST cover: parsing, validation, index operations
 - Test coverage expectations: Core library 80%+, CLI commands 60%+
 
@@ -115,7 +127,7 @@ Tests MUST exist for all public APIs and critical paths:
 All changes MUST be reviewed before merge:
 
 - At least one approval required for feature branches
-- Architecture changes (new projects, new dependencies, new MCP tools) require explicit justification
+- Architecture changes (new projects, new dependencies, new CLI commands) require explicit justification
 - Complexity additions MUST reference why simpler alternatives were rejected
 
 ## Governance
@@ -135,10 +147,10 @@ All changes MUST be reviewed before merge:
 
 - All PRs MUST verify compliance with Constitution principles
 - Violations MUST be documented in Complexity Tracking table (see plan template)
-- Runtime development guidance is in `AGENTS.md`
+- Runtime development guidance is in `CLAUDE.md` (`AGENTS.md` points to it)
 
 ### Supersession
 
 This Constitution supersedes all other practices when conflicts arise. If a pattern in existing code conflicts with these principles, new code MUST follow the Constitution and technical debt SHOULD be logged for remediation.
 
-**Version**: 2.0.0 | **Ratified**: 2026-03-13 | **Last Amended**: 2026-06-11
+**Version**: 2.1.0 | **Ratified**: 2026-03-13 | **Last Amended**: 2026-10-16

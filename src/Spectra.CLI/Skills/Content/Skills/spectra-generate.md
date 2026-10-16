@@ -85,12 +85,12 @@ In the main flow (Spec 093/094), `compile-analysis-prompt` and `ingest-analysis`
 
 ### Pre-flight token-budget check (Spec 040, exit code 4)
 
-`compile-analysis-prompt` inlines documentation, so before emitting it estimates the prompt size against `ai.analysis.max_prompt_tokens` (default 96K). If the estimate exceeds the budget it exits with code 4 and an actionable message naming every candidate doc-suite + token cost. Two recovery paths:
+`compile-analysis-prompt` inlines documentation, so before emitting it estimates the prompt size against `analysis.max_prompt_tokens` (default 96K). If the estimate exceeds the budget it exits with code 4 and an actionable message naming every candidate doc-suite + token cost. Two recovery paths:
 
 In the main flow this refusal arrives as `spectra-analyst`'s `refused:` / `refusal:` lines; re-running the analysis — with another doc suite from the candidates, or after the user raises the budget — means invoking `spectra-analyst` again with the new input. This session never runs `compile-analysis-prompt` itself.
 
 1. **Narrow with `--doc-suite {id}`** — re-run targeting one doc-suite that fits. Run `spectra docs list-suites` to discover IDs.
-2. **Raise the budget** — bump `ai.analysis.max_prompt_tokens` in `spectra.config.json`.
+2. **Raise the budget** — bump `analysis.max_prompt_tokens` in `spectra.config.json`.
 
 ---
 
@@ -386,7 +386,7 @@ Read the named SKILL first, then follow its steps exactly. Do NOT invent CLI com
 | Update test cases | `spectra-update` | `spectra ai update-triage --suite {suite} --dry-run --output-format json --verbosity quiet` |
 | Coverage analysis | `spectra-coverage` | `spectra ai analyze --coverage --auto-link --no-interaction --output-format json --verbosity quiet` |
 | Dashboard | `spectra-dashboard` | `spectra ai analyze --coverage --auto-link ... && spectra dashboard --output ./site ...` |
-| Extract criteria | `spectra-criteria` | `spectra ai analyze --extract-criteria --no-interaction --output-format json --verbosity quiet` |
+| Extract criteria | `spectra-criteria` | `spectra docs changed --no-interaction --output-format json --verbosity quiet` |
 | Validate test cases | `spectra-validate` | `spectra validate --no-interaction --output-format json --verbosity quiet` |
 | List / show test cases | `spectra-list` | `spectra list --no-interaction --output-format json --verbosity quiet` |
 | Docs index | `spectra-docs` | `spectra docs index [--force] --no-interaction --output-format json --verbosity quiet` |
