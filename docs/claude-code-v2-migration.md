@@ -48,7 +48,7 @@ spectra ai generate checkout --count 20
      that never talk to a model themselves:
        spectra ai compile-analysis-prompt  → (a turn in YOUR session) → spectra ai ingest-analysis
        spectra ai compile-prompt           → (a turn in YOUR session) → spectra ai ingest-tests
-       spectra ai compile-critic-prompt    → (the spectra-critic subagent, context: fork) → spectra ai ingest-verdict
+       spectra ai compile-critic-prompt    → (the spectra-critic subagent, a fresh context) → spectra ai ingest-verdict
        spectra ai ingest-grounding --all   (durable verdict write-back)
 ```
 
@@ -84,7 +84,7 @@ sessions.
   generation, behavior analysis, criteria extraction (`spectra docs changed` diffs by SHA-256 so
   only changed docs get re-prompted), and targeted updates (`compile-update-prompt` /
   `ingest-update`, with a drift guard that fails loud on out-of-scope field changes).
-- The `spectra-critic` subagent (`context: fork`) is an isolated, per-test verification call
+- The `spectra-critic` subagent is an isolated, per-test verification call (a fresh context each time)
   that sees only the test artifact and its source docs, never the generator's reasoning.
 - Under the new verdict disposition policy, a `grounded` verdict writes a durable `grounding:`
   block into the test's frontmatter plus a full verdict JSON under `.spectra/verdicts/`; a

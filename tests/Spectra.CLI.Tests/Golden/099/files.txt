@@ -807,7 +807,7 @@ keeping its original `id`, following this schema:
     ".spectra/prompts/test-generation.md": "ef6791f9973be3d2eda2d28f3efb9856ac69f739627df70f0a619cedc03a99e9",
     ".spectra/prompts/test-update.md": "393ad4b782de7155dd093983ec3426164da8bfa318311ef36b6d7335b1c462a1",
     "profiles/_default.yaml": "2188c0eeb095ec2df7646dc735a676f0b5fa18bd143af36c0a0a986b7a54cfbd",
-    "CUSTOMIZATION.md": "a3eedad9e617ff51bbedbccdb00aa971021c14209cc7bb9300679071bd0de73f"
+    "CUSTOMIZATION.md": "7b7eb33cffc5d4999bed2fb88f484084ab757a7b1d22504ef08262d830e75c67"
   }
 }
 ### end
@@ -858,7 +858,7 @@ keeping its original `id`, following this schema:
 ### .spectra/verdicts/critic-verdict-TC-105.json (187 bytes)
 {"verdict":"hallucinated","score":0.9,"critic_model":"claude-sonnet-4-6","findings":[{"element":"Step 2","claim":"1 KB = 1000 bytes","status":"hallucinated","reason":"contradicts docs"}]}
 ### end
-### CUSTOMIZATION.md (13925 bytes)
+### CUSTOMIZATION.md (14283 bytes)
 # SPECTRA Customization Guide
 
 This guide covers every way you can customize SPECTRA's behavior, from test case
@@ -1143,7 +1143,11 @@ This section controls how Claude Code interacts with the SPECTRA CLI.
 
 The relevant files are:
 - `.claude/skills/<name>/SKILL.md`, the authoring SKILL files (one per command group)
-- `.claude/agents/*.agent.md`, the subagents (`context: fork`): the critic (`spectra-critic`, a mandatory step of
+- `.claude/skills/spectra-generate/reference.md` and `.claude/skills/spectra-update/reference.md` (Spec 101),
+  material those two skills read only when needed (command tables, exit codes, examples); `update-skills`
+  keeps an edited one, like any other file
+- `.claude/agents/*.agent.md`, the subagents (each runs in a fresh context; Claude Code reads only their
+  `name`, `description`, `tools` and `model` fields): the critic (`spectra-critic`, a mandatory step of
   generation and update) and the analyst, generator, updater, repairer and extractor the skills delegate to
 
 **Skills** (bundled): `spectra-generate`, `spectra-update`, `spectra-criteria`, `spectra-coverage`,

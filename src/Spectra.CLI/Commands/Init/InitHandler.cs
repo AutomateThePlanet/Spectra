@@ -264,6 +264,14 @@ public sealed class InitHandler
             manifest.Record(Skills.ManifestKey.For(_workingDirectory, skillPath), Infrastructure.FileHasher.ComputeHash(content));
         }
 
+        // Spec 101 F2: each skill's reference.md beside its SKILL.md, recorded like any bundled file.
+        foreach (var (name, content) in Skills.SkillReferenceContent.All)
+        {
+            var referencePath = Skills.SkillInstallLayout.ReferencePath(_workingDirectory, name);
+            await InstallAgentFileAsync(referencePath, () => content, force, ct);
+            manifest.Record(Skills.ManifestKey.For(_workingDirectory, referencePath), Infrastructure.FileHasher.ComputeHash(content));
+        }
+
         // Create bundled agent files (role-routed by SkillInstallLayout). Spec 097 (FR-022): the critic is installed
         // with ai.critic.model from the config init has just written (the template's value).
         var loaded = await ConfigLoader.LoadForReadAsync(_workingDirectory, ConfigSections.None, ct);

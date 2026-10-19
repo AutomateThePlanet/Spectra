@@ -32,6 +32,10 @@
       <Link>testimizeSettings.json</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Spec 101 (T003): the compile-critic-prompt full-docs golden captured from 6a4c41a. -->
+    <None Include="TestFixtures\CriticGolden\*.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

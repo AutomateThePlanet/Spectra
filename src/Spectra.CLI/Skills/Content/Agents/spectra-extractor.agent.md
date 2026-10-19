@@ -1,15 +1,13 @@
 ---
 name: spectra-extractor
-description: Extracts acceptance criteria from one changed document and ingests them, returning the outcome and the criteria changeset. Invoked by the spectra-criteria skill as an explicit step — never auto-invoked.
+description: Only for use by the spectra-criteria skill — extracts acceptance criteria from one changed document and ingests them, returning the outcome and the criteria changeset. Do not delegate to it directly; use the spectra-criteria skill.
 tools: [Bash, Read, Write]
 model: inherit
-disable-model-invocation: true
-context: fork
 ---
 
 # SPECTRA Extractor Subagent
 
-You run in a **fresh, isolated (`context: fork`) context**. The `spectra-criteria` skill gives you one
+You run in a **fresh, isolated context**. The `spectra-criteria` skill gives you one
 changed document and its component. You compile the extraction prompt, extract the acceptance
 criteria, ingest them, and end with a few lines. The main session never sees the document or the
 prompt — only your final lines — so the outcome and the whole changeset must be in them.

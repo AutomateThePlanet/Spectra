@@ -82,7 +82,8 @@ public sealed class GenerateOrchestratorTests
 
         Assert.Contains("spectra ai ingest-verdict --suite {suite} --all --ids", flow);
         Assert.Contains("`results`", flow);
-        Assert.Contains("progress only", flow);
+        // Spec 101 F3: the generator relays the CLI's verdict per test; the critic's own line is only compared.
+        Assert.Contains("never read the verdict file", flow);
         Assert.Contains("unverified", flow);
     }
 
@@ -109,10 +110,13 @@ public sealed class GenerateOrchestratorTests
     public void GenerateSkill_ResumesFromTheGroundingAudit()
     {
         var flow = Normalised(MainFlow);
+        // Spec 101 F2: the resume procedure moved to the skill's reference.md (read when a run is resumed).
+        var resume = Normalised(SkillReferenceContent.Generate);
 
         Assert.Contains("audit-grounding", flow);
-        Assert.Contains("`action_needed: repair`", flow);
-        Assert.DoesNotContain("re-run `compile-repair-batch`", flow);
+        Assert.Contains("Resume an interrupted run", flow);
+        Assert.Contains("`action_needed: repair`", resume);
+        Assert.DoesNotContain("re-run `compile-repair-batch`", resume);
     }
 
     [Fact]
@@ -140,10 +144,11 @@ public sealed class GenerateOrchestratorTests
     [Fact]
     public void FromDescription_StillGeneratesInTheSession_AndUsesTheStep8Critic()
     {
-        var section = Section(Generate, "## When the user wants to create a specific test case", "## Test Creation Intent Routing");
+        // Spec 101 F2: the flow is a numbered list followed by the routing table; its detail is in reference.md.
+        var section = Section(Generate, "## When the user wants to create a specific test case", "## How to choose between generation flows");
 
         Assert.Contains("spectra ai compile-prompt --suite {suite} --from-description", section);
-        Assert.Contains("Step 8", Section(section, "### Step 4", "### Step 5"));
+        Assert.Contains("Step 8", Section(section, "\n4. ", "\n5. "));
     }
 
     // ---- update ----
@@ -155,7 +160,8 @@ public sealed class GenerateOrchestratorTests
 
         Assert.Contains("spectra ai ingest-verdict --suite <suite> --all --ids", step);
         Assert.Contains("`results`", step);
-        Assert.Contains("progress only", step);
+        // Spec 101 F3: the updater relays the CLI's verdict per test; on the fallback the critic's line is only compared.
+        Assert.Contains("never read the verdict file", step);
         Assert.Contains("disagree", step);
         Assert.Contains("the critic once more", step);
     }

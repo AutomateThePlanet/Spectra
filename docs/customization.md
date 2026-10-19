@@ -288,7 +288,11 @@ This section controls how Claude Code interacts with the SPECTRA CLI.
 
 The relevant files are:
 - `.claude/skills/<name>/SKILL.md`, the authoring SKILL files (one per command group)
-- `.claude/agents/*.agent.md`, the subagents (`context: fork`): the critic (`spectra-critic`, a mandatory step of
+- `.claude/skills/spectra-generate/reference.md` and `.claude/skills/spectra-update/reference.md` (Spec 101),
+  material those two skills read only when needed (command tables, exit codes, examples); `update-skills`
+  keeps an edited one, like any other file
+- `.claude/agents/*.agent.md`, the subagents (each runs in a fresh context; Claude Code reads only their
+  `name`, `description`, `tools` and `model` fields): the critic (`spectra-critic`, a mandatory step of
   generation and update) and the analyst, generator, updater, repairer and extractor the skills delegate to
 
 **Skills** (bundled): `spectra-generate`, `spectra-update`, `spectra-criteria`, `spectra-coverage`,

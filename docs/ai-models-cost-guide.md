@@ -60,10 +60,10 @@ or your plan's default). The batch size for generation is `ai.generation_batch_s
 tests per turn); fewer, larger turns cost less overhead than many small ones, at the cost of a
 longer single response.
 
-The critic is different: it always runs as a `context: fork` subagent (`.claude/agents/spectra-critic.md`
-in your project, seeded from SPECTRA's bundled copy), invoked once per generated test. `context:
-fork` means each critic call starts from a clean, isolated context (just the test artifact + its
-source docs), so it doesn't grow your main session's context window, but each call still counts as
+The critic is different: it always runs as a subagent (`.claude/agents/spectra-critic.agent.md`
+in your project, seeded from SPECTRA's bundled copy), invoked once per generated test — since Spec 101 by
+the generator, updater or repairer subagent that wrote the test. Each critic call starts from a clean,
+isolated context (just the test artifact + the sections it cites), so it doesn't grow your main session's context window, but each call still counts as
 normal Claude Code usage. The critic's model is a static `model:` field in that agent file (shipped
 as `claude-sonnet-4-6`); there is no `spectra.config.json` knob for it anymore, so edit the agent
 file directly (and re-apply your edit after `spectra update-skills` if you've customized it).

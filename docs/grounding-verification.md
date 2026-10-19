@@ -20,7 +20,8 @@ When AI generates test cases, it can hallucinate, inventing steps, expected resu
 
 1. **Generator** creates draft test cases from your documentation
 2. **Critic** verifies each test case against the same docs. The critic runs in a fresh, isolated
-   (`context: fork`) context, so it sees only the test artifact and its selected source documents,
+   subagent context, so it sees only the test artifact and the source text it cites (Spec 101: the cited
+   sections; `compile-critic-prompt --full-docs` gives whole documents),
    never the generator's prompt, reasoning, tool calls, or token usage.
 3. Test cases receive a verdict: `grounded`, `partial`, or `hallucinated`
 4. Only grounded and partial test cases are written to disk
@@ -142,8 +143,8 @@ Generating test cases...
 ## Configuration
 
 There's no `spectra.config.json` block for the critic anymore. Grounding verification runs as the
-`spectra-critic` subagent (`.claude/agents/spectra-critic.agent.md`), a Claude Code `context: fork`
-subagent invoked by the generation skill after generation, not an in-process model call, and not
+`spectra-critic` subagent (`.claude/agents/spectra-critic.agent.md`), a Claude Code subagent
+(a fresh context per test) started by the generation and update subagents for each test they wrote, not an in-process model call, and not
 something `ai.providers`/`ai.critic` route to. (A legacy config that still carries those keys loads
 unchanged; `spectra validate` surfaces a non-blocking notice naming them.)
 

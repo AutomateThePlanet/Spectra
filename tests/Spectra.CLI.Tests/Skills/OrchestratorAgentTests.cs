@@ -43,10 +43,13 @@ public sealed class OrchestratorAgentTests
 
         Assert.Contains($"name: {file.Replace(".agent.md", "")}", frontmatter);
         var tools = frontmatter.Split('\n').Single(l => l.StartsWith("tools:", StringComparison.Ordinal));
-        Assert.Equal("tools: [Bash, Read, Write]", tools);
+        // Spec 101 F3: the updater and the repairer start spectra-critic for the tests they wrote.
+        Assert.Equal(file == Extractor ? "tools: [Bash, Read, Write]" : "tools: [Bash, Read, Write, Agent]", tools);
         Assert.Contains("model: inherit", frontmatter);
-        Assert.Contains("disable-model-invocation: true", frontmatter);
-        Assert.Contains("context: fork", frontmatter);
+        // Spec 101 F4: skill fields Claude Code ignores on a subagent are gone; the description says who it's for.
+        Assert.DoesNotContain("disable-model-invocation", frontmatter);
+        Assert.DoesNotContain("context:", frontmatter);
+        Assert.Contains("description: Only for use by the ", frontmatter);
         Assert.DoesNotContain("Task", tools);
         Assert.DoesNotContain("Edit", tools);
     }

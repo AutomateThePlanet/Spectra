@@ -136,5 +136,6 @@ public sealed class AuditTruthTests : IDisposable
     [Fact]
     public void TheGenerateSkillsResumePath_AsksOnlyForWhatItActsOn() =>
         // Spec 098 F2 (deliberate change): the resume path also grounds and reports (was: `--action repair` only).
-        Assert.Contains("audit-grounding --suite {suite} --action ground,repair,review --output-format json", SkillContent.Generate);
+        // Spec 101 F2: the resume procedure lives in the generate skill's reference.md.
+        Assert.Contains("audit-grounding --suite {suite} --action ground,repair,review --output-format json", SkillReferenceContent.Generate);
 }

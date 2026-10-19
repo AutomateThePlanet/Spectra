@@ -1,7 +1,6 @@
 using System.CommandLine;
 using System.Text.Json;
 using Spectra.CLI.Criteria;
-using Spectra.CLI.Generation;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
 using Spectra.CLI.Source;
@@ -39,22 +38,27 @@ public sealed class CompileCriticPromptCommand : Command
         var suiteOption = new Option<string?>(["--suite", "-s"], "Suite to resolve the test(s) from (makes --test an ID, not a path; omit --test to emit all)");
         var testOption = new Option<string?>(["--test", "-t"], "Test artifact: a path (legacy) or, with --suite, the test ID to resolve");
         var docsOption = new Option<string?>(["--docs", "-d"], "Source document(s) to ground against (file or directory)");
+        // Spec 101 F1 (FR-004): the pre-101 input — each referenced document whole — as the escape hatch and the
+        // quality gate's baseline. Without it the critic gets the sections the test cites.
+        var fullDocsOption = new Option<bool>("--full-docs", "Give the critic each referenced document whole (the pre-101 input) instead of the cited sections");
 
         AddOption(suiteOption);
         AddOption(testOption);
         AddOption(docsOption);
+        AddOption(fullDocsOption);
 
         this.SetHandler(async (context) =>
         {
             var suite = context.ParseResult.GetValueForOption(suiteOption);
             var test = context.ParseResult.GetValueForOption(testOption);
             var docs = context.ParseResult.GetValueForOption(docsOption);
+            var fullDocs = context.ParseResult.GetValueForOption(fullDocsOption);
             var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
-            context.ExitCode = await RunAsync(suite, test, docs, outputFormat == OutputFormat.Json, context.GetCancellationToken());
+            context.ExitCode = await RunAsync(suite, test, docs, fullDocs, outputFormat == OutputFormat.Json, context.GetCancellationToken());
         });
     }
 
-    private static async Task<int> RunAsync(string? suite, string? testPath, string? docsPath, bool json, CancellationToken ct)
+    private static async Task<int> RunAsync(string? suite, string? testPath, string? docsPath, bool fullDocs, bool json, CancellationToken ct)
     {
         var currentDir = Directory.GetCurrentDirectory();
 
@@ -63,7 +67,7 @@ public sealed class CompileCriticPromptCommand : Command
         // hand-built paths, no enumeration. This branch runs BEFORE the legacy path check below.
         if (!string.IsNullOrWhiteSpace(suite))
         {
-            return await RunSuiteAsync(suite, testPath, docsPath, currentDir, json, ct);
+            return await RunSuiteAsync(suite, testPath, docsPath, fullDocs, currentDir, json, ct);
         }
 
         if (string.IsNullOrWhiteSpace(testPath))
@@ -128,7 +132,7 @@ public sealed class CompileCriticPromptCommand : Command
     /// Fails loud (exit 1) when the suite/index or the requested id cannot be resolved — never silently skips.
     /// </summary>
     private static async Task<int> RunSuiteAsync(
-        string suite, string? testId, string? docsPath, string currentDir, bool json, CancellationToken ct)
+        string suite, string? testId, string? docsPath, bool fullDocs, string currentDir, bool json, CancellationToken ct)
     {
         // Spec 080 A5: read command — defaults when there is no config, exit 1 on a malformed or invalid one.
         var loaded = await ConfigLoader.LoadForReadAsync(
@@ -198,10 +202,6 @@ public sealed class CompileCriticPromptCommand : Command
             }
         }
 
-        // Load criteria for this suite once — mirrors the generation path (CompilePromptCommand).
-        var criteria = await CriteriaContextLoader.LoadCriteriaContextAsync(
-            currentDir, suite, config, ct);
-
         var compiled = new List<(string Id, string Prompt)>();
         foreach (var entry in targets)
         {
@@ -223,7 +223,8 @@ public sealed class CompileCriticPromptCommand : Command
                 return ExitError;
             }
 
-            // Resolve the source docs for this test: --docs override > auto-resolve from source_refs.
+            // Resolve the source docs for this test: --docs override > auto-resolve from source_refs (Spec 101: the
+            // cited sections; --full-docs: each referenced document whole, as before).
             IReadOnlyList<SourceDocument> docs;
             if (sharedDocs is not null)
             {
@@ -233,8 +234,11 @@ public sealed class CompileCriticPromptCommand : Command
             {
                 try
                 {
-                    docs = await SourceRefDocumentLoader.LoadAsync(
-                        test.SourceRefs, currentDir, config.Source.LocalDir ?? "docs", failOnMissing: true, ct);
+                    var sourceDir = config.Source.LocalDir ?? "docs";
+                    docs = fullDocs
+                        ? await SourceRefDocumentLoader.LoadAsync(test.SourceRefs, currentDir, sourceDir, failOnMissing: true, ct)
+                        : await CriticSourceLoader.LoadAsync(
+                            test.SourceRefs, currentDir, sourceDir, note => Console.Error.WriteLine($"Warning: {note}"), ct);
                 }
                 catch (FileNotFoundException ex)
                 {
@@ -247,7 +251,8 @@ public sealed class CompileCriticPromptCommand : Command
                 docs = [];
             }
 
-            var result = CriticPromptCompiler.Compile(test, docs, criteria.Context);
+            // Spec 101 F1 (FR-003): no criteria — the built-in critic prompt never used them.
+            var result = CriticPromptCompiler.Compile(test, docs);
             if (!result.IsSuccess)
             {
                 EmitRefusal(json, result.MissingInput!, result.Message!);

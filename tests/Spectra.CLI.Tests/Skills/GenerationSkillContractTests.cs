@@ -18,8 +18,8 @@ public sealed class GenerationSkillContractTests
         var skill = Generate();
         Assert.Contains("spectra-critic", skill);
         Assert.Contains("MANDATORY", skill);
-        // The critic step is explicit and not auto-invoked.
-        Assert.Contains("never auto-invoked", skill);
+        // The critic step is explicit. Spec 101 F4: "never auto-invoked" claimed an agent field Claude Code ignores.
+        Assert.Contains("mandatory and explicit", skill);
     }
 
     [Fact]

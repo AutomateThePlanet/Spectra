@@ -53,7 +53,8 @@ public sealed class ManifestNewestTests : IDisposable
 
     private static bool IsSkipped(string report) =>
         report.IndexOf("Skipped (customized by user)", StringComparison.Ordinal) is var at and >= 0
-        && report[at..].Contains("spectra-generate", StringComparison.Ordinal);
+        // Spec 101: the skill's own SKILL.md, not its reference.md (which lives in the same folder).
+        && report[at..].Replace('\\', '/').Contains("spectra-generate/SKILL.md", StringComparison.Ordinal);
 
     [Fact]
     public async Task RelativeV1AndAbsoluteV2_Edited_IsSkipped_ThenRestoringV2_IsUpdated()

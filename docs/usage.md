@@ -40,9 +40,9 @@ The most common workflow. Three levels of specificity:
 
 1. The analysis phase identifies testable behaviors — each with the doc section it comes from — and shows existing coverage, plus the batch plan the CLI saved: each batch groups up to `generation.batch_size` (default 8) behaviors from neighbouring sections of one document, every batch gets at least one test, and behaviors whose source couldn't be found are listed and generated in an `unsourced` batch. Behaviors an existing test already covers (its title is at least `generation.duplicate_threshold`, default 0.6, similar) are listed as "already covered — not generated", with the covering test, and are left out of every batch; the recommended count is the uncovered behaviors.
 2. You approve the count, and generation runs batch by batch. Each batch's prompt already contains its doc sections and their acceptance criteria, so the generator doesn't browse the docs. If a batch's sections changed after the analysis (`PLAN_STALE`) or are too large for one prompt (`PROMPT_TOO_LARGE`), the assistant reports the batch and offers to re-run the analysis; you approve the new plan before anything more is generated. A customised `test-generation.md` from before this change still works: those batches are compiled the old way (the generator reads the docs) and the assistant tells you once to run `spectra prompts reset test-generation` (or `spectra update-skills` for an unedited copy).
-3. Each generated test is verified by the `spectra-critic` subagent before it's accepted; partial tests get one repair.
+3. Each generated test is verified by the `spectra-critic` subagent before it's accepted; partial tests get one repair. The critic sees the sections each test cites, not whole documents (Spec 101); for one test the sections don't explain, `spectra ai compile-critic-prompt --suite <s> --test <id> --full-docs` shows it the whole documents.
 4. The results list every test created, by id and title, with its outcome (kept, repaired, flagged, dropped, or unverified when the critic couldn't judge it).
-   The analysis, each batch and the repairs run in subagents (`spectra-analyst`, `spectra-generator`, `spectra-repairer`), so the documents, prompts and test text never fill your conversation; the assistant relays every line they return. Each test's route follows the verdict the CLI classified (`ingest-verdict --all --ids`), not the critic's own summary.
+   The analysis, each batch and the repairs run in subagents (`spectra-analyst`, `spectra-generator`, `spectra-repairer`), so the documents, prompts and test text never fill your conversation; the assistant relays every line they return. Since Spec 101 the generator and the repairer also start the critic for the tests they wrote and return one verdict line per test, so the per-test critic runs stay out of your conversation too. Each test's route follows the verdict the CLI classified (`ingest-verdict --all --ids`), not the critic's own summary. If nested subagents are turned off (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`), the subagent reports `critic: not run` and the assistant runs the critic per test itself.
 5. Optionally, suggestions for additional coverage areas are included.
 
 ### Follow-up prompts
@@ -188,9 +188,10 @@ SPECTRA keeps, for every test, a fingerprint of each doc section it references (
    the docs changed again since triage; the assistant asks you to re-run triage.
 8. **Re-verify** — an edit removes the test's critic verdict (a Manual verdict is kept and reported), so an edited test
    never carries a verdict given to different content; `audit-grounding` shows it as unverified until it is checked.
-   The assistant asks once per run whether to re-verify now (default yes) and runs the `spectra-critic` subagent on
-   each written test. `spectra ai ingest-verdict --suite checkout --all --ids <ids>` classifies the verdicts, and the
-   route follows the CLI's classification, not the critic's own summary: grounded is done (`spectra ai
+   The assistant asks once per run, before the first group is edited, whether to re-verify (default yes); the
+   `spectra-updater` subagent then runs the `spectra-critic` subagent on each test it wrote and classifies the verdicts
+   with `spectra ai ingest-verdict --suite checkout --all --ids <ids>`. The route follows the CLI's classification, not
+   the critic's own summary: grounded is done (`spectra ai
    ingest-grounding --suite checkout --all --ids <grounded ids>` writes the blocks); partial gets one repair by a
    `spectra-repairer` subagent and is flagged for review if still partial; hallucinated gets one repair, and if still
    hallucinated the assistant stops for that test and asks you — edit again, restore it from git, or delete it. A
@@ -418,7 +419,7 @@ When a batch has many partials, the `spectra-generate` skill runs a **manifest-d
 1. `spectra ai compile-repair-batch --suite <s>` reads all partial verdict JSONs, filters to those still missing a grounding block, and compiles every repair prompt into one JSON manifest, deterministically and with no model call. A test whose verdict is stale (it changed since the critic saw it, or the critic prompt was compiled again) gets no prompt; it is listed on stderr and needs the critic again (Spec 097).
 2. For each manifest entry, the assistant patches the test in-session and writes the corrected test JSON to `.spectra/repairs/<suite>/repaired-<id>.json`.
 3. Once all repairs are staged, they're ingested in one batch call: `spectra ai ingest-update <suite> --all --keep-baseline`. A repair that fails is kept as `failed-<id>.json` and retried at most twice.
-4. Each repaired test that landed (`written` or `unchanged`) is re-verified by the `spectra-critic` subagent, then all resulting verdicts are classified in one batch call: `spectra ai ingest-verdict --suite <s> --all`.
+4. Each repaired test that landed (`written` or `unchanged`) is re-verified by the `spectra-critic` subagent (started by the `spectra-repairer` subagent since Spec 101), then all resulting verdicts are classified in one batch call: `spectra ai ingest-verdict --suite <s> --all --ids <ids>`.
 5. The grounding blocks of exactly those re-critiqued tests are written in one batch call: `spectra ai ingest-grounding --suite <s> --all --repaired --ids <ids>`. `--ids` is required with `--repaired`, so a test whose repair failed, or a partial verdict left over from an interrupted run, is never marked repaired.
 6. If interrupted or the session runs out, re-running from step 1 picks up exactly where it left off. The grounding block already written into a test's `.md` frontmatter is the resume checkpoint, so nothing is double-processed or restarted from scratch.
 

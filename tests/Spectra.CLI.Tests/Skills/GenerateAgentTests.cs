@@ -33,10 +33,14 @@ public sealed class GenerateAgentTests
         var frontmatter = Regex.Match(content, @"\A---\n(.*?)\n---\n", RegexOptions.Singleline).Groups[1].Value;
 
         Assert.Contains($"name: {file.Replace(".agent.md", "")}", frontmatter);
-        Assert.Equal("tools: [Bash, Read, Write]", frontmatter.Split('\n').Single(l => l.StartsWith("tools:", StringComparison.Ordinal)));
+        // Spec 101 F3: the generator starts spectra-critic for the tests it created.
+        Assert.Equal(file == Generator ? "tools: [Bash, Read, Write, Agent]" : "tools: [Bash, Read, Write]",
+            frontmatter.Split('\n').Single(l => l.StartsWith("tools:", StringComparison.Ordinal)));
         Assert.Contains("model: inherit", frontmatter);
-        Assert.Contains("disable-model-invocation: true", frontmatter);
-        Assert.Contains("context: fork", frontmatter);
+        // Spec 101 F4: skill fields Claude Code ignores on a subagent are gone; the description says who it's for.
+        Assert.DoesNotContain("disable-model-invocation", frontmatter);
+        Assert.DoesNotContain("context:", frontmatter);
+        Assert.Contains("description: Only for use by the spectra-generate skill", frontmatter);
     }
 
     [Theory]

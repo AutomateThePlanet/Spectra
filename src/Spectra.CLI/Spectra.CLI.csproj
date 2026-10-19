@@ -55,6 +55,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Skills\Content\Skills\*.md" />
     <EmbeddedResource Include="Skills\Content\Agents\*.md" />
+    <!-- Spec 101 F2: each skill's reference.md, installed next to its SKILL.md. -->
+    <EmbeddedResource Include="Skills\Content\References\*.md" />
     <EmbeddedResource Include="Skills\Content\Profiles\*.yaml" />
     <!-- Customization & Usage guides live in the top-level docs/ folder
          (so they ship with the docs site) but are still embedded here

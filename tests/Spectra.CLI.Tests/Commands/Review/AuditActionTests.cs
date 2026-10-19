@@ -105,7 +105,8 @@ public sealed class AuditActionTests : IDisposable
     [Fact]
     public void TheResumePath_GroundsRepairsAndReportsByAction()
     {
-        var skill = SkillContent.Generate;
+        // Spec 101 F2: the resume procedure lives in the generate skill's reference.md.
+        var skill = SkillReferenceContent.Generate;
 
         Assert.Contains("audit-grounding --suite {suite} --action ground,repair,review --output-format json", skill);
         Assert.Contains("`action_needed: ground`", skill);

@@ -65,7 +65,9 @@ public sealed class NoCopilotIsmsTests
         // ai.critic.model (default sonnet).
         Assert.Contains("model: {{CRITIC_MODEL}}", critic);
         Assert.Contains("model: sonnet", AgentContent.Render("spectra-critic.agent.md", critic, "sonnet"));
-        Assert.Contains("disable-model-invocation: true", critic);
-        Assert.Contains("context: fork", critic);
+        // Spec 101 F4: only the fields Claude Code reads on a subagent (AgentFrontmatterTests holds the full rule).
+        Assert.Contains("description: Only for use by the ", critic);
+        Assert.DoesNotContain("disable-model-invocation", critic);
+        Assert.DoesNotContain("context: fork", critic);
     }
 }

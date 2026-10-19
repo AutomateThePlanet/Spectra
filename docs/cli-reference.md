@@ -592,12 +592,28 @@ cat ./criteria.json | spectra ai ingest-criteria --doc docs/payment.md
 Deterministic, model-free compilation of the **critic verification prompt** for one generated
 test, serving as the verification analogue of `compile-prompt`. It writes only the fingerprint record (below) —
 never the verdict — and calls no model. The
-`spectra-critic` `context: fork` subagent runs the emitted prompt in a fresh, isolated context
-(test artifact + selected source docs only) and hands its verdict to `ingest-verdict`.
+`spectra-critic` subagent runs the emitted prompt in a fresh, isolated context
+(test artifact + the source text it cites only) and hands its verdict to `ingest-verdict`.
 
 ```bash
+spectra ai compile-critic-prompt --suite checkout --test TC-900
+spectra ai compile-critic-prompt --suite checkout --test TC-900 --full-docs
 spectra ai compile-critic-prompt --test ./tc-900.json --docs ./docs/checkout
 ```
+
+- **What the critic sees (Spec 101).** In suite mode without `--docs`, each `source_ref` gives the critic only what it
+  cites: an anchor ref (`docs/a.md#login`) gives that section — its heading, body and subsections, found by the same
+  matcher as `update-triage` — and a ref without an anchor gives the whole file. The cited sections of one document are
+  one item, in first-reference order; a section inside another cited section, or cited twice, appears once. An anchor
+  that no longer matches a heading gives the whole document, after the line
+  `> Note: the anchor "#<anchor>" was not found in this document, so the whole document is given.` An anchor that
+  matches two headings uses the first, with a `Warning:` line on stderr.
+- **`--full-docs`** gives the pre-101 input instead: each referenced file whole. It is the escape hatch for a test the
+  cited sections don't explain, and the baseline of the Spec 101 quality comparison. The `spectra-critic` agent passes
+  it only when its caller asks for `full_docs: true`; the skills never do. With `--docs` or the legacy `--test <path>`
+  form, the given documents are used as before and `--full-docs` changes nothing.
+- Either way, each document item is cut at 8,000 characters and at most 5 documents are given (unchanged). The prompt
+  holds no acceptance criteria (it never did; Spec 101 removed the unused criteria load).
 
 - It is deterministic, so identical `(test, docs)` input produces a byte-identical prompt (no timestamps/GUIDs).
 - It refuses to emit when the test artifact is missing (no id/title), exiting `4`; an empty `--docs` set is
