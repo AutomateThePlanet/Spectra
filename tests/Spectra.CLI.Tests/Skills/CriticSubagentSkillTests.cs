@@ -20,16 +20,21 @@ public sealed class CriticSubagentSkillTests
     }
 
     [Fact]
-    public void CriticAgent_DeclaresForkIsolation()
+    public void CriticAgent_RunsInAFreshContext()
     {
-        Assert.Contains("context: fork", Skill());
+        // Spec 101 F4: a subagent always starts in a fresh context; `context: fork` was a skill field Claude Code
+        // ignored on a subagent, so the body says it plainly.
+        Assert.Contains("fresh, isolated context", Skill());
+        Assert.DoesNotContain("context: fork", Skill());
     }
 
     [Fact]
-    public void CriticAgent_DisablesAutoInvocation()
+    public void CriticAgent_IsOnlyForTheSkills()
     {
-        // FR-003: explicit mandatory-step invocation only — never auto-invoked.
-        Assert.Contains("disable-model-invocation: true", Skill());
+        // FR-003, Spec 101 F4: explicit mandatory-step invocation only — said in the description (Claude Code ignores
+        // `disable-model-invocation` on a subagent).
+        Assert.Contains("description: Only for use by the spectra-generate, spectra-update and spectra-review-flagged skills", Skill());
+        Assert.DoesNotContain("disable-model-invocation", Skill());
     }
 
     [Fact]

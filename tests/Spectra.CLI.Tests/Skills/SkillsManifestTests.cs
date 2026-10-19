@@ -325,7 +325,8 @@ public class SkillsManifestTests : IDisposable
     public void GenerationAgent_ContainsUpdateDelegation()
     {
         // skill-pair-merge: delegation table now lives in the merged spectra-generate skill.
-        var content = SkillContent.Generate;
+        // Spec 101 F2: in its reference.md (read when a request isn't generation).
+        var content = SkillReferenceContent.Generate;
         Assert.Contains("spectra-update", content);
     }
 
@@ -392,7 +393,9 @@ public class SkillsManifestTests : IDisposable
     [InlineData("spectra-execute")]
     public void UpdateDelegationRows_UseTriage_WithDryRun(string skill)
     {
-        var lines = SkillContent.All[skill]
+        // Spec 101 F2: the generate skill's delegation table lives in its reference.md.
+        var text = skill == "spectra-generate" ? SkillReferenceContent.Generate : SkillContent.All[skill];
+        var lines = text
             .Split('\n')
             .Where(l => l.Contains("spectra ai update-triage"))
             .ToList();
@@ -414,7 +417,8 @@ public class SkillsManifestTests : IDisposable
     [Fact]
     public void UpdateSkill_DrivesTriage()
     {
-        var content = SkillContent.Update;
+        // Spec 101 F2: the exit-code table (CONFIG_MISSING, CONFIG_INVALID, LOCK_TIMEOUT) moved to the skill's reference.md.
+        var content = SkillContent.Update + "\n" + SkillReferenceContent.Update;
 
         foreach (var expected in new[]
                  {
@@ -434,7 +438,9 @@ public class SkillsManifestTests : IDisposable
         var start = content.IndexOf("**Step 3**", StringComparison.Ordinal);
         var end = content.IndexOf("**Step 4**", StringComparison.Ordinal);
         Assert.True(start >= 0 && end > start);
-        var step = content[start..end];
+        // Spec 101 F2: Step 3 names the reference.md section that says how to clear each entry.
+        Assert.Contains("Clearing REMOVED entries", content[start..end]);
+        var step = content[start..end] + Section(SkillReferenceContent.Update, "## Clearing REMOVED entries", "## Suggest next steps");
 
         Assert.Contains("REMOVED", step);
         Assert.Contains("update-ack", step);
@@ -570,7 +576,9 @@ public class SkillsManifestTests : IDisposable
     public void GenerateSkill_StagesRepairsInTheRepairsFolder_NeverTheUpdateFolder()
     {
         // F1 (FR-005): the repair loop writes .spectra/repairs/; the table row names it too.
-        var content = GenerateSkill;
+        // Spec 101 F2: the CLI flags table moved to the skill's reference.md; the skill never names the update folder.
+        var content = SkillReferenceContent.Generate.Replace("\r\n", "\n");
+        Assert.DoesNotContain(".spectra/updates/{suite}/updated-{id}.json", GenerateSkill);
 
         Assert.Contains("`.spectra/repairs/{suite}/repaired-{id}.json`", content);
         Assert.DoesNotContain(".spectra/updates/{suite}/updated-{id}.json", content);
@@ -651,9 +659,12 @@ public class SkillsManifestTests : IDisposable
         var step = UpdateStep("**Step 5a**", "**Step 6**");
         var flat = Normalised(step);
 
-        Assert.Contains("Re-verify the edited tests with the critic\nnow? (recommended)", step);
-        Assert.Contains("don't ask again", step);
-        Assert.Contains("`manual_verdict_kept`", step);
+        // Spec 101 F3 (deliberate change): the question is asked once in Step 4, before the first updater call (the
+        // updater runs the critic), and its answer goes to every updater and repairer call.
+        var step4 = Normalised(UpdateStep("**Step 4**", "**Step 5**"));
+        Assert.Contains("\"Re-verify the edited tests with the critic now? (recommended)\"", step4);
+        Assert.Contains("don't ask again", step4);
+        Assert.Contains("`manual_verdict_kept`", UpdateStep("**Step 5**", "**Step 6**"));
         Assert.Contains("`spectra-critic` subagent with the Task tool", flat);
         Assert.Contains("spectra ai compile-critic-prompt --suite <suite> --test <id>", AgentContent.All["spectra-critic.agent.md"]);
         // Spec 093 (FR-015): the verdict ingest names the tests it routes.
@@ -773,12 +784,14 @@ public class SkillsManifestTests : IDisposable
 
     [Fact]
     public void UpdateSkill_NamesRelinkInTheBucketList() =>
-        Assert.Contains("- **RELINK**", Section(SkillContent.Update, "## Buckets", "## Suggest next steps"));
+        // Spec 101 F2: the bucket list moved to the skill's reference.md.
+        Assert.Contains("- **RELINK**", Section(SkillReferenceContent.Update, "## Buckets", "## Submodules and first-time setup"));
 
     [Fact]
     public void UpdateSkill_RemovedStep_HintsAtMinSimilarity_DryRunFirst()
     {
-        var step = Section(SkillContent.Update, "**Step 3**", "**Step 4**");
+        // Spec 101 F2: how to clear a REMOVED entry moved to the skill's reference.md, which Step 3 names.
+        var step = Section(SkillReferenceContent.Update, "## Clearing REMOVED entries", "## Suggest next steps");
 
         Assert.Contains("not found; no rename found at 90% similarity", step);
         Assert.Contains("relink-sources --suite <suite> --min-similarity <N> --dry-run", step);
@@ -815,7 +828,9 @@ public class SkillsManifestTests : IDisposable
     public void UpdateSkill_WithholdsInit_WhileTheSubmoduleNoteIsPresent()
     {
         // Analysis U1: the first-time setup names the note and tells the user to initialise the submodule first.
-        var content = SkillContent.Update.Replace("\r\n", "\n");
+        // Spec 101 F2: in the skill's reference.md (Submodules and first-time setup), which Step 2 names.
+        Assert.Contains("Submodules and first-time setup", SkillContent.Update);
+        var content = SkillReferenceContent.Update.Replace("\r\n", "\n");
         var paragraph = content.Split("\n\n").Single(p => p.Contains("point into submodule", StringComparison.Ordinal));
 
         Assert.Contains("source-baseline --init", paragraph);
@@ -837,11 +852,17 @@ public class SkillsManifestTests : IDisposable
             Assert.Contains("no `RELINK` group", paragraph);
         }
 
+        // Spec 101 F2: the skill itself offers no source-baseline --init after Step 2a; the first-time setup (relink
+        // first, then --from-date, plain --init as the fallback) is in reference.md, read when triage reports
+        // unbaselined tests.
         var after = content[relinkStep..];
-        var firstInit = after.IndexOf("spectra ai source-baseline --init", StringComparison.Ordinal);
-        Assert.True(firstInit > after.IndexOf("spectra ai relink-sources", StringComparison.Ordinal));
-        Assert.Contains("--from-date", after[firstInit..after.IndexOf('\n', firstInit)]);
-        Assert.Contains("plain\n`spectra ai source-baseline --init --suite <suite> --output-format json", after);
+        Assert.DoesNotContain("spectra ai source-baseline --init", after);
+        var setup = SkillReferenceContent.Update.Replace("\r\n", "\n");
+        setup = setup[setup.IndexOf("**First-time setup**", StringComparison.Ordinal)..];
+        Assert.Contains("after the relink step", setup);
+        var firstInit = setup.IndexOf("spectra ai source-baseline --init", StringComparison.Ordinal);
+        Assert.Contains("--from-date", setup[firstInit..setup.IndexOf('\n', firstInit)]);
+        Assert.Contains("plain\n`spectra ai source-baseline --init --suite <suite> --output-format json", setup);
     }
 
     // ---- Spec 078: criteria extraction reads each document once ----

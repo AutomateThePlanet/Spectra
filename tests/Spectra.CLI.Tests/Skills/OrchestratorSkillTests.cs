@@ -111,7 +111,8 @@ public sealed class OrchestratorSkillTests
     [Fact]
     public void UpdateSkill_AllSuites_OneAtATime_AndTheReportComesFromTheReturnedLines()
     {
-        Assert.Contains("one suite at a time", Normalised(Section(Update, "## Update all suites", "## Exit codes")));
+        // Spec 101 F2: "## Exit codes" moved to reference.md; "## Stop" now follows.
+        Assert.Contains("one suite at a time", Normalised(Section(Update, "## Update all suites", "## Stop")));
         var report = Normalised(Section(Update, "**Step 7**", "## Update all suites"));
         Assert.Contains("returned lines", report);
         Assert.Contains("baseline", report);

@@ -10,6 +10,7 @@ public static class SkillResourceLoader
 {
     private const string SkillPrefix = "Spectra.CLI.Skills.Content.Skills.";
     private const string AgentPrefix = "Spectra.CLI.Skills.Content.Agents.";
+    private const string ReferencePrefix = "Spectra.CLI.Skills.Content.References.";
 
     // Spec 056: Claude Code tool model for the ported authoring set. The generation set adds Task
     // (to invoke the context:fork critic subagent); the read-only set covers the critic + read/run
@@ -29,6 +30,7 @@ public static class SkillResourceLoader
 
     private static readonly Lazy<Dictionary<string, string>> CachedSkills = new(LoadAllSkills);
     private static readonly Lazy<Dictionary<string, string>> CachedAgents = new(LoadAllAgents);
+    private static readonly Lazy<Dictionary<string, string>> CachedReferences = new(LoadAllReferences);
 
     /// <summary>
     /// Gets all bundled SKILL file contents, keyed by SKILL name (e.g., "spectra-generate").
@@ -39,6 +41,11 @@ public static class SkillResourceLoader
     /// Gets all bundled agent file contents, keyed by filename (e.g., "spectra-execution.agent.md").
     /// </summary>
     public static Dictionary<string, string> GetAllAgents() => CachedAgents.Value;
+
+    /// <summary>
+    /// Spec 101 F2: the bundled reference files, keyed by the SKILL name they belong to (e.g., "spectra-generate").
+    /// </summary>
+    public static Dictionary<string, string> GetAllReferences() => CachedReferences.Value;
 
     private static Dictionary<string, string> LoadAllSkills()
     {
@@ -57,6 +64,26 @@ public static class SkillResourceLoader
 
             var content = LoadAndReplace(assembly, name);
             result[skillName] = content;
+        }
+
+        return result;
+    }
+
+    private static Dictionary<string, string> LoadAllReferences()
+    {
+        var result = new Dictionary<string, string>();
+        var assembly = Assembly.GetExecutingAssembly();
+
+        foreach (var name in assembly.GetManifestResourceNames())
+        {
+            if (!name.StartsWith(ReferencePrefix, StringComparison.Ordinal))
+                continue;
+
+            var skillName = name[ReferencePrefix.Length..];
+            if (skillName.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+                skillName = skillName[..^3];
+
+            result[skillName] = LoadAndReplace(assembly, name);
         }
 
         return result;

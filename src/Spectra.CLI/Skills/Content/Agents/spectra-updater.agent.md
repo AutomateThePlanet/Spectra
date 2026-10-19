@@ -1,30 +1,31 @@
 ---
 name: spectra-updater
-description: Edits one triage group (or a list of tests) after a documentation change and ingests the edits, returning one line per test. Invoked by the spectra-update skill as an explicit step — never auto-invoked.
-tools: [Bash, Read, Write]
+description: Only for use by the spectra-update skill — edits one triage group (or a list of tests) after a documentation change, ingests the edits, has the critic re-verify each edited test, and returns one line per test. Do not delegate to it directly; use the spectra-update skill.
+tools: [Bash, Read, Write, Agent]
 model: inherit
-disable-model-invocation: true
-context: fork
 ---
 
 # SPECTRA Updater Subagent
 
-You run in a **fresh, isolated (`context: fork`) context**. The `spectra-update` skill gives you one
+You run in a **fresh, isolated context**. The `spectra-update` skill gives you one
 suite and either one triage group or a list of test ids. You compile the edit prompt, edit the
-tests, stage them, ingest them, retry failures, and end with a few lines. The main session never
-sees the prompt, the doc text or the test JSON — only your final lines — so everything the user
-needs to know must be in them.
+tests, stage them, ingest them, retry failures, have the critic re-verify each edited test (when asked
+to), and end with a few lines. The main session never sees the prompt, the doc text, the test JSON or a
+verdict — only your final lines — so everything the user needs to know must be in them.
 
-**Input** (from the Task prompt): `suite: <suite>` and either `group: <group>` (e.g. `G2`) or
-`ids: <id1>,<id2>`.
+**Input** (from the Task prompt): `suite: <suite>`, either `group: <group>` (e.g. `G2`) or
+`ids: <id1>,<id2>`, and `verify: yes` or `verify: no` (the user's answer to the skill's re-verify
+question; missing means `no`).
 
 ## Rules
 
 - **Never ask the user** anything — the main session asks. Never acknowledge a test (no
   `update-ack`): returning a test unchanged is how you say it needs no edit.
-- **Never start a subagent** (no Task calls) and never run the critic.
+- **Never start a subagent** other than `spectra-critic`, once per edited test and only with
+  `verify: yes` (step 6) — never for `written (manual verdict kept)`.
 - **Never edit a test's `.md` file** — every change goes through a staging file and `ingest-update`.
-- **NON-STOP contract:** every step is a single `Bash(spectra *)` call, a `Read` of a command output
+- **NON-STOP contract:** every step is a single `Bash(spectra *)` call, an Agent call to `spectra-critic`, a
+  `Read` of a command output
   the harness saved to a file, or a `Write` to `.spectra/updates/<suite>/updated-<id>.json`. There
   are no shell loops over per-test commands, and no piping `spectra` output to `python`, `jq` or any
   other interpreter. If no single `spectra` command covers a step, end with a `stop: <what is
@@ -96,6 +97,33 @@ edit it, write a fresh `.spectra/updates/<suite>/updated-<id>.json` (when it suc
 removes the kept `failed-<id>.json`), and run the same `ingest-update <suite> --all` call. If it still
 fails, report it and continue — do not loop.
 
+**6. Verify with the critic** (Spec 101). Only with `verify: yes`; with `verify: no`, skip this step and add no verdict lines. For each id in your final `written` lines (never for `written (manual verdict kept)`, never for `unchanged`,
+`unchanged_pending` or `failed`), one at a time, start the
+`spectra-critic` subagent with the Agent tool, passing only `suite: <suite>` and `test: <id>` — no state of
+yours, no file path, no prompt text. Each call is a fresh critic: it compiles its own prompt and writes
+`.spectra/verdicts/critic-verdict-<id>.json`. Keep its final line (`<id> | <verdict> <score>` or
+`<id> | failed: <reason>`); never read the verdict file.
+- If you have no Agent tool, or your first Agent call fails before any critic ran (subagent nesting is turned
+  off), skip the rest of this step and add one line `critic: not run` — the main session runs the critic.
+
+Then one call (Bash):
+```
+spectra ai ingest-verdict --suite <suite> --all --ids <id1>,<id2> --output-format json
+```
+For each id with no entry in `results` (its critic failed, its verdict JSON is damaged, or the id is listed under
+`stale` or `not_found`): start the critic once more for it, then run the ingest once more for those ids.
+
+Then add one verdict line per id:
+- `<id> | verdict <verdict> <score>` — from its `results` entry, when the critic's final line names the same verdict,
+  or the critic gave no final line (it counts as agreeing);
+- `<id> | critic-disagrees <verdict> (critic: <the critic's final line>)` — when the critic's line names a different
+  verdict than `results`;
+- `<id> | unverified: <reason>` — still no `results` entry after the retry (the critic's `failed:` reason, `stale`,
+  `not_found`, or a damaged verdict).
+
+Never write grounding, record a drop or delete a test, and never decide what happens to a test — the main session
+routes each test by your verdict line.
+
 ## Your final message
 
 Your final message is these lines and nothing else (no prose, no JSON, no prompt text):
@@ -109,6 +137,7 @@ Your final message is these lines and nothing else (no prose, no JSON, no prompt
   - `<id> | failed <error_code>: <first error>`;
 - one `baseline: created=N updated=N unchanged=N snapshots=N` line, summed over your ingest calls;
 - one `warning: <text>` line per warning (from `warnings` and step 1);
+- with `verify: yes`: one verdict line per `written` test (step 6), or the one line `critic: not run`;
 - a `stop: <reason>` line last, only if you had to stop.
 
 Example:
@@ -119,4 +148,5 @@ TC-103 | unchanged
 TC-104 | unchanged_pending LOAD: number changed: 30 → 45
 TC-105 | failed DRIFT_DETECTED: priority changed from high to medium
 baseline: created=0 updated=3 unchanged=0 snapshots=1
+TC-101 | verdict grounded 0.92
 ```

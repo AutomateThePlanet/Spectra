@@ -12,6 +12,10 @@ public static class SkillInstallLayout
     public static string SkillPath(string root, string skillName)
         => Path.Combine(root, ".claude", "skills", skillName, "SKILL.md");
 
+    /// <summary>Spec 101 F2: a skill's reference file (from <see cref="SkillReferenceContent"/>) → <c>.claude/skills/&lt;name&gt;/reference.md</c>.</summary>
+    public static string ReferencePath(string root, string skillName)
+        => Path.Combine(root, ".claude", "skills", skillName, "reference.md");
+
     /// <summary>Agent file (from <see cref="AgentContent"/>) → <c>.claude/agents/&lt;file&gt;</c>, for every agent.</summary>
     public static string AgentPath(string root, string agentFileName)
         => Path.Combine(root, ".claude", "agents", agentFileName);

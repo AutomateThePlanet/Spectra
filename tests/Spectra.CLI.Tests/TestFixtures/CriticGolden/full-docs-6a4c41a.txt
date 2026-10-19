@@ -1,0 +1,255 @@
+You are a test case verification expert. Your job is to verify that test cases are grounded in source documentation.
+
+For each test case, analyze every claim (preconditions, steps, expected results) and determine if it can be traced to the provided documentation.
+
+Output format: Return ONLY a JSON object with this structure:
+{
+  "verdict": "grounded" | "partial" | "hallucinated",
+  "score": 0.0-1.0,
+  "findings": [
+    {
+      "element": "Step 1" | "Expected Result" | "Precondition",
+      "claim": "The specific claim being checked",
+      "status": "grounded" | "unverified" | "hallucinated",
+      "evidence": "Quote from documentation (if grounded)" | null,
+      "reason": "Why unverified or hallucinated (if not grounded)" | null
+    }
+  ]
+}
+
+Verdict rules:
+- "grounded": ALL claims can be traced to documentation
+- "partial": SOME claims are verified, but others cannot be confirmed
+- "hallucinated": The test contains invented behaviors or contradicts documentation
+
+Be strict but fair:
+- Generic UI actions (click, navigate, enter text) don't need documentation
+- Specific behaviors, values, or business rules MUST be in documentation
+- If documentation is vague, mark as "unverified" not "hallucinated"
+- "hallucinated" is reserved for clear inventions or contradictions
+
+---
+
+## Test Case to Verify
+
+**ID**: TC-001
+**Title**: Check the cited section TC-001
+
+**Steps**:
+1. Do the thing
+
+**Expected Result**:
+It works
+
+---
+
+## Source Documentation
+
+### long
+**Path**: docs/long.md
+
+# Feature
+
+Intro line of the feature document.
+
+## Section 1
+
+Section 1 paragraph line 1 with some filler words to take space.
+Section 1 paragraph line 2 with some filler words to take space.
+Section 1 paragraph line 3 with some filler words to take space.
+Section 1 paragraph line 4 with some filler words to take space.
+Section 1 paragraph line 5 with some filler words to take space.
+
+## Section 2
+
+Section 2 paragraph line 1 with some filler words to take space.
+Section 2 paragraph line 2 with some filler words to take space.
+Section 2 paragraph line 3 with some filler words to take space.
+Section 2 paragraph line 4 with some filler words to take space.
+Section 2 paragraph line 5 with some filler words to take space.
+
+## Section 3
+
+Section 3 paragraph line 1 with some filler words to take space.
+Section 3 paragraph line 2 with some filler words to take space.
+Section 3 paragraph line 3 with some filler words to take space.
+Section 3 paragraph line 4 with some filler words to take space.
+Section 3 paragraph line 5 with some filler words to take space.
+
+## Section 4
+
+Section 4 paragraph line 1 with some filler words to take space.
+Section 4 paragraph line 2 with some filler words to take space.
+Section 4 paragraph line 3 with some filler words to take space.
+Section 4 paragraph line 4 with some filler words to take space.
+Section 4 paragraph line 5 with some filler words to take space.
+
+## Section 5
+
+Section 5 paragraph line 1 with some filler words to take space.
+Section 5 paragraph line 2 with some filler words to take space.
+Section 5 paragraph line 3 with some filler words to take space.
+Section 5 paragraph line 4 with some filler words to take space.
+Section 5 paragraph line 5 with some filler words to take space.
+
+## Section 6
+
+Section 6 paragraph line 1 with some filler words to take space.
+Section 6 paragraph line 2 with some filler words to take space.
+Section 6 paragraph line 3 with some filler words to take space.
+Section 6 paragraph line 4 with some filler words to take space.
+Section 6 paragraph line 5 with some filler words to take space.
+
+## Section 7
+
+Section 7 paragraph line 1 with some filler words to take space.
+Section 7 paragraph line 2 with some filler words to take space.
+Section 7 paragraph line 3 with some filler words to take space.
+Section 7 paragraph line 4 with some filler words to take space.
+Section 7 paragraph line 5 with some filler words to take space.
+
+## Section 8
+
+Section 8 paragraph line 1 with some filler words to take space.
+Section 8 paragraph line 2 with some filler words to take space.
+Section 8 paragraph line 3 with some filler words to take space.
+Section 8 paragraph line 4 with some filler words to take space.
+Section 8 paragraph line 5 with some filler words to take space.
+
+## Section 9
+
+Section 9 paragraph line 1 with some filler words to take space.
+Section 9 paragraph line 2 with some filler words to take space.
+Section 9 paragraph line 3 with some filler words to take space.
+Section 9 paragraph line 4 with some filler words to take space.
+Section 9 paragraph line 5 with some filler words to take space.
+
+## Section 10
+
+Section 10 paragraph line 1 with some filler words to take space.
+Section 10 paragraph line 2 with some filler words to take space.
+Section 10 paragraph line 3 with some filler words to take space.
+Section 10 paragraph line 4 with some filler words to take space.
+Section 10 paragraph line 5 with some filler words to take space.
+
+## Section 11
+
+Section 11 paragraph line 1 with some filler words to take space.
+Section 11 paragraph line 2 with some filler words to take space.
+Section 11 paragraph line 3 with some filler words to take space.
+Section 11 paragraph line 4 with some filler words to take space.
+Section 11 paragraph line 5 with some filler words to take space.
+
+## Section 12
+
+Section 12 paragraph line 1 with some filler words to take space.
+Section 12 paragraph line 2 with some filler words to take space.
+Section 12 paragraph line 3 with some filler words to take space.
+Section 12 paragraph line 4 with some filler words to take space.
+Section 12 paragraph line 5 with some filler words to take space.
+
+### Sub 12.1
+
+Sub 12.1 detail line.
+
+## Section 13
+
+Section 13 paragraph line 1 with some filler words to take space.
+Section 13 paragraph line 2 with some filler words to take space.
+Section 13 paragraph line 3 with some filler words to take space.
+Section 13 paragraph line 4 with some filler words to take space.
+Section 13 paragraph line 5 with some filler words to take space.
+
+## Section 14
+
+Section 14 paragraph line 1 with some filler words to take space.
+Section 14 paragraph line 2 with some filler words to take space.
+Section 14 paragraph line 3 with some filler words to take space.
+Section 14 paragraph line 4 with some filler words to take space.
+Section 14 paragraph line 5 with some filler words to take space.
+
+## Section 15
+
+Section 15 paragraph line 1 with some filler words to take space.
+Section 15 paragraph line 2 with some filler words to take space.
+Section 15 paragraph line 3 with some filler words to take space.
+Section 15 paragraph line 4 with some filler words to take space.
+Section 15 paragraph line 5 with some filler words to take space.
+
+## Section 16
+
+Section 16 paragraph line 1 with some filler words to take space.
+Section 16 paragraph line 2 with some filler words to take space.
+Section 16 paragraph line 3 with some filler words to take space.
+Section 16 paragraph line 4 with some filler words to take space.
+Section 16 paragraph line 5 with some filler words to take space.
+
+## Section 17
+
+Section 17 paragraph line 1 with some filler words to take space.
+Section 17 paragraph line 2 with some filler words to take space.
+Section 17 paragraph line 3 with some filler words to take space.
+Section 17 paragraph line 4 with some filler words to take space.
+Section 17 paragraph line 5 with some filler words to take space.
+
+## Section 18
+
+Section 18 paragraph line 1 with some filler words to take space.
+Section 18 paragraph line 2 with some filler words to take space.
+Section 18 paragraph line 3 with some filler words to take space.
+Section 18 paragraph line 4 with some filler words to take space.
+Section 18 paragraph line 5 with some filler words to take space.
+
+## Section 19
+
+Section 19 paragraph line 1 with some filler words to take space.
+Section 19 paragraph line 2 with some filler words to take space.
+Section 19 paragraph line 3 with some filler words to take space.
+Section 19 paragraph line 4 with some filler words to take space.
+Section 19 paragraph line 5 with some filler words to take space.
+
+## Section 20
+
+Section 20 paragraph line 1 with some filler words to take space.
+Section 20 paragraph line 2 with some filler words to take space.
+Section 20 paragraph line 3 with some filler words to take space.
+Section 20 paragraph line 4 with some filler words to take space.
+Section 20 paragraph line 5 with some filler words to take space.
+
+## Section 21
+
+Section 21 paragraph line 1 with some filler words to take space.
+Section 21 paragraph line 2 with some filler words to take space.
+Section 21 paragraph line 3 with some filler words to take space.
+Section 21 paragraph line 4 with some filler words to take space.
+Section 21 paragraph line 5 with some filler words to take space.
+
+## Section 22
+
+Section 22 paragraph line 1 with some filler words to take space.
+Section 22 paragraph line 2 with some filler words to take space.
+Section 22 paragraph line 3 with some filler words to take space.
+Section 22 paragraph line 4 with some filler words to take space.
+Section 22 paragraph line 5 with some filler words to take space.
+
+## Section 23
+
+Section 23 paragraph line 1 with some filler words to take space.
+Section 23 paragraph line 2 with some filler words to take space.
+Section 23 paragraph line 3 with some filler words to take space.
+Section 23 paragraph line 4 with some filler words to take space.
+Section 23 paragraph line 5 with some filler words to take space.
+
+[... content truncated ...]
+
+### short
+**Path**: docs/short.md
+
+# Short
+
+Short document body line.
+
+
+---
+
+Verify this test case against the documentation. Return JSON only:

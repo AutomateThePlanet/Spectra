@@ -10,7 +10,8 @@ public class GenerateSkillContentTests
 {
     private static string SkillContentText => SkillContent.Generate;
     // skill-pair-merge: intent routing content merged into spectra-generate skill.
-    private static string AgentContentText => SkillContent.Generate;
+    // Spec 101 F2: the intent-routing examples moved to the skill's reference.md; the skill keeps the routing table.
+    private static string AgentContentText => SkillContent.Generate + Environment.NewLine + SkillReferenceContent.Generate;
 
     // -- spectra-generate SKILL ---------------------------------------------
 

@@ -70,7 +70,7 @@ public static partial class ManifestKey
 
     /// <summary>
     /// Analyze M1: the install path a foreign absolute key ends with — <c>.claude/skills/&lt;name&gt;/SKILL.md</c>,
-    /// <c>.claude/agents/&lt;file&gt;</c>, <c>.spectra/prompts/&lt;id&gt;.md</c>, <c>profiles/_default.yaml</c>,
+    /// <c>.claude/skills/&lt;name&gt;/reference.md</c> (Spec 101), <c>.claude/agents/&lt;file&gt;</c>, <c>.spectra/prompts/&lt;id&gt;.md</c>, <c>profiles/_default.yaml</c>,
     /// <c>CUSTOMIZATION.md</c> or <c>USAGE.md</c> — matched on the last segments (case-insensitive on Windows), or null.
     /// </summary>
     public static string? InstallTail(string key)
@@ -83,6 +83,11 @@ public static partial class ManifestKey
         if (segments.Length >= 4 && At(4, ".claude") && At(3, "skills") && At(1, "SKILL.md"))
         {
             return $".claude/skills/{segments[^2]}/SKILL.md";
+        }
+
+        if (segments.Length >= 4 && At(4, ".claude") && At(3, "skills") && At(1, "reference.md"))
+        {
+            return $".claude/skills/{segments[^2]}/reference.md";
         }
 
         if (segments.Length >= 3 && At(3, ".claude") && At(2, "agents"))

@@ -16,7 +16,7 @@ Related: [CLI Reference](cli-reference.md) | [Getting Started](getting-started.m
 
 SPECTRA ships both authoring and execution orchestration as Claude Code skills under `.claude/skills/<name>/SKILL.md`. These SKILLs let Claude Code invoke CLI commands through natural language: they translate what users say into CLI commands with `--output-format json --verbosity quiet`, parse the JSON output, and present results conversationally. The bundled SKILLs are auto-discovered from embedded resources and installed/refreshed by `spectra init` and `spectra update-skills` through the same install pipeline.
 
-The critic runs as a Claude Code subagent defined at `.claude/agents/spectra-critic.agent.md` (a `context: fork` subagent). The generation SKILL invokes `spectra-critic` as a **mandatory, explicit step** before a generated test is accepted.
+The critic runs as a Claude Code subagent defined at `.claude/agents/spectra-critic.agent.md` (a subagent with a fresh context per test). The generation SKILL invokes `spectra-critic` as a **mandatory, explicit step** before a generated test is accepted.
 
 > The port is complete: the test **execution** agent is a native Claude Code skill/agent
 > (`.claude/skills/spectra-execute/`), not a GitHub Copilot agent. The in-process GitHub Copilot SDK
@@ -64,7 +64,7 @@ Created by `spectra init` in `.claude/agents/`:
 
 | Agent | Path | Purpose |
 |-------|------|---------|
-| SPECTRA Critic | `spectra-critic.agent.md` | Independent verification of generated tests, run as a `context: fork` subagent |
+| SPECTRA Critic | `spectra-critic.agent.md` | Independent verification of generated tests, run as a subagent with a fresh context |
 
 The generation SKILL invokes `spectra-critic` as a mandatory explicit step before a test is accepted. Execution (`spectra-execute`) is a skill, not a subagent, and it orchestrates `spectra run` directly rather than running in an isolated context.
 

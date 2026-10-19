@@ -53,6 +53,13 @@ public sealed class UpdateSkillsHandler
             await ProcessFileAsync(currentDir, skillPath, content, DeleteAdvice, manifest, updated, unchanged, skipped, skippedNoRecord, ct);
         }
 
+        // Spec 101 F2: the skills' reference files, under the same 096 rules (an edited one is never overwritten).
+        foreach (var (name, content) in SkillReferenceContent.All)
+        {
+            var referencePath = SkillInstallLayout.ReferencePath(currentDir, name);
+            await ProcessFileAsync(currentDir, referencePath, content, DeleteAdvice, manifest, updated, unchanged, skipped, skippedNoRecord, ct);
+        }
+
         // Process agent files. Spec 097 (FR-022, FR-022a): the critic is rendered with ai.critic.model; the config is
         // read only for that value, so an invalid one never fails the command.
         var criticModel = await CriticModelAsync(currentDir, ct);

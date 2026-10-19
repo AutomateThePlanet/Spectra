@@ -63,7 +63,7 @@ my-project/
 │   └── _criteria_index.yaml                     # Acceptance criteria index
 ├── .claude/
 │   ├── agents/
-│   │   └── spectra-critic.agent.md              # Critic subagent (context: fork)
+│   │   └── spectra-critic.agent.md              # Critic subagent (fresh context)
 │   ├── settings.json                            # Tool allowlist (see execution setup)
 │   └── skills/
 │       ├── spectra-generate/SKILL.md            # Generate tests via Claude Code

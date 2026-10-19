@@ -666,6 +666,33 @@ Text only: no condition, exit code, JSON key or written-file set changed (the 09
   human summary goes to stderr); the agent writes only `.spectra/` staging inputs that a validated ingest reads;
   batch ingest commands support `--dry-run`.
 
+### Changed (Spec 101 — token economy follow-up)
+
+Fewer tokens per authoring run; only what the critic sees and how the skills and agents are packaged change.
+
+- **The critic reads the sections a test cites.** `compile-critic-prompt` gives each anchor ref's section (with its
+  subsections) and each anchor-less ref's whole file, instead of each referenced document whole. Before, every document
+  was cut at 8,000 characters, so a cited section deep in a long document could be missing from the critic's prompt;
+  now it is there. An anchor that no longer matches a heading gives the whole document with a note. The critic still
+  sees no acceptance criteria — it never did (the criteria were loaded and dropped; that unused load is gone).
+- **`compile-critic-prompt --full-docs`** gives the pre-101 input (whole documents) — the escape hatch for one test,
+  and the baseline of the quality comparison. The `spectra-critic` agent passes it only when asked (`full_docs: true`).
+- **The critic runs inside the work subagents.** `spectra-generator`, `spectra-updater` and `spectra-repairer` start
+  `spectra-critic` for each test they wrote (a fresh context per test, on `ai.critic.model`), classify the verdicts with
+  one `ingest-verdict --all --ids` call and return one verdict line per test (`<id> | verdict <v> <score>`,
+  `critic-disagrees …` or `unverified: …`). The skills route by those lines exactly as before; grounding, drops and
+  deletes stay in the main session's CLI calls. When nested subagents are off (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`),
+  the subagent returns `critic: not run` and the main session runs the critic itself.
+- **The update skill asks "Re-verify the edited tests with the critic now? (recommended)" before the first group is
+  edited** (it used to ask when the first edited test came back), and passes the answer to the updater and repairer.
+- **Lean skills.** `spectra-generate` and `spectra-update` SKILL.md are under 16,000 characters each, so all of each
+  comes back after Claude Code compacts a long run. Command tables, exit codes, the bucket list, the resume procedure
+  and examples moved to `reference.md` next to each SKILL.md; `init` and `update-skills` install and refresh it under
+  the 096 rules (an edited one is kept). The NON-STOP contract and the `written == 0` guard are unchanged, word for word.
+- **Agent frontmatter Claude Code reads.** The six bundled agents drop `disable-model-invocation` and `context: fork`
+  (skill fields, ignored on a subagent); each description now starts "Only for use by the … skill" and says not to
+  delegate to it directly, so Claude picks the skill (and its triage or analysis) instead of the agent.
+
 ### Notes
 
 - **`audit-grounding` (Spec 097)** no longer lists other suites' tests or verdicts of ids in no index. A stale verdict

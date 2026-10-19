@@ -1,6 +1,6 @@
 # Spectra Development Guidelines
 
-Last updated: 2026-10-16 | History: `CHANGELOG.md` and `specs/NNN-*/` (one folder per spec)
+Last updated: 2026-10-19 | History: `CHANGELOG.md` and `specs/NNN-*/` (one folder per spec)
 
 ## Tech Stack
 - C# 12, .NET 8+; System.CommandLine, Spectre.Console, System.Text.Json, YamlDotNet, CsvHelper,
@@ -8,10 +8,12 @@ Last updated: 2026-10-16 | History: `CHANGELOG.md` and `specs/NNN-*/` (one folde
 - No in-process model: all inference is the user's Claude Code session. Authoring ships as bundled skills
   (`.claude/skills/<name>/SKILL.md`) and subagents (`.claude/agents/*.agent.md`) that drive deterministic
   `spectra ai compile-*` → session turn → `ingest-*` commands. The critic is the `spectra-critic` subagent on
-  `ai.critic.model` (default `sonnet`), written into the installed agent by `init` / `update-skills`.
+  `ai.critic.model` (default `sonnet`), written into the installed agent by `init` / `update-skills`; the generator,
+  updater and repairer subagents start it per test (the main session only on fallback), and it sees the cited sections.
 - Read-only git (`Spectra.Core.Git`) for renamed docs and history baselines; everything works without git.
 - File-based state: `test-cases/<suite>/*.md` + `_index.json` + `_source-baseline.json`, `docs/_index/` (doc index v2),
-  `docs/criteria/` (per-doc `.criteria.yaml` + `_criteria_index.yaml`), `.spectra/` (prompts, snapshots, scratch).
+  `docs/criteria/` (per-doc `.criteria.yaml` + `_criteria_index.yaml`), `.spectra/` (prompts, snapshots, scratch),
+  `.claude/skills/<name>/reference.md` (generate/update reference files).
 
 ## Project Structure
 
@@ -60,7 +62,7 @@ spectra ai compile-analysis-prompt --suite X [--doc-suite D] [--focus "..."] [--
 spectra ai ingest-analysis --suite X --from FILE
 spectra ai compile-prompt --suite X (--batch B1 | --count N | --from-description "..." [--context "..."])
 spectra ai ingest-tests X --from FILE
-spectra ai compile-critic-prompt --suite X --test ID --docs PATH
+spectra ai compile-critic-prompt --suite X --test ID [--docs PATH] [--full-docs]
 spectra ai ingest-verdict --suite X --all [--ids a,b] | spectra ai ingest-verdict --from FILE
 spectra ai ingest-grounding --suite X (--all [--ids a,b] [--repaired] | --test ID)
 spectra ai audit-grounding --suite X [--action ground|repair|review|critic|none] [--ids a,b]
@@ -117,6 +119,7 @@ that drives the system under test is unrelated to SPECTRA's removed execution ad
 
 | Spec | Summary |
 |------|---------|
+| 101 | Token economy: critic gets cited sections (`--full-docs` = old input), critic runs in work subagents, lean skills + `reference.md`, agent frontmatter |
 | 100 | Docs, agent guidance and constitution 2.1.0 catch up with 078–099; "When documentation changes" guide; text only |
 | 099 | Performance and cleanup: one suite parse per ingest, layout-free read-only parses, dead code removed, 0 warnings |
 | 098 | Correctness fixes: legacy `ai.critic` ignored, audit actions by verdict, `generation.coverage_threshold` |
