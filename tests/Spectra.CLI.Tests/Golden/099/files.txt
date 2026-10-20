@@ -807,7 +807,7 @@ keeping its original `id`, following this schema:
     ".spectra/prompts/test-generation.md": "ef6791f9973be3d2eda2d28f3efb9856ac69f739627df70f0a619cedc03a99e9",
     ".spectra/prompts/test-update.md": "393ad4b782de7155dd093983ec3426164da8bfa318311ef36b6d7335b1c462a1",
     "profiles/_default.yaml": "2188c0eeb095ec2df7646dc735a676f0b5fa18bd143af36c0a0a986b7a54cfbd",
-    "CUSTOMIZATION.md": "7b7eb33cffc5d4999bed2fb88f484084ab757a7b1d22504ef08262d830e75c67"
+    "CUSTOMIZATION.md": "045755afe624b6ee143b3afb503d55813f88119d54242a2a6ebbcf667948c6ce"
   }
 }
 ### end
@@ -858,7 +858,7 @@ keeping its original `id`, following this schema:
 ### .spectra/verdicts/critic-verdict-TC-105.json (187 bytes)
 {"verdict":"hallucinated","score":0.9,"critic_model":"claude-sonnet-4-6","findings":[{"element":"Step 2","claim":"1 KB = 1000 bytes","status":"hallucinated","reason":"contradicts docs"}]}
 ### end
-### CUSTOMIZATION.md (14283 bytes)
+### CUSTOMIZATION.md (14555 bytes)
 # SPECTRA Customization Guide
 
 This guide covers every way you can customize SPECTRA's behavior, from test case
@@ -1205,7 +1205,7 @@ All user files are created by `spectra init` and tracked by
 
 ### "I want stricter verification"
 
-Edit `.spectra/prompts/critic-verification.md` to tighten verdict rules, or switch to a stronger critic model by editing the `model:` field in `.claude/agents/spectra-critic.agent.md`.
+Edit `.spectra/prompts/critic-verification.md` to tighten verdict rules: `spectra ai compile-critic-prompt` builds the critic's instructions from it (Spec 102; before that the critic ignored a customised copy). To switch to a stronger critic model, set `ai.critic.model` (`spectra config ai.critic.model opus`) and run `spectra update-skills`, which writes it into `.claude/agents/spectra-critic.agent.md` — don't edit the agent's `model:` field by hand.
 
 ### "I want the AI to focus on specific areas"
 

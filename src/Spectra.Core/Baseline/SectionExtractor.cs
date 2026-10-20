@@ -362,7 +362,9 @@ public static partial class SectionExtractor
         return covered;
     }
 
-    private static List<int> LineStarts(string text)
+    /// <summary>The offset of each line start in <paramref name="text"/>. Spec 102 (F7): also used by the critic loader,
+    /// which slices a document once.</summary>
+    internal static List<int> LineStarts(string text)
     {
         var starts = new List<int> { 0 };
         for (var i = 0; i < text.Length; i++)

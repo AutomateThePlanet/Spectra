@@ -16,6 +16,14 @@ public sealed class SourceRefResolver
     private static readonly StringComparison PathComparison =
         OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
 
+    /// <summary>
+    /// Spec 102 (F2): the one rule for whether two resolved paths name one file — ordinal on Linux, case-insensitive
+    /// elsewhere. <see cref="Resolve"/> deduplicates <see cref="SourceRefResolution.DistinctFullPaths"/> with it, and a
+    /// caller that groups <see cref="SourceRefResolution.Resolved"/> by file must use it too (a ref keeps its own casing).
+    /// </summary>
+    public static StringComparer PathComparer { get; } =
+        PathComparison == StringComparison.Ordinal ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase;
+
     private readonly string _repoRoot;
     private readonly string _sourceDir;
 
@@ -100,10 +108,7 @@ public sealed class SourceRefResolver
             }
         }
 
-        var comparer = PathComparison == StringComparison.Ordinal
-            ? StringComparer.Ordinal
-            : StringComparer.OrdinalIgnoreCase;
-        var distinct = resolved.Select(r => r.FullPath).Distinct(comparer).ToList();
+        var distinct = resolved.Select(r => r.FullPath).Distinct(PathComparer).ToList();
 
         return new SourceRefResolution(resolved, missing, distinct);
     }

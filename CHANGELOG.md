@@ -693,6 +693,38 @@ Fewer tokens per authoring run; only what the critic sees and how the skills and
   (skill fields, ignored on a subagent); each description now starts "Only for use by the … skill" and says not to
   delegate to it directly, so Claude picks the skill (and its triage or analysis) instead of the agent.
 
+### Fixed (Spec 102 — review fixes for 101 and the critic prompt template)
+
+- **The critic uses its prompt template.** `compile-critic-prompt` now builds the critic's instructions from
+  `critic-verification.md` (`.spectra/prompts/` if present and valid, else the bundled one) in every form and doc mode.
+  Since Spec 055 it had used a built-in prompt without the template's ISTQB "Technique Verification" (037) and
+  "Arithmetic Verification" (075) sections, and an edited template was ignored. Verdicts may change because the critic
+  now applies those checks. The test and documents the critic sees are unchanged.
+- **Refs that differ only in case reach the critic together.** On Windows and macOS, `docs/Auth.md#login` plus
+  `docs/auth.md#logout` gave the critic only the Login section, and an anchor-less mixed-case ref didn't give the whole
+  file. Refs are now grouped by file with the resolver's own comparer.
+- **A test title can't be read as a verdict.** The generator reports a created test as `<id> | created: <title>`;
+  a title such as "Verdict banner is shown" no longer looks like a `<id> | verdict …` line.
+- **The ambiguous-anchor warning** ("more than one heading shares the anchor key") appears only for a section the critic
+  actually gets, not for one absorbed into another cited section.
+
+### Changed (Spec 102)
+
+- **A repair that changed nothing is not judged again.** The repairer starts the critic only for `written` repairs;
+  an `unchanged` repair keeps the verdict that sent it to repair, which comes back from the same
+  `ingest-verdict --all --ids` call and is routed as before. The skills' fallback (`critic: not run`) follows the same
+  rule. This deliberately changes Spec 101 FR-026 ("outcomes unchanged apart from the critic's input") for unchanged
+  repairs only.
+- **`Agent` is the subagent tool's one name** in the skills' tool list and text (Claude Code renamed `Task` in
+  v2.1.63; `Task` still works as an alias). `update-skills` refreshes unedited installed skills and agents and keeps
+  edited ones (096).
+- **Internal:** the unused criteria parameter of the critic prompt compiler is gone; the critic loader matches each
+  cited anchor once and slices each document once (same output); a content test keeps the three copies of the agents'
+  "Verify with the critic" step identical; `spectra-generate` SKILL.md drops its "(Spec …)" annotations and keeps the
+  Key rule to one line (its explanation is in `reference.md`) to stay under the 16,000-character budget.
+- **Docs:** `customization.md` says the critic template is used and that the critic model is `ai.critic.model`
+  (rendered by `init` / `update-skills`), not an edit to the agent's `model:` field.
+
 ### Notes
 
 - **`audit-grounding` (Spec 097)** no longer lists other suites' tests or verdicts of ids in no index. A stale verdict

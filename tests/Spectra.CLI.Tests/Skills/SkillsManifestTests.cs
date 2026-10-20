@@ -665,7 +665,7 @@ public class SkillsManifestTests : IDisposable
         Assert.Contains("\"Re-verify the edited tests with the critic now? (recommended)\"", step4);
         Assert.Contains("don't ask again", step4);
         Assert.Contains("`manual_verdict_kept`", UpdateStep("**Step 5**", "**Step 6**"));
-        Assert.Contains("`spectra-critic` subagent with the Task tool", flat);
+        Assert.Contains("`spectra-critic` subagent with the Agent tool", flat);
         Assert.Contains("spectra ai compile-critic-prompt --suite <suite> --test <id>", AgentContent.All["spectra-critic.agent.md"]);
         // Spec 093 (FR-015): the verdict ingest names the tests it routes.
         Assert.Contains("spectra ai ingest-verdict --suite <suite> --all --ids <id1>,<id2> --output-format json", step);

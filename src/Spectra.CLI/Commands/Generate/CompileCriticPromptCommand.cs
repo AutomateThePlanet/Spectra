@@ -3,6 +3,7 @@ using System.Text.Json;
 using Spectra.CLI.Criteria;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
+using Spectra.CLI.Prompts;
 using Spectra.CLI.Source;
 using Spectra.CLI.Verification;
 using Spectra.Core.Config;
@@ -18,9 +19,10 @@ namespace Spectra.CLI.Commands.Generate;
 /// the critic verification prompt for one generated test. Writes nothing to disk; no model call.
 /// Mirrors <see cref="CompilePromptCommand"/> / <see cref="CompileExtractionPromptCommand"/>.
 ///
-/// The <c>spectra-critic</c> <c>context: fork</c> subagent runs the emitted prompt in a fresh,
-/// isolated context (artifact + selected source docs only) and hands its verdict JSON to
-/// <see cref="IngestVerdictCommand"/>.
+/// The <c>spectra-critic</c> subagent (on <c>ai.critic.model</c>) runs the emitted prompt in a fresh, isolated
+/// context (artifact + selected source docs only) and hands its verdict JSON to <see cref="IngestVerdictCommand"/>.
+/// Spec 102 (F1): the system part is the <c>critic-verification</c> template (the workspace copy, else the bundled
+/// one) in every form and doc mode, with the same loader rules as the other compile commands.
 /// </summary>
 public sealed class CompileCriticPromptCommand : Command
 {
@@ -61,13 +63,14 @@ public sealed class CompileCriticPromptCommand : Command
     private static async Task<int> RunAsync(string? suite, string? testPath, string? docsPath, bool fullDocs, bool json, CancellationToken ct)
     {
         var currentDir = Directory.GetCurrentDirectory();
+        var templateLoader = new PromptTemplateLoader(currentDir);
 
         // Suite-aware resolution (Spec 071): the agent supplies the suite name (and optionally the test
         // ID) it already knows; the command resolves the test file(s) from _index.json on disk — no
         // hand-built paths, no enumeration. This branch runs BEFORE the legacy path check below.
         if (!string.IsNullOrWhiteSpace(suite))
         {
-            return await RunSuiteAsync(suite, testPath, docsPath, fullDocs, currentDir, json, ct);
+            return await RunSuiteAsync(suite, testPath, docsPath, fullDocs, currentDir, templateLoader, json, ct);
         }
 
         if (string.IsNullOrWhiteSpace(testPath))
@@ -105,7 +108,7 @@ public sealed class CompileCriticPromptCommand : Command
             return ExitError;
         }
 
-        var result = CriticPromptCompiler.Compile(test, docs);
+        var result = CriticPromptCompiler.Compile(test, docs, templateLoader);
         if (!result.IsSuccess)
         {
             EmitRefusal(json, result.MissingInput!, result.Message!);
@@ -132,7 +135,8 @@ public sealed class CompileCriticPromptCommand : Command
     /// Fails loud (exit 1) when the suite/index or the requested id cannot be resolved — never silently skips.
     /// </summary>
     private static async Task<int> RunSuiteAsync(
-        string suite, string? testId, string? docsPath, bool fullDocs, string currentDir, bool json, CancellationToken ct)
+        string suite, string? testId, string? docsPath, bool fullDocs, string currentDir, PromptTemplateLoader templateLoader,
+        bool json, CancellationToken ct)
     {
         // Spec 080 A5: read command — defaults when there is no config, exit 1 on a malformed or invalid one.
         var loaded = await ConfigLoader.LoadForReadAsync(
@@ -251,8 +255,9 @@ public sealed class CompileCriticPromptCommand : Command
                 docs = [];
             }
 
-            // Spec 101 F1 (FR-003): no criteria — the built-in critic prompt never used them.
-            var result = CriticPromptCompiler.Compile(test, docs);
+            // Spec 102 (F1): the system part is the critic-verification template; its placeholders resolve to empty (the
+            // test and documents are in the user part, and the critic gets no criteria, as in Spec 101).
+            var result = CriticPromptCompiler.Compile(test, docs, templateLoader);
             if (!result.IsSuccess)
             {
                 EmitRefusal(json, result.MissingInput!, result.Message!);

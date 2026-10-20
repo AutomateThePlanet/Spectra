@@ -350,7 +350,7 @@ All user files are created by `spectra init` and tracked by
 
 ### "I want stricter verification"
 
-Edit `.spectra/prompts/critic-verification.md` to tighten verdict rules, or switch to a stronger critic model by editing the `model:` field in `.claude/agents/spectra-critic.agent.md`.
+Edit `.spectra/prompts/critic-verification.md` to tighten verdict rules: `spectra ai compile-critic-prompt` builds the critic's instructions from it (Spec 102; before that the critic ignored a customised copy). To switch to a stronger critic model, set `ai.critic.model` (`spectra config ai.critic.model opus`) and run `spectra update-skills`, which writes it into `.claude/agents/spectra-critic.agent.md` — don't edit the agent's `model:` field by hand.
 
 ### "I want the AI to focus on specific areas"
 

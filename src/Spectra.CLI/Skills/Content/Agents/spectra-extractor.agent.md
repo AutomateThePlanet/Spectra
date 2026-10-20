@@ -12,12 +12,12 @@ changed document and its component. You compile the extraction prompt, extract t
 criteria, ingest them, and end with a few lines. The main session never sees the document or the
 prompt — only your final lines — so the outcome and the whole changeset must be in them.
 
-**Input** (from the Task prompt): `doc: <path>` (repo-relative) and `component: <component>`.
+**Input** (from the Agent call's prompt): `doc: <path>` (repo-relative) and `component: <component>`.
 
 ## Rules
 
 - **Never ask the user** anything — the main session asks.
-- **Never start a subagent** (no Task calls).
+- **Never start a subagent** (no Agent calls).
 - **Never edit a test's `.md` file**, and never retire, move or migrate criteria — the main session
   does those, with the user's confirmation. You only extract and ingest this one document.
 - **NON-STOP contract:** every step is a single `Bash(spectra *)` call, a `Read` of a command output

@@ -1,4 +1,5 @@
 using Spectra.CLI.Agent.Critic;
+using Spectra.CLI.Prompts;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Grounding;
@@ -11,10 +12,14 @@ namespace Spectra.CLI.Tests.Commands.Generate;
 /// </summary>
 public class VerificationIntegrationTests
 {
+    // Spec 102 (F1): the builder needs a template loader; a folder with no .spectra/prompts gives the bundled template.
+    private static PromptTemplateLoader BundledTemplates() =>
+        new(Path.Combine(Path.GetTempPath(), $"spectra-102-no-workspace-{Guid.NewGuid():N}"));
+
     [Fact]
     public void VerificationPipeline_PromptBuilder_BuildsValidPrompt()
     {
-        var promptBuilder = new CriticPromptBuilder();
+        var promptBuilder = new CriticPromptBuilder(BundledTemplates());
         var test = CreateTestCase("TC-001", "Test Login");
         var docs = new List<SourceDocument>
         {
@@ -98,7 +103,7 @@ public class VerificationIntegrationTests
     [Fact]
     public void VerificationPipeline_PromptBuilder_HandlesEmptyDocs()
     {
-        var promptBuilder = new CriticPromptBuilder();
+        var promptBuilder = new CriticPromptBuilder(BundledTemplates());
         var test = CreateTestCase("TC-001", "Test");
         var docs = new List<SourceDocument>();
 
@@ -110,7 +115,7 @@ public class VerificationIntegrationTests
     [Fact]
     public void VerificationPipeline_PromptBuilder_TruncatesLargeDocs()
     {
-        var promptBuilder = new CriticPromptBuilder();
+        var promptBuilder = new CriticPromptBuilder(BundledTemplates());
         var test = CreateTestCase("TC-001", "Test");
         var largeContent = new string('x', 20000);
         var docs = new List<SourceDocument>
@@ -129,7 +134,7 @@ public class VerificationIntegrationTests
     [Fact]
     public void VerificationPipeline_PromptBuilder_PrioritizesSourceRefs()
     {
-        var promptBuilder = new CriticPromptBuilder();
+        var promptBuilder = new CriticPromptBuilder(BundledTemplates());
         var test = new TestCase
         {
             Id = "TC-001",

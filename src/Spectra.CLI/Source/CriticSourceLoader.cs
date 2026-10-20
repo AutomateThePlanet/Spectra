@@ -16,6 +16,8 @@ namespace Spectra.CLI.Source;
 /// line; a section inside another cited section of the same document is absorbed (094's rule), and duplicates count
 /// once.</item>
 /// </list>
+/// Spec 102 (F2): refs are grouped by file with <see cref="SourceRefResolver.PathComparer"/>, the comparer the resolver
+/// deduplicates files with, so refs that differ only in case (on Windows / macOS) reach the critic together.
 /// </summary>
 public static class CriticSourceLoader
 {
@@ -34,10 +36,22 @@ public static class CriticSourceLoader
             throw new FileNotFoundException(SourceRefDocumentLoader.MissingMessage(missing), missing.Ref);
         }
 
+        return await LoadAsync(resolution, SourceRefResolver.PathComparer, note, ct);
+    }
+
+    /// <summary>
+    /// Spec 102 (F2): the documents of a resolved ref set, grouping refs by file with <paramref name="comparer"/> (first-
+    /// reference order); each file is read from its first ref's full path. The comparer is a parameter so tests can run
+    /// the case-insensitive rule on every OS.
+    /// </summary>
+    internal static async Task<IReadOnlyList<SourceDocument>> LoadAsync(
+        SourceRefResolution resolution, StringComparer comparer, Action<string>? note, CancellationToken ct)
+    {
         var docs = new List<SourceDocument>();
-        foreach (var fullPath in resolution.DistinctFullPaths)
+        foreach (var group in resolution.Resolved.GroupBy(r => r.FullPath, comparer))
         {
-            var refs = resolution.Resolved.Where(r => r.FullPath == fullPath).ToList();
+            var refs = group.ToList();
+            var fullPath = refs[0].FullPath;
             var raw = await File.ReadAllTextAsync(fullPath, ct);
             docs.Add(new SourceDocument
             {
@@ -50,8 +64,23 @@ public static class CriticSourceLoader
         return docs;
     }
 
-    private static string Content(string raw, IReadOnlyList<string> refs, Action<string>? note)
+    /// <summary>
+    /// The text the critic gets for one document. Spec 102 (F7): each anchor is matched once and the document is
+    /// sliced once — a ref is absorbed when its heading lies inside another cited section (the same set
+    /// <see cref="SectionExtractor.CoveredHeadings"/> gives). F5: the ambiguous-anchor note is only for a section that is
+    /// given. <paramref name="match"/> and <paramref name="lineStarts"/> default to <see cref="SectionExtractor"/>'s; tests
+    /// pass counting wrappers.
+    /// </summary>
+    internal static string Content(
+        string raw,
+        IReadOnlyList<string> refs,
+        Action<string>? note,
+        Func<IReadOnlyList<MarkdownHeading>, string?, HeadingMatch?>? match = null,
+        Func<string, IReadOnlyList<int>>? lineStarts = null)
     {
+        match ??= SectionExtractor.Match;
+        lineStarts ??= SectionExtractor.LineStarts;
+
         var anchors = refs.Select(r => SectionExtractor.AnchorOf(r)).ToList();
         if (anchors.Any(string.IsNullOrEmpty))
         {
@@ -60,7 +89,7 @@ public static class CriticSourceLoader
 
         var text = SectionExtractor.NormalizeNewlines(raw);
         var headings = SectionExtractor.Headings(text);
-        var matches = anchors.Select(a => SectionExtractor.Match(headings, a)).ToList();
+        var matches = anchors.Select(a => match(headings, a)).ToList();
         var unmatched = anchors.Where((_, i) => matches[i] is null).Distinct(StringComparer.Ordinal).ToList();
         if (unmatched.Count > 0)
         {
@@ -68,26 +97,46 @@ public static class CriticSourceLoader
                 $"> Note: the anchor \"#{a}\" was not found in this document, so the whole document is given.\n")) + raw;
         }
 
-        var kept = new List<int>();
-        var noted = new HashSet<string>(StringComparer.Ordinal);
-        for (var i = 0; i < matches.Count; i++)
+        // A section runs from its heading to the next heading of the same or a higher level (or the end of the file).
+        var starts = matches.Select(m => m!.Index).ToList();
+        var ends = starts.Select(start =>
         {
-            var position = matches[i]!.Index;
-            if (matches[i]!.Ambiguous && noted.Add(refs[i]))
+            var end = start + 1;
+            while (end < headings.Count && headings[end].Level > headings[start].Level)
             {
-                note?.Invoke($"{refs[i]}: more than one heading shares the anchor key '{AnchorKey.FromAnchor(anchors[i])}'; the first was used");
+                end++;
             }
 
-            var absorbed = Enumerable.Range(0, matches.Count).Any(j => matches[j]!.Index != position
-                && SectionExtractor.CoveredHeadings(headings, anchors[j]).Contains(position));
-            if (!absorbed && !kept.Contains(position))
+            return end;
+        }).ToList();
+
+        var kept = new List<int>();
+        for (var i = 0; i < starts.Count; i++)
+        {
+            var absorbed = Enumerable.Range(0, starts.Count).Any(j => starts[j] < starts[i] && starts[i] < ends[j]);
+            if (!absorbed && !kept.Any(k => starts[k] == starts[i]))
             {
-                kept.Add(position);
+                kept.Add(i);
             }
         }
 
-        var sections = kept.Select(position =>
-            SectionExtractor.Extract(text, headings, anchors[matches.FindIndex(m => m!.Index == position)]).RawText!.TrimEnd('\n'));
+        var keptStarts = kept.Select(k => starts[k]).ToHashSet();
+        var noted = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = 0; i < starts.Count; i++)
+        {
+            if (matches[i]!.Ambiguous && keptStarts.Contains(starts[i]) && noted.Add(refs[i]))
+            {
+                note?.Invoke($"{refs[i]}: more than one heading shares the anchor key '{AnchorKey.FromAnchor(anchors[i])}'; the first was used");
+            }
+        }
+
+        var offsets = lineStarts(text);
+        var sections = kept.Select(k =>
+        {
+            var from = offsets[headings[starts[k]].StartLine];
+            var to = ends[k] < headings.Count ? offsets[headings[ends[k]].StartLine] : text.Length;
+            return text[from..to].TrimEnd('\n');
+        });
         return string.Join("\n\n", sections) + "\n";
     }
 }

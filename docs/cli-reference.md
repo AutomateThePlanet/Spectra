@@ -595,6 +595,13 @@ never the verdict — and calls no model. The
 `spectra-critic` subagent runs the emitted prompt in a fresh, isolated context
 (test artifact + the source text it cites only) and hands its verdict to `ingest-verdict`.
 
+**Spec 102: the instructions come from the `critic-verification` template.** The prompt's system part is
+`.spectra/prompts/critic-verification.md` when that file parses, else the bundled template (the loader rule of every
+compile command), in every form (`--suite`, all tests, `--docs`, the legacy `--test <path>`) and with or without
+`--full-docs`. Its placeholders resolve to empty; the test and documents follow after `---`. Before 102 the command
+used a built-in prompt without the template's Technique Verification and Arithmetic Verification sections, and an
+edited template had no effect. The output shape is unchanged.
+
 ```bash
 spectra ai compile-critic-prompt --suite checkout --test TC-900
 spectra ai compile-critic-prompt --suite checkout --test TC-900 --full-docs
@@ -697,7 +704,7 @@ spectra ai ingest-grounding --suite reporting --test TC-113 \
 ```bash
 # After 8a critic loop — write all grounded tests in one call (partial skipped: pre-repair filter)
 spectra ai ingest-grounding --suite reporting --all --output-format json
-# After 8b repair loop — write the re-critiqued tests (grounded + still-partial); --ids is required with --repaired
+# After 8b repair loop — write the re-verified tests (grounded + still-partial); --ids is required with --repaired
 spectra ai ingest-grounding --suite reporting --all --repaired --repair-attempts 1 --ids TC-113,TC-114 --output-format json
 ```
 
@@ -851,7 +858,7 @@ Spec 098 (F2) — **the action comes from the verdict.** A test with a fresh ver
 | Verdict | `action_needed` | What to do |
 |---|---|---|
 | `grounded` | `ground` | Only the block is missing: `ingest-grounding --suite <s> --all --ids <ids>` (no repair). |
-| `partial` | `repair` | One repair attempt (`spectra-repairer`), then the critic again. |
+| `partial` | `repair` | One repair attempt (`spectra-repairer`), then the critic again if the repair changed the test (Spec 102: an `unchanged` repair keeps its verdict). |
 | `hallucinated` | `review` | Waiting for the user's decision; never repaired automatically. |
 | anything else | `critic` | Run the critic again. |
 

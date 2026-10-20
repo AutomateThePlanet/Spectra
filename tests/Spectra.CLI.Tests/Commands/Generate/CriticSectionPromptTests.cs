@@ -4,7 +4,8 @@ namespace Spectra.CLI.Tests.Commands.Generate;
 
 /// <summary>
 /// Spec 101 F1 (FR-001–FR-006; US1): <c>compile-critic-prompt</c> gives the critic the sections a test cites, and
-/// <c>--full-docs</c> gives exactly what <c>6a4c41a</c> gave (the golden captured from that build). The critic still sees
+/// <c>--full-docs</c> gives the user part <c>6a4c41a</c> gave (the golden captured from that build; Spec 102 changed only
+/// the system part). The critic still sees
 /// no criteria; refusals, the JSON shape and the freshness record are unchanged. On 6a4c41a the cited Section 30 was cut
 /// off (each document stops at 8,000 characters) and <c>--full-docs</c> didn't exist.
 /// </summary>
@@ -55,9 +56,12 @@ public sealed class CriticSectionPromptTests : IDisposable
     }
 
     [Fact]
-    public async Task FullDocs_IsByteIdenticalTo6a4c41a()
+    public async Task FullDocs_UserPart_IsByteIdenticalTo6a4c41a()
     {
-        Assert.Equal(CriticSourceWorkspace.Golden(), await PromptAsync("TC-001", "--full-docs"));
+        // Spec 102 (F1, R2): the system part is now the critic-verification template (full output: the 102 golden in
+        // CriticTemplatePromptTests); the user part — the test and its documents — is still what 6a4c41a gave.
+        Assert.Equal(CriticSourceWorkspace.UserPart(CriticSourceWorkspace.Golden()),
+            CriticSourceWorkspace.UserPart(await PromptAsync("TC-001", "--full-docs")));
     }
 
     [Fact]

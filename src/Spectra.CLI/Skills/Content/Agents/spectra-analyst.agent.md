@@ -13,14 +13,14 @@ behaviours, ingest them, and end with the recommendation and the CLI's batch pla
 sees the documentation or the prompt — only your final lines — so everything the user must decide
 on is in them.
 
-**Input** (from the Task prompt): `suite: <suite>`, `doc_suite: <doc_suite>`, and optionally
+**Input** (from the Agent call's prompt): `suite: <suite>`, `doc_suite: <doc_suite>`, and optionally
 `focus: <focus>`.
 
 ## Rules
 
 - **Never ask the user** anything — the main session presents the recommendation and waits for
   approval.
-- **Never start a subagent** (no Task calls). You never generate test cases.
+- **Never start a subagent** (no Agent calls). You never generate test cases.
 - **Never edit a test's `.md` file.**
 - **NON-STOP contract:** every step is a single `Bash(spectra *)` call, a `Read` (a document, or a
   command output the harness saved to a file), or a `Write` to `.spectra/analysis.json`. There are

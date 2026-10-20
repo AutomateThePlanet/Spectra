@@ -121,6 +121,8 @@ From the ingest + critic output, show: test id and title; the suite; linked acce
 
 ## Test Creation Intent Routing
 
+**Key rule (in full)**: If you can read the user's request as a single test case title, it's `--from-description`. If it's a topic to explore, it's the main flow. Do NOT ask the user about count or scope to disambiguate — the topic-vs-scenario shape is the only signal you need.
+
 ### Intent 1: Explore a feature area → use `--focus`
 
 **Signals**: topic words ("error handling", "negative test cases", "payment module"), no specific scenario described, request implies multiple test cases, plural ("test cases").

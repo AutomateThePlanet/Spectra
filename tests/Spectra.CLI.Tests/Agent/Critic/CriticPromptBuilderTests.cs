@@ -1,11 +1,25 @@
 using Spectra.CLI.Agent.Critic;
+using Spectra.CLI.Prompts;
 using Spectra.Core.Models;
 
 namespace Spectra.CLI.Tests.Agent.Critic;
 
 public class CriticPromptBuilderTests
 {
-    private readonly CriticPromptBuilder _builder = new();
+    // Spec 102 (F1): the builder needs a template loader; a folder with no .spectra/prompts gives the bundled template.
+    private static PromptTemplateLoader BundledTemplates() =>
+        new(Path.Combine(Path.GetTempPath(), $"spectra-102-no-workspace-{Guid.NewGuid():N}"));
+
+    private readonly CriticPromptBuilder _builder = new(BundledTemplates());
+
+    [Fact]
+    public void BuildSystemPrompt_IsTheTemplate_WithTheTechniqueAndArithmeticSections()
+    {
+        var prompt = _builder.BuildSystemPrompt();
+
+        Assert.Contains("## Technique Verification", prompt);
+        Assert.Contains("## Arithmetic Verification", prompt);
+    }
 
     [Fact]
     public void BuildSystemPrompt_ContainsVerdictInstructions()

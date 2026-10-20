@@ -1,6 +1,6 @@
 # Spectra Development Guidelines
 
-Last updated: 2026-10-19 | History: `CHANGELOG.md` and `specs/NNN-*/` (one folder per spec)
+Last updated: 2026-10-20 | History: `CHANGELOG.md` and `specs/NNN-*/` (one folder per spec)
 
 ## Tech Stack
 - C# 12, .NET 8+; System.CommandLine, Spectre.Console, System.Text.Json, YamlDotNet, CsvHelper,
@@ -119,6 +119,7 @@ that drives the system under test is unrelated to SPECTRA's removed execution ad
 
 | Spec | Summary |
 |------|---------|
+| 102 | Review fixes for 101: critic uses the critic-verification template, case-insensitive ref grouping, no re-critic for unchanged repairs, `created:` lines, `Agent` tool name |
 | 101 | Token economy: critic gets cited sections (`--full-docs` = old input), critic runs in work subagents, lean skills + `reference.md`, agent frontmatter |
 | 100 | Docs, agent guidance and constitution 2.1.0 catch up with 078–099; "When documentation changes" guide; text only |
 | 099 | Performance and cleanup: one suite parse per ingest, layout-free read-only parses, dead code removed, 0 warnings |
