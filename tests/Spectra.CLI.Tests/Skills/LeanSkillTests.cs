@@ -41,10 +41,12 @@ public sealed class LeanSkillTests
         **NON-STOP CONTRACT (restated):** A broken or zero-result CLI verb is a STOP signal — it is NEVER a license to do the work by hand. Manual editing of `.md` files, rewriting of `grounding:` frontmatter, and synthesizing verdict fields are PROHIBITED regardless of how blocked you are. If a CLI verb returns an anomaly, stop and report. Do not improvise. Exit `8` from `ingest-update --all` is neither broken nor zero-result: the batch completed and `results` lists the failed files — retry them as 8b describes.
         """;
 
+    // Spec 102 F9 (FR-018): the one deliberate change to the 6a4c41a text is the tool's name, "a Task call" → "an Agent
+    // call" (Claude Code renamed the subagent tool in v2.1.63).
     private const string UpdateNonStop6a4c41a = """
         ## NON-STOP CONTRACT
 
-        Every step below is a single `Bash(spectra *)` call, a Task call to the `spectra-updater`,
+        Every step below is a single `Bash(spectra *)` call, an Agent call to the `spectra-updater`,
         `spectra-repairer` or `spectra-critic` subagent, or a `Write` only to `.spectra/progress.json`. If no
         single `spectra` call covers a step, **STOP and report a missing affordance** — never work around it.
         Prohibited: shell loops over per-test verbs, piping spectra output to `python` / `jq` / any

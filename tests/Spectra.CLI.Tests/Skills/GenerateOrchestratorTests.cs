@@ -40,7 +40,7 @@ public sealed class GenerateOrchestratorTests
 
         Assert.True(contract >= 0 && contract < content.IndexOf("## Main generation flow", StringComparison.Ordinal));
         var section = Normalised(Section(content, "## Context budget contract", "## Main generation flow"));
-        foreach (var item in new[] { "docs", "compiled prompts", "test files", "generated", "verdict files", "Task", "`.spectra/progress.json`" })
+        foreach (var item in new[] { "docs", "compiled prompts", "test files", "generated", "verdict files", "Agent", "`.spectra/progress.json`" })
         {
             Assert.Contains(item, section);
         }

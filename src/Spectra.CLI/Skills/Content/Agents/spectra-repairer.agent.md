@@ -13,7 +13,7 @@ attempt** per test, ingest the repairs, retry ingest failures, have the critic r
 and end with one line per test plus its verdict line. You never write grounding — the caller does that
 after you return.
 
-**Input** (from the Task prompt): `suite: <suite>`, `ids: <id1>,<id2>`, and optionally `verify: no` (the
+**Input** (from the Agent call's prompt): `suite: <suite>`, `ids: <id1>,<id2>`, and optionally `verify: no` (the
 update skill passes the user's re-verify answer; without `verify: no` you always re-verify).
 
 ## Rules
@@ -57,7 +57,7 @@ touch only what the critic flagged; `MALFORMED_JSON` / `SCHEMA_INVALID`: fix the
 `.spectra/repairs/<suite>/repaired-<id>.json` and run the same call again — **at most twice**. These
 retries are part of the same repair attempt.
 
-**5. Verify with the critic** (Spec 101). Skip it with `verify: no` (add no verdict lines). For each id in your final `written` and `unchanged` lines (the repairs that landed, leftovers included), one at a time, start the
+**5. Verify with the critic** (Spec 101, 102). Skip it with `verify: no` (add no verdict lines). Your `unchanged` ids (the test didn't change, so its verdict still stands) get no critic run, but go to the ingest call below with the `written` ids, and each gets a verdict line from its `results` entry. For each id in your final `written` lines (the repairs that landed, leftovers included), one at a time, start the
 `spectra-critic` subagent with the Agent tool, passing only `suite: <suite>` and `test: <id>` — no state of
 yours, no file path, no prompt text. Each call is a fresh critic: it compiles its own prompt and writes
 `.spectra/verdicts/critic-verdict-<id>.json`. Keep its final line (`<id> | <verdict> <score>` or

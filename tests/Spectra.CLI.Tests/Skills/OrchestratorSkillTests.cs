@@ -36,7 +36,7 @@ public sealed class OrchestratorSkillTests
 
         Assert.True(contract >= 0 && contract < content.IndexOf("## Update test cases for a suite", StringComparison.Ordinal));
         var section = Normalised(Section(content, "## Context budget contract", "## Update test cases for a suite"));
-        foreach (var item in new[] { "docs", "compiled prompts", "test files", "staging", "verdict files", "Task", "`update-ack`", "`.spectra/progress.json`" })
+        foreach (var item in new[] { "docs", "compiled prompts", "test files", "staging", "verdict files", "Agent", "`update-ack`", "`.spectra/progress.json`" })
         {
             Assert.Contains(item, section);
         }

@@ -14,7 +14,8 @@ namespace Spectra.CLI.Verification;
 /// <list type="bullet">
 /// <item><see cref="Assemble"/> — the lenient assembly. Delegates to <see cref="CriticPromptBuilder"/>
 /// (system + user prompt, joined <c>{system}\n\n---\n\n{user}</c> exactly as the runtime does) so
-/// there is a single source of critic-prompt truth.</item>
+/// there is a single source of critic-prompt truth. Spec 102 (F1): the system part is the
+/// <c>critic-verification</c> template, loaded through the required <see cref="PromptTemplateLoader"/>.</item>
 /// <item><see cref="Compile"/> — the validated entry (FR-002). Refuses to emit when the required
 /// test artifact is missing and names the failing input.</item>
 /// </list>
@@ -36,10 +37,10 @@ public static class CriticPromptCompiler
     /// </summary>
     public static CriticPromptCompileResult Compile(
         TestCase? test,
-        IReadOnlyList<SourceDocument>? documents = null,
-        string? criteriaContext = null,
-        PromptTemplateLoader? templateLoader = null)
+        IReadOnlyList<SourceDocument>? documents,
+        PromptTemplateLoader templateLoader)
     {
+        ArgumentNullException.ThrowIfNull(templateLoader);
         if (test is null || string.IsNullOrWhiteSpace(test.Id) || string.IsNullOrWhiteSpace(test.Title))
         {
             return CriticPromptCompileResult.MissingRequired(
@@ -47,7 +48,7 @@ public static class CriticPromptCompiler
                 "A test artifact with an id and title is required to compile a critic prompt.");
         }
 
-        var prompt = Assemble(test, documents ?? [], criteriaContext, templateLoader);
+        var prompt = Assemble(test, documents ?? [], templateLoader);
         return CriticPromptCompileResult.Success(prompt);
     }
 
@@ -58,16 +59,15 @@ public static class CriticPromptCompiler
     public static string Assemble(
         TestCase test,
         IReadOnlyList<SourceDocument> documents,
-        string? criteriaContext = null,
-        PromptTemplateLoader? templateLoader = null)
+        PromptTemplateLoader templateLoader)
     {
         ArgumentNullException.ThrowIfNull(test);
         ArgumentNullException.ThrowIfNull(documents);
+        ArgumentNullException.ThrowIfNull(templateLoader);
 
-        var builder = new CriticPromptBuilder();
-        builder.SetTemplateLoader(templateLoader);
+        var builder = new CriticPromptBuilder(templateLoader);
 
-        var system = builder.BuildSystemPrompt(criteriaContext);
+        var system = builder.BuildSystemPrompt();
         var user = builder.BuildUserPrompt(test, documents);
         return $"{system}\n\n---\n\n{user}";
     }

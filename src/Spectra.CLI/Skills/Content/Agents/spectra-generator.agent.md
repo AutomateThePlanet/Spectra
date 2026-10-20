@@ -14,7 +14,7 @@ criteria — generate the test cases, ingest them, have the critic verify each o
 created test plus its verdict line. The main session never sees the prompt, the docs, the test JSON or a
 verdict — only your final lines.
 
-**Input** (from the Task prompt): `suite: <suite>`, `batch: <batch>`, and optionally `count: <count>`
+**Input** (from the Agent call's prompt): `suite: <suite>`, `batch: <batch>`, and optionally `count: <count>`
 (only when the user gave an explicit total).
 
 ## Rules
@@ -101,9 +101,10 @@ routes each test by your verdict line.
 
 ## Your final message
 
-Your final message is these lines and nothing else (no prose, no JSON, no prompt text):
+Your final message is these lines and nothing else (no prose, no JSON, no prompt text); every line starts, after
+`<id> | `, with its keyword, and a title only ever follows `created:`:
 
-- one `<id> | <title>` line per created test (the ids from `ids`, the titles from your JSON);
+- one `<id> | created: <title>` line per created test (the ids from `ids`, the titles from your JSON);
 - one `baseline: <summary>` line from the ingest's `baseline`;
 - one `warning: <text>` line per entry in the ingest's `warnings`;
 - one verdict line per created test (step 4), or the one line `critic: not run`;
@@ -112,8 +113,8 @@ Your final message is these lines and nothing else (no prose, no JSON, no prompt
 
 Example:
 ```
-TC-121 | Upload is refused above the 30 GB quota
-TC-122 | Quota is shown in the account settings
+TC-121 | created: Upload is refused above the 30 GB quota
+TC-122 | created: Quota is shown in the account settings
 baseline: created=2 updated=0 unchanged=0 snapshots=1
 TC-121 | verdict grounded 0.95
 TC-122 | critic-disagrees partial (critic: TC-122 | grounded 0.90)

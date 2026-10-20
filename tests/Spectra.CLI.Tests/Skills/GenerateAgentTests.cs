@@ -91,7 +91,7 @@ public sealed class GenerateAgentTests
         Assert.Contains("`.spectra/generated.json`", body);
         Assert.Contains("spectra ai ingest-tests <suite> --from .spectra/generated.json", body);
         Assert.Contains("at most 2", body);
-        Assert.Contains("`<id> | <title>`", body);
+        Assert.Contains("`<id> | created: <title>`", body); // Spec 102 F4: a title line can never read as a verdict line
         Assert.Contains("`baseline: ", body);
         Assert.Contains("`warning: ", body);
         Assert.Contains("`failed <error_code>: <first error>`", body);

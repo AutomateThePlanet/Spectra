@@ -100,7 +100,7 @@ one shared `.spectra/criteria.json`) — update progress.json first:
 {"phases":["Step 1 — Find changed docs","Step 2 — Extract criteria","Step 3 — Summarize"],"active":1,"loop":{"current":i,"total":N,"label":"doc i/N: <path>"}}
 ```
 
-Then invoke the `spectra-extractor` subagent with the Task tool, passing `doc: <path>` and
+Then invoke the `spectra-extractor` subagent with the Agent tool, passing `doc: <path>` and
 `component: <component>` from the entry — nothing else. It compiles the extraction prompt, extracts,
 ingests (with its own bounded retries), and returns:
 - one outcome line: `<path> | extracted`, `<path> | unchanged`, `<path> | rejected` or

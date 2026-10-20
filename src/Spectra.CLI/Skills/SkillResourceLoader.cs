@@ -12,11 +12,11 @@ public static class SkillResourceLoader
     private const string AgentPrefix = "Spectra.CLI.Skills.Content.Agents.";
     private const string ReferencePrefix = "Spectra.CLI.Skills.Content.References.";
 
-    // Spec 056: Claude Code tool model for the ported authoring set. The generation set adds Task
-    // (to invoke the context:fork critic subagent); the read-only set covers the critic + read/run
-    // skills. The execution set is left on the Copilot tool model (the execution agent is ported by
-    // the next spec).
-    private const string GenerateToolsList = "Read, Write, Edit, Bash, Glob, Grep, Task";
+    // Spec 056: Claude Code tool model for the ported authoring set. The generation set adds Agent, Claude Code's
+    // subagent tool (named Task before v2.1.63; Spec 102), to start SPECTRA's subagents: the analyst, generator,
+    // updater, repairer and extractor, and the critic on the fallback. The read-only set covers the read/run skills.
+    // The execution set is left on the Copilot tool model (the execution agent is ported by the next spec).
+    private const string GenerateToolsList = "Read, Write, Edit, Bash, Glob, Grep, Agent";
     private const string ReadOnlyToolsList = "Read, Grep, Glob, Bash";
     private const string ExecutionToolsList = "vscode/getProjectSetupInfo, vscode/installExtension, vscode/memory, vscode/newWorkspace, vscode/resolveMemoryFileUri, vscode/runCommand, vscode/vscodeAPI, vscode/extensions, vscode/askQuestions, execute/runNotebookCell, execute/testFailure, execute/getTerminalOutput, execute/awaitTerminal, execute/killTerminal, execute/createAndRunTask, execute/runInTerminal, execute/runTests, read/getNotebookSummary, read/problems, read/readFile, read/viewImage, read/terminalSelection, read/terminalLastCommand, agent/runSubagent, edit/createDirectory, edit/createFile, edit/createJupyterNotebook, edit/editFiles, edit/editNotebook, edit/rename, search/changes, search/codebase, search/fileSearch, search/listDirectory, search/textSearch, search/usages, web/fetch, web/githubRepo, browser/openBrowserPage, todo";
 

@@ -13,7 +13,7 @@ tests, stage them, ingest them, retry failures, have the critic re-verify each e
 to), and end with a few lines. The main session never sees the prompt, the doc text, the test JSON or a
 verdict — only your final lines — so everything the user needs to know must be in them.
 
-**Input** (from the Task prompt): `suite: <suite>`, either `group: <group>` (e.g. `G2`) or
+**Input** (from the Agent call's prompt): `suite: <suite>`, either `group: <group>` (e.g. `G2`) or
 `ids: <id1>,<id2>`, and `verify: yes` or `verify: no` (the user's answer to the skill's re-verify
 question; missing means `no`).
 

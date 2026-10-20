@@ -38,7 +38,7 @@ user requests**.
 This session **never reads** docs, compiled prompts, test files, staging JSON or verdict files — the named subagent does
 that work and returns a few lines. Its own calls: `spectra` commands with small JSON output (triage, relink,
 `update-ack`, `ingest-grounding --all`, and `ingest-verdict --all` on the fallback), writes to `.spectra/progress.json`,
-and Task calls to `spectra-updater`, `spectra-repairer` — and to `spectra-critic` only on the fallback (Step 5a).
+and Agent calls to `spectra-updater`, `spectra-repairer` — and to `spectra-critic` only on the fallback (Step 5a).
 
 The user's decisions stay here: which buckets to process, whether to re-verify, the REMOVED review, relinking, a test
 returned unchanged while its change still needs an edit, and a test that stays hallucinated. Report every line a
@@ -46,7 +46,7 @@ subagent returns, as returned — this session's report is how the user learns w
 
 ## NON-STOP CONTRACT
 
-Every step below is a single `Bash(spectra *)` call, a Task call to the `spectra-updater`,
+Every step below is a single `Bash(spectra *)` call, an Agent call to the `spectra-updater`,
 `spectra-repairer` or `spectra-critic` subagent, or a `Write` only to `.spectra/progress.json`. If no
 single `spectra` call covers a step, **STOP and report a missing affordance** — never work around it.
 Prohibited: shell loops over per-test verbs, piping spectra output to `python` / `jq` / any
@@ -110,7 +110,7 @@ Update `.spectra/progress.json` (G = number of selected groups):
 `{"phases":[…as above…],"active":2,"loop":{"current":0,"total":G,"label":"starting"}}`
 
 **Step 5** — For each selected group (g = 1..G), one at a time — never in parallel — set the loop to
-`{"current":g,"total":G,"label":"group g/G: <group>"}`, then invoke the `spectra-updater` subagent with the Task tool,
+`{"current":g,"total":G,"label":"group g/G: <group>"}`, then invoke the `spectra-updater` subagent with the Agent tool,
 passing `suite: <suite>`, `group: <group>` and `verify: yes|no` — nothing else. It edits, stages and ingests the tests
 (retrying a failed test at most twice), has `spectra-critic` re-verify each `written` test (with `verify: yes`), and
 returns one line per test:
@@ -149,7 +149,7 @@ hallucinated". Nothing loses its verification silently: a `written` test that is
 - `critic-disagrees` → **unverified**; report both verdicts.
 
 Fallback — `critic: not run`, or a `written` test with no verdict line (and `verify: yes`): for each such test invoke
-the `spectra-critic` subagent with the Task tool — suite + test id only, never a hand-built file path; compare its
+the `spectra-critic` subagent with the Agent tool — suite + test id only, never a hand-built file path; compare its
 final line, never read the verdict file — then `spectra ai ingest-verdict --suite <suite> --all --ids <id1>,<id2> --output-format json` and route
 by `results` as above (no entry → the critic once more and the ingest again; still none → unverified; the critic's
 line names another verdict → unverified).
@@ -161,15 +161,17 @@ spectra ai ingest-grounding --suite <suite> --all --ids <grounded ids> --output-
 ```
 An **unverified** test is never in `--ids`, so it never gets a block.
 
-**Repair.** If any ids were collected, invoke the `spectra-repairer` subagent once with the Task tool, passing
+**Repair.** If any ids were collected, invoke the `spectra-repairer` subagent once with the Agent tool, passing
 `suite: <suite>`, `ids: <id1>,<id2>` and `verify: yes`. It patches only what the critic flagged, ingests the repairs
 (keeping each test's baseline), retries a failed repair ingest at most twice, has `spectra-critic` re-verify each
-repair that landed, and returns `<id> | written`, `<id> | unchanged` or `<id> | failed <error_code>: <first error>` per
-ingested file, then a verdict line per `written` / `unchanged` test (or `critic: not run`). Report every line. Then:
+`written` repair (an `unchanged` repair keeps the verdict that sent it to repair), and returns `<id> | written`,
+`<id> | unchanged` or `<id> | failed <error_code>: <first error>` per ingested file, then a verdict line per
+`written` / `unchanged` test (or `critic: not run`). Report every line. Then:
 - only for the ids it returned `written` or `unchanged` (a leftover included): route by their verdict lines as above (the
-  fallback for a missing line), then
+  fallback for a missing line or `critic: not run`: the critic for `written` ids only, `unchanged` ids straight to its
+  ingest call), then
   `spectra ai ingest-grounding --suite <suite> --all --repaired --repair-attempts 1 --ids <id1>,<id2> --output-format json`
-  (Spec 091: `--ids` names exactly the re-critiqued tests, so nothing else is marked repaired);
+  (Spec 091: `--ids` names exactly the re-verified tests, so nothing else is marked repaired);
 - **repair failed** — a `failed` line: report "repair failed: <error_code>", write no repaired grounding, and list the
   test as **unverified** if it was partial, or as **waiting for the user** if it was hallucinated (the choices below);
 - an id with no line → report "repair outcome unknown" and leave it unverified.

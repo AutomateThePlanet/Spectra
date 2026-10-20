@@ -80,4 +80,38 @@ public static class CriticSourceWorkspace
         File.ReadAllText(Path.Combine(AppContext.BaseDirectory, GoldenFile)).Replace("\r\n", "\n");
 
     public static string Lf(string text) => text.Replace("\r\n", "\n");
+
+    /// <summary>Spec 102 (R2): the 102 <c>--full-docs</c> golden — the template's system part, the unchanged user part.</summary>
+    public const string Golden102File = "TestFixtures/CriticGolden/full-docs-102.txt";
+
+    /// <summary>The 102 golden text, LF line endings.</summary>
+    public static string Golden102() =>
+        File.ReadAllText(Path.Combine(AppContext.BaseDirectory, Golden102File)).Replace("\r\n", "\n");
+
+    /// <summary>Where a critic prompt's user part starts (after the <c>{system}\n\n---\n\n</c> join).</summary>
+    public const string UserPartMarker = "\n\n---\n\n## Test Case to Verify";
+
+    /// <summary>The user part of a critic prompt (LF): the test and its documents, from <see cref="UserPartMarker"/> on.</summary>
+    public static string UserPart(string prompt)
+    {
+        var at = prompt.IndexOf(UserPartMarker, StringComparison.Ordinal);
+        if (at < 0) throw new InvalidOperationException("The prompt has no user part.");
+        return prompt[at..];
+    }
+
+    /// <summary>
+    /// Spec 102: writes <c>.spectra/prompts/critic-verification.md</c> with the bundled frontmatter (the three declared
+    /// placeholders) and <paramref name="body"/>, LF.
+    /// </summary>
+    public static void WriteCriticTemplate(this BaselineTestWorkspace ws, string body) =>
+        ws.WriteDoc(".spectra/prompts/critic-verification.md",
+            "---\n" +
+            "spectra_version: \"1.0\"\n" +
+            "template_id: critic-verification\n" +
+            "description: \"How SPECTRA's critic verifies generated tests against source documentation\"\n" +
+            "placeholders:\n" +
+            "  - name: test_case\n    description: \"Generated test case (full markdown)\"\n" +
+            "  - name: source_document\n    description: \"Source documentation the test references\"\n" +
+            "  - name: acceptance_criteria\n    description: \"Linked acceptance criteria\"\n" +
+            "---\n\n" + body + "\n");
 }

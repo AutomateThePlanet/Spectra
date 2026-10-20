@@ -59,8 +59,8 @@ public sealed class GenerationSkillContractTests
     [Fact]
     public void GenerationSkill_ResolvedToolsInclude_Task()
     {
-        // The skill needs the Task tool to invoke the context:fork critic subagent.
-        Assert.Contains("Task", Generate());
+        // The skill starts its subagents with the Agent tool (Spec 102: Claude Code's name since v2.1.63, was Task).
+        Assert.Contains("Agent", Generate());
     }
 
     [Fact]

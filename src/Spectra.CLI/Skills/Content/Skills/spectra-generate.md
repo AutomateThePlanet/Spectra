@@ -8,7 +8,7 @@ tools: [{{GENERATE_TOOLS}}]
 
 The CLI never calls a model: it **compiles a grounded prompt**, a model generates, and the CLI **ingests** and validates the result.
 
-This session **orchestrates** (Specs 093, 094, 101): `spectra-analyst` analyses and saves a plan; `spectra-generator` generates a batch, has `spectra-critic` verify each test and returns one verdict line per test; `spectra-repairer` repairs partial tests the same way. You ask the user, route by the verdict lines, write grounding through the CLI and report.
+This session **orchestrates**: `spectra-analyst` analyses and saves a plan; `spectra-generator` generates a batch, has `spectra-critic` verify each test and returns one verdict line per test; `spectra-repairer` repairs partial tests the same way. You ask the user, route by the verdict lines, write grounding through the CLI and report.
 
 There is **no** `spectra ai generate` command anymore. Do not look for one.
 
@@ -34,7 +34,7 @@ The ONLY time you skip analysis is when the user describes a single concrete sce
 
 ## Context budget contract
 
-This session **never reads** docs, compiled prompts, test files, generated / staged JSON or verdict files (Spec 093). Its calls: `spectra` commands with small JSON output, writes to `.spectra/progress.json`, Task calls to the subagents (`spectra-critic` only on the Step 8 fallback and in the from-description flow), and [reference.md](reference.md) outside Steps 7–9. Report every line a subagent returns, as returned. No shell improvisation (`ls`, `find`, `cat`): use `spectra ai audit-grounding` and `spectra config --raw`.
+This session **never reads** docs, compiled prompts, test files, generated / staged JSON or verdict files. Its calls: `spectra` commands with small JSON output, writes to `.spectra/progress.json`, Agent calls to the subagents (`spectra-critic` only on the Step 8 fallback and in the from-description flow), and [reference.md](reference.md) outside Steps 7–9. Report every line a subagent returns, as returned. No shell improvisation (`ls`, `find`, `cat`): use `spectra ai audit-grounding` and `spectra config --raw`.
 
 ## Main generation flow (user names an area)
 
@@ -47,7 +47,7 @@ This session **never reads** docs, compiled prompts, test files, generated / sta
 
 ### Steps 1–3 — Analysis (the `spectra-analyst` subagent)
 
-Invoke the `spectra-analyst` subagent with the Task tool, passing `suite: {suite}`, `doc_suite: {docSuite}` and, when there is one, `focus: {focus}`. It saves the generation plan and returns:
+Invoke the `spectra-analyst` subagent with the Agent tool, passing `suite: {suite}`, `doc_suite: {docSuite}` and, when there is one, `focus: {focus}`. It saves the generation plan and returns:
 - the recommendation lines (`recommended:`, `breakdown:`, `techniques:`, `boundary_gap:` …), `batch <id> | count <k> | …`, `covered:` (never generated — Spec 095) and `unresolved:` lines;
 - or `refused: <code>` / `refusal: …` lines (the pre-flight budget refusal): show them verbatim and offer a recovery path from [reference.md](reference.md) — re-running means invoking `spectra-analyst` again. Do NOT proceed;
 - a `stop: …` line → report it and stop.
@@ -72,8 +72,8 @@ Update `.spectra/progress.json`: `{"active":4}`
 
 Use the batch lines in plan order. An explicit user total overrides `recommended`: split it over the batches in proportion to their counts (largest remainder), passed as `count: <k>`. **Never invoke the generator for a batch whose count is 0.** **`recommended` is advisory guidance, not a quota.**
 
-For each batch, one at a time — never in parallel (the id allocator and the index have a single writer) — invoke the `spectra-generator` subagent with the Task tool, passing `suite: {suite}`, `batch: <id>` and, only for an explicit total, `count: <k>`. It returns:
-- one `<id> | <title>` line per created test, a `baseline: …` line and `warning: …` lines (report each distinct template warning once per run);
+For each batch, one at a time — never in parallel (the id allocator and the index have a single writer) — invoke the `spectra-generator` subagent with the Agent tool, passing `suite: {suite}`, `batch: <id>` and, only for an explicit total, `count: <k>`. It returns:
+- one `<id> | created: <title>` line per created test, a `baseline: …` line and `warning: …` lines (report each distinct template warning once per run);
 - one verdict line per created test (`<id> | verdict <verdict> <score>`, `<id> | critic-disagrees …`, `<id> | unverified: <reason>`), or `critic: not run`;
 - or `failed <error_code>: <first error>` — report it and run the next batch; never generate a batch in this session (`PLAN_STALE` and `PROMPT_TOO_LARGE` are handled in Step 9);
 - a `stop: …` line → report it and stop.
@@ -100,7 +100,7 @@ Report every line, as returned. Update `.spectra/progress.json`: `{"active":6}`
 
 Verification is **mandatory and explicit — never skipped**: the generator and the repairer start `spectra-critic` per test they wrote (a fresh context each, on `ai.critic.model`); this session does only on the fallback and in the from-description flow. It is the single critic of record; a test is not accepted until its critic step has passed.
 
-### Step 8 — Critic routing + repair (Spec 072, Spec 093, Spec 101)
+### Step 8 — Critic routing + repair
 
 Update `.spectra/progress.json`: `{"active":7}`
 
@@ -117,7 +117,7 @@ Update `.spectra/progress.json`: `{"active":7}`
 4. **`unverified: <reason>`:** kept as **unverified** — no grounding block, never regenerated or deleted; listed in Step 9 under "Unverified (critic could not judge)".
 5. **`critic-disagrees`** → kept as **unverified** and reported with both verdicts — never dropped.
 
-**Fallback.** For each created id of a batch that returned `critic: not run`, or with no verdict line: invoke the `spectra-critic` subagent with the Task tool — suite + test id only (it runs `compile-critic-prompt`), **never a hand-built file path**; compare its final line, never read the verdict file. Then `spectra ai ingest-verdict --suite {suite} --all --ids <those ids> --output-format json` and route by `results` with rows 1–3; no entry → the critic once more and the ingest again, then row 4; the critic's line names another verdict → row 5.
+**Fallback.** For each created id of a batch that returned `critic: not run`, or with no verdict line: invoke the `spectra-critic` subagent with the Agent tool — suite + test id only (it runs `compile-critic-prompt`), **never a hand-built file path**; compare its final line, never read the verdict file. Then `spectra ai ingest-verdict --suite {suite} --all --ids <those ids> --output-format json` and route by `results` with rows 1–3; no entry → the critic once more and the ingest again, then row 4; the critic's line names another verdict → row 5.
 
 **After routing — batch grounding-ingest for the kept-grounded tests (one call, no loop; Spec 097):**
 ```
@@ -139,13 +139,13 @@ Parse the JSON result of the batch call. Check `written` against the `kept-groun
 
 **NON-STOP CONTRACT (restated):** A broken or zero-result CLI verb is a STOP signal — it is NEVER a license to do the work by hand. Manual editing of `.md` files, rewriting of `grounding:` frontmatter, and synthesizing verdict fields are PROHIBITED regardless of how blocked you are. If a CLI verb returns an anomaly, stop and report. Do not improvise. Exit `8` from `ingest-update --all` is neither broken nor zero-result: the batch completed and `results` lists the failed files — retry them as 8b describes.
 
-**8b — Repair (for partials).** If 8a noted partial ids, invoke the `spectra-repairer` subagent with the Task tool, passing `suite: {suite}` and `ids: <partial ids>`. It patches only what the critic flagged, ingests with `ingest-update {suite} --all --keep-baseline`, retries a failed repair ingest at most twice (the same repair attempt), has `spectra-critic` verify each repair that landed, and returns `<id> | written`, `<id> | unchanged` or `<id> | failed <error_code>: <first error>`, then a verdict line per `written` / `unchanged` test (or `critic: not run`). Report every line.
+**8b — Repair (for partials).** If 8a noted partial ids, invoke the `spectra-repairer` subagent with the Agent tool, passing `suite: {suite}` and `ids: <partial ids>`. It patches only what the critic flagged, ingests with `ingest-update {suite} --all --keep-baseline`, retries a failed repair ingest at most twice (the same repair attempt), has `spectra-critic` verify each `written` repair (an `unchanged` one keeps its verdict), and returns `<id> | written`, `<id> | unchanged` or `<id> | failed <error_code>: <first error>`, then a verdict line per `written` / `unchanged` test (or `critic: not run`). Report every line.
 - `failed` → report it; the test stays **unverified** with its partial verdict.
-- Every `written` line is re-verified, leftovers from an earlier run included; one without a verdict line goes through the fallback.
+- Every `written` line is re-verified, leftovers from an earlier run included; one without a verdict line, or `critic: not run`, goes through the fallback — the critic for `written` ids only, `unchanged` ids straight to its ingest call.
 
 **Re-critic phase** — route by the repairer's verdict lines: `verdict grounded` → repaired-to-grounded count; `verdict partial` → flagged-partial count (**continue — do NOT stop the batch**); `verdict hallucinated` (the critic's line agreed or there was none) → `record-drop` then `spectra delete` as in row 3, dropped count; `unverified:` / `critic-disagrees` → unverified.
 
-**After the re-critic — batch grounding-ingest for the re-critiqued tests (one call, no loop):**
+**After the re-critic — batch grounding-ingest for the re-verified tests (one call, no loop):**
 ```
 spectra ai ingest-grounding --suite {suite} --all --repaired --repair-attempts 1 --ids {ids} --output-format json
 ```
@@ -165,7 +165,7 @@ Report every created test by id and title with its outcome:
 
 Also every `baseline:` and `warning:` line. If {flagged} > 0: "Run `spectra ai review-flagged --suite {suite}` to accept, retry repair, or delete flagged tests." If total-kept < requested, say "Run again to generate more." Never present a test as accepted unless its critic step passed.
 
-A warning that "the generation plan predates per-behaviour coverage" (Spec 095), or batches that failed with `PLAN_STALE` / `PROMPT_TOO_LARGE` (Spec 094): name them and offer once to re-run the analysis. If the user accepts, invoke `spectra-analyst` again and go **back to Step 4**, naming the batches already run with their created test ids, and STOP for approval. Nothing is regenerated automatically.
+A warning that "the generation plan predates per-behaviour coverage", or batches that failed with `PLAN_STALE` / `PROMPT_TOO_LARGE`: name them and offer once to re-run the analysis. If the user accepts, invoke `spectra-analyst` again and go **back to Step 4**, naming the batches already run with their created test ids, and STOP for approval. Nothing is regenerated automatically.
 
 Write `.spectra/progress.json`: `{"active":9}` (terminal — seam-progress page renders Complete).
 
@@ -189,4 +189,4 @@ Write `.spectra/progress.json`: `{"active":9}` (terminal — seam-progress page 
 | Explore a feature area ("Generate test cases for…", "Cover… error handling") | Main generation flow, with `--focus` |
 | Create a specific test case ("Add a test case for…", "Create a test case where…") | From-description flow |
 
-**Key rule**: If you can read the user's request as a single test case title, it's `--from-description`. If it's a topic to explore, it's the main flow. Do NOT ask the user about count or scope to disambiguate — the topic-vs-scenario shape is the only signal you need.
+**Key rule**: a single test case title → `--from-description`; a topic to explore → the main flow. Never ask about count or scope to decide.
