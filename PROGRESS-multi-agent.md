@@ -9,7 +9,7 @@ Golden rule: the Claude install stays byte-identical; ADD, don't change.
 |---|---|---|
 | s.0 sync | done | baseline: see below |
 | golden Claude test | done | `ClaudeInstallGoldenTests`, 40 files pinned (Golden/104) |
-| s.1 investigation | in progress | FINDINGS-multi-client-gap-v2.md |
+| s.1 investigation | done | `FINDINGS-multi-client-gap-v2.md`, `specs/104-multi-agent-init/spec.md` |
 | s.2 implement | todo | |
 | s.3 tests | todo | |
 | s.4 docs + release | todo | |
@@ -33,8 +33,11 @@ Golden rule: the Claude install stays byte-identical; ADD, don't change.
 
 ## Decisions (pre-approved design choices, recorded)
 
-(filled in s.1)
+18 decisions in `FINDINGS-multi-client-gap-v2.md` §5. Key ones: `--agent` omitted = Claude as today (+notice),
+`--agent auto` = BELLATRIX detection; new layer in `src/Spectra.CLI/Install/`; only change to existing code is an
+`installClaude = true` guard in `InitHandler`; skills neutral (shared dirs), subagents per provider (all 6); the critic
+keeps Write (verdict file) so no Cursor `readonly`; allowlists only Cursor/Devin/OpenCode.
 
 ## Next action
 
-Finish the baseline, create the feature branch with the spec-kit script, write the Claude golden test.
+s.2: content transform (neutral text) + emitters + planner + manifests + `--agent` option; Claude golden must stay green.
