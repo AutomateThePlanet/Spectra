@@ -27,6 +27,10 @@ public sealed class SourceStringsGuardTests
         ("src/Spectra.CLI/Skills/Content/Skills/spectra-execute.md", "no MCP server"),
         ("src/Spectra.CLI/Skills/Content/Skills/spectra-execute.md", "No MCP server required."),
         ("src/Spectra.CLI/Skills/Content/Skills/spectra-dashboard.md", "**NEVER use MCP tools for dashboard generation"),
+        // Spec 104: GitHub Copilot as an install target of `spectra init --agent` (not the removed SDK integration).
+        ("src/Spectra.CLI/Install/AgentTargets.cs", "public override string Name => \"copilot\";"),
+        ("src/Spectra.CLI/Install/AgentTargets.cs", "public override string DisplayName => \"GitHub Copilot\";"),
+        ("src/Spectra.CLI/Install/AgentTargets.cs", "\".github/copilot-instructions.md\""),
     ];
 
     private static IEnumerable<string> Files()

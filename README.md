@@ -125,6 +125,40 @@ spectra init                  # Creates the config, folders, 16 skills and 6 sub
 spectra update-skills         # Update skills and agents when the CLI is upgraded (edited files are kept)
 ```
 
+### Other AI Agents
+
+`spectra init --agent <list>` also installs the skills, the six subagents and an always-on instructions file for other
+AI coding agents. Without `--agent`, `spectra init` installs for Claude Code exactly as before.
+
+```bash
+spectra init --agent copilot                  # one agent
+spectra init --agent claude,copilot,codex     # several (a skills folder they share is written once)
+spectra init --agent auto                     # the agents already installed, or the one detected in the repo
+spectra init --agent cursor --dry-run         # list every file it would write; write nothing
+```
+
+| Agent (`--agent`) | Instructions | Skills | Subagents |
+|---|---|---|---|
+| `claude` | — | `.claude/skills/` | `.claude/agents/` |
+| `copilot` | `.github/instructions/spectra.instructions.md` | `.github/skills/` (or reuses `.claude/skills/`) | `.github/agents/` (or reuses `.claude/agents/`) |
+| `cursor` | `.cursor/rules/spectra.mdc` | `.cursor/skills/` (or reuses `.claude/skills/`, `.agents/skills/`) | `.cursor/agents/` |
+| `devin` (`windsurf`) | `.devin/rules/spectra.md` | `.devin/skills/` | `.devin/agents/` |
+| `codex` | a SPECTRA block in `AGENTS.md` | `.agents/skills/` | `.codex/agents/*.toml` |
+| `gemini` (enterprise) | a SPECTRA block in `GEMINI.md` | `.agents/skills/` | `.gemini/agents/` |
+| `antigravity` (`agy`) | `.agents/rules/spectra.md` | `.agents/skills/` | `.agents/agents/` |
+| `kiro` | `.kiro/steering/spectra.md` | `.kiro/skills/` | `.kiro/agents/` |
+| `opencode` | a SPECTRA block in `AGENTS.md` | `.opencode/skills/` (or reuses `.claude/skills/`, `.agents/skills/`) | `.opencode/agents/` |
+
+The names, aliases and detection match BELLATRIX Agent, so both tools can be installed in the same repository. Your
+`AGENTS.md` / `GEMINI.md` keep their content; SPECTRA adds one marked block. A file you edit is never overwritten on a
+re-run unless you pass `--regenerate`.
+
+> **Known limitation:** the critic's isolated, mandatory verification is enforced by the platform only in Claude Code.
+> In the other agents the critic runs when the agent follows the skill's instruction to start it. A critic gate enforced
+> by the CLI is planned for a later version.
+
+See [Skills Integration](docs/skills-integration.md#other-ai-agents) for the details per agent.
+
 ### Generation Profiles
 
 Customize AI output with natural language profiles — detail level, negative scenario count, domain rules, formatting preferences.

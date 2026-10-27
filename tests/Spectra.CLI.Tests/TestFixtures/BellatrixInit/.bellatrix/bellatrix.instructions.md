@@ -1,0 +1,55 @@
+# BELLATRIX Automation (model-free CLI)
+
+> Scaffolded by `bellatrix init`. This is the single BELLATRIX instruction fragment
+> for this repo, loaded by your AI agent from its own instructions location. Edit your
+> own automation notes elsewhere — re-running `bellatrix init` may refresh this file
+> (it skips files you have edited; use `--regenerate` to force a refresh).
+
+Drive UI automation with the **`bellatrix <domain> <verb>`** CLI. It runs no model and
+holds no credentials — all inference is yours. The driver, browser server, or device
+is the user's to run; never start, stop, or probe it (if a command returns a
+connection error, ask the user to start it). Output is always JSON — the success JSON
+is the contract. Sessions persist across invocations by id (no daemon); always
+`close-session` when done.
+
+## MANDATORY: delegate UI-state reads (Context Economy)
+
+Never read a full UI tree (`snapshot --inline`, `get-page-source`, or a snapshot file)
+into this context. Capture a snapshot — which returns only a compact reference
+`{ path, elementCount, summary }` — then resolve each locator in one of two ways:
+
+1. **Delegate (preferred, when your agent supports subagents):** hand the description
+   and the snapshot `path` to the domain's isolated **locator-specialist** subagent
+   (`bellatrix-<domain>-locator-specialist`); only the returned locator comes back.
+2. **Otherwise — and whenever delegation is unavailable — query narrowly:**
+   `bellatrix <domain> find --session <s> --snapshot <path> … --json`, which returns a
+   handful of matching nodes. Never open the snapshot file yourself.
+
+## Web domain (`bellatrix web <verb>`)
+
+Drives browsers over Selenium. Locator specialist: **`bellatrix-web-locator-specialist`**.
+Narrow query: `bellatrix web find --session <s> --snapshot <path> --data-testid "…" --json`
+(also `--id`, `--role`, `--name`, `--text`, `--grep`, `--interactive-only`).
+
+Flow: `start-session --browser <chrome|firefox|edge>` → `navigate --url` →
+`snapshot` → resolve a selector → interact with `click`/`type-text`/`clear`/`select`/
+`get-text`/`get-attribute`/`is-visible`/`is-enabled` (`--locator <s> [--strategy css|xpath|id|…]`;
+XPath is auto-detected when it starts with `/`; legacy `--selector` also works)
+→ `close-session`. Locator ladder: `data-testid` → `#id` → `aria-label` → role+text
+(xpath) → css → positional xpath. Web-only verbs: `navigate`/`back`/`forward`/`refresh`,
+`select`, `wait-for-element`/`wait-for-page-ready`, `execute-js`. Every session re-attaches
+across invocations: without `--remote-url` the CLI starts a detached local browser driver and
+`close-session` stops it; with `--remote-url` the Selenium server is yours to run.
+Also: `list-sessions`, `get-title`, `get-url`, `get-page-source` (context-heavy; prefer `snapshot`), `take-screenshot`
+(saves a PNG under `.bellatrix/screenshots/` → `{ path, width, height }`; `--out <file>` picks the file).
+Every verb's flags and output: `bellatrix web help --json`.
+
+### Skills & agents
+
+- Skills `bellatrix-web-*` — components, locators & waits, page
+  objects, test structure & lifecycle, validations & assertions, app services, recipes,
+  project structure, code generation, execute-scenario, and the SPECTRA bridges
+  (automate-spectra-test, execute-spectra-test).
+- Agent `bellatrix-web-system-tests-generator` — end-to-end web test generation with
+  SPECTRA TC-ID traceability.
+- Subagent `bellatrix-web-locator-specialist` — isolated single-selector resolver.

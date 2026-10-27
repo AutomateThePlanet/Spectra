@@ -176,11 +176,68 @@ spectra update-skills
 - User-modified files are preserved (skipped with warning)
 - Missing files are recreated
 
+## Other AI Agents
+
+`spectra init --agent <list>` installs the same skills and subagents for other AI coding agents, in each agent's own
+layout. Without `--agent`, `spectra init` installs for Claude Code exactly as described above.
+
+```bash
+spectra init --agent copilot,codex         # comma-separated; claude can be in the list too
+spectra init --agent auto                  # the agents already installed, else the one agent detected in the repo
+spectra init --agent kiro --dry-run        # print every file it would write, the decisions and the skips
+spectra init --agent kiro --regenerate     # also overwrite agent files you edited
+```
+
+Accepted names: `claude`, `copilot`, `cursor`, `devin`, `codex`, `gemini`, `antigravity`, `kiro`, `opencode`; `windsurf`
+is accepted for `devin` (renamed Devin Desktop) and `agy` for `antigravity`. On a repository that is already
+initialised, `--agent` adds the agents without `--force` and leaves `spectra.config.json` and the Claude files alone.
+
+| Agent | Always-on instructions | Skills | Subagents | Starting a subagent | `spectra` allowlist |
+|---|---|---|---|---|---|
+| Claude Code | — | `.claude/skills/` | `.claude/agents/*.agent.md` | platform-enforced | `.claude/settings.json` |
+| GitHub Copilot | `.github/instructions/spectra.instructions.md` (`applyTo: "**"`) | `.github/skills/` (reuses `.claude/skills/`) | `.github/agents/*.agent.md` (reuses `.claude/agents/`) | the `agent` tool, by name | — |
+| Cursor | `.cursor/rules/spectra.mdc` (`alwaysApply`) | `.cursor/skills/` (reuses `.claude/skills/` or `.agents/skills/`) | `.cursor/agents/*.md` | by name, or `/name` | `.cursor/cli.json`: `Shell(spectra)` |
+| Devin | `.devin/rules/spectra.md` (`always_on`) | `.devin/skills/` | `.devin/agents/*.md` | by name | `.devin/config.json`: `Exec(spectra)` |
+| Codex CLI | SPECTRA block in `AGENTS.md` → `.spectra/spectra.instructions.md` | `.agents/skills/` | `.codex/agents/*.toml` | ask for it by name | — |
+| Gemini CLI | SPECTRA block in `GEMINI.md` importing `.spectra/spectra.instructions.md` | `.agents/skills/` | `.gemini/agents/*.md` | `@name` | — |
+| Antigravity CLI | `.agents/rules/spectra.md` (`always_on`) | `.agents/skills/` | `.agents/agents/<name>/agent.md` | by name | — |
+| Kiro CLI | `.kiro/steering/spectra.md` (`inclusion: always`) | `.kiro/skills/` | `.kiro/agents/*.md` (with the steering file and skills as `resources`) | by name | — |
+| OpenCode | SPECTRA block in `AGENTS.md` → `.spectra/spectra.instructions.md` | `.opencode/skills/` (reuses `.claude/skills/` or `.agents/skills/`) | `.opencode/agents/*.md` | `@name` | `opencode.json`: `"spectra *": "allow"` |
+
+**What is installed.** The 16 skills (with the two reference files), the six subagents (`spectra-analyst`,
+`spectra-generator`, `spectra-updater`, `spectra-repairer`, `spectra-extractor`, `spectra-critic`) and one always-on
+instructions file. The skill and subagent instructions are the same as for Claude Code; only Claude-specific wording is
+replaced (for example "start the subagent" instead of "with the Agent tool") and each subagent gets the agent's own
+frontmatter and tool names. The critic keeps the tools it has today, including writing its verdict file.
+
+**Shared folders are written once.** Several agents read the same skills folder (`.agents/skills/` is read by Codex,
+Gemini, Antigravity, Cursor and OpenCode), so `init` picks the fewest folders that reach every selected agent and reuses
+`.claude/skills/` when Claude is installed. When an agent would see two copies anyway, `init` prints a warning.
+
+**Re-runs and your edits.** Each agent has a manifest, `.spectra/manifest.<agent>.json`, with a hash of every file
+SPECTRA wrote for it. Re-running `spectra init --agent …` refreshes those files, skips any file you edited (and says so)
+unless you pass `--regenerate`, and removes files a newer version no longer installs if you did not edit them.
+`spectra update-skills` refreshes only the Claude install; to refresh another agent after upgrading the CLI, re-run
+`spectra init --agent <agent>`.
+
+**Your files.** `AGENTS.md` and `GEMINI.md` belong to you: SPECTRA adds one block between
+`<!-- >>> spectra >>> -->` and `<!-- <<< spectra <<< -->` and never changes anything outside it. Allowlist entries are
+merged into your settings file by key; a value you already set is kept, and a file with comments is left alone (add the
+entry by hand). SPECTRA writes only `spectra-*` skills and subagents, `spectra.*` instruction files and
+`.spectra/manifest.*.json`, so it can be installed next to BELLATRIX Agent (`bellatrix-*`, its own
+`<!-- >>> bellatrix >>> -->` block) in any order.
+
+> **Known limitation.** In Claude Code the critic runs as an isolated subagent that the platform starts as a mandatory
+> step. The other agents choose when to delegate, so there the critic runs when the agent follows the skill's
+> instruction to start it. A critic gate enforced by the CLI is planned for a later version.
+
+To check an installation by hand, follow the [live verification checklist](live-verification-agents.md).
+
 ## Skipping SKILLs
 
-For projects that don't use Claude Code:
+For projects that don't use an AI coding agent:
 ```bash
 spectra init --skip-skills
 ```
 
-This creates only core files (config, directories, templates) without the `.claude/skills/` SKILLs or the `.claude/agents/` critic subagent.
+This creates only core files (config, directories, templates) without the `.claude/skills/` SKILLs or the `.claude/agents/` critic subagent. With `--agent`, `--skip-skills` installs no agent files either.

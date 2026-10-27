@@ -82,6 +82,16 @@ internal static class RemovedConcepts
     public static bool NamesLegitimateMcp(string paragraph) =>
         LegitimateMcps.Any(m => Regex.IsMatch(paragraph, $@"\b{Regex.Escape(m)}\b"));
 
+    /// <summary>
+    /// Spec 104: GitHub Copilot is an install target of <c>spectra init --agent</c>. A paragraph that names Copilot next to
+    /// the option or the other agents describes that install, not the removed SDK integration (which never named them).
+    /// </summary>
+    public static readonly IReadOnlyList<string> AgentInstallMarkers =
+        ["--agent", "Cursor", "Kiro", "OpenCode", "Antigravity", ".github/instructions/spectra.instructions.md", "runSubagent"];
+
+    public static bool DescribesAgentInstall(string paragraph) =>
+        AgentInstallMarkers.Any(m => paragraph.Contains(m, StringComparison.OrdinalIgnoreCase));
+
     /// <summary>The removed concepts in <paramref name="paragraph"/> that the allow rule does not cover.</summary>
     public static IEnumerable<(RemovedConcept Concept, string Match)> Disallowed(string paragraph, bool fenced, ConceptScope scope)
     {
@@ -100,6 +110,11 @@ internal static class RemovedConcepts
             }
 
             if (concept.IsMcp && NamesLegitimateMcp(paragraph))
+            {
+                continue;
+            }
+
+            if (concept.Name == "GitHub Copilot" && DescribesAgentInstall(paragraph))
             {
                 continue;
             }

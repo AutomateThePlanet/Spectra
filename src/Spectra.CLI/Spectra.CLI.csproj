@@ -69,6 +69,8 @@
       <LogicalName>Spectra.CLI.Skills.Content.Docs.USAGE.md</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="Prompts\Content\*.md" />
+    <!-- Spec 104: the always-on instructions fragment installed for non-Claude agents. -->
+    <EmbeddedResource Include="Install\Content\*.md" />
     <EmbeddedResource Include="Templates\deploy-dashboard.yml" />
     <!-- Spec 041: embed spectra.config.json so `spectra init` produces the
          same file in published (single-file) builds and in dev. Previously

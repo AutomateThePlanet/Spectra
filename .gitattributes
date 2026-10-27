@@ -3,3 +3,4 @@
 
 # Spec 099: golden outputs are compared byte for byte (platform newlines included); git must not convert them.
 tests/Spectra.CLI.Tests/Golden/099/** -text
+tests/Spectra.CLI.Tests/TestFixtures/BellatrixInit/** -text

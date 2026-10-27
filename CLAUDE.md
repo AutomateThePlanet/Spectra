@@ -52,7 +52,7 @@ dotnet run --project src/Spectra.CLI -- <command>   # Run the CLI
 # Global: --output-format json|human  --no-interaction  --verbosity quiet  --dry-run  --no-review
 
 # Setup
-spectra init [--skip-skills]
+spectra init [--skip-skills] [--agent <list>|auto] [--regenerate]   # --agent: copilot,cursor,devin,codex,gemini,antigravity,kiro,opencode
 spectra update-skills
 spectra config [<key> [<value>]] | spectra config add-automation-dir|remove-automation-dir|list-automation-dirs <path>
 spectra prompts list|show|validate|reset [<template-id>] [--raw] [--all]
@@ -119,6 +119,7 @@ that drives the system under test is unrelated to SPECTRA's removed execution ad
 
 | Spec | Summary |
 |------|---------|
+| 104 | `spectra init --agent` for copilot/cursor/devin/codex/gemini/antigravity/kiro/opencode (`src/Spectra.CLI/Install/`, neutral emit-time transform, `.spectra/manifest.<agent>.json`); Claude install byte-identical (`ClaudeInstallGoldenTests`) |
 | 103 | Human review record (merged from `078-human-review-record`): `review-flagged --action`, `reviewed_by/at`, `--re-verify`, suppression, staged `--fix` review |
 | 102 | Review fixes for 101: critic uses the critic-verification template, case-insensitive ref grouping, no re-critic for unchanged repairs, `created:` lines, `Agent` tool name |
 | 101 | Token economy: critic gets cited sections (`--full-docs` = old input), critic runs in work subagents, lean skills + `reference.md`, agent frontmatter |

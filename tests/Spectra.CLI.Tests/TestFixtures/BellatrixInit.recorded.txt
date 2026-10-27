@@ -1,0 +1,2 @@
+bellatrix init --agent claude,copilot,cursor,devin,codex,gemini,antigravity,kiro,opencode --language csharp --domains web
+bellatrix.cli 3.1.1, recorded 2026-10-27 in an empty directory
