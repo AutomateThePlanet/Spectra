@@ -32,7 +32,7 @@ public sealed class BoundaryGapParsingTests
     [Fact]
     public void Build_WellFormedBoundaryGaps_AreCarried()
     {
-        var result = AnalysisRecommendationBuilder.Build(WithGaps, [], snapshot: null, focusArea: null);
+        var result = AnalysisRecommendationBuilder.Build(WithGaps, [], focusArea: null);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(2, result.BoundaryGaps.Count);
@@ -50,7 +50,7 @@ public sealed class BoundaryGapParsingTests
     [Fact]
     public void Build_BoundaryGaps_CoexistWithTechniqueBreakdown()
     {
-        var result = AnalysisRecommendationBuilder.Build(WithGaps, [], snapshot: null, focusArea: null);
+        var result = AnalysisRecommendationBuilder.Build(WithGaps, [], focusArea: null);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(1, result.TechniqueBreakdown["BVA"]);   // breakdown still produced
@@ -62,7 +62,7 @@ public sealed class BoundaryGapParsingTests
     [Fact]
     public void Build_NoBoundaryGapsKey_YieldsEmpty_AndSucceeds()
     {
-        var result = AnalysisRecommendationBuilder.Build(NoGapsKey, [], snapshot: null, focusArea: null);
+        var result = AnalysisRecommendationBuilder.Build(NoGapsKey, [], focusArea: null);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(result.BoundaryGaps);
@@ -75,7 +75,7 @@ public sealed class BoundaryGapParsingTests
             {"behaviors":[{"category":"x","title":"t","source":"s.md","technique":"EP"}],"boundary_gaps":[]}
             """;
 
-        var result = AnalysisRecommendationBuilder.Build(content, [], snapshot: null, focusArea: null);
+        var result = AnalysisRecommendationBuilder.Build(content, [], focusArea: null);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(result.BoundaryGaps);
@@ -89,7 +89,7 @@ public sealed class BoundaryGapParsingTests
             [{"category":"x","title":"t","source":"s.md","technique":"EP"}]
             """;
 
-        var result = AnalysisRecommendationBuilder.Build(content, [], snapshot: null, focusArea: null);
+        var result = AnalysisRecommendationBuilder.Build(content, [], focusArea: null);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(result.BoundaryGaps);
@@ -104,7 +104,7 @@ public sealed class BoundaryGapParsingTests
             {"behaviors":[{"category":"x","title":"t","source":"s.md","technique":"EP"}],"boundary_gaps":{"field":"x"}}
             """;
 
-        var result = AnalysisRecommendationBuilder.Build(content, [], snapshot: null, focusArea: null);
+        var result = AnalysisRecommendationBuilder.Build(content, [], focusArea: null);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(AnalysisIngestOutcome.ParseFailure, result.Outcome);
@@ -126,7 +126,7 @@ public sealed class BoundaryGapParsingTests
             "{\"behaviors\":[{\"category\":\"x\",\"title\":\"t\",\"source\":\"s.md\",\"technique\":\"EP\"}]," +
             "\"boundary_gaps\":[" + element + "]}";
 
-        var result = AnalysisRecommendationBuilder.Build(content, [], snapshot: null, focusArea: null);
+        var result = AnalysisRecommendationBuilder.Build(content, [], focusArea: null);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(AnalysisIngestOutcome.ParseFailure, result.Outcome);
@@ -140,7 +140,7 @@ public sealed class BoundaryGapParsingTests
             {"behaviors":[{"category":"x","title":"t","source":"s.md","technique":"EP"}],"boundary_gaps":["not an object"]}
             """;
 
-        var result = AnalysisRecommendationBuilder.Build(content, [], snapshot: null, focusArea: null);
+        var result = AnalysisRecommendationBuilder.Build(content, [], focusArea: null);
 
         Assert.False(result.IsSuccess);
         Assert.Equal(AnalysisIngestOutcome.ParseFailure, result.Outcome);
@@ -152,13 +152,13 @@ public sealed class BoundaryGapParsingTests
     [Fact]
     public void Build_BoundaryGaps_DoNotAlterAccounting()
     {
-        var withGaps = AnalysisRecommendationBuilder.Build(WithGaps, [], snapshot: null, focusArea: null);
+        var withGaps = AnalysisRecommendationBuilder.Build(WithGaps, [], focusArea: null);
 
         // Same single behavior, no boundary_gaps key.
         var withoutGaps = AnalysisRecommendationBuilder.Build(
             """
             {"behaviors":[{"category":"boundary","title":"Username at max length","source":"signup.md","technique":"BVA"}]}
-            """, [], snapshot: null, focusArea: null);
+            """, [], focusArea: null);
 
         Assert.Equal(withoutGaps.TotalBehaviors, withGaps.TotalBehaviors);
         Assert.Equal(withoutGaps.RecommendedCount, withGaps.RecommendedCount);

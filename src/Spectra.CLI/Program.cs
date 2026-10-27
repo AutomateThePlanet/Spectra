@@ -18,6 +18,7 @@ using Spectra.CLI.Commands.Testimize;
 using Spectra.CLI.Commands.Open;
 using Spectra.CLI.Commands.UpdateSkills;
 using Spectra.CLI.Commands.Validate;
+using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
 
 namespace Spectra.CLI;
@@ -32,6 +33,10 @@ public class Program
     /// </summary>
     public static async Task<int> Main(string[] args)
     {
+        // Spec 084/085: a redirected stdout/stderr is UTF-8 (no BOM), so the skills read →, —, Ü intact. Only the
+        // redirected writers are replaced — never the console's encoding, which would change the user's terminal.
+        ConsoleEncoding.UseUtf8ForRedirectedStreams();
+
         var rootCommand = CreateRootCommand();
         return await rootCommand.InvokeAsync(args);
     }

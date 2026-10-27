@@ -2,7 +2,9 @@ using System.CommandLine;
 using System.Text.Json;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
+using Spectra.CLI.Source;
 using Spectra.CLI.Verification;
+using Spectra.Core.Config;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
@@ -14,7 +16,8 @@ namespace Spectra.CLI.Commands.Generate;
 /// <summary>
 /// Spec 071 FR4: <c>spectra ai compile-repair-prompt</c>. Deterministic, model-free repair-prompt
 /// compiler for partial tests. Reads the test artifact and its per-test verdict JSON, emits a
-/// plain-text repair prompt to stdout. Refuses (exit 4) for non-partial verdicts.
+/// plain-text repair prompt to stdout. Refuses (exit 4) for a grounded verdict; Spec 090 (FR-A6) accepts
+/// hallucinated as well as partial verdicts.
 /// Mirrors compile-critic-prompt in structure; never calls a model.
 /// </summary>
 public sealed class CompileRepairPromptCommand : Command
@@ -48,7 +51,20 @@ public sealed class CompileRepairPromptCommand : Command
     private static async Task<int> RunAsync(string suite, string testId, string? from, CancellationToken ct)
     {
         var currentDir = Directory.GetCurrentDirectory();
-        var testsDir = await ResolveTestsDirAsync(currentDir, ct);
+
+        // Spec 080 A5: read command — defaults when there is no config, exit 1 on a malformed or invalid one.
+        var loaded = await ConfigLoader.LoadForReadAsync(currentDir, ConfigSections.Source | ConfigSections.Tests, ct);
+        if (!loaded.IsSuccess)
+        {
+            Console.Error.WriteLine(loaded.Error);
+            return ExitError;
+        }
+        var config = loaded.Config!;
+        foreach (var warning in loaded.Warnings)
+        {
+            Console.Error.WriteLine($"Warning: {warning}");
+        }
+        var testsDir = config.Tests.Dir;
         var suitePath = Path.Combine(currentDir, testsDir, suite);
         var indexPath = IndexWriter.GetIndexPath(suitePath);
 
@@ -75,7 +91,7 @@ public sealed class CompileRepairPromptCommand : Command
 
         var fileContent = await File.ReadAllTextAsync(testFilePath, ct);
         var relativePath = Path.GetRelativePath(currentDir, testFilePath);
-        var parsed = new TestCaseParser().Parse(fileContent, relativePath);
+        var parsed = new TestCaseParser(captureLayout: false).Parse(fileContent, relativePath);
         if (!parsed.IsSuccess || parsed.Value is null)
         {
             Console.Error.WriteLine($"Could not parse test file: {testFilePath}");
@@ -89,6 +105,15 @@ public sealed class CompileRepairPromptCommand : Command
         {
             Console.Error.WriteLine($"Verdict file not found: {verdictPath}. Run the critic for this test first.");
             return ExitVerdictEmpty;
+        }
+
+        // Spec 097 (FR-010): a stale verdict never drives the test's repair attempt — the same check and message as the
+        // ingest. The record-time rule applies to the verdict file the record describes (the default path); a custom
+        // --from gets the fingerprint rule only.
+        if (VerdictFreshness.Check(currentDir, testId, test, from is null ? verdictPath : null) is { IsStale: true } stale)
+        {
+            Console.Error.WriteLine($"{VerdictFreshness.ErrorVerdictStale}: {stale.Message(testId)}");
+            return ExitRefused;
         }
 
         var verdictJson = await File.ReadAllTextAsync(verdictPath, ct);
@@ -107,11 +132,12 @@ public sealed class CompileRepairPromptCommand : Command
 
         var verResult = classification.Result!;
 
-        // Only compile repair prompts for partial verdicts
-        if (verResult.Verdict != VerificationVerdict.Partial)
+        // Spec 090 (FR-A6): partial and hallucinated verdicts can be repaired (the update flow repairs a hallucinated
+        // edit once instead of dropping a test that existed before); a grounded verdict has nothing to repair.
+        if (verResult.Verdict is not (VerificationVerdict.Partial or VerificationVerdict.Hallucinated))
         {
             Console.Error.WriteLine(
-                $"Refusing to compile repair prompt: verdict is '{verResult.Verdict.ToString().ToLowerInvariant()}' (repair is for partial verdicts only).");
+                $"Refusing to compile repair prompt: verdict is '{verResult.Verdict.ToString().ToLowerInvariant()}' (repair is for partial or hallucinated verdicts only).");
             return ExitRefused;
         }
 
@@ -123,7 +149,7 @@ public sealed class CompileRepairPromptCommand : Command
         IReadOnlyList<SourceDocument> sourceDocs;
         try
         {
-            sourceDocs = await LoadDocumentsFromRefsAsync(test.SourceRefs, currentDir, ct);
+            sourceDocs = await SourceRefDocumentLoader.LoadAsync(test.SourceRefs, currentDir, config.Source.LocalDir ?? "docs", failOnMissing: true, ct);
         }
         catch (FileNotFoundException ex)
         {
@@ -141,43 +167,5 @@ public sealed class CompileRepairPromptCommand : Command
         Console.Out.Write(prompt);
         if (!prompt.EndsWith('\n')) Console.Out.WriteLine();
         return ExitSuccess;
-    }
-
-    private static async Task<IReadOnlyList<SourceDocument>> LoadDocumentsFromRefsAsync(
-        IReadOnlyList<string> sourceRefs, string currentDir, CancellationToken ct)
-    {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var docs = new List<SourceDocument>();
-        foreach (var r in sourceRefs)
-        {
-            var file = r.Split('#')[0].Trim();
-            if (string.IsNullOrWhiteSpace(file)) continue;
-            var full = Path.IsPathRooted(file) ? file : Path.Combine(currentDir, file);
-            if (!seen.Add(Path.GetFullPath(full))) continue;
-            if (!File.Exists(full))
-                throw new FileNotFoundException($"Source ref not found: {r}", full);
-            var content = await File.ReadAllTextAsync(full, ct);
-            docs.Add(new SourceDocument
-            {
-                Path = Path.GetRelativePath(currentDir, full).Replace('\\', '/'),
-                Title = Path.GetFileNameWithoutExtension(full),
-                Content = content
-            });
-        }
-        return docs;
-    }
-
-    private static async Task<string> ResolveTestsDirAsync(string currentDir, CancellationToken ct)
-    {
-        var configPath = Path.Combine(currentDir, "spectra.config.json");
-        if (!File.Exists(configPath)) return "test-cases";
-        try
-        {
-            var json = await File.ReadAllTextAsync(configPath, ct);
-            var config = JsonSerializer.Deserialize<SpectraConfig>(json,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return config?.Tests?.Dir ?? "test-cases";
-        }
-        catch { return "test-cases"; }
     }
 }

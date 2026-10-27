@@ -1,0 +1,20 @@
+# step: 20-ingest-analysis spectra ai ingest-analysis --suite payments --from .spectra/golden/analysis.json --output-format json
+# exit: 0
+## stdout
+{"outcome":"Recommendation","already_covered":2,"recommended":2,"breakdown":{"happy_path":4},"technique_breakdown":{"EP":4},"documents_analyzed":3,"boundary_gaps":[],"plan":".spectra/generation-plan/payments.json","planned_total":2,"count_rule":"proportional","batches":[{"id":"1","count":1,"source_refs":["docs/payments/receipts.md#currency"],"behaviors":["Currency shown on the receipt"]},{"id":"2","count":1,"source_refs":["docs/payments/refunds.md#partial-refunds"],"behaviors":["Partial refund capped at the paid amount"]}],"covered":[{"id":"B1","title":"Large card payment needs confirmation","covered_by":"TC-101"},{"id":"B2","title":"Refund inside the window","covered_by":"TC-103"}],"unresolved":[],"notes":[]}
+
+## stderr
+Total behaviors:    4
+Already covered:    2
+Recommended:        2
+Documents analyzed: 3
+Breakdown:
+  happy_path: 4
+Techniques:
+  EP: 4
+Plan: .spectra/generation-plan/payments.json
+batch 1 | count 1 | docs/payments/receipts.md#currency | Currency shown on the receipt
+batch 2 | count 1 | docs/payments/refunds.md#partial-refunds | Partial refund capped at the paid amount
+covered: Large card payment needs confirmation (TC-101)
+covered: Refund inside the window (TC-103)
+

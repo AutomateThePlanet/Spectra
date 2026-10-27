@@ -11,16 +11,23 @@
     "id_prefix": "TC",
     "id_start": 100
   },
+  "coverage": {
+    "criteria_dir": "docs/criteria",
+    "criteria_file": "docs/criteria/_criteria_index.yaml"
+  },
   "ai": {
-    "_comment_ai": "Spec 069: SPECTRA no longer runs an in-process model — all inference is your Claude Code session — so there is no `providers` or `critic` block. Only the timeout/batch levers below apply.",
+    "_comment_ai": "Spec 069: SPECTRA no longer runs an in-process model — all inference is your Claude Code session — so there is no `providers` block. The critic runs as the `spectra-critic` subagent on `critic.model` (an alias such as sonnet or opus, a model id, or inherit); run `spectra update-skills` after changing it. The generation batch size is `generation.batch_size`.",
+    "critic": {
+      "model": "sonnet"
+    },
     "generation_timeout_minutes": 5,
-    "analysis_timeout_minutes": 2,
-    "generation_batch_size": 30
+    "analysis_timeout_minutes": 2
   },
   "generation": {
     "default_count": 15,
     "require_review": true,
     "duplicate_threshold": 0.6,
+    "coverage_threshold": 0.6,
     "categories": ["happy_path", "negative", "boundary", "integration"]
   },
   "validation": {

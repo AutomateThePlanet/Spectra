@@ -1,0 +1,110 @@
+# step: 14-compile-update-prompt-test spectra ai compile-update-prompt --suite payments --test-id TC-101
+# exit: 0
+## stdout
+
+
+
+You are a test maintenance engineer. The tests below reference documentation sections or acceptance criteria that
+changed. For each test, **edit only the parts the change implicates** so the test matches the current documentation.
+
+## EDIT — DO NOT REGENERATE
+
+1. **Edit only what the source change implicates.** Compare each section's previous version with its current one
+   (and "What changed"), and change only the steps, expected results, test data, scenario reference or criteria links
+   that depend on it. Leave everything else exactly as it is.
+2. **A test that nothing in the change implicates is returned unchanged** — exactly as given.
+3. **Keep the original ids.** Return each test with its original `id`. Never invent, merge or split tests.
+4. **Preserve structure and manual content.** Do not restructure a test, change its priority, component or tags, or
+   alter manual notes.
+5. **Use the documented values.** If the change moved a numeric boundary, added a rule or an equivalence class, use
+   the exact values the current section states.
+6. **Don't invent documentation.** A section marked REMOVED or RELINK has no text here; do not guess its content.
+
+## SOURCE SECTIONS
+
+Each section is shown as it is now ("Current section"), as it was when the tests were written ("Previous version" —
+normalised: lowercased with markup removed, so compare meaning, not formatting), and what changed between them.
+
+#### S1 — docs/payments/checkout.md#cards  (tests: TC-101)
+State: changed (LOAD) — numbers: 5000→3000
+Current section:
+~~~~markdown
+## Card payments {#cards}
+
+Cards are charged in **EUR**. A payment above 3000 EUR MUST be confirmed.
+
+```bash
+# not a heading
+echo charge
+```
+~~~~
+Previous version (normalised: lowercased, markup removed):
+~~~~text
+## card payments cards are charged in eur. a payment above 5000 eur must be confirmed. bash # not a heading echo charge
+~~~~
+What changed: removed "5000"; added "3000"
+
+
+## ACCEPTANCE CRITERIA (linked by these tests)
+
+- AC-PAY-001: A payment above 5000 EUR MUST be confirmed
+
+
+## TESTS TO REVIEW
+
+### TEST TC-101
+Sections: S1
+Criteria: AC-PAY-001
+```json
+{
+  "id": "TC-101",
+  "title": "Large card payment is confirmed",
+  "priority": "high",
+  "tags": [],
+  "component": null,
+  "preconditions": null,
+  "steps": [
+    "Open checkout",
+    "Pay"
+  ],
+  "expected_result": "The payment is handled as documented",
+  "test_data": null,
+  "source_refs": [
+    "docs/payments/checkout.md#cards"
+  ],
+  "scenario_from_doc": null,
+  "criteria": [
+    "AC-PAY-001"
+  ]
+}
+```
+
+## OUTPUT FORMAT
+
+Your FINAL message must contain ONLY a JSON array with ONE object per `### TEST` above, in the same order, each
+keeping its original `id`, following this schema:
+
+```json
+[
+  {
+    "id": "TC-XXX",
+    "title": "Descriptive title based on documentation",
+    "priority": "high|medium|low",
+    "tags": ["tag1", "tag2"],
+    "component": "component-name",
+    "preconditions": "Setup requirements",
+    "steps": ["Step 1", "Step 2", "Step 3"],
+    "expected_result": "Specific outcome from documentation",
+    "test_data": "Test data if needed",
+    "source_refs": ["docs/file.md#Section-Name"],
+    "scenario_from_doc": "Quote or paraphrase the documented behavior",
+    "estimated_duration": "5m",
+    "criteria": ["AC-ID-1", "AC-ID-2"]
+  }
+]
+
+```
+
+## stderr
+Warning: test-cases/payments/TC-106.md could not be parsed and was skipped.
+

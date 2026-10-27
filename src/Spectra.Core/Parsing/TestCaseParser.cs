@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
+using Spectra.Core.Diagnostics;
 using Spectra.Core.Models;
 
 namespace Spectra.Core.Parsing;
@@ -9,6 +11,14 @@ namespace Spectra.Core.Parsing;
 public sealed partial class TestCaseParser
 {
     private readonly MarkdownFrontmatterParser _frontmatterParser = new();
+    private readonly bool _captureLayout;
+
+    /// <summary>
+    /// Spec 099 F3: <paramref name="captureLayout"/> false parses for reading only — the 078 layout (what the lossless
+    /// writer needs) is not captured and the test is marked <see cref="TestCase.LayoutOmitted"/>, which the writer
+    /// refuses. Callers that may write the test keep the default.
+    /// </summary>
+    public TestCaseParser(bool captureLayout = true) => _captureLayout = captureLayout;
 
     [GeneratedRegex(@"^#\s+(.+)$", RegexOptions.Multiline)]
     private static partial Regex TitleRegex();
@@ -28,6 +38,12 @@ public sealed partial class TestCaseParser
     [GeneratedRegex(@"^\d+\.\s+(.+)$", RegexOptions.Multiline)]
     private static partial Regex NumberedListRegex();
 
+    [GeneratedRegex(@"^#\s+.+$")]
+    private static partial Regex TitleLineRegex();
+
+    [GeneratedRegex(@"^##\s+")]
+    private static partial Regex SectionHeaderRegex();
+
     /// <summary>
     /// Parses a test case from Markdown content.
     /// </summary>
@@ -36,6 +52,7 @@ public sealed partial class TestCaseParser
     /// <returns>ParseResult containing the TestCase or errors</returns>
     public ParseResult<TestCase> Parse(string markdown, string filePath)
     {
+        ParseCounter.FullParse();
         var parseResult = _frontmatterParser.Parse<TestCaseFrontmatter>(markdown, filePath);
 
         if (parseResult.IsFailure)
@@ -107,10 +124,295 @@ public sealed partial class TestCaseParser
             Title = title,
             Steps = steps,
             ExpectedResult = expectedResult ?? "",
-            TestData = testData
+            TestData = testData,
+            Status = frontmatter.Status,
+            OrphanedReason = frontmatter.OrphanedReason,
+            OrphanedDate = ParseOrphanedDate(frontmatter.OrphanedDate)
         };
 
-        return ParseResult<TestCase>.Success(testCase);
+        return ParseResult<TestCase>.Success(
+            _captureLayout ? AttachLayout(testCase, markdown) : testCase with { LayoutOmitted = true });
+    }
+
+    /// <summary>
+    /// Frontmatter keys the typed model reads. Everything else is preserved verbatim as an unknown key.
+    /// </summary>
+    public static readonly IReadOnlySet<string> KnownFrontmatterKeys =
+        new HashSet<string>(TestCaseFrontmatterKeys.Ordered, StringComparer.Ordinal);
+
+    private TestCase AttachLayout(TestCase baseline, string markdown)
+    {
+        ParseCounter.LayoutCapture();
+        if (!_frontmatterParser.TrySplitRaw(markdown, out var frontmatterText, out var rawBody))
+        {
+            return baseline;
+        }
+
+        IReadOnlyList<FrontmatterEntry> entries;
+        string leading, trailing;
+        try
+        {
+            (entries, leading, trailing) = CaptureFrontmatterEntries(frontmatterText);
+        }
+        catch (YamlDotNet.Core.YamlException)
+        {
+            // The typed parse already succeeded, so this should not happen; without a reliable layout
+            // the writer falls back to canonical output.
+            return baseline;
+        }
+
+        var layout = new TestCaseLayout(
+            baseline,
+            entries,
+            CaptureBodySegments(rawBody),
+            DetectNewline(markdown),
+            leading,
+            trailing);
+
+        return baseline with { Layout = layout };
+    }
+
+    private static (IReadOnlyList<FrontmatterEntry> Entries, string Leading, string Trailing) CaptureFrontmatterEntries(
+        string yaml)
+    {
+        var keyStarts = new List<(string Key, int Index)>();
+        // Spec 081 C5: per entry, whether its last scalar (at any depth) is a keep-chomped block scalar.
+        var keepChomped = new List<bool>();
+        var parser = new YamlDotNet.Core.Parser(new StringReader(yaml));
+        var depth = 0;
+        var expectKey = true;
+
+        while (parser.MoveNext())
+        {
+            if (parser.Current is YamlDotNet.Core.Events.Scalar any && keyStarts.Count > 0
+                && !(depth == 1 && expectKey))
+            {
+                keepChomped[^1] = IsKeepChompedBlock(yaml, any);
+            }
+
+            switch (parser.Current)
+            {
+                case YamlDotNet.Core.Events.MappingStart:
+                case YamlDotNet.Core.Events.SequenceStart:
+                    depth++;
+                    break;
+                case YamlDotNet.Core.Events.MappingEnd:
+                case YamlDotNet.Core.Events.SequenceEnd:
+                    depth--;
+                    if (depth == 1) expectKey = true; // a collection value finished
+                    break;
+                case YamlDotNet.Core.Events.Scalar scalar when depth == 1:
+                    if (expectKey)
+                    {
+                        keyStarts.Add((scalar.Value, (int)scalar.Start.Index));
+                        keepChomped.Add(false);
+                    }
+                    expectKey = !expectKey;
+                    break;
+                case YamlDotNet.Core.Events.AnchorAlias when depth == 1:
+                    expectKey = !expectKey;
+                    break;
+            }
+        }
+
+        if (keyStarts.Count == 0)
+        {
+            return ([], yaml, "");
+        }
+
+        // Spec 080 A4: blank lines and column-0 comments at the end of an entry's span belong to the key below
+        // them (its prelude), or to the frontmatter's trailing text after the last key. Text before the first key
+        // is the leading text. Indented comment lines stay inside the value they sit in.
+        var entries = new List<FrontmatterEntry>(keyStarts.Count);
+        var leading = yaml[..keyStarts[0].Index];
+        var prelude = "";
+        for (var i = 0; i < keyStarts.Count; i++)
+        {
+            var start = keyStarts[i].Index;
+            var end = i + 1 < keyStarts.Count ? keyStarts[i + 1].Index : yaml.Length;
+            var cut = start + TrimTrailingDetachedLines(yaml[start..end], keepChomped[i]);
+            var key = keyStarts[i].Key;
+            entries.Add(new FrontmatterEntry(key, prelude, yaml[start..cut], KnownFrontmatterKeys.Contains(key)));
+            prelude = yaml[cut..end];
+        }
+
+        System.Diagnostics.Debug.Assert(
+            leading + string.Concat(entries.Select(e => e.Prelude + e.RawText)) + prelude == yaml,
+            "Frontmatter layout must reproduce the source exactly.");
+
+        return (entries, leading, prelude);
+    }
+
+    /// <summary>
+    /// Spec 081 C5: true when <paramref name="scalar"/> is a literal or folded block scalar with keep chomping
+    /// (<c>|+</c>, <c>&gt;+</c>, <c>|2+</c>, <c>&gt;+1</c>, …), whose trailing line breaks are part of its value. The
+    /// scalar's start mark is at the <c>|</c>/<c>&gt;</c> indicator (pinned by <c>TestCaseLayoutTests</c>).
+    /// </summary>
+    private static bool IsKeepChompedBlock(string yaml, YamlDotNet.Core.Events.Scalar scalar)
+    {
+        if (scalar.Style is not (YamlDotNet.Core.ScalarStyle.Literal or YamlDotNet.Core.ScalarStyle.Folded))
+        {
+            return false;
+        }
+
+        var i = (int)scalar.Start.Index;
+        if (i < 0 || i >= yaml.Length || (yaml[i] != '|' && yaml[i] != '>'))
+        {
+            return false;
+        }
+
+        for (i++; i < yaml.Length && (yaml[i] is '+' or '-' || char.IsAsciiDigit(yaml[i])); i++)
+        {
+            if (yaml[i] == '+')
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Length of <paramref name="span"/> without its trailing blank and column-0 <c>#</c> lines. The first line (the
+    /// key itself) is always kept. When the entry ends with a keep-chomped block scalar
+    /// (<paramref name="keepTrailing"/>), its trailing blank lines are value content: only the lines from the first
+    /// column-0 comment onwards detach (Spec 081 C5).
+    /// </summary>
+    private static int TrimTrailingDetachedLines(string span, bool keepTrailing)
+    {
+        var firstLineEnd = span.IndexOf('\n');
+        if (firstLineEnd < 0)
+        {
+            return span.Length;
+        }
+
+        var keep = span.Length;
+        while (keep > firstLineEnd + 1)
+        {
+            // The last line of span[..keep] runs from just after the previous line break up to keep.
+            var searchFrom = span[keep - 1] == '\n' ? keep - 2 : keep - 1;
+            var lineStart = span.LastIndexOf('\n', searchFrom) + 1;
+            var line = span[lineStart..keep];
+            if (line.Trim().Length != 0 && !line.StartsWith('#'))
+            {
+                break;
+            }
+
+            keep = lineStart;
+        }
+
+        if (!keepTrailing)
+        {
+            return keep;
+        }
+
+        // Keep chomping: blank lines before the first trailing comment belong to the value.
+        for (var pos = keep; pos < span.Length;)
+        {
+            var next = span.IndexOf('\n', pos);
+            var lineEnd = next < 0 ? span.Length : next + 1;
+            if (span[pos..lineEnd].StartsWith('#'))
+            {
+                return pos;
+            }
+
+            pos = lineEnd;
+        }
+
+        return span.Length;
+    }
+
+    private static IReadOnlyList<BodySegment> CaptureBodySegments(string body)
+    {
+        var boundaries = new List<(int Index, BodySegmentKind Kind)>();
+        var seenKinds = new HashSet<BodySegmentKind>();
+        var titleSeen = false;
+        var titleLineEnd = -1;
+
+        var pos = 0;
+        while (pos < body.Length)
+        {
+            var lineBreak = body.IndexOf('\n', pos);
+            var nextPos = lineBreak < 0 ? body.Length : lineBreak + 1;
+            var line = body[pos..(lineBreak < 0 ? body.Length : lineBreak)].TrimEnd('\r');
+
+            if (!titleSeen && TitleLineRegex().IsMatch(line))
+            {
+                boundaries.Add((pos, BodySegmentKind.Title));
+                titleSeen = true;
+                titleLineEnd = nextPos;
+            }
+            else if (SectionHeaderRegex().IsMatch(line))
+            {
+                var kind = ClassifySectionHeader(line);
+                if (kind != BodySegmentKind.Unknown && !seenKinds.Add(kind))
+                {
+                    kind = BodySegmentKind.Unknown;
+                }
+
+                boundaries.Add((pos, kind));
+            }
+
+            pos = nextPos;
+        }
+
+        var segments = new List<BodySegment>();
+        var firstBoundary = boundaries.Count > 0 ? boundaries[0].Index : body.Length;
+        if (firstBoundary > 0)
+        {
+            segments.Add(new BodySegment(BodySegmentKind.Leading, body[..firstBoundary]));
+        }
+
+        for (var i = 0; i < boundaries.Count; i++)
+        {
+            var (start, kind) = boundaries[i];
+            var end = i + 1 < boundaries.Count ? boundaries[i + 1].Index : body.Length;
+
+            if (kind == BodySegmentKind.Title)
+            {
+                segments.Add(new BodySegment(BodySegmentKind.Title, body[start..titleLineEnd]));
+                if (end > titleLineEnd)
+                {
+                    segments.Add(new BodySegment(BodySegmentKind.Intro, body[titleLineEnd..end]));
+                }
+            }
+            else
+            {
+                segments.Add(new BodySegment(kind, body[start..end]));
+            }
+        }
+
+        return segments;
+    }
+
+    private static BodySegmentKind ClassifySectionHeader(string line)
+    {
+        if (PreconditionsHeaderRegex().IsMatch(line)) return BodySegmentKind.Preconditions;
+        if (StepsHeaderRegex().IsMatch(line)) return BodySegmentKind.Steps;
+        if (ExpectedResultHeaderRegex().IsMatch(line)) return BodySegmentKind.ExpectedResult;
+        if (TestDataHeaderRegex().IsMatch(line)) return BodySegmentKind.TestData;
+        return BodySegmentKind.Unknown;
+    }
+
+    private static string DetectNewline(string markdown) => Spectra.Core.Text.Newlines.Detect(markdown);
+
+    private static DateTimeOffset? ParseOrphanedDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (DateTime.TryParseExact(value.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var date))
+        {
+            return new DateTimeOffset(date, TimeSpan.Zero);
+        }
+
+        return DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal,
+            out var parsed)
+            ? parsed
+            : null;
     }
 
     /// <summary>

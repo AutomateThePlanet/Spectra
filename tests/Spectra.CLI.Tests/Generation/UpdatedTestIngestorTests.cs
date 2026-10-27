@@ -153,6 +153,26 @@ public sealed class UpdatedTestIngestorTests : IDisposable
         Assert.Null(result.PersistedTests[0].Grounding); // preserved from original (was null)
     }
 
+    [Fact]
+    public async Task Ingest_CriticGrounding_IsDropped_ManualIsKept_AndReported()
+    {
+        // Spec 090 (FR-A1): a critic verdict judged the old content, so a written edit drops it; Manual stays.
+        var critic = ManualGrounding() with { Verdict = VerificationVerdict.Grounded, Critic = "claude-sonnet-4-6" };
+        var criticOriginal = Original(id: "TC-100", grounding: critic);
+
+        var dropped = await NewIngestor().IngestAsync(EditJson(), _testsPath, Suite, criticOriginal, [criticOriginal], default);
+
+        Assert.True(dropped.IsSuccess);
+        Assert.Null(dropped.PersistedTests[0].Grounding);
+        Assert.False(dropped.ManualVerdictKept);
+
+        var manualOriginal = Original(id: "TC-100", grounding: ManualGrounding());
+        var kept = await NewIngestor().IngestAsync(EditJson(title: "Edited again"), _testsPath, Suite, manualOriginal, [manualOriginal], default);
+
+        Assert.Equal(VerificationVerdict.Manual, kept.PersistedTests[0].Grounding!.Verdict);
+        Assert.True(kept.ManualVerdictKept);
+    }
+
     // ---------- US3: drift guard (T017) ----------
 
     [Fact]
@@ -221,6 +241,105 @@ public sealed class UpdatedTestIngestorTests : IDisposable
         Assert.False(result.IsSuccess);
         Assert.Equal(expectedCode, result.ErrorCode);
         Assert.Empty(result.PersistedTests);
+    }
+
+    // ---------- Spec 088 FR-015: an edit that changes nothing ----------
+
+    [Fact]
+    public async Task Ingest_IdenticalEdit_IsUnchanged_NothingWritten()
+    {
+        var original = Original();
+        var content = EditJson(title: "Original title", steps: "original step", expected: "original result");
+
+        var result = await NewIngestor().IngestAsync(content, _testsPath, Suite, original, [original], default);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Unchanged);
+        Assert.Empty(result.PersistedTests);
+        Assert.Same(original, result.Original);
+        Assert.False(Directory.Exists(Path.Combine(_testsPath, Suite)), "nothing written");
+    }
+
+    [Fact]
+    public async Task Ingest_IdenticalEditWithReorderedTags_IsUnchanged()
+    {
+        var original = Original(tags: ["a", "b"]);
+        var content = EditJson(title: "Original title", tags: ["b", "a"], steps: "original step", expected: "original result");
+
+        var result = await NewIngestor().IngestAsync(content, _testsPath, Suite, original, [original], default);
+
+        Assert.True(result.Unchanged);
+    }
+
+    [Fact]
+    public async Task Ingest_DriftFailsBeforeTheUnchangedCheck()
+    {
+        var original = Original();
+        var content = EditJson(title: "Original title", priority: "low", steps: "original step", expected: "original result");
+
+        var result = await NewIngestor().IngestAsync(content, _testsPath, Suite, original, [original], default);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(UpdatedTestIngestor.DriftDetected, result.ErrorCode);
+    }
+
+    public static TheoryData<string, Func<TestCase, TestCase>, bool> UnchangedRows => new()
+    {
+        { "identical", t => t with { }, true },
+        { "trailing space in a step", t => t with { Steps = ["step one ", "step two"] }, true },
+        { "CRLF and a final newline", t => t with { ExpectedResult = "original result\r\n" }, true },
+        { "null vs empty preconditions", t => t with { Preconditions = "" }, true },
+        { "inner whitespace", t => t with { Steps = ["step  one", "step two"] }, false },
+        { "a word", t => t with { ExpectedResult = "original results" }, false },
+        { "a step added", t => t with { Steps = ["step one", "step two", "step three"] }, false },
+        { "steps reordered", t => t with { Steps = ["step two", "step one"] }, false },
+        { "a criterion added", t => t with { Criteria = ["AC-1"] }, false },
+        { "a source ref changed", t => t with { SourceRefs = ["docs/a.md"] }, false },
+    };
+
+    [Theory]
+    [MemberData(nameof(UnchangedRows))]
+    public void IsUnchanged_ComparesNormalisedEditableFields(string row, Func<TestCase, TestCase> edit, bool unchanged)
+    {
+        var original = Original() with { Steps = ["step one", "step two"] };
+
+        Assert.True(unchanged == UpdatedTestIngestor.IsUnchanged(original, edit(original)), row);
+    }
+
+    [Fact]
+    public void IsUnchanged_CrLineEndings_EqualLf()
+    {
+        var original = Original() with { Preconditions = "line one\nline two" };
+
+        Assert.True(UpdatedTestIngestor.IsUnchanged(original, original with { Preconditions = "line one\rline two" }));
+        Assert.True(UpdatedTestIngestor.IsUnchanged(original, original with { Preconditions = "line one  \r\nline two\n\n" }));
+    }
+
+    // ---------- Spec 089 F2: one test per edit ----------
+
+    [Fact]
+    public async Task Ingest_TwoTestObjects_IsMultipleTests_NothingWritten()
+    {
+        var original = Original();
+        var two = "[" + EditJson(id: "TC-100").Trim().Trim('[', ']') + "," + EditJson(id: "TC-101").Trim().Trim('[', ']') + "]";
+
+        var result = await NewIngestor().IngestAsync(two, _testsPath, Suite, original, [original], default);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(UpdatedTestIngestor.MultipleTests, result.ErrorCode);
+        Assert.Equal("The edit holds 2 test objects (TC-100, TC-101); a staged file holds exactly one test.", Assert.Single(result.Errors));
+        Assert.False(Directory.Exists(Path.Combine(_testsPath, Suite)), "nothing written");
+    }
+
+    [Fact]
+    public void ArrayObjects_CountsObjects_NotValidTests()
+    {
+        // Spec 099 F4: the string overload had no production caller left; the rows read the extracted content.
+        Assert.Equal(["TC-1", null], GeneratedTestIngestor.ArrayObjects(GeneratedTestIngestor.Extract("[{\"id\":\"TC-1\",\"title\":\"t\"},{\"title\":\"no id\"}]")));
+        Assert.Equal(["TC-1"], GeneratedTestIngestor.ArrayObjects(GeneratedTestIngestor.Extract("```json\n[{\"id\":\"TC-1\"}]\n```")));
+        Assert.Empty(GeneratedTestIngestor.ArrayObjects(GeneratedTestIngestor.Extract("[]"))!);
+        Assert.Null(GeneratedTestIngestor.ArrayObjects(GeneratedTestIngestor.Extract("not json")));
+        Assert.Null(GeneratedTestIngestor.ArrayObjects(GeneratedTestIngestor.Extract(null)));
     }
 
     [Fact]

@@ -78,8 +78,14 @@ public sealed class TempWorkspace : IDisposable
         if (dependsOn != null)
         {
             var list = dependsOn.ToList();
-            if (list.Count > 0)
+            if (list.Count == 1)
             {
+                // Spec 090: depends_on is a single value; that is the form SPECTRA reads and delete cleans up.
+                sb.Append("depends_on: ").AppendLine(list[0]);
+            }
+            else if (list.Count > 1)
+            {
+                // A list doesn't parse as a test (TestCase.DependsOn is a single value); delete leaves it and warns.
                 sb.AppendLine("depends_on:");
                 foreach (var d in list)
                 {

@@ -7,10 +7,25 @@ namespace Spectra.Core.Models.Config;
 /// </summary>
 public sealed class AiConfig
 {
-    // Spec 069: `ai.providers` and `ai.critic` were removed — SPECTRA no longer runs an in-process
-    // model (all inference is the user's Claude Code session), so the config carries no provider or
-    // critic block. Legacy configs that still carry those keys deserialize cleanly (unmapped members
-    // are ignored). Only the surviving cost/telemetry levers remain below.
+    // Spec 069: `ai.providers` and the in-process critic were removed — SPECTRA no longer runs an in-process
+    // model (all inference is the user's Claude Code session), so the config carries no provider block.
+    // Legacy configs that still carry those keys deserialize cleanly (unmapped members are ignored).
+    // Spec 097: `ai.critic.model` is back, as the model the spectra-critic subagent runs on.
+
+    /// <summary>Spec 097 (FR-020): the optional <c>ai.critic</c> block.</summary>
+    [JsonPropertyName("critic")]
+    public CriticConfig? Critic { get; init; }
+
+    /// <summary>
+    /// Spec 098 (F1): the critic's model and, when the configured one was ignored (a legacy block of the in-process
+    /// critic, or an invalid value), the warning to show.
+    /// </summary>
+    [JsonIgnore]
+    public CriticModelChoice CriticModel => Critic?.Choose() ?? new CriticModelChoice(CriticConfig.DefaultModel, null);
+
+    /// <summary>Spec 097/098: the critic's model — a valid new-style <c>ai.critic.model</c>, else <see cref="CriticConfig.DefaultModel"/>.</summary>
+    [JsonIgnore]
+    public string EffectiveCriticModel => CriticModel.Model;
 
     /// <summary>
     /// Per-batch timeout for the AI generation SDK call, in minutes. Default 5.
@@ -32,10 +47,11 @@ public sealed class AiConfig
     public int AnalysisTimeoutMinutes { get; init; } = 2;
 
     /// <summary>
-    /// Number of tests requested per AI call. Default 30. Smaller batches
-    /// reduce per-batch latency on slow models at the cost of more total
-    /// round-trips. Pair with <see cref="GenerationTimeoutMinutes"/>.
+    /// Read by nothing since Spec 059 removed the in-process generator. Spec 096 (FR-013): kept only so an existing
+    /// config that still has <c>ai.generation_batch_size</c> loads (no section or key is ever required — Spec 083);
+    /// <c>spectra init</c> no longer writes it. The generation batch size is <c>generation.batch_size</c> (Spec 094).
     /// </summary>
+    [Obsolete("Ignored. The generation batch size is generation.batch_size (Spec 094).")]
     [JsonPropertyName("generation_batch_size")]
     public int GenerationBatchSize { get; init; } = 30;
 }

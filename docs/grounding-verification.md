@@ -20,10 +20,14 @@ When AI generates test cases, it can hallucinate, inventing steps, expected resu
 
 1. **Generator** creates draft test cases from your documentation
 2. **Critic** verifies each test case against the same docs. The critic runs in a fresh, isolated
-   (`context: fork`) context, so it sees only the test artifact and its selected source documents,
-   never the generator's prompt, reasoning, tool calls, or token usage.
+   subagent context, so it sees only the test artifact and the source text it cites (Spec 101: the cited
+   sections; `compile-critic-prompt --full-docs` gives whole documents),
+   never the generator's prompt, reasoning, tool calls, or token usage. Its instructions are the
+   `critic-verification` prompt template (customise `.spectra/prompts/critic-verification.md`; Spec 102).
 3. Test cases receive a verdict: `grounded`, `partial`, or `hallucinated`
 4. Only grounded and partial test cases are written to disk
+5. A partial test gets one repair attempt. Only a repair that changed the test is judged again; a repair that left
+   it unchanged keeps the verdict it already has (Spec 102), which routes it as before
 
 ### Advisory verdict, fail-loud damage
 
@@ -142,16 +146,16 @@ Generating test cases...
 ## Configuration
 
 There's no `spectra.config.json` block for the critic anymore. Grounding verification runs as the
-`spectra-critic` subagent (`.claude/agents/spectra-critic.agent.md`), a Claude Code `context: fork`
-subagent invoked by the generation skill after generation, not an in-process model call, and not
+`spectra-critic` subagent (`.claude/agents/spectra-critic.agent.md`), a Claude Code subagent
+(a fresh context per test) started by the generation and update subagents for each test they wrote, not an in-process model call, and not
 something `ai.providers`/`ai.critic` route to. (A legacy config that still carries those keys loads
 unchanged; `spectra validate` surfaces a non-blocking notice naming them.)
 
-The critic model is set by the `model:` field in `.claude/agents/spectra-critic.agent.md` (shipped as
-`claude-sonnet-4-6`). Edit that file directly to change it, and re-apply the edit after
-`spectra update-skills` if you've customized it. There's no separate provider/timeout/concurrency
-config; Claude Code itself schedules subagent calls.
+The critic model is `ai.critic.model` in `spectra.config.json` (default `sonnet`; an alias such as `opus`, a model
+id, or `inherit` for your session's model). `spectra init` and `spectra update-skills` write it into
+`.claude/agents/spectra-critic.agent.md`; an agent file you edited by hand is never overwritten. There's no separate
+provider/timeout/concurrency config; Claude Code itself schedules subagent calls.
 
 The generator isn't configurable either. Generation runs as an ordinary turn in your own Claude
 Code session, driven by the `spectra-generate` skill over the compile→ingest seam. See
-[Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) for the full picture.
+[Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) for the history (the SDK was removed).

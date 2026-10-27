@@ -636,4 +636,69 @@ public class TestCaseParserTests
         Assert.True(result.IsSuccess);
         Assert.Equal("Frontmatter preconditions only", result.Value.Preconditions);
     }
+
+    // ---- Spec 078: lifecycle and grounding fields round-trip ----
+
+    private static string WithFrontmatter(string extra) =>
+        "---\nid: TC-1\npriority: low\n" + extra + "---\n\n# T\n\n## Steps\n\n1. a\n\n## Expected Result\n\nok\n";
+
+    [Fact]
+    public void Parse_ReadsLifecycleFields()
+    {
+        var result = _parser.Parse(WithFrontmatter(
+            "status: orphaned\norphaned_reason: \"Doc removed\"\norphaned_date: 2026-01-15\n"), "TC-1.md");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("orphaned", result.Value.Status);
+        Assert.Equal("Doc removed", result.Value.OrphanedReason);
+        Assert.Equal(new DateTimeOffset(2026, 1, 15, 0, 0, 0, TimeSpan.Zero), result.Value.OrphanedDate);
+    }
+
+    [Fact]
+    public void Parse_UnparseableOrphanedDate_IsNull()
+    {
+        var result = _parser.Parse(WithFrontmatter("status: orphaned\norphaned_date: someday\n"), "TC-1.md");
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value.OrphanedDate);
+    }
+
+    [Fact]
+    public void Parse_ManualGrounding_UsesVerifiedAtFromFile()
+    {
+        var result = _parser.Parse(WithFrontmatter(
+            "grounding:\n  verdict: manual\n  verified_at: 2026-02-03T04:05:06Z\n  flagged_for_review: true\n  repair_attempts: 2\n"),
+            "TC-1.md");
+
+        Assert.True(result.IsSuccess);
+        var g = result.Value.Grounding!;
+        Assert.Equal(new DateTimeOffset(2026, 2, 3, 4, 5, 6, TimeSpan.Zero), g.VerifiedAt);
+        Assert.True(g.FlaggedForReview);
+        Assert.Equal(2, g.RepairAttempts);
+    }
+
+    [Fact]
+    public void Parse_ManualGroundingWithoutVerifiedAt_IsDeterministic()
+    {
+        var md = WithFrontmatter("grounding:\n  verdict: manual\n");
+
+        var first = _parser.Parse(md, "TC-1.md").Value.Grounding!;
+        var second = _parser.Parse(md, "TC-1.md").Value.Grounding!;
+
+        Assert.Equal(DateTimeOffset.MinValue, first.VerifiedAt);
+        Assert.Equal(first.VerifiedAt, second.VerifiedAt);
+    }
+
+    [Fact]
+    public void Parse_GroundingSourceCreatedByNote_AreMapped()
+    {
+        var result = _parser.Parse(WithFrontmatter(
+            "grounding:\n  verdict: manual\n  source: review\n  created_by: vik\n  note: \"looked fine\"\n"),
+            "TC-1.md");
+
+        var g = result.Value.Grounding!;
+        Assert.Equal("review", g.Source);
+        Assert.Equal("vik", g.CreatedBy);
+        Assert.Equal("looked fine", g.Note);
+    }
 }

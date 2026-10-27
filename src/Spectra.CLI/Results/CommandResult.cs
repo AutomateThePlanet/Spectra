@@ -39,6 +39,11 @@ public sealed class ErrorResult : CommandResult
     [JsonPropertyName("error")]
     public required string Error { get; init; }
 
+    /// <summary>Spec 082 A4: a named error code (e.g. <c>CONFIG_INVALID</c>), when the failure has one.</summary>
+    [JsonPropertyName("error_code")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ErrorCode { get; init; }
+
     [JsonPropertyName("missing_arguments")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<string>? MissingArguments { get; init; }

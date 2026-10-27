@@ -43,22 +43,10 @@ From the JSON result, show:
 - Acceptance criteria extracted (if any)
 - Path to `docs/_index/_manifest.yaml`
 
-### Criteria warning surfacing (Spec 048)
+### Criteria are not extracted here
 
-If the result contains a `criteria_warning` field (a non-empty string), surface it
-to the user as a prominent non-blocking warning rendered verbatim. The field
-appears when the run indexed at least one document but produced zero acceptance
-criteria across the whole corpus — usually because per-document extractions came
-back inconclusive on a large project. It is NOT a failure: `status` will still be
-`completed` and the exit code is success. The message names the exact recovery
-command (`spectra ai analyze --extract-criteria`); do not paraphrase it.
-
-Example rendering:
-```
-WARNING: Indexed 47 document(s) but extracted 0 acceptance criteria.
-Test generation will not be able to link criteria.
-Run: spectra ai analyze --extract-criteria
-```
+`docs index` only indexes; it never extracts acceptance criteria (the automatic extraction step and its
+`criteria_warning` were removed in Spec 069). When the user wants criteria, use the `spectra-criteria` skill.
 
 Do NOT re-run `docs index` automatically and do NOT prompt the user before continuing.
 

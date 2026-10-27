@@ -125,8 +125,10 @@ public class ProfileFormatLoaderTests : IDisposable
         Assert.Contains("Coverage Analysis", content);
         Assert.Contains("Generating Dashboard", content);
         Assert.Contains("Validating Test Cases", content);
-        Assert.Contains("Updating Test Cases After Doc Changes", content);
-        Assert.Contains("Executing Tests", content);
+        Assert.Contains("## When documentation changes", content); // Spec 100 F2: replaced "Updating Test Cases After Doc Changes"
+        // Spec 096 F8: the heading is "Executing Tests" since Spec 070 removed the MCP execution adapter.
+        Assert.Contains("## Executing Tests", content);
+        Assert.DoesNotContain("Executing Tests via MCP", content);
         Assert.Contains("Creating a Custom Profile", content);
         Assert.Contains("Indexing Documentation", content);
         Assert.Contains("Customizing SPECTRA", content);

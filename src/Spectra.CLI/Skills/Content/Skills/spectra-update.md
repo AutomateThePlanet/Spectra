@@ -6,153 +6,215 @@ tools: [{{GENERATE_TOOLS}}]
 
 # SPECTRA Update SKILL
 
-You help users update existing test cases when documentation or acceptance
-criteria have changed. The CLI classifies each test as UP_TO_DATE, OUTDATED,
-ORPHANED, or REDUNDANT (deterministic, no model). For OUTDATED tests you then
-**edit the affected parts in this session** through a deterministic seam — the
-CLI compiles an edit prompt, *you* edit the test in your own context, and the CLI
-ingests it. The CLI never rewrites a test for you; the targeted edit happens
-in-session.
-
-The seam, per OUTDATED test:
+You help users update existing test cases when documentation or acceptance criteria have changed. The CLI records a
+fingerprint of each doc section a test references (`source_refs`) and each criterion it links (`criteria`), and
+`update-triage` reports exactly what changed since — deterministic and model-free; git is only read, to find renamed
+doc files. The edits run in **subagents** (Specs 092, 101): this session orchestrates, asks the user, and reports;
+`spectra-updater` edits a group and has `spectra-critic` re-verify each edited test, and `spectra-repairer` repairs
+what the critic flagged the same way — each returns a few lines.
 
 ```
-compile-update-prompt (CLI, deterministic)  →  you edit in-session  →  ingest-update (CLI, fail-loud)
+update-triage (CLI)  →  relink-sources for renamed docs (CLI, after the user's yes)
+  →  you choose buckets and ask once about re-verifying  →  per group: spectra-updater subagent
+       (compile-update-prompt --group → edit → ingest-update --all → spectra-critic per written test)
+  →  you route by the verdict lines  →  partial / hallucinated: spectra-repairer subagent
+  →  update-ack for tests reviewed without an edit prompt
 ```
 
-`ingest-update` deterministically protects invariants so you don't have to: it keeps
-the **original id** (never a new one), re-asserts any pre-existing **manual verdict /
-notes**, and **fails loud on drift** — if your edit changes a field the doc change did
-not implicate (priority, component, tags) it rejects the edit and persists nothing.
+`ingest-update` keeps the **original id**, re-asserts any **manual verdict / notes**, **fails loud on drift** (an
+out-of-scope change to priority, component or tags), and records the edited test's new baseline; a test returned
+unchanged is recorded as reviewed. The CLI never rewrites a test for you.
+
+## Additional resources
+
+[reference.md](reference.md) in this skill's folder explains what this session needs only now and then. Reading it is
+looking up this skill's own instructions, not a workflow step; read only the part you need: **Exit codes** (when a
+command exits non-zero), **Buckets** (when you present the triage), **Submodules and first-time setup** (when triage
+notes a submodule or unbaselined tests), **Clearing REMOVED entries** (Step 3), **Suggest next steps** and **Example
+user requests**.
+
+## Context budget contract
+
+This session **never reads** docs, compiled prompts, test files, staging JSON or verdict files — the named subagent does
+that work and returns a few lines. Its own calls: `spectra` commands with small JSON output (triage, relink,
+`update-ack`, `ingest-grounding --all`, and `ingest-verdict --all` on the fallback), writes to `.spectra/progress.json`,
+and Agent calls to `spectra-updater`, `spectra-repairer` — and to `spectra-critic` only on the fallback (Step 5a).
+
+The user's decisions stay here: which buckets to process, whether to re-verify, the REMOVED review, relinking, a test
+returned unchanged while its change still needs an edit, and a test that stays hallucinated. Report every line a
+subagent returns, as returned — this session's report is how the user learns what happened.
+
+## NON-STOP CONTRACT
+
+Every step below is a single `Bash(spectra *)` call, an Agent call to the `spectra-updater`,
+`spectra-repairer` or `spectra-critic` subagent, or a `Write` only to `.spectra/progress.json`. If no
+single `spectra` call covers a step, **STOP and report a missing affordance** — never work around it.
+Prohibited: shell loops over per-test verbs, piping spectra output to `python` / `jq` / any
+interpreter, reading docs, prompts, tests, staging or verdict files, editing a test's `.md` file
+yourself, and rewriting a baseline file (`_source-baseline.json`) by hand.
 
 ## Update test cases for a suite
 
-**Step 0** — Set up the live progress monitor.
-
-Run with the Bash tool:
-```
-spectra ai init-seam-progress
-```
-
-Write `.spectra/progress.json` with the Write tool:
+**Step 0** — Run `spectra ai init-seam-progress`, then write `.spectra/progress.json`:
 ```json
-{"phases":["Step 1 — Classify tests","Step 2 — Edit OUTDATED tests","Step 3 — Report"],"active":0}
+{"phases":["Step 1 — Triage","Step 2 — Review","Step 5 — Edit tests","Step 7 — Report"],"active":0}
 ```
 
-**Step 1** — Classify and find the OUTDATED tests.
-
-Run with the Bash tool:
+**Step 1** — Triage (deterministic, no model):
 ```
-spectra ai update --suite <suite> --diff --no-interaction --output-format json --verbosity quiet
+spectra ai update-triage --suite <suite> --output-format json --verbosity quiet
 ```
-Replace `<suite>` with the suite the user mentions (e.g., "checkout", "login", "payments").
-The progress page auto-refreshes — the user can watch live. While it runs, do NOTHING —
-don't poll the terminal, list directories, or read files; just wait for it to complete. Once it finishes, open `.spectra-progress.html` using the VS Code preview (IDE preview tool) to see the run summary. If an IDE preview is not available, run `spectra open .spectra-progress.html`.
+`<suite>` is the suite the user mentions. While it runs, do NOTHING — no polling, no listing, no reading files. COSMETIC
+changes (markup, whitespace or case only) were already acknowledged automatically (`auto_acked`).
 
-Then Read `.spectra-result.json`. Collect the ids classified **OUTDATED**.
+**Step 2** — Show the summary: per suite the bucket counts from `suites[].counts`, then each group from `groups` (`id`,
+`bucket`, the `refs` / `criteria`, how many tests, and `why`, e.g. `numbers: 30→45`), the `notes` and `warnings`. List
+`unbaselined` tests (no baseline yet, can't be triaged) and `no_tests` (sections of changed docs no test covers —
+hints for the `spectra-generate` skill). If there is no `RELINK` group, offer
+`spectra ai source-baseline --init --suite <suite> --output-format json --verbosity quiet` (it adopts the current docs as
+the baseline — only after the user agrees); with a `RELINK` group, Step 2a offers it after relinking. A submodule note,
+or unbaselined tests: follow reference.md (**Submodules and first-time setup**). If every count except `unchanged` is
+0, say "Tests are up to date" and STOP.
 
-- UP_TO_DATE → leave untouched.
-- ORPHANED / REDUNDANT → present for the user's review; the edit seam does not touch these.
-- OUTDATED → continue to Step 2 for each.
+**Step 2a** — RELINK (doc files renamed or moved; `why`: `renamed to <path>`). Only when a group has the bucket
+`RELINK`; otherwise go on with Step 3.
+1. Preview: `spectra ai relink-sources --suite <suite> --dry-run --output-format json --verbosity quiet`
+2. Show, per test, each `relinked` ref as `from` → `to` (the `#anchor` is kept), whether `orphan_cleared` is true, and
+   every `not_relinked` ref with its `reason`.
+3. Ask the user whether to relink these tests. Relink only after the user says yes.
+4. On yes, run `spectra ai relink-sources --suite <suite> --output-format json --verbosity quiet`, then re-run triage
+   (Step 1) and show the summary again before Step 3.
+5. On no, nothing is relinked: report the RELINK tests as left for later and go on with the
+   other buckets (Step 3).
 
-Update `.spectra/progress.json` — N = number of OUTDATED tests:
-```json
-{"phases":["Step 1 — Classify tests","Step 2 — Edit OUTDATED tests","Step 3 — Report"],"active":1,"loop":{"current":0,"total":N,"label":"starting"}}
+**Step 3** — REMOVED and CRITERIA_REMOVED (review only). Entries whose reason starts with
+`not found; submodule not checked out` are not removals: name the submodule once, tell the user to run
+git submodule update --init themselves and re-run triage, and do not list those tests for review. List every other entry of `removed`: the test, the ref or
+criterion that is gone, and its `reason`. Do not compile an edit prompt for these tests, and never edit the `.md` file
+yourself. Tell the user how to clear each one (reference.md, **Clearing REMOVED entries**); never run a delete from
+this skill. These tests can't be acknowledged while the ref is still listed (`REF_REMOVED` / `CRITERION_REMOVED`).
+
+**Step 4** — Ask the user which buckets to process:
+- **LOAD only (recommended)** — the `LOAD` and `CRITERIA_CHANGED` buckets;
+- **LOAD + LIGHT** — those plus `LIGHT` (small wording changes);
+- **choose groups** — offer only groups in the `LOAD`, `CRITERIA_CHANGED` or `LIGHT` buckets;
+- **report only** — no edits; STOP after the report.
+
+`RELINK`, `REMOVED` and `CRITERIA_REMOVED` groups never enter the edit loop, whichever option is chosen.
+
+Then, before the first group is edited, ask once: "Re-verify the edited tests with the critic now? (recommended)". The
+answer (`verify: yes` or `verify: no`) goes to every `spectra-updater` and `spectra-repairer` call of this run; don't
+ask again. With `no`, the edited tests are collected as **unverified** for the report.
+
+Update `.spectra/progress.json` (G = number of selected groups):
+`{"phases":[…as above…],"active":2,"loop":{"current":0,"total":G,"label":"starting"}}`
+
+**Step 5** — For each selected group (g = 1..G), one at a time — never in parallel — set the loop to
+`{"current":g,"total":G,"label":"group g/G: <group>"}`, then invoke the `spectra-updater` subagent with the Agent tool,
+passing `suite: <suite>`, `group: <group>` and `verify: yes|no` — nothing else. It edits, stages and ingests the tests
+(retrying a failed test at most twice), has `spectra-critic` re-verify each `written` test (with `verify: yes`), and
+returns one line per test:
+- `<id> | written` — updated, baseline recorded. `<id> | written (manual verdict kept)` (`manual_verdict_kept`) — the
+  same, and the test keeps its Manual verdict: never sent to the critic; reported as "manual verdict kept — review by
+  hand";
+- `<id> | unchanged` — acknowledged: reviewed, no edit needed; baseline recorded;
+- `<id> | unchanged_pending <BUCKET>: <why>` — returned unchanged, but the change still needs an edit (below);
+- `<id> | failed <error_code>: <first error>` — still failing after the retries; nothing written;
+
+then `baseline: …` and `warning: …` lines, and (with `verify: yes`) one verdict line per `written` test or
+`critic: not run`. Report every line, as returned. A failed test is reported, not redone here. A line may name a test
+of an earlier group (a leftover staging file): attribute it by id. A test of the group with no line is "outcome
+unknown"; do not read files to find out. A `stop: triage is stale` line → re-run Step 1, then continue with the
+buckets the user chose; any other `stop:` → report it and stop for this suite.
+
+**Returned unchanged, still pending.** List each `unchanged_pending` test with its bucket and reason, then:
+- `LOAD` or `CRITERIA_CHANGED` → ask the user, per group, whether to **acknowledge** it (the change needs no edit) or
+  **edit again**. Never acknowledge without the user's
+  answer.
+  - acknowledge → `spectra ai update-ack --suite <suite> --ids <id1>,<id2> --output-format json --verbosity quiet`;
+  - edit again → invoke the `spectra-updater` subagent with `suite: <suite>` and `ids: <id>` (and `verify: yes|no`),
+    and report its lines. Offer this at most twice per test.
+- `REMOVED`, `CRITERIA_REMOVED` or `RELINK` → the documentation changed again since triage: say so,
+  offer no acknowledgement (`update-ack` refuses them: `REF_REMOVED`, `CRITERION_REMOVED`), and tell the user to
+  re-run `spectra ai update-triage`.
+
+**Step 5a** — Route the re-verified tests (Specs 090, 093, 101). An edit removes the test's old critic verdict, so
+**every `written` line goes through this step** — a group's, a leftover's, an "edit again", or a re-edit after "still
+hallucinated". Nothing loses its verification silently: a `written` test that isn't re-verified is reported as
+**unverified**. Route by the updater's verdict lines (the verdict the CLI classified):
+- `verdict grounded` → add the id to the group's grounded ids;
+- `verdict partial` or `verdict hallucinated` → collect the id for one repair attempt (below);
+- `unverified: <reason>` → **unverified** (critic could not judge): report it with the reason and the next step (run
+  this step again for it, or `spectra ai audit-grounding --suite <suite>`, where it shows as `none` / `critic`);
+- `critic-disagrees` → **unverified**; report both verdicts.
+
+Fallback — `critic: not run`, or a `written` test with no verdict line (and `verify: yes`): for each such test invoke
+the `spectra-critic` subagent with the Agent tool — suite + test id only, never a hand-built file path; compare its
+final line, never read the verdict file — then `spectra ai ingest-verdict --suite <suite> --all --ids <id1>,<id2> --output-format json` and route
+by `results` as above (no entry → the critic once more and the ingest again; still none → unverified; the critic's
+line names another verdict → unverified).
+
+Then write the grounding blocks of the group's grounded tests only (Spec 097) — skip this call when no test of the
+group is `grounded`:
 ```
-
-**Step 2** — For each OUTDATED test (i = 1..N), update progress.json first:
-```json
-{"phases":["Step 1 — Classify tests","Step 2 — Edit OUTDATED tests","Step 3 — Report"],"active":1,"loop":{"current":i,"total":N,"label":"test i/N: <id>"}}
+spectra ai ingest-grounding --suite <suite> --all --ids <grounded ids> --output-format json
 ```
+An **unverified** test is never in `--ids`, so it never gets a block.
 
-Then compile its edit prompt with the Bash tool:
+**Repair.** If any ids were collected, invoke the `spectra-repairer` subagent once with the Agent tool, passing
+`suite: <suite>`, `ids: <id1>,<id2>` and `verify: yes`. It patches only what the critic flagged, ingests the repairs
+(keeping each test's baseline), retries a failed repair ingest at most twice, has `spectra-critic` re-verify each
+`written` repair (an `unchanged` repair keeps the verdict that sent it to repair), and returns `<id> | written`,
+`<id> | unchanged` or `<id> | failed <error_code>: <first error>` per ingested file, then a verdict line per
+`written` / `unchanged` test (or `critic: not run`). Report every line. Then:
+- only for the ids it returned `written` or `unchanged` (a leftover included): route by their verdict lines as above (the
+  fallback for a missing line or `critic: not run`: the critic for `written` ids only, `unchanged` ids straight to its
+  ingest call), then
+  `spectra ai ingest-grounding --suite <suite> --all --repaired --repair-attempts 1 --ids <id1>,<id2> --output-format json`
+  (Spec 091: `--ids` names exactly the re-verified tests, so nothing else is marked repaired);
+- **repair failed** — a `failed` line: report "repair failed: <error_code>", write no repaired grounding, and list the
+  test as **unverified** if it was partial, or as **waiting for the user** if it was hallucinated (the choices below);
+- an id with no line → report "repair outcome unknown" and leave it unverified.
+
+After the repair, by the re-critic's verdict:
+- **still partial** → it is flagged for review (its block says so); report it.
+- **still hallucinated** → stop for that test and ask the user to choose: edit it again (the
+  `spectra-updater` subagent with `ids: <id>`), restore the previous version from git (the user
+  runs that — never run git yourself), or delete it through the `spectra-delete` skill. This skill
+  never runs `spectra ai record-drop` or `spectra delete` — the test existed before the edit, so
+  dropping it is the user's decision.
+
+The critic and repair steps are never skipped silently: a test that isn't re-verified is reported as unverified.
+
+**Step 6** — Acknowledge the tests the user reviewed and kept as they are without an edit prompt (a test returned
+unchanged in Step 5 is already acknowledged), in one call:
 ```
-spectra ai compile-update-prompt --suite <suite> --test-id <id>
+spectra ai update-ack --suite <suite> --ids <id1>,<id2> --output-format json --verbosity quiet
 ```
-- Exit `0` → the edit prompt is on stdout (the existing test + the changed source/criteria + edit instructions).
-- Exit `4` → a required input is missing (no such test, or no changed source/criteria to reconcile against). Skip this test and tell the user why.
+Only tests the user actually reviewed. A test neither edited nor acknowledged stays in triage — nothing is deferred
+silently.
 
-**Step 3** — Edit in-session. Read the prompt. Edit **only** the parts the
-documentation/criteria change requires. Keep the id, the structure, the priority,
-component, tags, and any manual notes. Write the whole edited test as a JSON array
-with a single element to `.spectra/updated.json`.
+**Step 7** — Set `"active":3`, then report for the suite, from the returned lines and the commands you ran: the bucket counts, COSMETIC auto-acknowledged, tests edited,
+returned unchanged, acknowledged and still pending (with ids and bucket), REMOVED / CRITERIA_REMOVED left for the user,
+tests failed after retries (with error codes), each `baseline:` and `warning:` line, and unbaselined tests. For the
+re-verification (Step 5a), the counts with ids: grounded, partial (flagged for review), hallucinated (waiting for the
+user's choice), unverified (declined or not run), and manual verdict kept.
 
-**Step 4** — Ingest (fail-loud), with the Bash tool:
-```
-spectra ai ingest-update <suite> --test-id <id> --from .spectra/updated.json --output-format json --verbosity quiet
-```
-- Exit `0` → persisted; the id is unchanged and the index was regenerated.
-- Exit `5` → content invalid **or** `DRIFT_DETECTED`. Read the specific error.
-  - `DRIFT_DETECTED` → you changed an out-of-scope field; redo the edit touching ONLY what the doc change requires.
-  - otherwise → fix the malformed/truncated JSON.
-- Exit `6` → schema invalid. Read the error and fix the offending field.
-
-**Bounded retry:** on exit `5`/`6`, re-edit and re-ingest **at most twice** (3 attempts
-total) for the same test. If it still fails, stop and report the specific error — do not
-loop. On any non-zero exit, nothing was persisted; the original test and indexes are untouched.
-
-**Step 5** — Update progress.json to mark complete, then report.
-```json
-{"phases":["Step 1 — Classify tests","Step 2 — Edit OUTDATED tests","Step 3 — Report"],"active":2}
-```
-For the suite, summarize: total analyzed, classification breakdown
-(UP_TO_DATE / OUTDATED / ORPHANED / REDUNDANT), tests edited (with ids), and any tests
-that failed ingest after retries or were flagged for manual review.
-
-Write `.spectra/progress.json`: `{"active":3}` (terminal — seam-progress page renders Complete).
+Write `.spectra/progress.json`: `{"active":4}` (terminal — seam-progress page renders Complete).
 
 ## Update all suites
 
-When the user says "update all": list suites with
-`spectra list --no-interaction --output-format json --verbosity quiet`, then run the
-loop above for each suite sequentially.
-
----
-
-## Classification meanings
-
-When presenting results, explain classifications:
-- **UP_TO_DATE** — test matches current documentation, left untouched
-- **OUTDATED** — documentation or linked criteria changed; the test is **edited in-session** through the seam, preserving its id and manual fields
-- **ORPHANED** — source documentation or criteria were removed; flagged for review (not edited)
-- **REDUNDANT** — duplicates another test's coverage; flagged for review (not edited)
-
----
-
-## Suggest next steps
-
-After updating:
-- "Run coverage analysis?" → use spectra-coverage SKILL
-- "Validate the updated test cases?" → use spectra-validate SKILL
-- "Generate additional test cases for new coverage gaps?" → use spectra-generate SKILL
-- "View the updated test cases?" → use spectra-list SKILL
-
----
-
-## Example user requests
-
-- "Update test cases for the checkout suite"
-- "My docs changed, update the test cases"
-- "Check if any test cases are outdated"
-- "Edit the outdated login test cases to match the new docs"
-- "Update all test suites"
-- "Are there any orphaned test cases?"
-- "Refresh test cases after the API docs update"
-
----
-
-## Cancel the current run
-
-If the user says "stop", "cancel", "kill it", "stop the analysis", "stop updating":
-
-**Step 1** — Run with the Bash tool:
+When the user says "update all", run ONE triage over every suite:
 ```
-spectra cancel --no-interaction --output-format json --verbosity quiet
+spectra ai update-triage --all-suites --output-format json --verbosity quiet
 ```
+Then follow Steps 2–7 one suite at a time, with the groups of that suite (each group names its `suite`; pass that suite
+to the subagents and to `update-ack`). In Step 2a, preview and relink every suite in one call each:
+`spectra ai relink-sources --all-suites --dry-run …`, then, after the user's yes, the same without `--dry-run`.
 
-**Step 2** — Wait for the command to finish, then Read `.spectra-result.json`.
+## Stop
 
-**Step 3** — Report what happened:
-- `status: completed` with `shutdown_path: cooperative` → "Cancelled at phase {phase}. Tests/files written before stopping are preserved."
-- `status: completed` with `shutdown_path: forced` → "Force-killed after grace window."
-- `status: no_active_run` → "Nothing was running."
+If the user says "stop", "cancel" or "stop updating": finish or abandon the current group
+(`ingest-update` persists each staged test whole or not at all), don't start the next one,
+and report what was edited, acknowledged and left so far. Tests not yet processed stay in
+triage and are reported again next time.

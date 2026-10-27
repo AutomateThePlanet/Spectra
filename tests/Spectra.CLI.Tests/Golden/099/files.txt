@@ -1,0 +1,1992 @@
+### .claude/settings.json (134 bytes)
+{
+  "permissions": {
+    "allow": [
+      "Bash(spectra *)",
+      "Write(.spectra/**)",
+      "Edit(.spectra/**)"
+    ]
+  }
+}
+### end
+### .github/workflows/deploy-dashboard.yml (3134 bytes)
+# SPECTRA Dashboard Auto-Deployment
+#
+# Automatically regenerates and deploys the SPECTRA dashboard to Cloudflare Pages
+# when test files, documentation, execution data, or configuration change.
+#
+# Required GitHub Secrets:
+#   CLOUDFLARE_API_TOKEN  - Cloudflare API token with "Edit Cloudflare Pages" permissions
+#   CLOUDFLARE_ACCOUNT_ID - Your Cloudflare account ID
+#
+# Required Cloudflare Pages Environment Variables:
+#   GITHUB_CLIENT_ID      - GitHub OAuth App client ID (for authentication)
+#   GITHUB_CLIENT_SECRET  - GitHub OAuth App client secret
+#   ALLOWED_REPOS         - Comma-separated org/repo list (e.g., "myorg/myrepo")
+#   SESSION_SECRET        - Random string for cookie signing
+#   AUTH_ENABLED          - Set to "true" to enable authentication
+#
+# For full setup instructions, see docs/deployment/cloudflare-pages-setup.md
+
+name: Deploy SPECTRA Dashboard
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'test-cases/**'
+      - '.execution/**'
+      - 'docs/**'
+      - 'spectra.config.json'
+
+  workflow_dispatch:
+
+concurrency:
+  group: dashboard-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Generate and Deploy Dashboard
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0'
+
+      - name: Install SPECTRA CLI
+        run: dotnet tool install -g Spectra.CLI
+
+      - name: Run coverage analysis with auto-linking
+        run: spectra ai analyze --coverage --auto-link
+        continue-on-error: true
+
+      - name: Generate dashboard
+        run: spectra dashboard --output ./site
+
+      - name: Copy Cloudflare Pages functions (OAuth middleware)
+        run: |
+          if [ -d "dashboard-site/functions" ]; then
+            cp -r dashboard-site/functions ./site/functions
+          fi
+
+      - name: Read project name from config
+        id: config
+        run: |
+          PROJECT_NAME=$(jq -r '.dashboard.cloudflare_project_name // "spectra-dashboard"' spectra.config.json 2>/dev/null || echo "spectra-dashboard")
+          echo "project_name=$PROJECT_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy ./site --project-name=${{ steps.config.outputs.project_name }}
+
+      - name: Post deployment summary
+        run: |
+          echo "## Dashboard Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The SPECTRA dashboard has been updated and deployed." >> $GITHUB_STEP_SUMMARY
+          echo "**Project:** ${{ steps.config.outputs.project_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+
+### end
+### .gitignore (1177 bytes)
+# SPECTRA
+.execution/*.db
+.execution/*.db-*
+.spectra.lock
+.spectra/.pid
+.spectra/.cancel
+.spectra/id-allocator.lock
+.spectra/id-allocator.json
+.spectra/progress.json
+.spectra/analysis.json
+.spectra/generated.json
+.spectra/updated.json
+.spectra/criteria.json
+.spectra/critic-verdict.json
+.spectra/seam-progress.html
+.spectra/skills-manifest.json
+.spectra-result.json
+.spectra-progress.html
+.spectra/criteria.lock
+.spectra/baseline.lock
+.spectra/update-triage.json
+.spectra/updates/
+.spectra/repairs/
+.spectra/generation-plan/
+.spectra/verdicts/
+.spectra/dropped-tests.json
+# spectra-offered: .execution/*.db, .execution/*.db-*, .spectra.lock, .spectra/.pid, .spectra/.cancel, .spectra/id-allocator.lock, .spectra/id-allocator.json, .spectra/progress.json, .spectra/analysis.json, .spectra/generated.json, .spectra/updated.json, .spectra/criteria.json, .spectra/critic-verdict.json, .spectra/seam-progress.html, .spectra/skills-manifest.json, .spectra-result.json, .spectra-progress.html, .spectra/criteria.lock, .spectra/baseline.lock, .spectra/update-triage.json, .spectra/updates/, .spectra/repairs/, .spectra/generation-plan/, .spectra/verdicts/, .spectra/dropped-tests.json
+
+### end
+### .spectra-progress.html (<mask:size> bytes)
+<mask:run-status-file>
+### end
+### .spectra-result.json (<mask:size> bytes)
+<mask:run-status-file>
+### end
+### .spectra/generation-plan/payments.json (2052 bytes)
+{
+  "version": 1,
+  "suite": "payments",
+  "focus": null,
+  "batch_size": 8,
+  "coverage_threshold": 0.6,
+  "recommended": 2,
+  "planned_total": 2,
+  "count_rule": "proportional",
+  "behaviors": [
+    {
+      "id": "B1",
+      "title": "Large card payment needs confirmation",
+      "category": "happy_path",
+      "technique": "EP",
+      "source": "docs/payments/checkout.md#cards",
+      "ref": "docs/payments/checkout.md#cards",
+      "resolved": true,
+      "covered_by": "TC-101"
+    },
+    {
+      "id": "B2",
+      "title": "Refund inside the window",
+      "category": "happy_path",
+      "technique": "EP",
+      "source": "docs/payments/checkout.md#refund-window",
+      "ref": "docs/payments/checkout.md#refund-window",
+      "resolved": true,
+      "covered_by": "TC-103"
+    },
+    {
+      "id": "B3",
+      "title": "Partial refund capped at the paid amount",
+      "category": "happy_path",
+      "technique": "EP",
+      "source": "docs/payments/refunds.md#partial-refunds",
+      "ref": "docs/payments/refunds.md#partial-refunds",
+      "resolved": true,
+      "covered_by": null
+    },
+    {
+      "id": "B4",
+      "title": "Currency shown on the receipt",
+      "category": "happy_path",
+      "technique": "EP",
+      "source": "docs/payments/receipts.md#currency",
+      "ref": "docs/payments/receipts.md#currency",
+      "resolved": true,
+      "covered_by": null
+    }
+  ],
+  "sections": {
+    "docs/payments/receipts.md#currency": "sha256:ff5cb5b3a2f115b4aa66d2ddc3488ea7d192996851ea08815574a5700d3f4280",
+    "docs/payments/refunds.md#partial-refunds": "sha256:6ade1b55876d45a5a610705b317d72184c6f9542581f365b5c99b06682ba3f1f"
+  },
+  "batches": [
+    {
+      "batch_id": "1",
+      "behavior_ids": [
+        "B4"
+      ],
+      "source_refs": [
+        "docs/payments/receipts.md#currency"
+      ],
+      "count": 1
+    },
+    {
+      "batch_id": "2",
+      "behavior_ids": [
+        "B3"
+      ],
+      "source_refs": [
+        "docs/payments/refunds.md#partial-refunds"
+      ],
+      "count": 1
+    }
+  ],
+  "notes": []
+}
+
+### end
+### .spectra/golden/analysis.json (553 bytes)
+{"behaviors":[{"category":"happy_path","title":"Large card payment needs confirmation","source":"docs/payments/checkout.md#cards","technique":"EP"},{"category":"happy_path","title":"Refund inside the window","source":"docs/payments/checkout.md#refund-window","technique":"EP"},{"category":"happy_path","title":"Partial refund capped at the paid amount","source":"docs/payments/refunds.md#partial-refunds","technique":"EP"},{"category":"happy_path","title":"Currency shown on the receipt","source":"docs/payments/receipts.md#currency","technique":"EP"}]}
+### end
+### .spectra/golden/edit-TC-101.json (281 bytes)
+[
+  {"id": "TC-101", "title": "Large card payment is confirmed", "priority": "high", "steps": ["Open checkout", "Pay 3001 EUR"], "expected_result": "The payment asks for confirmation above 3000 EUR", "source_refs": ["docs/payments/checkout.md#cards"], "criteria": ["AC-PAY-001"]}
+]
+### end
+### .spectra/golden/new-tests.json (515 bytes)
+[
+  {"id": "TC-107", "title": "Receipt shows the currency", "priority": "medium", "steps": ["Pay", "Open the receipt"], "expected_result": "The currency is shown", "source_refs": ["docs/payments/receipts.md#currency"], "criteria": []},
+  {"id": "TC-108", "title": "Second partial refund is capped", "priority": "low", "steps": ["Refund part", "Refund the rest"], "expected_result": "The total never exceeds the paid amount", "source_refs": ["docs/payments/refunds.md#partial-refunds"], "criteria": ["AC-REF-001"]}
+]
+### end
+### .spectra/prompts/behavior-analysis.md (8732 bytes)
+---
+spectra_version: "1.0"
+template_id: behavior-analysis
+description: "How SPECTRA analyzes documentation to identify testable behaviors using ISTQB test design techniques"
+placeholders:
+  - name: document_text
+    description: "Full text of the documents being analyzed"
+  - name: document_title
+    description: "Title/filename of the document"
+  - name: existing_tests
+    description: "YAML list of existing test IDs and titles for this suite"
+  - name: suite_name
+    description: "Target test suite name"
+  - name: focus_areas
+    description: "User-specified --focus filter (optional, may be empty)"
+  - name: acceptance_criteria
+    description: "Related acceptance criteria from .criteria.yaml files"
+  - name: categories
+    description: "Configured behavior categories with descriptions (from config)"
+  - name: coverage_context
+    description: "Coverage snapshot context block (existing tests, criteria, source refs) for gap-only analysis"
+---
+
+<!-- Pattern: Persona + Boundaries + Chain-of-thought + Structured output -->
+<!-- Customize the categories section to focus on your domain -->
+
+You are a senior test analyst (ISTQB Advanced Level) analyzing product documentation
+to systematically identify every testable behavior. Apply formal test design techniques
+— do NOT just list features as happy-path scenarios.
+
+## TECHNIQUE 1: Equivalence Partitioning (EP)
+
+For every input field, parameter, or configuration value mentioned in the documentation:
+- Identify the VALID equivalence classes (ranges, allowed values, formats)
+- Identify the INVALID equivalence classes (out-of-range, wrong type, empty, null, too long)
+- Generate ONE behavior per equivalence class
+
+## TECHNIQUE 2: Boundary Value Analysis (BVA)
+
+For every numeric range, text length limit, date range, or collection size:
+- Identify exact boundary values: min, max, min-1, max+1, min+1, max-1
+- Generate ONE behavior per boundary value
+- Example: "Field accepts 3-20 chars" → test at 2, 3, 4, 19, 20, 21 chars
+
+## TECHNIQUE 3: Decision Table
+
+For every business rule with multiple conditions that produce different outcomes:
+- Identify the conditions (inputs) and actions (outcomes)
+- Generate behaviors covering each unique combination of conditions
+- Example: "Discount applies if member AND order > $100" → 4 combinations
+
+## TECHNIQUE 4: State Transition
+
+For every workflow, process, or status machine:
+- Identify the states and valid transitions between them
+- Generate behaviors for each valid transition (happy path)
+- Generate behaviors for INVALID transitions (attempting actions in wrong state)
+- Example: Calculator states: Clear → Operand1 → Operator → Operand2 → Result
+
+## TECHNIQUE 5: Error Guessing
+
+Based on common defect patterns, generate behaviors for:
+- Division by zero, overflow, underflow
+- Empty/null/whitespace inputs
+- Special characters, Unicode, injection
+- Rapid repeated actions, concurrent access
+- Maximum data volumes
+
+## TECHNIQUE 6: Use Case Paths
+
+For every user-facing feature:
+- Main success scenario (happy path)
+- Each documented alternate flow
+- Each documented exception/error flow
+
+## OUTPUT INSTRUCTIONS
+
+Categorize each behavior into one of these categories:
+
+{{#each categories}}
+- {{id}}: {{description}}
+{{/each}}
+
+For each behavior, provide:
+- category: one of the categories above
+- title: short description (max 80 chars)
+- source: the most specific section it comes from, as `doc#anchor` — the same form tests use in `source_refs`, with
+  the anchor of a heading from the document's Sections list (e.g. `docs/form.md#username`); the bare document path
+  when the behavior spans the whole document
+- technique: which test design technique produced this behavior (EP, BVA, DT, ST, EG, UC)
+
+Return ONLY a JSON object in this exact format (no other text):
+
+{"behaviors": [{"category": "boundary", "title": "Input field rejects 21 chars (max is 20)", "source": "docs/form.md#username", "technique": "BVA"}]}
+
+## BOUNDARY-COVERAGE GAPS
+
+Extending the Boundary Value Analysis above, also report **boundary-coverage gaps**: boundary/edge
+conditions the documentation or acceptance criteria *imply should be tested* — min/max, off-by-one,
+empty/null, overflow, timeout — that are **NOT** covered by the existing tests (see coverage context
+below, if present) and are **NOT** already addressed by a behavior you listed above.
+
+Emit them in a top-level `boundary_gaps` array, a sibling of `behaviors`. For each gap provide:
+- `field`: the field/parameter or behavior the boundary concerns (e.g. "username", "order total")
+- `kind`: the boundary kind — one of `min-max`, `off-by-one`, `empty-null`, `overflow`, `timeout`, `max-length`
+- `description`: the specific missing edge (e.g. "21-char input (max 20) is untested")
+- `source`: the document/criterion that implies the boundary (may be "" if inferred from combined context)
+
+Be CONSERVATIVE: report a gap ONLY where the source actually implies a boundary condition. If the
+documentation implies no boundary, or every implied boundary is already covered, return
+`"boundary_gaps": []`. Do NOT emit speculative "you might want to test X" suggestions.
+
+Full output shape with both arrays:
+
+{"behaviors": [{"category": "boundary", "title": "Input field rejects 21 chars (max is 20)", "source": "docs/form.md#username", "technique": "BVA"}], "boundary_gaps": [{"field": "username", "kind": "max-length", "description": "max length boundary (20) has no test", "source": "docs/form.md"}]}
+
+## DISTRIBUTION GUIDELINES
+
+- Do NOT generate more than 40% of behaviors in any single category — push toward boundary, negative, and edge cases
+- Every numeric range MUST produce at least 4 BVA behaviors (min, max, min-1, max+1)
+- Every multi-condition rule MUST produce a decision table
+- Every workflow MUST produce at least one invalid state transition
+- Distribute behaviors across ALL configured categories — no category should have 0 behaviors unless the documentation genuinely has no content matching that category
+
+Count only DISTINCT testable behaviors — do not duplicate similar scenarios.
+
+{{#if coverage_context}}
+{{coverage_context}}
+{{/if}}
+
+{{#if testimize_enabled}}
+## STRUCTURED FIELD SPECIFICATIONS
+
+In addition to the `behaviors` array, include a top-level `field_specs` array in your JSON output listing every input field the documentation constrains (numeric ranges, string lengths, date ranges, enumerated values, required/optional). SPECTRA will feed these specs into the Testimize engine in-process to pre-compute optimal boundary values, equivalence classes, and error-message pairings *before* the test-generation step runs. You do NOT need to call any tool yourself — just emit the structured data.
+
+For each field, include these keys (omit keys that don't apply to the type):
+
+- `name`: field label as it appears in the UI (e.g., "Age", "Email", "First Day of Week")
+- `type`: one of `Text`, `Integer`, `Date`, `Email`, `Phone`, `Password`, `Url`, `Username`, `Boolean`, `SingleSelect`, `MultiSelect`
+- `required`: `true` if the documentation says the field is required, `false` otherwise
+- `min` / `max`: numeric bounds for `Integer` fields
+- `minLength` / `maxLength`: length bounds for string-like types (`Text`, `Email`, `Password`, `Url`, `Username`, `Phone`)
+- `minDate` / `maxDate`: ISO-8601 bounds for `Date` fields (e.g., `"1900-01-01"`)
+- `allowedValues`: array of strings for `SingleSelect` / `MultiSelect`
+- `expectedInvalidMessage`: exact error message string the documentation says is shown when the field is invalid — quote it verbatim if possible
+
+Output shape (example):
+
+{"behaviors": [...], "field_specs": [
+  {"name": "Age", "type": "Integer", "required": true, "min": 18, "max": 100, "expectedInvalidMessage": "Age must be between 18 and 100."},
+  {"name": "Email", "type": "Email", "required": true, "minLength": 6, "maxLength": 254, "expectedInvalidMessage": "Enter a valid email address."},
+  {"name": "First Day of Week", "type": "SingleSelect", "required": false, "allowedValues": ["Monday", "Sunday", "Saturday"]}
+]}
+
+When the documentation has NO constrained input fields (e.g., a pure button-tap UI with no text entry or ranges), return `"field_specs": []` or omit the key entirely. Do not invent fields that aren't in the docs.
+{{/if}}
+
+{{#if focus_areas}}
+Focus area: {{focus_areas}}
+Prioritize behaviors related to this focus, but still apply all techniques systematically.
+{{/if}}
+
+{{#if acceptance_criteria}}
+Acceptance criteria to cover:
+{{acceptance_criteria}}
+{{/if}}
+
+Documentation:
+{{document_text}}
+
+### end
+### .spectra/prompts/criteria-extraction.md (3505 bytes)
+---
+spectra_version: "1.0"
+template_id: criteria-extraction
+description: "How SPECTRA extracts acceptance criteria from a single document"
+placeholders:
+  - name: document_text
+    description: "Single document content"
+  - name: document_title
+    description: "Document path/filename"
+  - name: existing_criteria
+    description: "Already extracted criteria for this doc (for incremental updates)"
+  - name: component
+    description: "Component hint for the document (optional)"
+---
+
+<!-- Pattern: Persona + Boundaries + Structured output -->
+<!-- Customize the RFC 2119 normalization rules for your domain -->
+
+You are a requirements analyst. Extract all testable acceptance criteria from this single document.
+
+For each criterion:
+- id (optional): the id of an existing criterion this one expresses (see "Existing criteria" below); omit it for a new requirement
+- text: Rewrite using RFC 2119 language (MUST, SHOULD, MAY). Preserve original meaning.
+- rfc2119: The primary RFC 2119 keyword used (MUST, MUST NOT, SHALL, SHALL NOT, SHOULD, SHOULD NOT, MAY, REQUIRED, RECOMMENDED, OPTIONAL)
+- source_section: The heading/section where this criterion was found
+- priority: "high" for MUST/SHALL/REQUIRED, "medium" for SHOULD/RECOMMENDED, "low" for MAY/OPTIONAL
+- tags: 1-3 relevant categorization tags
+- technique_hint: optional ISTQB test design technique that best applies (see "Technique Hints" below)
+
+## Technique Hints
+
+When extracting acceptance criteria, identify which ISTQB test design technique
+best applies. Set the optional `technique_hint` field on each criterion:
+
+- If the criterion mentions a numeric range, add `technique_hint: BVA`
+- If the criterion mentions multiple conditions with outcomes, add `technique_hint: DT`
+- If the criterion mentions a workflow or state change, add `technique_hint: ST`
+- If the criterion mentions valid/invalid input categories, add `technique_hint: EP`
+- If no technique clearly applies, omit the field (it is optional)
+
+Examples:
+
+- "Username must be 3-20 characters" → `technique_hint: BVA` (has numeric range)
+- "Discount applies if member AND order > $100" → `technique_hint: DT` (multiple conditions)
+- "Order status changes from Pending to Shipped when dispatched" → `technique_hint: ST` (state transition)
+
+These hints are informational — they help the generation prompt select
+appropriate techniques when covering this criterion.
+{{#if component}}
+The document belongs to the "{{component}}" component.
+{{/if}}
+{{#if existing_criteria}}
+
+## Existing criteria
+
+This document already has acceptance criteria. For every criterion you extract that expresses the SAME requirement as one
+of these (even if you word it differently), return that criterion's "id" unchanged. Omit "id" for new requirements. Never
+invent an id, and never use the same id twice.
+
+Existing criteria:
+{{existing_criteria}}
+{{/if}}
+
+Respond ONLY with a JSON array. No markdown, no explanation, no code fences. Example:
+[
+  {"id": "AC-PAYMENTS-001", "text": "System MUST validate IBAN format before payment", "rfc2119": "MUST", "source_section": "Payment Validation", "priority": "high", "tags": ["payment", "validation"], "technique_hint": "EP"},
+  {"text": "System SHOULD display inline error within 500ms", "rfc2119": "SHOULD", "source_section": "UX Requirements", "priority": "medium", "tags": ["ux", "performance"]}
+]
+
+Document path: {{document_title}}
+
+Document content:
+{{document_text}}
+
+### end
+### .spectra/prompts/critic-verification.md (5089 bytes)
+---
+spectra_version: "1.0"
+template_id: critic-verification
+description: "How SPECTRA's critic verifies generated tests against source documentation"
+placeholders:
+  - name: test_case
+    description: "Generated test case (full markdown)"
+  - name: source_document
+    description: "Source documentation the test references"
+  - name: acceptance_criteria
+    description: "Linked acceptance criteria"
+---
+
+<!-- Pattern: Persona + Boundaries + Fact Check List -->
+<!-- Customize verdict rules and strictness level for your quality bar -->
+
+You are a test case verification expert. Your job is to verify that test cases are grounded in source documentation.
+
+For each test case, analyze every claim (preconditions, steps, expected results) and determine if it can be traced to the provided documentation.
+
+Output format: Return ONLY a JSON object with this structure:
+{
+  "verdict": "grounded" | "partial" | "hallucinated",
+  "score": 0.0-1.0,
+  "findings": [
+    {
+      "element": "Step 1" | "Expected Result" | "Precondition",
+      "claim": "The specific claim being checked",
+      "status": "grounded" | "unverified" | "hallucinated",
+      "evidence": "Quote from documentation (if grounded)" | null,
+      "reason": "Why unverified or hallucinated (if not grounded)" | null
+    }
+  ]
+}
+
+Verdict rules:
+- "grounded": ALL claims can be traced to documentation
+- "partial": SOME claims are verified, but others cannot be confirmed
+- "hallucinated": The test contains invented behaviors or contradicts documentation
+
+Be strict but fair:
+- Generic UI actions (click, navigate, enter text) don't need documentation
+- Specific behaviors, values, or business rules MUST be in documentation
+- If documentation is vague, mark as "unverified" not "hallucinated"
+- "hallucinated" is reserved for clear inventions or contradictions
+
+## Technique Verification
+
+When the test claims to verify a boundary value, equivalence class, state
+transition, or decision-table condition combination, apply ISTQB-aware checks:
+
+- **BVA tests**: Verify the boundary value used in the test matches the actual
+  documented range. If a test says "Enter 21 chars (above 20-char max)" but the
+  docs say max is 25, the verdict is PARTIAL with an unverified claim such as
+  "Boundary value 20 does not match documented maximum of 25".
+
+- **EP tests**: Verify the equivalence class is real — the invalid class must
+  actually be documented as invalid in the source documentation. Otherwise
+  return PARTIAL.
+
+- **ST tests**: Verify the state transition path exists in the documented
+  workflow. If the test assumes state A→C but docs only show A→B→C, flag as
+  PARTIAL.
+
+- **DT tests**: Verify the condition combinations match documented business
+  rules. If the test uses a condition not mentioned in docs, flag as
+  HALLUCINATED.
+
+## Arithmetic Verification
+
+When a test's expected result is a **computed value** — a unit conversion
+result, formula output, scientific-notation magnitude, derived constant, or any
+number produced by calculation — you MUST independently compute the value and
+compare it to what the test asserts. Documentation grounding the *principle*
+(e.g. "use scientific notation", "convert via the SI factor") is NOT sufficient
+if the *number* is wrong.
+
+**Rule**: Principle in docs AND number arithmetically correct → eligible for
+`grounded`. Principle in docs BUT number arithmetically wrong → NOT `grounded`
+(use `partial` or `hallucinated` as appropriate, with an `unverified` or
+`hallucinated` finding on the Expected Result element).
+
+**What counts as a computed value**:
+- Unit conversions (e.g. km → nm, °F → K, bytes → megabytes)
+- Formula outputs (e.g. F = (9/5)C + 32, ΔG = ΔH − TΔS)
+- Conversion-factor products (e.g. 1 km × 10¹² pm/km)
+- Derived constants (e.g. speed of light in nm/s)
+- Scientific-notation magnitudes asserted as exact results
+
+**How to verify**: Compute the expected result yourself using the documented
+conversion factor or formula. Compare your result to the test's asserted value.
+
+**Example of a wrong computed value** (must NOT be `grounded`):
+- Test asserts: input `1×10⁻⁹ km`, expected result `1E-9 nm`
+- Your computation: `1 km = 10¹² nm`, so `1×10⁻⁹ km = 1×10⁻⁹ × 10¹² nm = 10³ nm = 1000 nm`
+- The asserted value `1E-9 nm` ≠ `1000 nm` → arithmetic error → NOT `grounded`
+- Finding: `{ "element": "Expected Result", "claim": "1×10⁻⁹ km → 1E-9 nm", "status": "unverified", "evidence": null, "reason": "Arithmetic error: 1×10⁻⁹ km = 1000 nm, not 1E-9 nm (off by 10¹²)" }`
+
+**Example of a correct computed value** (can be `grounded` if principle is also documented):
+- Test asserts: input `−459.67°F`, expected result `0 K`
+- Your computation: K = (°F − 32) × 5/9 + 273.15 = (−459.67 − 32) × 5/9 + 273.15 = −491.67 × 5/9 + 273.15 = −273.15 + 273.15 = 0 K ✓
+- Arithmetic is correct → this claim is eligible for `grounded` (if the conversion formula is in the docs)
+
+### end
+### .spectra/prompts/test-generation.md (6374 bytes)
+---
+spectra_version: "1.0"
+template_id: test-generation
+description: "How SPECTRA generates test cases from analyzed behaviors"
+placeholders:
+  - name: behaviors
+    description: "Analyzed behaviors from phase 1"
+  - name: suite_name
+    description: "Target test suite name"
+  - name: existing_tests
+    description: "Current tests to avoid duplication"
+  - name: acceptance_criteria
+    description: "Related acceptance criteria"
+  - name: profile_format
+    description: "JSON schema example for output format from generation profile"
+  - name: count
+    description: "Number of tests to generate"
+  - name: focus_areas
+    description: "User-specified --focus filter value"
+  - name: testimize_dataset
+    description: "Pre-computed algorithmic test data rendered as a YAML block (empty when Testimize is disabled, skipped, or found no constrained fields)"
+  - name: testimize_strategy_name
+    description: "Human-readable Testimize strategy name (e.g., HybridArtificialBeeColony). Only meaningful when testimize_dataset is non-empty."
+  - name: source_sections
+    description: "Batch mode (compile-prompt --batch): the batch's documentation sections, each fenced under its ref (empty in count mode)"
+  - name: read_docs
+    description: "Count mode: non-empty when the model reads the documentation itself (empty in batch mode)"
+---
+
+<!-- Pattern: Persona + Boundaries + Few-shot + Structured output -->
+<!-- Customize the CRITICAL RULES to match your process. Keep the DOCUMENTATION and SOURCE SECTIONS blocks: compile-prompt --batch needs them. -->
+
+You are a test case generation expert that creates DOCUMENT-GROUNDED test cases.
+
+## CRITICAL RULES
+
+1. NEVER generate generic test patterns. Every test MUST trace to specific documentation.
+2. Every step and expected result MUST come from the documentation — never from memory or assumptions.
+
+{{#if read_docs}}
+## DOCUMENTATION
+
+Read the relevant documentation with your file tools before writing any test, and ground every step and expected
+result in what it says. Test IDs are assigned when the tests are ingested — do not invent them.
+{{/if}}
+
+{{#if source_sections}}
+## SOURCE SECTIONS
+
+The sections below are the complete source for this batch — do not read any other documentation. Ground every step and
+expected result in these sections. Set each test's "source_refs" to the section refs (the `###` lines below, exactly as
+written) of the behaviors it covers. Test IDs are assigned when the tests are ingested — do not invent them.
+
+{{source_sections}}
+{{/if}}
+
+## TEST DESIGN TECHNIQUE RULES
+
+When writing test steps and expected results, apply these rules based on the
+ISTQB technique tag attached to each behavior (BVA, EP, DT, ST, EG, UC).
+
+### For BVA-tagged behaviors
+
+- Use EXACT boundary values in steps, not generic descriptions
+- WRONG: "Enter a very long username"
+- RIGHT: "Enter a username with exactly 21 characters (one above the 20-char maximum)"
+
+### For EP-tagged behaviors
+
+- Name the equivalence class explicitly
+- WRONG: "Enter invalid input"
+- RIGHT: "Enter a negative number (-5) which is outside the valid range 0-999"
+
+### For DT-tagged behaviors
+
+- State all condition values explicitly in preconditions
+- WRONG: "Test discount calculation"
+- RIGHT: "User is a member (condition 1: true), order total is $50 (condition 2: below $100 threshold)"
+
+### For ST-tagged behaviors
+
+- State the starting state, the action, and the expected resulting state
+- WRONG: "Verify order processing"
+- RIGHT: "Starting in 'Payment Pending' state, click 'Cancel Order'. Verify state changes to 'Cancelled' and refund is initiated"
+
+### For EG-tagged behaviors
+
+- Describe the specific error scenario concretely
+- WRONG: "Test with special characters"
+- RIGHT: "Enter '√(−1)' in the calculator input and verify error handling"
+
+{{#if testimize_dataset}}
+## PRE-COMPUTED ALGORITHMIC TEST DATA (from Testimize, strategy={{testimize_strategy_name}})
+
+The following test data was generated algorithmically by the Testimize engine BEFORE this prompt was sent, using Boundary Value Analysis, Equivalence Partitioning, and the **{{testimize_strategy_name}}** strategy. These values are authoritative — use them verbatim in your generated test case steps. Do NOT round, simplify, or paraphrase them, and do NOT invent additional boundary values; Testimize has already computed the mathematically optimal set.
+
+{{testimize_dataset}}
+
+When you write a test case that exercises one of these fields:
+
+- Use the EXACT `value` in the test step (e.g., "Enter 17 in the Age field", not "Enter a low age")
+- When a value's `category` is `BoundaryInvalid` or `Invalid`, quote the EXACT `expectedInvalidMessage` in the test's expected result
+- Reference the `category` in the test title so the BVA/EP coverage is visible — for example:
+  - `"Enter age 17 (BoundaryInvalid: below minimum 18)"`
+  - `"Enter age 18 (BoundaryValid: at minimum)"`
+  - `"Enter valid age 42 (Valid)"`
+- Each row in the table above may become one test case, or closely related rows (same field, different category) may be grouped into a parameterized test
+- Every `BoundaryInvalid` and `Invalid` row MUST be covered by at least one generated test — these are the highest-value defect-finding cases
+{{/if}}
+
+## OUTPUT FORMAT
+
+Your FINAL message must contain ONLY a JSON array of test cases.
+Do NOT include any explanatory text before or after the JSON. Output ONLY the JSON array.
+
+The JSON array must follow this exact schema:
+
+```json
+{{profile_format}}
+```
+
+---
+
+## YOUR TASK
+
+Generate {{count}} new manual test cases based on this request:
+
+{{behaviors}}
+
+{{#if acceptance_criteria}}
+## ACCEPTANCE CRITERIA — MANDATORY
+
+You MUST map each test case to matching acceptance criteria below. Every test MUST have at least one criterion ID in its "criteria" array. If a test doesn't match any criterion, use the closest related one.
+
+{{acceptance_criteria}}
+{{/if}}
+
+IMPORTANT:
+1. Only generate tests that are grounded in the documentation
+2. Your FINAL response must be ONLY the JSON array — no other text
+3. MANDATORY: For each test, populate the "criteria" array with IDs of acceptance criteria it verifies. Never leave criteria empty when acceptance criteria are provided above.
+
+### end
+### .spectra/prompts/test-update.md (3236 bytes)
+---
+spectra_version: "1.0"
+template_id: test-update
+description: "How SPECTRA edits tests in place when the documentation sections or acceptance criteria they reference changed (inverted update seam; one test or a whole triage group)"
+placeholders:
+  - name: source_diff
+    description: "Each referenced doc section once: its current text, the previous (normalised) version the tests were written against, and what changed — or why it no longer resolves"
+  - name: acceptance_criteria
+    description: "Only the criteria the tests link, with their current text and state (changed since baseline / removed); may be empty"
+  - name: tests
+    description: "The tests to review, each under '### TEST <id>' with the sections and criteria it links and its JSON"
+  - name: profile_format
+    description: "JSON schema example for the output format"
+  - name: test_case
+    description: "Legacy (pre-088 custom templates): the single test to edit, serialized as a JSON object"
+  - name: current_source
+    description: "Legacy (pre-088 custom templates): the source documentation to reconcile against"
+---
+
+<!-- Pattern: Persona + Boundaries + Targeted edit + Structured output -->
+<!-- Spec 088: the prompt carries each changed doc section (current, previous, what changed) once, only the linked
+     criteria, and one or more tests. It drives an EDIT, not a regeneration. -->
+
+You are a test maintenance engineer. The tests below reference documentation sections or acceptance criteria that
+changed. For each test, **edit only the parts the change implicates** so the test matches the current documentation.
+
+## EDIT — DO NOT REGENERATE
+
+1. **Edit only what the source change implicates.** Compare each section's previous version with its current one
+   (and "What changed"), and change only the steps, expected results, test data, scenario reference or criteria links
+   that depend on it. Leave everything else exactly as it is.
+2. **A test that nothing in the change implicates is returned unchanged** — exactly as given.
+3. **Keep the original ids.** Return each test with its original `id`. Never invent, merge or split tests.
+4. **Preserve structure and manual content.** Do not restructure a test, change its priority, component or tags, or
+   alter manual notes.
+5. **Use the documented values.** If the change moved a numeric boundary, added a rule or an equivalence class, use
+   the exact values the current section states.
+6. **Don't invent documentation.** A section marked REMOVED or RELINK has no text here; do not guess its content.
+
+## SOURCE SECTIONS
+
+Each section is shown as it is now ("Current section"), as it was when the tests were written ("Previous version" —
+normalised: lowercased with markup removed, so compare meaning, not formatting), and what changed between them.
+
+{{source_diff}}
+
+{{#if acceptance_criteria}}
+## ACCEPTANCE CRITERIA (linked by these tests)
+
+{{acceptance_criteria}}
+{{/if}}
+
+## TESTS TO REVIEW
+
+{{tests}}
+
+## OUTPUT FORMAT
+
+Your FINAL message must contain ONLY a JSON array with ONE object per `### TEST` above, in the same order, each
+keeping its original `id`, following this schema:
+
+```json
+{{profile_format}}
+```
+
+### end
+### .spectra/skills-manifest.json (801 bytes)
+{
+  "version": "1.0",
+  "files": {
+    ".spectra/prompts/behavior-analysis.md": "4c19052521794265aebf93b45dc7af97e368d1463bd026ac3a1286bf892c6189",
+    ".spectra/prompts/criteria-extraction.md": "6ce3b68a24bc5b3ab733408359f03af4d55e41bf9cd3194cda53ca94ab06c07e",
+    ".spectra/prompts/critic-verification.md": "d8f752862cc3a7978be9c6116d31b84d8d86d77a23cc1d2ac8e00d9665acaa86",
+    ".spectra/prompts/test-generation.md": "ef6791f9973be3d2eda2d28f3efb9856ac69f739627df70f0a619cedc03a99e9",
+    ".spectra/prompts/test-update.md": "393ad4b782de7155dd093983ec3426164da8bfa318311ef36b6d7335b1c462a1",
+    "profiles/_default.yaml": "2188c0eeb095ec2df7646dc735a676f0b5fa18bd143af36c0a0a986b7a54cfbd",
+    "CUSTOMIZATION.md": "045755afe624b6ee143b3afb503d55813f88119d54242a2a6ebbcf667948c6ce"
+  }
+}
+### end
+### .spectra/source-snapshots/32a401628e1d42ef7c44cdbb3346258451d3a4be1ba91f3fb0246872816d0d6b.txt (49 bytes)
+## refund window refunds are allowed for 30 days.
+### end
+### .spectra/source-snapshots/6ade1b55876d45a5a610705b317d72184c6f9542581f365b5c99b06682ba3f1f.txt (68 bytes)
+## partial refunds a partial refund must not exceed the paid amount.
+### end
+### .spectra/source-snapshots/79604c4d9a8eb3791fc33160b20c507d603a872617d6f150f08278a55d4eccc4.txt (119 bytes)
+## card payments cards are charged in eur. a payment above 5000 eur must be confirmed. bash # not a heading echo charge
+### end
+### .spectra/source-snapshots/9547e54f8403610497ab3c209dd9141655a1d6819120ba146eaf8621bedbf6f9.txt (119 bytes)
+## card payments cards are charged in eur. a payment above 3000 eur must be confirmed. bash # not a heading echo charge
+### end
+### .spectra/source-snapshots/bbbd0f5afeaaf80a4593cc6b3e5def86e64a9c0638d0a6174995fdafff8deade.txt (53 bytes)
+## refund window refunds are allowed for thirty days.
+### end
+### .spectra/source-snapshots/c66a957c7ebacf05fbb4c3e0ad454b20a08f710275f8f47ba32da8dd096eb53a.txt (35 bytes)
+## limits first limits: 3 attempts.
+### end
+### .spectra/source-snapshots/ea5a59246fbe96a99a390d3785aed580cecaba8f4318c4edce0d36f7db9e8506.txt (282 bytes)
+# checkout how checkout works. ## card payments cards are charged in eur. a payment above 5000 eur must be confirmed. bash # not a heading echo charge ## limits first limits: 3 attempts. ## limits second limits: 10 payments per day. ## refund window refunds are allowed for 30 days.
+### end
+### .spectra/source-snapshots/ff5cb5b3a2f115b4aa66d2ddc3488ea7d192996851ea08815574a5700d3f4280.txt (58 bytes)
+## currency the receipt shows the currency of the payment.
+### end
+### .spectra/update-triage.json (5740 bytes)
+{"version":1,"scope":{"suite":"payments"},"config":{"group_size":10,"light_threshold_words":12},"tests":[{"suite":"payments","id":"TC-101","bucket":"LOAD","partial":false,"refs":[{"ref":"docs/payments/checkout.md#cards","state":"LOAD","baseline":"sha256:79604c4d9a8eb3791fc33160b20c507d603a872617d6f150f08278a55d4eccc4","current":"sha256:9547e54f8403610497ab3c209dd9141655a1d6819120ba146eaf8621bedbf6f9","why":["numbers: 5000→3000"],"diff":[{"removed":["5000"]},{"added":["3000"]}]}],"criteria":[{"id":"AC-PAY-001","state":"UNCHANGED","baseline":"sha256:bb49a19405740e688eec09515a7924532d8b342eabffb08498e372711bfc36e1","current":"sha256:bb49a19405740e688eec09515a7924532d8b342eabffb08498e372711bfc36e1"}],"unbaselined_refs":[],"unbaselined_criteria":[],"current":{"refs":{"docs/payments/checkout.md#cards":"sha256:9547e54f8403610497ab3c209dd9141655a1d6819120ba146eaf8621bedbf6f9"},"criteria":{"AC-PAY-001":"sha256:bb49a19405740e688eec09515a7924532d8b342eabffb08498e372711bfc36e1"}}},{"suite":"payments","id":"TC-102","bucket":"UNCHANGED","partial":false,"refs":[{"ref":"docs/payments/checkout.md#limits","state":"UNCHANGED","baseline":"sha256:c66a957c7ebacf05fbb4c3e0ad454b20a08f710275f8f47ba32da8dd096eb53a","current":"sha256:c66a957c7ebacf05fbb4c3e0ad454b20a08f710275f8f47ba32da8dd096eb53a"}],"criteria":[],"unbaselined_refs":[],"unbaselined_criteria":[],"current":{"refs":{"docs/payments/checkout.md#limits":"sha256:c66a957c7ebacf05fbb4c3e0ad454b20a08f710275f8f47ba32da8dd096eb53a"},"criteria":{}}},{"suite":"payments","id":"TC-103","bucket":"LOAD","partial":false,"refs":[{"ref":"docs/payments/checkout.md#refund-window","state":"LOAD","baseline":"sha256:32a401628e1d42ef7c44cdbb3346258451d3a4be1ba91f3fb0246872816d0d6b","current":"sha256:bbbd0f5afeaaf80a4593cc6b3e5def86e64a9c0638d0a6174995fdafff8deade","why":["numbers: 30→∅"],"diff":[{"removed":["30"]},{"added":["thirty"]}]}],"criteria":[{"id":"AC-PAY-002","state":"UNCHANGED","baseline":"sha256:993de30017712cd737f55c1add85f49342a726b2616af4852799b8a71e84aa9f","current":"sha256:993de30017712cd737f55c1add85f49342a726b2616af4852799b8a71e84aa9f"}],"unbaselined_refs":[],"unbaselined_criteria":[],"current":{"refs":{"docs/payments/checkout.md#refund-window":"sha256:bbbd0f5afeaaf80a4593cc6b3e5def86e64a9c0638d0a6174995fdafff8deade"},"criteria":{"AC-PAY-002":"sha256:993de30017712cd737f55c1add85f49342a726b2616af4852799b8a71e84aa9f"}}},{"suite":"payments","id":"TC-104","bucket":"UNCHANGED","partial":false,"refs":[{"ref":"docs/payments/refunds.md#partial-refunds","state":"UNCHANGED","baseline":"sha256:6ade1b55876d45a5a610705b317d72184c6f9542581f365b5c99b06682ba3f1f","current":"sha256:6ade1b55876d45a5a610705b317d72184c6f9542581f365b5c99b06682ba3f1f"}],"criteria":[{"id":"AC-REF-001","state":"UNCHANGED","baseline":"sha256:eb7341b57d6357a0f9bb53c3796ebc20eda8b0e58bc7f5e3efc51f8da53832ba","current":"sha256:eb7341b57d6357a0f9bb53c3796ebc20eda8b0e58bc7f5e3efc51f8da53832ba"}],"unbaselined_refs":[],"unbaselined_criteria":[],"current":{"refs":{"docs/payments/refunds.md#partial-refunds":"sha256:6ade1b55876d45a5a610705b317d72184c6f9542581f365b5c99b06682ba3f1f"},"criteria":{"AC-REF-001":"sha256:eb7341b57d6357a0f9bb53c3796ebc20eda8b0e58bc7f5e3efc51f8da53832ba"}}},{"suite":"payments","id":"TC-105","bucket":"LOAD","partial":false,"refs":[{"ref":"docs/payments/checkout.md","state":"LOAD","baseline":"sha256:ea5a59246fbe96a99a390d3785aed580cecaba8f4318c4edce0d36f7db9e8506","current":"sha256:6878b6ee5096f6da8f98a33a3932474789d39ecd774b91b58d0df676fae0f776","why":["numbers: 5000,30→3000"],"diff":[{"removed":["5000"]},{"added":["3000"]},{"removed":["30"]},{"added":["thirty"]}]}],"criteria":[],"unbaselined_refs":[],"unbaselined_criteria":[],"current":{"refs":{"docs/payments/checkout.md":"sha256:6878b6ee5096f6da8f98a33a3932474789d39ecd774b91b58d0df676fae0f776"},"criteria":{}}},{"suite":"payments","id":"TC-107","bucket":"UNCHANGED","partial":false,"refs":[{"ref":"docs/payments/receipts.md#currency","state":"UNCHANGED","baseline":"sha256:ff5cb5b3a2f115b4aa66d2ddc3488ea7d192996851ea08815574a5700d3f4280","current":"sha256:ff5cb5b3a2f115b4aa66d2ddc3488ea7d192996851ea08815574a5700d3f4280"}],"criteria":[],"unbaselined_refs":[],"unbaselined_criteria":[],"current":{"refs":{"docs/payments/receipts.md#currency":"sha256:ff5cb5b3a2f115b4aa66d2ddc3488ea7d192996851ea08815574a5700d3f4280"},"criteria":{}}},{"suite":"payments","id":"TC-108","bucket":"UNCHANGED","partial":false,"refs":[{"ref":"docs/payments/refunds.md#partial-refunds","state":"UNCHANGED","baseline":"sha256:6ade1b55876d45a5a610705b317d72184c6f9542581f365b5c99b06682ba3f1f","current":"sha256:6ade1b55876d45a5a610705b317d72184c6f9542581f365b5c99b06682ba3f1f"}],"criteria":[{"id":"AC-REF-001","state":"UNCHANGED","baseline":"sha256:eb7341b57d6357a0f9bb53c3796ebc20eda8b0e58bc7f5e3efc51f8da53832ba","current":"sha256:eb7341b57d6357a0f9bb53c3796ebc20eda8b0e58bc7f5e3efc51f8da53832ba"}],"unbaselined_refs":[],"unbaselined_criteria":[],"current":{"refs":{"docs/payments/refunds.md#partial-refunds":"sha256:6ade1b55876d45a5a610705b317d72184c6f9542581f365b5c99b06682ba3f1f"},"criteria":{"AC-REF-001":"sha256:eb7341b57d6357a0f9bb53c3796ebc20eda8b0e58bc7f5e3efc51f8da53832ba"}}}],"groups":[{"id":"G1","suite":"payments","bucket":"LOAD","tests":["TC-101"],"items":["ref:docs/payments/checkout.md#cards=LOAD"]},{"id":"G2","suite":"payments","bucket":"LOAD","tests":["TC-103"],"items":["ref:docs/payments/checkout.md#refund-window=LOAD"]},{"id":"G3","suite":"payments","bucket":"LOAD","tests":["TC-105"],"items":["ref:docs/payments/checkout.md=LOAD"]}],"unbaselined":{"payments":{"full":[],"partial":[]}},"notes":["docs/payments/checkout.md#limits: more than one heading shares the anchor key 'limits'; the first was used"]}
+### end
+### .spectra/updates/payments/failed-TC-104.json (356 bytes)
+[
+  {"id": "TC-104", "title": "Partial refund is capped", "priority": "high", "steps": ["Refund"], "expected_result": "Capped", "source_refs": ["docs/payments/refunds.md#partial-refunds"], "criteria": []},
+  {"id": "TC-109", "title": "Another test", "priority": "high", "steps": ["Refund"], "expected_result": "Capped", "source_refs": [], "criteria": []}
+]
+### end
+### .spectra/updates/payments/failed-TC-105.json (208 bytes)
+[
+  {"id": "TC-999", "title": "Checkout page shows the rules", "priority": "high", "steps": ["Open checkout"], "expected_result": "Rules shown", "source_refs": ["docs/payments/checkout.md"], "criteria": []}
+]
+### end
+### .spectra/verdicts/critic-verdict-TC-101.json (170 bytes)
+{"verdict":"grounded","score":0.9,"critic_model":"claude-sonnet-4-6","findings":[{"element":"Step 1","claim":"step action","status":"grounded","evidence":"doc says so"}]}
+### end
+### .spectra/verdicts/critic-verdict-TC-104.json (266 bytes)
+{"verdict":"partial","score":0.9,"critic_model":"claude-sonnet-4-6","findings":[{"element":"Step 1","claim":"step action","status":"grounded","evidence":"doc says so"},{"element":"Expected Result","claim":"exact value","status":"unverified","reason":"not in docs"}]}
+### end
+### .spectra/verdicts/critic-verdict-TC-105.json (187 bytes)
+{"verdict":"hallucinated","score":0.9,"critic_model":"claude-sonnet-4-6","findings":[{"element":"Step 2","claim":"1 KB = 1000 bytes","status":"hallucinated","reason":"contradicts docs"}]}
+### end
+### CUSTOMIZATION.md (14555 bytes)
+# SPECTRA Customization Guide
+
+This guide covers every way you can customize SPECTRA's behavior, from test case
+output format to AI reasoning strategy.
+
+> **Looking for workflow how-tos instead of customization?** See [`USAGE.md`](USAGE.md), the workflow guide for using SPECTRA from Claude Code.
+
+---
+
+## Quick Reference
+
+| What to customize | File(s) | How |
+|---|---|---|
+| Test case format (fields, structure) | `profiles/_default.yaml` | Edit the `format` field directly |
+| AI reasoning (analysis, generation, verification) | `.spectra/prompts/*.md` | Edit markdown prompt templates |
+| Behavior categories | `spectra.config.json` → `analysis.categories` | Add/remove categories with descriptions |
+| Coverage settings | `spectra.config.json` → `coverage` | Configure dirs, patterns, criteria paths |
+| Generation batches | `spectra.config.json` → `generation` | `batch_size` (behaviors per generation batch, default 8) |
+| Session model used for generation/analysis | Your Claude Code session | Pick the model for your session (`/model`); generation runs as a turn in it, so there's no separate config |
+| Critic model | `spectra.config.json` → `ai.critic.model` | An alias (`sonnet`, `opus`), a model id, or `inherit`; run `spectra update-skills` to apply it |
+| Dashboard branding | `spectra.config.json` → `dashboard.branding` | Logo, colors, company name, theme |
+| Claude Code integration | `.claude/skills/<name>/SKILL.md`, `.claude/agents/*.agent.md` | Edit the skill files and subagents |
+
+---
+
+## 1. Test Case Format: `profiles/_default.yaml`
+
+This section controls the JSON schema the AI must follow when producing test
+cases. It determines what fields appear in YAML frontmatter and how test case
+steps/expected results are structured.
+
+The file to edit is `profiles/_default.yaml`.
+
+To customize it:
+
+1. Open `profiles/_default.yaml`.
+2. Edit the `format` field, which is the JSON template the AI receives.
+3. Generate again (ask the assistant to generate tests) so new test cases follow the new schema.
+
+Common modifications include:
+
+- Add custom frontmatter fields (e.g., `regulatory_reference`, `test_data_class`)
+- Change step format (numbered vs. action/expected pairs)
+- Add environment or browser fields
+- Enforce specific tag taxonomies
+
+For example, here's how to add a `test_data` field:
+
+```yaml
+format: |
+  [
+    {
+      "id": "TC-XXX",
+      "title": "...",
+      "priority": "high|medium|low",
+      "tags": ["tag1"],
+      "component": "component-name",
+      "test_data": {
+        "users": ["admin@test.com"],
+        "environment": "staging"
+      },
+      "steps": ["Step 1: ..."],
+      "expected_result": "...",
+      "criteria": ["AC-XXX-001"]
+    }
+  ]
+```
+
+The resolution order is `profiles/_default.yaml` on disk, falling back to the
+built-in embedded default. Missing or malformed files fall back gracefully to
+the embedded default, so generation never crashes due to a profile error.
+
+---
+
+## 2. AI Reasoning: Root Prompt Templates
+
+This section controls how the AI thinks: analysis strategy, test case writing
+approach, verification rigor, and criteria extraction depth.
+
+The relevant files are `.spectra/prompts/*.md`.
+
+| Template | Controls | Used by |
+|----------|----------|---------|
+| `behavior-analysis.md` | How docs are read, what counts as "testable" | `spectra ai compile-analysis-prompt` (the `spectra-generate` skill's analysis) |
+| `test-generation.md` | How test cases are written from analyzed behaviors | `spectra ai compile-prompt` (the `spectra-generate` skill's batches) |
+| `criteria-extraction.md` | How acceptance criteria are pulled from docs | `spectra ai compile-extraction-prompt` (the `spectra-criteria` skill) |
+| `critic-verification.md` | How generated test cases are verified against sources | `spectra ai compile-critic-prompt` (the `spectra-critic` subagent) |
+| `test-update.md` | How existing test cases are edited after a doc change | `spectra ai compile-update-prompt` (the `spectra-update` skill) |
+
+To customize, edit any `.md` file directly. The prompt body uses
+`{{placeholders}}` for dynamic content injected at runtime, and available
+placeholders are listed in each file's YAML frontmatter.
+
+For example, here's how to add domain focus to behavior analysis:
+
+Open `.spectra/prompts/behavior-analysis.md` and add after the persona section:
+
+```
+## Domain Focus
+When analyzing documentation, pay special attention to:
+- PCI-DSS compliance implications in payment flows
+- GDPR data handling in user registration
+- Idempotency requirements on all write operations
+- Rate limiting and abuse prevention on public APIs
+```
+
+For coverage-aware analysis, the `behavior-analysis.md` template includes a
+`{{coverage_context}}` placeholder. When an existing suite has
+coverage data, this resolves to a markdown block listing covered/uncovered
+criteria and doc sections, directing the AI to focus on gaps. If your custom
+template omits this placeholder, coverage context is simply not injected.
+
+Updates are safe: `spectra update-skills` refreshes unmodified templates to
+the latest version, and modified templates are preserved. Use
+`spectra prompts reset {template}` to restore a template to default.
+
+---
+
+## 3. Behavior Categories
+
+This section controls the classification taxonomy for analyzed behaviors.
+Categories appear in test case frontmatter as tags and drive coverage distribution.
+
+The relevant file is `spectra.config.json`, under `analysis.categories`.
+
+```json
+{
+  "analysis": {
+    "categories": [
+      { "name": "happy_path", "description": "Core happy-path functionality" },
+      { "name": "negative", "description": "Invalid input, unauthorized access, bad state" },
+      { "name": "edge_case", "description": "Unusual but valid scenarios" },
+      { "name": "boundary", "description": "Min/max values, exact limits, off-by-one" },
+      { "name": "error_handling", "description": "System failures, timeouts, downstream errors" },
+      { "name": "security", "description": "Auth checks, input sanitization, data exposure" }
+    ]
+  }
+}
+```
+
+Here are some domain-specific examples:
+
+```json
+// Fintech
+{ "name": "compliance", "description": "PCI-DSS, AML, KYC regulatory requirements" }
+{ "name": "reconciliation", "description": "Balance matching, settlement, ledger consistency" }
+{ "name": "idempotency", "description": "Duplicate request handling, retry safety" }
+
+// Healthcare
+{ "name": "hipaa", "description": "PHI access controls, audit logging, encryption" }
+
+// E-commerce
+{ "name": "inventory", "description": "Stock tracking, oversell prevention, reservation" }
+```
+
+The `description` field is injected into the behavior analysis prompt to tell
+the AI what to look for. Specific descriptions produce targeted behaviors.
+
+---
+
+## 4. Coverage Settings
+
+This section controls which directories are scanned, what file patterns
+match, and where acceptance criteria live.
+
+The relevant file is `spectra.config.json`, under `coverage`.
+
+```json
+{
+  "coverage": {
+    "criteria_file": "docs/criteria/_criteria_index.yaml",
+    "criteria_dir": "docs/criteria",
+    "automation_dirs": ["tests/", "e2e/"],
+    "scan_patterns": ["*.cs", "*.ts", "*.py"],
+    "file_extensions": [".cs", ".ts", ".py"]
+  }
+}
+```
+
+Key settings include:
+
+- `automation_dirs` names the directories scanned for `automated_by` links. Add more
+  with `spectra config add-automation-dir ../integration-tests`.
+- `scan_patterns` sets the glob patterns for automation code files.
+- `criteria_dir` is where per-document `.criteria.yaml` files are stored.
+- `criteria_file` is the path to the master criteria index.
+- `requirements_file` is the path to the requirements YAML index (default:
+  `"docs/requirements/_requirements.yaml"`), used by requirements coverage
+  analysis.
+- `report_orphans` / `report_broken_links` / `report_mismatches` are boolean
+  flags (all default `true`) that control which coverage report sections are
+  generated. Set to `false` to suppress noisy sections in large repos.
+
+**Criteria import tuning** (`coverage.criteria_import`):
+
+```json
+{
+  "coverage": {
+    "criteria_import": {
+      "default_source_type": "manual",
+      "auto_split": true,
+      "normalize_rfc2119": true,
+      "id_prefix": "AC"
+    }
+  }
+}
+```
+
+- `auto_split` automatically splits compound acceptance criteria into atomic
+  ones when importing from CSV/YAML.
+- `normalize_rfc2119` normalizes RFC 2119 keywords (MUST, SHALL, SHOULD) to
+  a consistent form during import.
+- `id_prefix` is the prefix for auto-generated acceptance criteria IDs (default: `"AC"`).
+
+---
+
+## 5. AI Model & Batch Tuning
+
+This section controls how generation batches are sized and which model verifies the tests.
+
+> SPECTRA makes no model calls of its own, so there is no provider or model-routing config. The GitHub Copilot SDK
+> and `ai.providers` were removed in Spec 069; a config that still has them loads, and the keys are ignored.
+> Generation and analysis run as ordinary turns in your own Claude Code session; the model is whatever your session is
+> using (`/model`). See [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) and the
+> [AI Models & Cost Guide](ai-models-cost-guide.md) for the history.
+
+```json
+{
+  "ai": {
+    "critic": { "model": "sonnet" }
+  },
+  "generation": {
+    "batch_size": 8
+  }
+}
+```
+
+- `ai.critic.model` is the model the `spectra-critic` subagent runs on: an alias such as `sonnet` or `opus`, a model
+  id, or `inherit` (your session's model). `spectra init` and `spectra update-skills` write it into
+  `.claude/agents/spectra-critic.agent.md`; an agent file you edited by hand is never overwritten.
+- `generation.batch_size` is the most behaviors one generation batch holds (default 8, 1–50); the analysis's
+  generation plan groups neighbouring doc sections into batches of this size.
+- `ai.generation_timeout_minutes` / `ai.analysis_timeout_minutes` are still accepted, but nothing reads them since the
+  in-process generator was removed (Spec 069).
+
+---
+
+## 6. Dashboard Branding
+
+This section controls the visual appearance of the generated coverage dashboard.
+
+The relevant file is `spectra.config.json`, under `dashboard.branding`.
+
+```json
+{
+  "dashboard": {
+    "branding": {
+      "company_name": "Acme Corp",
+      "logo": "assets/logo.svg",
+      "favicon": "assets/favicon.ico",
+      "theme": "dark",
+      "colors": {
+        "primary": "#2E75B6",
+        "success": "#27AE60",
+        "warning": "#F39C12",
+        "danger": "#E74C3C"
+      },
+      "custom_css": "assets/dashboard-overrides.css"
+    }
+  }
+}
+```
+
+To preview it, `spectra dashboard --preview` shows the dashboard with sample
+data and your branding applied, without needing real test data.
+
+---
+
+## 7. Claude Code Integration
+
+This section controls how Claude Code interacts with the SPECTRA CLI.
+
+The relevant files are:
+- `.claude/skills/<name>/SKILL.md`, the authoring SKILL files (one per command group)
+- `.claude/skills/spectra-generate/reference.md` and `.claude/skills/spectra-update/reference.md` (Spec 101),
+  material those two skills read only when needed (command tables, exit codes, examples); `update-skills`
+  keeps an edited one, like any other file
+- `.claude/agents/*.agent.md`, the subagents (each runs in a fresh context; Claude Code reads only their
+  `name`, `description`, `tools` and `model` fields): the critic (`spectra-critic`, a mandatory step of
+  generation and update) and the analyst, generator, updater, repairer and extractor the skills delegate to
+
+**Skills** (bundled): `spectra-generate`, `spectra-update`, `spectra-criteria`, `spectra-coverage`,
+`spectra-dashboard`, `spectra-validate`, `spectra-list`, `spectra-init-profile`, `spectra-help`, `spectra-docs`,
+`spectra-prompts`, `spectra-quickstart`, `spectra-review-flagged`, `spectra-delete`, `spectra-suite`,
+`spectra-execute`.
+
+**Subagents** (bundled): `spectra-critic` (independent verification), `spectra-analyst`, `spectra-generator`,
+`spectra-updater`, `spectra-repairer`, `spectra-extractor`.
+
+> The test **execution** agent is a Claude Code main-session skill at `.claude/skills/spectra-execute/SKILL.md`.
+
+To customize, edit any `SKILL.md` or subagent file to change how Claude Code
+invokes CLI commands, presents results, or handles multi-step workflows.
+
+Updates are safe here too, using the same hash-tracking as prompt templates: `spectra update-skills`
+refreshes unmodified files and preserves your edits.
+
+---
+
+## Customization Precedence Summary
+
+```
+profiles/_default.yaml (on disk)
+  ↓ fallback (missing or malformed)
+Built-in embedded default
+
+.spectra/prompts/{template}.md (on disk)
+  ↓ fallback
+Built-in embedded prompt template
+
+spectra.config.json (user values)
+  ↓ fallback
+Built-in defaults (categories, coverage paths, etc.)
+```
+
+All user files are created by `spectra init` and tracked by
+`spectra update-skills`. You can always restore prompt-template defaults with
+`spectra prompts reset --all`.
+
+---
+
+## Common Workflows
+
+### "I want better test case quality for my domain"
+
+1. Edit `.spectra/prompts/behavior-analysis.md` to add domain-specific focus.
+2. Add domain categories to `spectra.config.json` → `analysis.categories`.
+3. Generate a handful of tests for the suite and evaluate the result.
+
+### "I want to change the test case output format"
+
+1. Edit `profiles/_default.yaml` → `format` field directly.
+2. Re-run generation. New test cases follow the new schema.
+
+### "I want stricter verification"
+
+Edit `.spectra/prompts/critic-verification.md` to tighten verdict rules: `spectra ai compile-critic-prompt` builds the critic's instructions from it (Spec 102; before that the critic ignored a customised copy). To switch to a stronger critic model, set `ai.critic.model` (`spectra config ai.critic.model opus`) and run `spectra update-skills`, which writes it into `.claude/agents/spectra-critic.agent.md` — don't edit the agent's `model:` field by hand.
+
+### "I want the AI to focus on specific areas"
+
+Use `--focus` when compiling the generation prompt:
+`spectra ai compile-prompt --suite checkout --count <n> --focus "payment validation, error handling"`
+
+Or permanently: edit the behavior analysis prompt template to always
+prioritize those areas.
+
+### end
+### docs/_index/_checksums.json (<mask:size> bytes)
+{
+  "version": 2,
+  "generated_at": "<mask:timestamp>",
+  "checksums": {
+    "docs/payments/checkout.md": "ea5a59246fbe96a99a390d3785aed580cecaba8f4318c4edce0d36f7db9e8506",
+    "docs/payments/receipts.md": "39d71004f8dc9860cfbd3f9b8a44c13874d01791b10a09384f1b2caed231cf17",
+    "docs/payments/refunds.md": "171b8237e3a0aa3750fe7afe2fe72b0c68902973bc8f1d8caa5efbc01c382158"
+  }
+}
+### end
+### docs/_index/_manifest.yaml (<mask:size> bytes)
+# Auto-generated by `spectra docs index`. Do not edit by hand.
+version: 2
+generated_at:
+  date_time: <mask:clock>
+  utc_date_time: <mask:clock>
+  local_date_time: <mask:clock>
+  date: <mask:clock>
+  day: <mask:clock>
+  day_of_week: <mask:clock>
+  day_of_year: <mask:clock>
+  hour: <mask:clock>
+  millisecond: <mask:clock>
+  microsecond: <mask:clock>
+  nanosecond: <mask:clock>
+  minute: <mask:clock>
+  month: <mask:clock>
+  offset: <mask:clock>
+  total_offset_minutes: <mask:clock>
+  second: <mask:clock>
+  ticks: <mask:clock>
+  utc_ticks: <mask:clock>
+  time_of_day: <mask:clock>
+  year: <mask:clock>
+total_documents: 3
+total_words: 80
+total_tokens_estimated: 103
+groups:
+- id: payments
+  title: payments
+  path: docs/payments
+  document_count: 3
+  tokens_estimated: 103
+  skip_analysis: false
+  excluded_by: none
+  index_file: groups/payments.index.md
+
+### end
+### docs/_index/groups/payments.index.md (<mask:size> bytes)
+# payments
+
+> Group: payments | 3 documents | ~103 tokens
+> Last indexed: <mask:timestamp>
+
+---
+
+### docs/payments/checkout.md
+- **Title:** Checkout {#checkout}
+- **Size:** 1 KB | **Words:** 54 | **Tokens:** ~70
+- **Last Modified:** <mask:file-date>
+- **Key Entities:** bash
+# not a heading
+echo charge, Limits
+
+First, Limits
+
+Second
+
+| Section | Summary |
+|---------|---------|
+| Card payments {#cards} | Cards are charged in **EUR**. A payment above 5000 EUR MUST be confirmed. ```bash echo charge ``` |
+| Limits | First limits: 3 attempts. |
+| Limits | Second limits: 10 payments per day. |
+| Refund window | Refunds are allowed for 30 days. |
+
+---
+
+### docs/payments/receipts.md
+- **Title:** Receipts
+- **Size:** 1 KB | **Words:** 12 | **Tokens:** ~15
+- **Last Modified:** <mask:file-date>
+- **Key Entities:** Currency
+
+The
+
+| Section | Summary |
+|---------|---------|
+| Currency | The receipt shows the currency of the payment. |
+
+---
+
+### docs/payments/refunds.md
+- **Title:** Refunds
+- **Size:** 1 KB | **Words:** 14 | **Tokens:** ~18
+- **Last Modified:** <mask:file-date>
+
+| Section | Summary |
+|---------|---------|
+| Partial refunds | A partial refund MUST NOT exceed the paid amount. |
+
+
+### end
+### docs/criteria/_criteria_index.yaml (149 bytes)
+# Auto-generated by SPECTRA. Ask your assistant to extract criteria (spectra-criteria skill) to populate.
+version: 1
+total_criteria: 0
+sources: []
+### end
+### docs/criteria/docs/payments/checkout.criteria.yaml (439 bytes)
+criteria:
+  - id: AC-PAY-001
+    text: "A payment above 5000 EUR MUST be confirmed"
+    rfc2119: MUST
+    source_type: document
+    source_doc: docs/payments/checkout.md
+    source_section: Card payments
+    component: payments
+  - id: AC-PAY-002
+    text: "Refunds MUST be allowed for 30 days"
+    rfc2119: MUST
+    source_type: document
+    source_doc: docs/payments/checkout.md
+    source_section: Refund window
+    component: payments
+
+### end
+### docs/criteria/docs/payments/receipts.criteria.yaml (223 bytes)
+criteria:
+  - id: AC-RCP-001
+    text: "The receipt MUST show the payment currency"
+    rfc2119: MUST
+    source_type: document
+    source_doc: docs/payments/receipts.md
+    source_section: Currency
+    component: payments
+
+### end
+### docs/criteria/docs/payments/refunds.criteria.yaml (235 bytes)
+criteria:
+  - id: AC-REF-001
+    text: "A partial refund MUST NOT exceed the paid amount"
+    rfc2119: MUST
+    source_type: document
+    source_doc: docs/payments/refunds.md
+    source_section: Partial refunds
+    component: payments
+
+### end
+### docs/criteria/sample.criteria.yaml (681 bytes)
+# Example acceptance criteria file. Delete this file after reviewing.
+#
+# You can:
+#   1. Ask your assistant to extract criteria from your docs (spectra-criteria skill)
+#   2. Import from Jira/ADO: 'spectra ai analyze --import-criteria ./export.csv'
+#   3. Write criteria manually in this format
+#
+criteria:
+  - id: AC-SAMPLE-001
+    text: "User MUST be able to log in with email and password"
+    rfc2119: MUST
+    component: auth
+    priority: high
+    tags: [authentication, login]
+
+  - id: AC-SAMPLE-002
+    text: "System SHOULD display password strength indicator"
+    rfc2119: SHOULD
+    component: auth
+    priority: medium
+    tags: [authentication, ux]
+### end
+### docs/payments/checkout.md (329 bytes)
+# Checkout {#checkout}
+
+How checkout works.
+
+## Card payments {#cards}
+
+Cards are charged in **EUR**. A payment above 3000 EUR MUST be confirmed.
+
+```bash
+# not a heading
+echo charge
+```
+
+## Limits
+
+First limits: 3 attempts.
+
+## Limits
+
+Second limits: 10 payments per day.
+
+## Refund window
+
+Refunds are allowed for thirty days.
+
+### end
+### docs/payments/receipts.md (72 bytes)
+# Receipts
+
+## Currency
+
+The receipt shows the currency of the payment.
+
+### end
+### docs/payments/refunds.md (81 bytes)
+# Refunds
+
+## Partial refunds
+
+A partial refund MUST NOT exceed the paid amount.
+
+### end
+### profiles/_default.yaml (3078 bytes)
+# SPECTRA Default Test Case Format
+# =================================
+# This file defines the JSON output schema that the AI uses when generating
+# test cases. It controls what fields appear in test YAML frontmatter and
+# how test steps/expected results are structured.
+#
+# To customize:
+#   Option 1: Edit this file directly (affects all generation)
+#   Option 2: Copy to profiles/myteam.yaml and edit (named profiles - future)
+#
+# The AI receives the `format` field as part of its generation prompt and
+# must produce a JSON array matching this exact structure.
+#
+# See CUSTOMIZATION.md for full documentation on all customization options.
+
+# --- JSON Schema sent to the AI ---
+format: |
+  [
+    {
+      "id": "TC-XXX",
+      "title": "Descriptive title based on documentation",
+      "priority": "high|medium|low",
+      "tags": ["tag1", "tag2"],
+      "component": "component-name",
+      "preconditions": "Setup requirements",
+      "steps": ["Step 1", "Step 2", "Step 3"],
+      "expected_result": "Specific outcome from documentation",
+      "test_data": "Test data if needed",
+      "source_refs": ["docs/file.md#Section-Name"],
+      "scenario_from_doc": "Quote or paraphrase the documented behavior",
+      "estimated_duration": "5m",
+      "criteria": ["AC-ID-1", "AC-ID-2"]
+    }
+  ]
+
+# --- Field descriptions (for human reference, NOT sent to AI) ---
+fields:
+  id:
+    description: "Unique test case ID. SPECTRA allocates IDs automatically via GetNextTestIds."
+    required: true
+  title:
+    description: "Clear, descriptive title. Should describe the scenario, not the feature."
+    required: true
+  priority:
+    description: "Test priority. Allowed values: high, medium, low."
+    required: true
+    allowed_values: [high, medium, low]
+  tags:
+    description: "Classification tags. Used for filtering and reporting."
+    required: true
+  component:
+    description: "Functional component this test covers. Used for coverage grouping."
+    required: true
+  preconditions:
+    description: "Setup state required before test execution."
+    required: false
+  steps:
+    description: "Ordered list of test steps. Each step should be concrete and actionable."
+    required: true
+  expected_result:
+    description: "Observable outcome that determines pass/fail."
+    required: true
+  test_data:
+    description: "Optional test data values."
+    required: false
+  source_refs:
+    description: "Documentation references the test was grounded against (e.g., docs/checkout.md#Validation)."
+    required: true
+  scenario_from_doc:
+    description: "Quote or paraphrase of the documented behavior this test verifies."
+    required: true
+  estimated_duration:
+    description: "Expected execution time. Format: Nm (minutes) or Nh (hours)."
+    required: false
+    default: "5m"
+  criteria:
+    description: "Array of acceptance criteria IDs this test verifies (e.g., AC-CHECKOUT-001)."
+    required: false
+    note: "Auto-populated when acceptance criteria are available during generation."
+
+### end
+### spectra.config.json (4039 bytes)
+{
+  "source": {
+    "mode": "local",
+    "local_dir": "docs/",
+    "max_file_size_kb": 50,
+    "include_patterns": ["**/*.md"],
+    "exclude_patterns": ["**/CHANGELOG.md"]
+  },
+  "tests": {
+    "dir": "test-cases/",
+    "id_prefix": "TC",
+    "id_start": 100
+  },
+  "coverage": {
+    "criteria_dir": "docs/criteria",
+    "criteria_file": "docs/criteria/_criteria_index.yaml"
+  },
+  "ai": {
+    "_comment_ai": "Spec 069: SPECTRA no longer runs an in-process model — all inference is your Claude Code session — so there is no `providers` block. The critic runs as the `spectra-critic` subagent on `critic.model` (an alias such as sonnet or opus, a model id, or inherit); run `spectra update-skills` after changing it. The generation batch size is `generation.batch_size`.",
+    "critic": {
+      "model": "sonnet"
+    },
+    "generation_timeout_minutes": 5,
+    "analysis_timeout_minutes": 2
+  },
+  "generation": {
+    "default_count": 15,
+    "require_review": true,
+    "duplicate_threshold": 0.6,
+    "coverage_threshold": 0.6,
+    "categories": ["happy_path", "negative", "boundary", "integration"]
+  },
+  "validation": {
+    "required_fields": ["id", "priority"],
+    "allowed_priorities": ["high", "medium", "low"],
+    "max_steps": 20,
+    "id_pattern": "^TC-\\d{3,}$"
+  },
+  "dashboard": {
+    "output_dir": "./site",
+    "include_coverage": true,
+    "include_runs": true,
+    "max_trend_points": 30,
+    "cloudflare_project_name": "spectra-dashboard",
+    "branding": {
+      "company_name": "SPECTRA",
+      "logo": "assets/spectra-logo.svg",
+      "favicon": "assets/favicon.ico",
+      "theme": "light",
+      "_comment_theme": "Options: 'light' or 'dark'",
+      "colors": {
+        "primary": null,
+        "accent": null,
+        "_comment_colors": "Override theme colors: primary, accent, background, text, surface, border. Use CSS color values (#hex, rgb(), hsl(), named)."
+      },
+      "custom_css": null,
+      "_comment_custom_css": "Path to a custom CSS file loaded after default styles for full override control."
+    }
+  },
+  "execution": {
+    "copilot_space": null,
+    "copilot_space_owner": null
+  },
+  "bug_tracking": {
+    "provider": "auto",
+    "template": "templates/bug-report.md",
+    "default_severity": "medium",
+    "auto_attach_screenshots": true,
+    "auto_prompt_on_failure": true
+  },
+  "git": {
+    "auto_branch": true,
+    "branch_prefix": "spectra/",
+    "auto_commit": true,
+    "auto_pr": false
+  },
+  "testimize": {
+    "enabled": false,
+    "_comment": "v1.48.3: in-process algorithmic test data generation via the Testimize NuGet library (no child process, no MCP). When enabled, SPECTRA extracts field constraints from behavior analysis and runs the engine before sending the generation prompt, embedding optimized BVA/EP/pairwise values as authoritative facts.",
+    "mode": "exploratory",
+    "_comment_mode": "all | valid | validation. Maps to Testimize.TestCaseCategory. 'exploratory' and any unknown value defaults to 'all' (valid + invalid + boundary).",
+    "strategy": "HybridArtificialBeeColony",
+    "_comment_strategy": "HybridArtificialBeeColony (default, thorough) | Pairwise (fast, minimal) | Combinatorial | OptimizedPairwise | OptimizedCombinatorial"
+  },
+  "debug": {
+    "enabled": false,
+    "_comment": "Spec 040: opt-in .spectra-debug.log. Set enabled=true to persist per-call AI diagnostics, or run any AI command with --verbosity diagnostic to force-enable for a single run.",
+    "log_file": ".spectra-debug.log",
+    "error_log_file": ".spectra-errors.log",
+    "_comment_error_log_file": "Spec 043: dedicated error log. Written only when debug.enabled is true AND at least one error occurs during the run. On clean runs the file is not created.",
+    "mode": "append",
+    "_comment_mode": "append (default): keep existing log content and add a separator + header before each new run. overwrite: truncate the file at run start, keeping only the latest run."
+  }
+}
+
+### end
+### templates/bug-report.md (604 bytes)
+## {{title}}
+
+**Test Case:** {{test_id}} - {{test_title}}
+**Suite:** {{suite_name}}
+**Environment:** {{environment}}
+**Severity:** {{severity}}
+**Execution Run:** {{run_id}}
+
+### Steps to Reproduce
+
+{{failed_steps}}
+
+### Expected Result
+
+{{expected_result}}
+
+### Actual Result
+
+[Describe what actually happened]
+
+### Screenshots
+
+{{attachments}}
+
+### Additional Context
+
+[Any relevant details — browser, OS, test data used, error messages]
+
+### Traceability
+
+- **Source Documentation:** {{source_refs}}
+- **Requirements:** {{requirements}}
+- **Component:** {{component}}
+### end
+### test-cases/payments/TC-101.md (<mask:size> bytes)
+---
+id: TC-101
+priority: high
+source_refs:
+  - "docs/payments/checkout.md#cards"
+criteria:
+  - AC-PAY-001
+grounding:
+  verdict: grounded
+  score: 0.90
+  generator: claude-code-session
+  critic: claude-sonnet-4-6
+  verified_at: <mask:timestamp>
+# reviewed by QA
+owner: team-a
+---
+
+# Large card payment is confirmed
+
+## Steps
+
+1. Open checkout
+2. Pay 3001 EUR
+
+## Expected Result
+
+The payment asks for confirmation above 3000 EUR
+
+## Notes
+
+Keep this section.
+
+### end
+### test-cases/payments/TC-102.md (228 bytes)
+---
+id: TC-102
+priority: high
+source_refs:
+  - "docs/payments/checkout.md#limits"
+---
+
+# Payment attempts are limited
+
+## Steps
+
+1. Open checkout
+2. Pay
+
+## Expected Result
+
+The payment is handled as documented
+
+### end
+### test-cases/payments/TC-103.md (286 bytes)
+---
+id: TC-103
+priority: high
+depends_on: TC-101
+source_refs:
+  - "docs/payments/checkout.md#refund-window"
+criteria:
+  - AC-PAY-002
+---
+
+# Refund inside the window
+
+## Steps
+
+1. Open checkout
+2. Ask for a refund on day 29
+
+## Expected Result
+
+The refund is accepted within thirty days
+
+### end
+### test-cases/payments/TC-104.md (240 bytes)
+---
+id: TC-104
+priority: high
+source_refs:
+  - "docs/payments/refunds.md#partial-refunds"
+criteria:
+  - AC-REF-001
+---
+
+# Partial refund is capped
+
+## Steps
+
+1. Open checkout
+2. Pay
+
+## Expected Result
+
+The payment is handled as documented
+
+### end
+### test-cases/payments/TC-105.md (205 bytes)
+---
+id: TC-105
+priority: high
+source_refs:
+  - "docs/payments/checkout.md"
+---
+
+# Checkout page shows the rules
+
+## Steps
+
+1. Open checkout
+2. Pay
+
+## Expected Result
+
+The payment is handled as documented
+
+### end
+### test-cases/payments/TC-106.md (50 bytes)
+---
+id: TC-106
+priority: high
+---
+
+No title here.
+
+### end
+### test-cases/payments/TC-107.md (212 bytes)
+---
+id: TC-107
+priority: medium
+source_refs:
+  - docs/payments/receipts.md#currency
+criteria: []
+---
+
+# Receipt shows the currency
+
+## Steps
+
+1. Pay
+2. Open the receipt
+
+## Expected Result
+
+The currency is shown
+
+### end
+### test-cases/payments/TC-108.md (257 bytes)
+---
+id: TC-108
+priority: low
+source_refs:
+  - docs/payments/refunds.md#partial-refunds
+criteria:
+  - AC-REF-001
+---
+
+# Second partial refund is capped
+
+## Steps
+
+1. Refund part
+2. Refund the rest
+
+## Expected Result
+
+The total never exceeds the paid amount
+
+### end
+### test-cases/payments/_index.json (<mask:size> bytes)
+{
+  "suite": "payments",
+  "generated_at": "<mask:timestamp>",
+  "test_count": 7,
+  "tests": [
+    {
+      "id": "TC-101",
+      "file": "TC-101.md",
+      "title": "Large card payment is confirmed",
+      "priority": "high",
+      "tags": [],
+      "source_refs": [
+        "docs/payments/checkout.md#cards"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "criteria": [
+        "AC-PAY-001"
+      ],
+      "bugs": []
+    },
+    {
+      "id": "TC-102",
+      "file": "TC-102.md",
+      "title": "Payment attempts are limited",
+      "priority": "high",
+      "tags": [],
+      "source_refs": [
+        "docs/payments/checkout.md#limits"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "criteria": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-103",
+      "file": "TC-103.md",
+      "title": "Refund inside the window",
+      "priority": "high",
+      "tags": [],
+      "depends_on": "TC-101",
+      "source_refs": [
+        "docs/payments/checkout.md#refund-window"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "criteria": [
+        "AC-PAY-002"
+      ],
+      "bugs": []
+    },
+    {
+      "id": "TC-104",
+      "file": "TC-104.md",
+      "title": "Partial refund is capped",
+      "priority": "high",
+      "tags": [],
+      "source_refs": [
+        "docs/payments/refunds.md#partial-refunds"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "criteria": [
+        "AC-REF-001"
+      ],
+      "bugs": []
+    },
+    {
+      "id": "TC-105",
+      "file": "TC-105.md",
+      "title": "Checkout page shows the rules",
+      "priority": "high",
+      "tags": [],
+      "source_refs": [
+        "docs/payments/checkout.md"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "criteria": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-107",
+      "file": "TC-107.md",
+      "title": "Receipt shows the currency",
+      "priority": "medium",
+      "tags": [],
+      "source_refs": [
+        "docs/payments/receipts.md#currency"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "criteria": [],
+      "bugs": []
+    },
+    {
+      "id": "TC-108",
+      "file": "TC-108.md",
+      "title": "Second partial refund is capped",
+      "priority": "low",
+      "tags": [],
+      "source_refs": [
+        "docs/payments/refunds.md#partial-refunds"
+      ],
+      "automated_by": [],
+      "requirements": [],
+      "criteria": [
+        "AC-REF-001"
+      ],
+      "bugs": []
+    }
+  ]
+}
+### end
+### test-cases/payments/_source-baseline.json (1774 bytes)
+{
+  "version": 1,
+  "tests": {
+    "TC-101": {
+      "refs": {
+        "docs/payments/checkout.md#cards": "sha256:9547e54f8403610497ab3c209dd9141655a1d6819120ba146eaf8621bedbf6f9"
+      },
+      "criteria": {
+        "AC-PAY-001": "sha256:bb49a19405740e688eec09515a7924532d8b342eabffb08498e372711bfc36e1"
+      }
+    },
+    "TC-102": {
+      "refs": {
+        "docs/payments/checkout.md#limits": "sha256:c66a957c7ebacf05fbb4c3e0ad454b20a08f710275f8f47ba32da8dd096eb53a"
+      },
+      "criteria": {}
+    },
+    "TC-103": {
+      "refs": {
+        "docs/payments/checkout.md#refund-window": "sha256:bbbd0f5afeaaf80a4593cc6b3e5def86e64a9c0638d0a6174995fdafff8deade"
+      },
+      "criteria": {
+        "AC-PAY-002": "sha256:993de30017712cd737f55c1add85f49342a726b2616af4852799b8a71e84aa9f"
+      }
+    },
+    "TC-104": {
+      "refs": {
+        "docs/payments/refunds.md#partial-refunds": "sha256:6ade1b55876d45a5a610705b317d72184c6f9542581f365b5c99b06682ba3f1f"
+      },
+      "criteria": {
+        "AC-REF-001": "sha256:eb7341b57d6357a0f9bb53c3796ebc20eda8b0e58bc7f5e3efc51f8da53832ba"
+      }
+    },
+    "TC-105": {
+      "refs": {
+        "docs/payments/checkout.md": "sha256:ea5a59246fbe96a99a390d3785aed580cecaba8f4318c4edce0d36f7db9e8506"
+      },
+      "criteria": {}
+    },
+    "TC-107": {
+      "refs": {
+        "docs/payments/receipts.md#currency": "sha256:ff5cb5b3a2f115b4aa66d2ddc3488ea7d192996851ea08815574a5700d3f4280"
+      },
+      "criteria": {}
+    },
+    "TC-108": {
+      "refs": {
+        "docs/payments/refunds.md#partial-refunds": "sha256:6ade1b55876d45a5a610705b317d72184c6f9542581f365b5c99b06682ba3f1f"
+      },
+      "criteria": {
+        "AC-REF-001": "sha256:eb7341b57d6357a0f9bb53c3796ebc20eda8b0e58bc7f5e3efc51f8da53832ba"
+      }
+    }
+  }
+}
+
+### end

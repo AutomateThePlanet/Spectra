@@ -1,7 +1,6 @@
 using System.Text;
 using Spectra.CLI.Profile;
 using Spectra.CLI.Prompts;
-using Spectra.Core.Models.Testimize;
 
 namespace Spectra.CLI.Generation;
 
@@ -37,8 +36,7 @@ public static class PromptCompiler
         int requestedCount,
         string? criteriaContext,
         PromptTemplateLoader? templateLoader = null,
-        string? profileFormat = null,
-        TestimizeDataset? testimizeData = null)
+        string? profileFormat = null)
     {
         if (string.IsNullOrWhiteSpace(userPrompt))
         {
@@ -59,8 +57,7 @@ public static class PromptCompiler
             return PromptCompileResult.MissingRequired(
                 "criteria_context",
                 "No acceptance-criteria context was resolved for this suite. Refusing to emit a "
-                + "prompt without grounding criteria. Run 'spectra ai analyze --extract-criteria' "
-                + "(or 'spectra docs index') first.");
+                + "prompt without grounding criteria. Extract criteria first (the spectra-criteria skill).");
         }
 
         var prompt = Assemble(
@@ -68,8 +65,7 @@ public static class PromptCompiler
             requestedCount,
             criteriaContext,
             templateLoader,
-            profileFormat,
-            testimizeData);
+            profileFormat);
 
         return PromptCompileResult.Success(prompt);
     }
@@ -85,8 +81,7 @@ public static class PromptCompiler
         int requestedCount,
         string? criteriaContext = null,
         PromptTemplateLoader? templateLoader = null,
-        string? profileFormat = null,
-        TestimizeDataset? testimizeData = null)
+        string? profileFormat = null)
     {
         // The JSON output schema sent to the AI. Prefer the caller-supplied profileFormat
         // (resolved from profiles/_default.yaml on disk or the embedded default by
@@ -94,26 +89,25 @@ public static class PromptCompiler
         // embedded default to keep behavior identical.
         var jsonExample = profileFormat ?? ProfileFormatLoader.LoadFormat(Directory.GetCurrentDirectory());
 
-        // Render the optional Testimize dataset as a YAML-ish block only when present and
-        // non-empty. When null or empty, both placeholders are empty strings and the
-        // {{#if testimize_dataset}} block in test-generation.md collapses to nothing.
-        var testimizeBlock = FormatTestimizeDataset(testimizeData);
-        var testimizeStrategyName = testimizeData?.Strategy ?? "";
-
         if (templateLoader is not null)
         {
             var template = templateLoader.LoadTemplate("test-generation");
             var values = new Dictionary<string, string>
             {
-                ["testimize_dataset"] = testimizeBlock,
-                ["testimize_strategy_name"] = testimizeStrategyName,
+                // Spec 099 F5: the in-process Testimize dataset is gone (its only producer was the Copilot-era
+                // generator); the placeholders stay empty, so {{#if testimize_dataset}} collapses as before.
+                ["testimize_dataset"] = "",
+                ["testimize_strategy_name"] = "",
                 ["behaviors"] = userPrompt,
                 ["suite_name"] = "",
                 ["existing_tests"] = "",
                 ["acceptance_criteria"] = criteriaContext ?? "",
                 ["profile_format"] = jsonExample,
                 ["count"] = requestedCount.ToString(),
-                ["focus_areas"] = ""
+                ["focus_areas"] = "",
+                // Spec 094: count mode — the model reads the docs itself; no inlined sections.
+                ["read_docs"] = "yes",
+                ["source_sections"] = ""
             };
 
             return PromptTemplateLoader.Resolve(template, values);
@@ -125,23 +119,16 @@ public static class PromptCompiler
             ## CRITICAL RULES
 
             1. NEVER generate generic test patterns. Every test MUST trace to specific documentation.
-            2. Use the available tools to read documentation ON-DEMAND instead of relying on memory.
-            3. ALWAYS check for duplicates before generating tests.
+            2. Every step and expected result MUST come from the documentation — never from memory or assumptions.
 
-            ## WORKFLOW
+            ## DOCUMENTATION
 
-            Follow this exact workflow for test generation:
-
-            1. **LIST DOCUMENTS**: First, call ListDocumentationFiles to see what documentation is available.
-            2. **READ TEST INDEX**: Call ReadTestIndex to see existing tests and avoid duplicates.
-            3. **READ RELEVANT DOCS**: Based on the user's request, call ReadDocument for specific files.
-            4. **CHECK DUPLICATES**: Before finalizing, call CheckDuplicates with your proposed titles.
-            5. **GET TEST IDs**: Call GetNextTestIds to allocate unique IDs for new tests.
-            6. **GENERATE TESTS**: Return tests as a JSON array.
+            Read the relevant documentation with your file tools before writing any test, and ground every step and expected
+            result in what it says. Test IDs are assigned when the tests are ingested — do not invent them.
 
             ## OUTPUT FORMAT
 
-            After using tools to gather information, your FINAL message must contain ONLY a JSON array of test cases.
+            Your FINAL message must contain ONLY a JSON array of test cases.
             Do NOT include any explanatory text before or after the JSON. Output ONLY the JSON array.
 
             The JSON array must follow this exact schema:
@@ -160,81 +147,9 @@ public static class PromptCompiler
 
             {(string.IsNullOrEmpty(criteriaContext) ? "" : $"\n## ACCEPTANCE CRITERIA — MANDATORY\n\nYou MUST map each test case to matching acceptance criteria below. Every test MUST have at least one criterion ID in its \"criteria\" array. If a test doesn't match any criterion, use the closest related one.\n\n{criteriaContext}\n")}
             IMPORTANT:
-            1. Use the tools to read documentation and check for duplicates first
-            2. Only generate tests that are grounded in the documentation
-            3. Ensure unique test IDs using GetNextTestIds
-            4. Your FINAL response must be ONLY the JSON array — no other text
-            5. MANDATORY: For each test, populate the "criteria" array with IDs of acceptance criteria it verifies (e.g. ["AC-REPORTING-001", "AC-REPORTING-003"]). Never leave criteria empty when acceptance criteria are provided above.
+            1. Only generate tests that are grounded in the documentation
+            2. Your FINAL response must be ONLY the JSON array — no other text
+            3. MANDATORY: For each test, populate the "criteria" array with IDs of acceptance criteria it verifies (e.g. ["AC-REPORTING-001", "AC-REPORTING-003"]). Never leave criteria empty when acceptance criteria are provided above.
             """;
     }
-
-    /// <summary>
-    /// Renders a <see cref="TestimizeDataset"/> as a compact YAML-ish block for embedding in
-    /// the test-generation prompt. Returns an empty string when the dataset is null or contains
-    /// no rows, which causes the <c>{{#if testimize_dataset}}</c> block in
-    /// <c>test-generation.md</c> to collapse to nothing.
-    /// </summary>
-    public static string FormatTestimizeDataset(TestimizeDataset? dataset)
-    {
-        if (dataset is null || dataset.TestCases.Count == 0)
-            return "";
-
-        var sb = new StringBuilder();
-        sb.AppendLine("```yaml");
-        sb.AppendLine($"strategy: {dataset.Strategy}");
-        sb.AppendLine($"field_count: {dataset.FieldCount}");
-        sb.AppendLine($"test_data_sets: {dataset.TestCases.Count}");
-        sb.AppendLine("fields:");
-        foreach (var f in dataset.Fields)
-        {
-            sb.AppendLine($"  - name: {f.Name}");
-            sb.AppendLine($"    type: {f.Type}");
-            if (f.Required) sb.AppendLine("    required: true");
-            if (f.Min is not null) sb.AppendLine($"    min: {f.Min}");
-            if (f.Max is not null) sb.AppendLine($"    max: {f.Max}");
-            if (f.MinLength is not null) sb.AppendLine($"    min_length: {f.MinLength}");
-            if (f.MaxLength is not null) sb.AppendLine($"    max_length: {f.MaxLength}");
-            if (!string.IsNullOrWhiteSpace(f.MinDate)) sb.AppendLine($"    min_date: {f.MinDate}");
-            if (!string.IsNullOrWhiteSpace(f.MaxDate)) sb.AppendLine($"    max_date: {f.MaxDate}");
-            if (f.AllowedValues is { Count: > 0 })
-                sb.AppendLine($"    allowed_values: [{string.Join(", ", f.AllowedValues.Select(v => $"\"{v}\""))}]");
-            if (!string.IsNullOrWhiteSpace(f.ExpectedInvalidMessage))
-                sb.AppendLine($"    expected_invalid_message: \"{EscapeYaml(f.ExpectedInvalidMessage)}\"");
-        }
-        sb.AppendLine("test_cases:");
-        for (var i = 0; i < dataset.TestCases.Count; i++)
-        {
-            var row = dataset.TestCases[i];
-            sb.AppendLine($"  - id: {i + 1}");
-            if (row.Score > 0) sb.AppendLine($"    score: {row.Score:F2}");
-            sb.AppendLine("    values:");
-            foreach (var cell in row.Values)
-            {
-                sb.AppendLine($"      - field: {cell.FieldName}");
-                sb.AppendLine($"        value: {FormatYamlValue(cell.Value)}");
-                sb.AppendLine($"        category: {cell.Category}");
-                if (!string.IsNullOrWhiteSpace(cell.ExpectedInvalidMessage))
-                    sb.AppendLine($"        expected_invalid_message: \"{EscapeYaml(cell.ExpectedInvalidMessage)}\"");
-            }
-        }
-        sb.AppendLine("```");
-        return sb.ToString();
-    }
-
-    private static string FormatYamlValue(object? value)
-    {
-        if (value is null) return "null";
-        if (value is string s) return $"\"{EscapeYaml(s)}\"";
-        if (value is bool b) return b ? "true" : "false";
-        if (value is DateTime dt) return $"\"{dt:yyyy-MM-dd}\"";
-        if (value is System.Collections.IEnumerable en && value is not string)
-        {
-            var items = new List<string>();
-            foreach (var item in en) items.Add(FormatYamlValue(item));
-            return $"[{string.Join(", ", items)}]";
-        }
-        return value.ToString() ?? "null";
-    }
-
-    private static string EscapeYaml(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
 }

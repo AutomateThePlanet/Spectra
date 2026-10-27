@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Spectra.CLI.Commands.Analyze;
+using Spectra.CLI.Commands.Baseline;
 using Spectra.CLI.Commands.Generate;
 using Spectra.CLI.Commands.Review;
 using Spectra.CLI.Commands.Update;
@@ -52,6 +53,12 @@ public sealed class AiCommand : Command
         // repair batch manifest.
         AddCommand(new AuditGroundingCommand());
         AddCommand(new CompileRepairBatchCommand());
+
+        // Spec 084: deterministic source-change detection (baseline, triage, acknowledge).
+        AddCommand(new UpdateTriageCommand());
+        AddCommand(new UpdateAckCommand());
+        AddCommand(new SourceBaselineCommand());
+        AddCommand(new RelinkSourcesCommand());
 
         // Throwaway seam-skill progress poller (superseded when execution console generalises).
         AddCommand(new InitSeamProgressCommand());

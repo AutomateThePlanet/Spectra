@@ -6,68 +6,38 @@ using Spectra.Core.Models;
 namespace Spectra.CLI.Agent.Critic;
 
 /// <summary>
-/// Builds prompts for critic model verification.
+/// Builds prompts for critic model verification. Spec 102 (F1): the system prompt is always the
+/// <c>critic-verification</c> template — the workspace copy in <c>.spectra/prompts/</c>, else the bundled one — so
+/// there is one critic prompt and a customised template takes effect.
 /// </summary>
 public sealed class CriticPromptBuilder
 {
     private const int MaxDocumentChars = 8000;
     private const int MaxDocuments = 5;
 
-    private PromptTemplateLoader? _templateLoader;
+    private readonly PromptTemplateLoader _templateLoader;
 
-    /// <summary>
-    /// Sets the template loader for customizable prompts.
-    /// </summary>
-    public void SetTemplateLoader(PromptTemplateLoader? loader) => _templateLoader = loader;
-
-    /// <summary>
-    /// Builds the system prompt for the critic model.
-    /// </summary>
-    public string BuildSystemPrompt(string? criteriaContext = null)
+    public CriticPromptBuilder(PromptTemplateLoader templateLoader)
     {
-        if (_templateLoader is not null)
+        ArgumentNullException.ThrowIfNull(templateLoader);
+        _templateLoader = templateLoader;
+    }
+
+    /// <summary>
+    /// Builds the system prompt for the critic model from the <c>critic-verification</c> template. Its declared
+    /// placeholders resolve to empty: the test and its documents are in the user prompt. Trimmed, so the template's
+    /// removed comments leave no blank head.
+    /// </summary>
+    public string BuildSystemPrompt()
+    {
+        var template = _templateLoader.LoadTemplate("critic-verification");
+        var values = new Dictionary<string, string>
         {
-            var template = _templateLoader.LoadTemplate("critic-verification");
-            var values = new Dictionary<string, string>
-            {
-                ["test_case"] = "",
-                ["source_document"] = "",
-                ["acceptance_criteria"] = criteriaContext ?? ""
-            };
-            return PromptTemplateLoader.Resolve(template, values);
-        }
-
-        return """
-            You are a test case verification expert. Your job is to verify that test cases are grounded in source documentation.
-
-            For each test case, analyze every claim (preconditions, steps, expected results) and determine if it can be traced to the provided documentation.
-
-            Output format: Return ONLY a JSON object with this structure:
-            {
-              "verdict": "grounded" | "partial" | "hallucinated",
-              "score": 0.0-1.0,
-              "findings": [
-                {
-                  "element": "Step 1" | "Expected Result" | "Precondition",
-                  "claim": "The specific claim being checked",
-                  "status": "grounded" | "unverified" | "hallucinated",
-                  "evidence": "Quote from documentation (if grounded)" | null,
-                  "reason": "Why unverified or hallucinated (if not grounded)" | null
-                }
-              ]
-            }
-
-            Verdict rules:
-            - "grounded": ALL claims can be traced to documentation
-            - "partial": SOME claims are verified, but others cannot be confirmed
-            - "hallucinated": The test contains invented behaviors or contradicts documentation
-
-            Be strict but fair:
-            - Generic UI actions (click, navigate, enter text) don't need documentation
-            - Specific behaviors, values, or business rules MUST be in documentation
-            - If documentation is vague, mark as "unverified" not "hallucinated"
-            - "hallucinated" is reserved for clear inventions or contradictions
-            """;
+            ["test_case"] = "",
+            ["source_document"] = "",
+            ["acceptance_criteria"] = ""
+        };
+        return PromptTemplateLoader.Resolve(template, values).Trim();
     }
 
     /// <summary>

@@ -113,13 +113,13 @@ includes a `technique_breakdown` map alongside the category breakdown.
 spectra ai compile-analysis-prompt --suite payments   # analyze: emits the behavior-analysis prompt
 spectra ai compile-prompt --suite payments --count 20  # generate: emits the generation prompt
 spectra ai analyze --coverage --auto-link
-spectra ai analyze --extract-criteria --output-format json
+spectra docs changed --output-format json             # criteria: documents to (re-)extract — then the spectra-criteria skill
 spectra dashboard --output ./site
 spectra validate
 spectra list
 spectra show TC-100
 spectra docs index --force
-spectra ai update --suite notification --diff
+spectra ai update-triage --suite notification
 ```
 
 ---

@@ -54,7 +54,7 @@ public sealed class ReviewFlaggedHandler
             suiteDirs = Directory.GetDirectories(testsPath);
         }
 
-        var parser = new TestCaseParser();
+        var parser = new TestCaseParser(captureLayout: false);
         foreach (var suiteDir in suiteDirs)
         {
             var suiteName = Path.GetFileName(suiteDir);
@@ -103,7 +103,7 @@ public sealed class ReviewFlaggedHandler
 
         // Clear the flagged_for_review flag (GroundingMetadata is a record — with-expression works)
         var updatedGrounding = tc.Grounding with { FlaggedForReview = false };
-        var updated = CopyWithGrounding(tc, updatedGrounding);
+        var updated = tc with { Grounding = updatedGrounding };
 
         await new TestFileWriter().WriteAsync(test.FilePath, updated, ct);
         return true;
@@ -161,36 +161,6 @@ public sealed class ReviewFlaggedHandler
 
         return true;
     }
-
-    private static TestCase CopyWithGrounding(TestCase original, Core.Models.Grounding.GroundingMetadata grounding) => new()
-    {
-        Id = original.Id,
-        FilePath = original.FilePath,
-        Priority = original.Priority,
-        Tags = original.Tags,
-        Component = original.Component,
-        Description = original.Description,
-        Preconditions = original.Preconditions,
-        Environment = original.Environment,
-        EstimatedDuration = original.EstimatedDuration,
-        DependsOn = original.DependsOn,
-        SourceRefs = original.SourceRefs,
-        ScenarioFromDoc = original.ScenarioFromDoc,
-        RelatedWorkItems = original.RelatedWorkItems,
-        Custom = original.Custom,
-        AutomatedBy = original.AutomatedBy,
-        Requirements = original.Requirements,
-        Criteria = original.Criteria,
-        Bugs = original.Bugs,
-        Status = original.Status,
-        OrphanedReason = original.OrphanedReason,
-        OrphanedDate = original.OrphanedDate,
-        Title = original.Title,
-        Steps = original.Steps,
-        ExpectedResult = original.ExpectedResult,
-        TestData = original.TestData,
-        Grounding = grounding
-    };
 
     public static async Task<string> ResolveTestsDirAsync(string currentDir, CancellationToken ct)
     {

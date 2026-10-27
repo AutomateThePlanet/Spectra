@@ -77,11 +77,7 @@ public static class NextStepHints
     [
         "Ask Claude Code to generate tests      # runs the spectra-generate skill",
         "spectra init-profile           # Configure generation preferences",
-        "spectra ai analyze --extract-criteria  # Extract acceptance criteria from docs",
-        "",
-        "ℹ  Optional: Create a Copilot Space with your product documentation",
-        "   for inline help during test execution.",
-        "   See docs/copilot-spaces-setup.md"
+        "Ask Claude Code to extract criteria    # runs the spectra-criteria skill"
     ];
 
     private static List<string> GetGenerateHints(bool success, HintContext context)
@@ -119,7 +115,7 @@ public static class NextStepHints
             hints.Add("Ask Claude Code to generate tests          # spectra-generate skill (fills gaps)");
         }
 
-        hints.Add("spectra ai analyze --extract-criteria       # Extract acceptance criteria from docs");
+        hints.Add("Ask Claude Code to extract criteria         # spectra-criteria skill");
 
         return hints;
     }

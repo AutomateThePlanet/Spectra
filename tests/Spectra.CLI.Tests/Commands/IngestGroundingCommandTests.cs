@@ -343,8 +343,9 @@ public sealed class IngestGroundingCommandTests : IDisposable
             var testPath = WriteTestMd("reporting", "TC-504");
             WriteVerdictJson("TC-504", "partial");
 
+            // Spec 091 (FR-007): --all --repaired names the re-critiqued tests.
             var exit = await RunAsync("ai", "ingest-grounding", "--suite", "reporting", "--all",
-                "--repaired", "--repair-attempts", "1", "--output-format", "json");
+                "--repaired", "--repair-attempts", "1", "--ids", "TC-504", "--output-format", "json");
             Assert.Equal(0, exit);
             var json = captured.ToString().Trim();
             var result = System.Text.Json.JsonDocument.Parse(json).RootElement;

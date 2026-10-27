@@ -9,6 +9,8 @@
     <!-- Treat warnings as errors in release builds (suppress CA1062 null-check noise) -->
     <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
     <NoWarn>$(NoWarn);CA1062;CS8602</NoWarn>
+    <!-- NuGet vulnerability audit stays visible as warnings; an advisory with no patched release must not break the build -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
 
     <!-- Code analysis -->
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
@@ -16,7 +18,7 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 
     <!-- Versioning -->
-    <Version>2.4.0</Version>
+    <Version>2.6.0</Version>
     <Authors>Spectra Contributors</Authors>
     <Company>Spectra</Company>
     <Product>Spectra</Product>

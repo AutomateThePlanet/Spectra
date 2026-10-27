@@ -49,24 +49,6 @@ public sealed class GlobalIdScanner
     }
 
     /// <summary>
-    /// Creates a TestIdAllocator initialized with all existing IDs from all suites.
-    /// </summary>
-    /// <param name="testsPath">Path to the tests/ directory</param>
-    /// <param name="prefix">ID prefix (default: "TC")</param>
-    /// <param name="startNumber">Starting number for new IDs (default: 100)</param>
-    /// <param name="ct">Cancellation token</param>
-    /// <returns>TestIdAllocator with all existing IDs reserved</returns>
-    public async Task<TestIdAllocator> CreateGlobalAllocatorAsync(
-        string testsPath,
-        string prefix = "TC",
-        int startNumber = 100,
-        CancellationToken ct = default)
-    {
-        var existingIds = await ScanAllIdsAsync(testsPath, ct);
-        return TestIdAllocator.FromExistingIds(existingIds, prefix, startNumber);
-    }
-
-    /// <summary>
     /// Gets the maximum test ID number across all suites.
     /// </summary>
     /// <param name="testsPath">Path to the tests/ directory</param>

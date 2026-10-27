@@ -8,7 +8,7 @@ nav_order: 1
 
 How SPECTRA's two subsystems work together, as of the v2 (Claude Code) migration.
 
-Related: [Claude Code v2 vs. the GitHub Copilot SDK v1](../claude-code-v2-migration.md) |
+Related: [the v2 migration](../claude-code-v2-migration.md) (history: the GitHub Copilot SDK runtime was removed) |
 [How Test Case Generation Works](analysis/cli-vs-chat-generation.md)
 
 ---

@@ -1,0 +1,10 @@
+# step: 11-update-ack-dry-run spectra ai update-ack --suite payments --group G1 --dry-run --output-format json
+# exit: 0
+## stdout
+{"command":"update-ack","success":true,"suite":"payments","dry_run":true,"tests":["TC-101"],"baseline":{"created":0,"updated":1,"unchanged":0,"snapshots_written":1},"warnings":["test-cases/payments/TC-106.md could not be parsed and was skipped."]}
+
+## stderr
+Warning: test-cases/payments/TC-106.md could not be parsed and was skipped.
+Acknowledged 1 test(s) in 'payments': TC-101 (dry run: nothing written)
+  Baseline: created 0, updated 1, unchanged 0, snapshots written 1
+

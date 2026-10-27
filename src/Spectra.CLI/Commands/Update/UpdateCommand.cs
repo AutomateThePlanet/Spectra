@@ -9,7 +9,7 @@ namespace Spectra.CLI.Commands.Update;
 /// </summary>
 public sealed class UpdateCommand : Command
 {
-    public UpdateCommand() : base("update", "Update test cases based on documentation changes")
+    public UpdateCommand() : base("update", "Legacy word-overlap classifier — use update-triage for documentation changes")
     {
         var suiteArgument = new Argument<string?>(
             "suite",
@@ -25,7 +25,7 @@ public sealed class UpdateCommand : Command
 
         var diffOption = new Option<bool>(
             ["--diff", "-d"],
-            "Show diff of proposed changes without applying");
+            "Show diff of proposed changes");
 
         var deleteOrphanedOption = new Option<bool>(
             "--delete-orphaned",

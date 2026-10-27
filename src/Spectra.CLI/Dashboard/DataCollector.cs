@@ -279,7 +279,7 @@ public sealed class DataCollector
         IReadOnlyDictionary<string, string> automatedTestIds)
     {
         var entries = new List<TestEntry>();
-        var parser = new TestCaseParser();
+        var parser = new TestCaseParser(captureLayout: false);
 
         foreach (var (suite, index) in indexes)
         {

@@ -16,8 +16,9 @@ namespace Spectra.CLI.Generation;
 /// <item><b>Id from original</b> — the persisted id (and file path) is the original's; the model's
 /// id is ignored. This is an edit, not a create: no new id is allocated.</item>
 /// <item><b>Manual/grounding re-assertion</b> — the original's grounding (including a
-/// <see cref="VerificationVerdict.Manual"/> verdict and its note) is re-asserted onto the edited
-/// test, so an edit can never silently strip human-curated content.</item>
+/// <see cref="VerificationVerdict.Manual"/> verdict with its source, author and note) and every
+/// non-edited field are kept from the original, so an edit can never silently strip human-curated
+/// content.</item>
 /// <item><b>Drift guard</b> — a change to a protected field not implicated by the doc change
 /// (priority, component, tags) is surfaced fail-loud (<see cref="DriftDetected"/>) rather than
 /// persisted.</item>
@@ -28,6 +29,14 @@ public sealed class UpdatedTestIngestor
 {
     /// <summary>The drift-guard failure class. Maps to the content-invalid exit class (5).</summary>
     public const string DriftDetected = "DRIFT_DETECTED";
+
+    /// <summary>Spec 089 (F2): the edit holds more than one test object. Content-invalid exit class (5).</summary>
+    public const string MultipleTests = "MULTIPLE_TESTS";
+
+    /// <summary>Spec 089 (F2): names the count and every object's id (<c>(no id)</c> when it has none).</summary>
+    public static string MultipleTestsMessage(IReadOnlyList<string?> ids) =>
+        $"The edit holds {ids.Count} test objects ({string.Join(", ", ids.Select(id => id ?? "(no id)"))}); "
+        + "a staged file holds exactly one test.";
 
     private readonly TestPersistenceService _persistence;
     private readonly TestValidator _validator;
@@ -50,18 +59,35 @@ public sealed class UpdatedTestIngestor
     /// <param name="suite">Suite the edited test belongs to.</param>
     /// <param name="originalTest">The on-disk test being edited — the source of truth for invariants.</param>
     /// <param name="existingTests">Existing suite tests, used to regenerate the index.</param>
-    public async Task<IngestResult> IngestAsync(
+    public Task<IngestResult> IngestAsync(
         string? content,
         string testsPath,
         string suite,
         TestCase originalTest,
         IReadOnlyList<TestCase> existingTests,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool persist = true) =>
+        IngestAsync(GeneratedTestIngestor.Extract(content), testsPath, suite, originalTest, existingTests, ct, persist);
+
+    /// <summary>Spec 099 F4: the edit's JSON already extracted and parsed once by the caller.</summary>
+    internal async Task<IngestResult> IngestAsync(
+        GeneratedTestIngestor.ExtractedContent content,
+        string testsPath,
+        string suite,
+        TestCase originalTest,
+        IReadOnlyList<TestCase> existingTests,
+        CancellationToken ct = default,
+        bool persist = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(testsPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(suite);
         ArgumentNullException.ThrowIfNull(originalTest);
         ArgumentNullException.ThrowIfNull(existingTests);
+
+        // Spec 089 (F2): one test per edit. Counted before validation, so an array with a second (even invalid) object
+        // never slips through as "one test".
+        if (GeneratedTestIngestor.ArrayObjects(content) is { Count: > 1 } objects)
+            return IngestResult.Failure(MultipleTests, MultipleTestsMessage(objects));
 
         // 1. Reuse the generation parse/validate pipeline verbatim (fail-loud on any defect).
         var parsed = GeneratedTestIngestor.ParseAndValidate(content, _validator);
@@ -80,12 +106,20 @@ public sealed class UpdatedTestIngestor
         //    original — invariants are enforced here, not trusted to the model.
         var edited = ApplyEdit(originalTest, candidate);
 
+        // Spec 088 FR-015: an edit that changes nothing is not written (the caller records it as reviewed).
+        if (IsUnchanged(originalTest, edited))
+            return IngestResult.NoChange(originalTest);
+
         // 4. Persist through the single write+index path. allForIndex = existing with the original
         //    replaced by the edited test (same id ⇒ replace in place).
         var allForIndex = ReplaceById(existingTests, edited);
-        await _persistence.PersistAsync(testsPath, suite, [edited], allForIndex, ct);
+        // Spec 090 (FR-B2): a dry run returns exactly what a real run would, without writing.
+        if (persist)
+        {
+            await _persistence.PersistAsync(testsPath, suite, [edited], allForIndex, ct);
+        }
 
-        return IngestResult.Success([edited]);
+        return IngestResult.Success([edited], manualVerdictKept: edited.Grounding is not null);
     }
 
     /// <summary>
@@ -113,38 +147,22 @@ public sealed class UpdatedTestIngestor
     }
 
     /// <summary>
-    /// Produces the test to persist: a copy of <paramref name="original"/> with only the editable
-    /// content fields replaced from <paramref name="candidate"/>. Id, file path, grounding, and
-    /// every protected / non-round-tripped field are preserved from the original.
+    /// Produces the test to persist: <paramref name="original"/> with only the editable content fields
+    /// replaced from <paramref name="candidate"/>. Everything else — id, file path, priority, component,
+    /// tags, a Manual verdict, estimated duration, links, custom metadata, lifecycle fields and the source
+    /// layout (unknown frontmatter keys and body sections) — stays the original's. Spec 090 (FR-A1): a critic
+    /// grounding block is dropped, because it judged the old content.
     /// </summary>
     public static TestCase ApplyEdit(TestCase original, TestCase candidate)
     {
         ArgumentNullException.ThrowIfNull(original);
         ArgumentNullException.ThrowIfNull(candidate);
 
-        return new TestCase
+        return original with
         {
-            // Invariants — always from the original.
-            Id = original.Id,
-            FilePath = original.FilePath,
-            Priority = original.Priority,
-            Component = original.Component,
-            Tags = original.Tags,
-            // Manual / grounding re-asserted from the original (incl. Manual verdict + note).
-            Grounding = original.Grounding,
-            // Non-round-tripped fields preserved from the original.
-            Description = original.Description,
-            Environment = original.Environment,
-            DependsOn = original.DependsOn,
-            RelatedWorkItems = original.RelatedWorkItems,
-            Custom = original.Custom,
-            AutomatedBy = original.AutomatedBy,
-            Requirements = original.Requirements,
-            Bugs = original.Bugs,
-            Status = original.Status,
-            OrphanedReason = original.OrphanedReason,
-            OrphanedDate = original.OrphanedDate,
-            // Editable content — taken from the model's edit.
+            // Spec 090 (FR-A1): a critic verdict described the old content, so an edit drops it; a Manual verdict (a
+            // human judgement) is kept.
+            Grounding = original.Grounding?.Verdict == VerificationVerdict.Manual ? original.Grounding : null,
             Title = candidate.Title,
             Preconditions = candidate.Preconditions,
             Steps = candidate.Steps,
@@ -154,6 +172,39 @@ public sealed class UpdatedTestIngestor
             SourceRefs = candidate.SourceRefs,
             Criteria = candidate.Criteria
         };
+    }
+
+    /// <summary>
+    /// Spec 088 FR-015: true when <paramref name="candidate"/> equals <paramref name="original"/> in every editable
+    /// field (the <see cref="ApplyEdit"/> fields). For the comparison only, CRLF / CR count as LF, trailing whitespace
+    /// of each line and of each field is ignored, and null equals empty; whitespace inside a line counts. Lists
+    /// compare by sequence. Pure; nothing is altered.
+    /// </summary>
+    public static bool IsUnchanged(TestCase original, TestCase candidate)
+    {
+        ArgumentNullException.ThrowIfNull(original);
+        ArgumentNullException.ThrowIfNull(candidate);
+
+        return Same(original.Title, candidate.Title)
+            && Same(original.Preconditions, candidate.Preconditions)
+            && SameList(original.Steps, candidate.Steps)
+            && Same(original.ExpectedResult, candidate.ExpectedResult)
+            && Same(original.TestData, candidate.TestData)
+            && Same(original.ScenarioFromDoc, candidate.ScenarioFromDoc)
+            && SameList(original.SourceRefs, candidate.SourceRefs)
+            && SameList(original.Criteria, candidate.Criteria);
+
+        static bool SameList(IReadOnlyList<string> a, IReadOnlyList<string> b) =>
+            a.Count == b.Count && a.Zip(b).All(p => Same(p.First, p.Second));
+
+        static bool Same(string? a, string? b) => string.Equals(Comparable(a), Comparable(b), StringComparison.Ordinal);
+
+        static string Comparable(string? value)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+            var lines = value.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            return string.Join('\n', lines.Select(l => l.TrimEnd())).TrimEnd();
+        }
     }
 
     private static IReadOnlyList<TestCase> ReplaceById(IReadOnlyList<TestCase> existing, TestCase edited)

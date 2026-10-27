@@ -1,0 +1,8 @@
+# step: 18-ingest-grounding-all spectra ai ingest-grounding --suite payments --all --ids TC-101 --output-format json
+# exit: 0
+## stdout
+{"command":"ingest-grounding","mode":"batch","suite":"payments","written":1,"skipped_already_written":0,"skipped_partial_pre_repair":0,"errors":0,"skipped_manual":0,"manual":[],"skipped_stale":0,"stale":[],"skipped_hallucinated":0,"hallucinated":[],"not_found":[]}
+
+## stderr
+Batch grounding-ingest for suite 'payments': written=1 skipped_already_written=0 skipped_partial_pre_repair=0 errors=0
+

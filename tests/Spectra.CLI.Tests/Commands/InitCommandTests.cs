@@ -18,6 +18,13 @@ public class InitCommandTests : IDisposable
         _logger = loggerFactory.CreateLogger<InitHandler>();
     }
 
+    /// <summary>
+    /// Spec 096: how many lines are exactly <paramref name="pattern"/>. A substring count no longer works — the
+    /// <c># spectra-offered:</c> marker line names every pattern too.
+    /// </summary>
+    private static int PatternLines(string content, string pattern) =>
+        content.Replace("\r\n", "\n").Split('\n').Count(l => l.Trim() == pattern);
+
     public void Dispose()
     {
         if (Directory.Exists(_testDir))
@@ -131,8 +138,23 @@ public class InitCommandTests : IDisposable
         Assert.Equal(ExitCodes.Success, exitCode);
 
         var content = await File.ReadAllTextAsync(gitIgnorePath);
-        var lockCount = content.Split(".spectra.lock").Length - 1;
-        Assert.Equal(1, lockCount);
+        Assert.Equal(1, PatternLines(content, ".spectra.lock"));
+    }
+
+    [Fact]
+    public async Task HandleAsync_GitIgnoresRunStatusFiles_WithoutDuplicates()
+    {
+        // Spec 078: classify-only runs still write these; they must not dirty `git status`.
+        var gitIgnorePath = Path.Combine(_testDir, ".gitignore");
+        await File.WriteAllTextAsync(gitIgnorePath, "node_modules/\n");
+
+        Assert.Equal(ExitCodes.Success, await new InitHandler(_logger, _testDir).HandleAsync(force: false));
+        Assert.Equal(ExitCodes.Success, await new InitHandler(_logger, _testDir).HandleAsync(force: true));
+
+        var content = await File.ReadAllTextAsync(gitIgnorePath);
+        Assert.Equal(1, PatternLines(content, ".spectra-result.json"));
+        Assert.Equal(1, PatternLines(content, ".spectra-progress.html"));
+        Assert.Equal(1, PatternLines(content, ".spectra/criteria.lock")); // Spec 079
     }
 
     [Fact]
@@ -420,5 +442,34 @@ public class InitCommandTests : IDisposable
         Assert.Equal(ExitCodes.Success, exitCode);
         var usagePath = Path.Combine(_testDir, "USAGE.md");
         Assert.False(File.Exists(usagePath), "USAGE.md should NOT exist when --skip-skills");
+    }
+
+    // Spec 083 F1: the config `spectra init` writes shows where criteria go.
+    [Fact]
+    public async Task Init_WritesCoverageSection()
+    {
+        var exitCode = await new InitHandler(_logger, _testDir).HandleAsync(force: false);
+
+        Assert.Equal(ExitCodes.Success, exitCode);
+        using var config = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(_testDir, "spectra.config.json")));
+        var coverage = config.RootElement.GetProperty("coverage");
+        Assert.Equal("docs/criteria", coverage.GetProperty("criteria_dir").GetString());
+        Assert.Equal("docs/criteria/_criteria_index.yaml", coverage.GetProperty("criteria_file").GetString());
+    }
+
+    // Spec 084 FR-010: the baseline lock and the triage scratch are ignored; the baselines and snapshots are not.
+    [Fact]
+    public async Task Init_GitIgnoresBaselineScratch_ButNotTheBaselineOrSnapshots()
+    {
+        var gitIgnorePath = Path.Combine(_testDir, ".gitignore");
+
+        Assert.Equal(ExitCodes.Success, await new InitHandler(_logger, _testDir).HandleAsync(force: false));
+        Assert.Equal(ExitCodes.Success, await new InitHandler(_logger, _testDir).HandleAsync(force: true));
+
+        var content = await File.ReadAllTextAsync(gitIgnorePath);
+        Assert.Equal(1, PatternLines(content, ".spectra/baseline.lock"));
+        Assert.Equal(1, PatternLines(content, ".spectra/update-triage.json"));
+        Assert.DoesNotContain("source-snapshots", content);
+        Assert.DoesNotContain("_source-baseline", content);
     }
 }

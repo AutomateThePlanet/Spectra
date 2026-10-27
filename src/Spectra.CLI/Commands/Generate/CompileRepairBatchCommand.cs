@@ -1,7 +1,9 @@
 using System.CommandLine;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Spectra.CLI.Source;
 using Spectra.CLI.Verification;
+using Spectra.Core.Config;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
@@ -41,7 +43,20 @@ public sealed class CompileRepairBatchCommand : Command
     private static async Task<int> RunAsync(string suite, CancellationToken ct)
     {
         var currentDir = Directory.GetCurrentDirectory();
-        var testsDir = await ResolveTestsDirAsync(currentDir, ct);
+
+        // Spec 080 A5: read command — defaults when there is no config, exit 1 on a malformed or invalid one.
+        var loaded = await ConfigLoader.LoadForReadAsync(currentDir, ConfigSections.Source | ConfigSections.Tests, ct);
+        if (!loaded.IsSuccess)
+        {
+            Console.Error.WriteLine(loaded.Error);
+            return ExitError;
+        }
+        var config = loaded.Config!;
+        foreach (var warning in loaded.Warnings)
+        {
+            Console.Error.WriteLine($"Warning: {warning}");
+        }
+        var testsDir = config.Tests.Dir;
         var suitePath = Path.Combine(currentDir, testsDir, suite);
         var indexPath = IndexWriter.GetIndexPath(suitePath);
 
@@ -64,8 +79,9 @@ public sealed class CompileRepairBatchCommand : Command
         var indexLookup = index.Tests
             .ToDictionary(t => t.Id, t => t, StringComparer.OrdinalIgnoreCase);
 
-        var parser = new TestCaseParser();
+        var parser = new TestCaseParser(captureLayout: false);
         var entries = new List<RepairBatchEntry>();
+        var stale = new List<(string Id, string Reason)>();
 
         var verdictFiles = Directory.GetFiles(verdictDir, "critic-verdict-*.json")
             .OrderBy(f => f);
@@ -113,13 +129,20 @@ public sealed class CompileRepairBatchCommand : Command
             if (!testParsed.IsSuccess || testParsed.Value is null) continue;
             var test = testParsed.Value;
 
+            // Spec 097 (FR-011): a stale verdict gets no prompt; it is listed on stderr instead.
+            if (VerdictFreshness.Check(currentDir, testId, test, vf) is { IsStale: true } staleResult)
+            {
+                stale.Add((testId, staleResult.Message(testId)));
+                continue;
+            }
+
             var nonGrounded = verResult.Findings
                 .Where(f => f.Status != FindingStatus.Grounded)
                 .ToList();
 
             // Load source docs
             IReadOnlyList<SourceDocument> sourceDocs;
-            try { sourceDocs = await LoadDocumentsFromRefsAsync(test.SourceRefs, currentDir, ct); }
+            try { sourceDocs = await SourceRefDocumentLoader.LoadAsync(test.SourceRefs, currentDir, config.Source.LocalDir ?? "docs", failOnMissing: false, ct); }
             catch { sourceDocs = []; }
 
             var (prompt, _) = RepairPromptCompiler.Compile(test, nonGrounded, sourceDocs);
@@ -141,45 +164,24 @@ public sealed class CompileRepairBatchCommand : Command
         });
 
         Console.Out.WriteLine(json);
+
+        // Spec 097 (FR-011): stdout stays the array; stale tests go to stderr as one JSON line plus a human line each.
+        if (stale.Count > 0)
+        {
+            Console.Error.WriteLine(JsonSerializer.Serialize(new
+            {
+                command = "compile-repair-batch",
+                stale = stale.Select(s => new { id = s.Id, reason = s.Reason })
+            }));
+            foreach (var (id, _) in stale)
+            {
+                Console.Error.WriteLine($"{id}: stale verdict — run the critic again");
+            }
+        }
+
         return ExitSuccess;
     }
 
-    private static async Task<IReadOnlyList<SourceDocument>> LoadDocumentsFromRefsAsync(
-        IReadOnlyList<string> sourceRefs, string currentDir, CancellationToken ct)
-    {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var docs = new List<SourceDocument>();
-        foreach (var r in sourceRefs)
-        {
-            var file = r.Split('#')[0].Trim();
-            if (string.IsNullOrWhiteSpace(file)) continue;
-            var full = Path.IsPathRooted(file) ? file : Path.Combine(currentDir, file);
-            if (!seen.Add(Path.GetFullPath(full))) continue;
-            if (!File.Exists(full)) continue;
-            var content = await File.ReadAllTextAsync(full, ct);
-            docs.Add(new SourceDocument
-            {
-                Path = Path.GetRelativePath(currentDir, full).Replace('\\', '/'),
-                Title = Path.GetFileNameWithoutExtension(full),
-                Content = content
-            });
-        }
-        return docs;
-    }
-
-    private static async Task<string> ResolveTestsDirAsync(string currentDir, CancellationToken ct)
-    {
-        var configPath = Path.Combine(currentDir, "spectra.config.json");
-        if (!File.Exists(configPath)) return "test-cases";
-        try
-        {
-            var json = await File.ReadAllTextAsync(configPath, ct);
-            var config = JsonSerializer.Deserialize<SpectraConfig>(json,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return config?.Tests?.Dir ?? "test-cases";
-        }
-        catch { return "test-cases"; }
-    }
 }
 
 /// <summary>

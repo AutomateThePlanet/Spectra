@@ -1,10 +1,13 @@
 using System.Text.Json;
 using Spectra.CLI.Commands.Analyze;
+using Spectra.CLI.Criteria;
 using Spectra.CLI.Index;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Output;
 using Spectra.CLI.Source;
+using Spectra.Core.Criteria;
 using Spectra.Core.Models.Config;
+using Spectra.Core.Models.Coverage;
 using Spectra.Core.Parsing;
 
 namespace Spectra.CLI.Commands.Docs;
@@ -39,29 +42,23 @@ public sealed class DocsChangedHandler
     /// </summary>
     public async Task<int> ExecuteAsync(string currentDir, TextWriter output, CancellationToken ct = default)
     {
-        var configPath = Path.Combine(currentDir, "spectra.config.json");
-        if (!File.Exists(configPath))
+        // Spec 080 A5: a read command — built-in defaults when there is no config; exit 1 on a malformed or
+        // invalid one (never a silent fallback).
+        var loaded = await Spectra.Core.Config.ConfigLoader.LoadForReadAsync(
+            currentDir, Spectra.Core.Config.ConfigSections.Source, ct);
+        if (!loaded.IsSuccess)
         {
-            Console.Error.WriteLine("spectra.config.json not found. Run 'spectra init' first.");
+            // Spec 082 A4: in JSON mode a config failure is the shared failure document with its named code.
+            if (_outputFormat == OutputFormat.Json)
+                CriteriaCommandIO.WriteFailureJson("docs-changed", loaded.ErrorCode, [loaded.Error!]);
+            else
+                Console.Error.WriteLine(loaded.Error);
             return ExitCodes.Error;
         }
-
-        SpectraConfig? config;
-        try
+        var config = loaded.Config!;
+        foreach (var warning in loaded.Warnings)
         {
-            config = JsonSerializer.Deserialize<SpectraConfig>(
-                await File.ReadAllTextAsync(configPath, ct),
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        }
-        catch (JsonException ex)
-        {
-            Console.Error.WriteLine($"Error reading config: {ex.Message}");
-            return ExitCodes.Error;
-        }
-        if (config is null)
-        {
-            Console.Error.WriteLine("Could not parse spectra.config.json.");
-            return ExitCodes.Error;
+            Console.Error.WriteLine($"Warning: {warning}");
         }
 
         var criteriaIndexPath = Path.Combine(currentDir, config.Coverage.CriteriaFile);
@@ -76,6 +73,7 @@ public sealed class DocsChangedHandler
         var criteriaIndex = await new CriteriaIndexReader().ReadAsync(criteriaIndexPath, ct);
 
         var entries = new List<ChangedDocEntry>();
+        var discovered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var doc in documentMap.Documents)
         {
             if (AnalyzeHandler.ShouldSkipDocument(Path.GetFileName(doc.Path)))
@@ -91,19 +89,69 @@ public sealed class DocsChangedHandler
                 continue; // unreadable doc — not our concern here
             }
 
-            var existing = criteriaIndex.Sources
-                .FirstOrDefault(s => string.Equals(s.SourceDoc, doc.Path, StringComparison.OrdinalIgnoreCase));
+            var path = CriteriaPaths.NormalizeLexical(doc.Path);
+            discovered.Add(path);
+
+            // Spec 079 FR-017: compare normalised paths, so an index entry written as docs\x.md or ./docs/x.md
+            // still matches.
+            var existing = FindDocumentSource(criteriaIndex, path, currentDir);
             var indexedHash = existing?.DocHash;
 
             var status = indexedHash is null
                 ? "new"
                 : (!string.Equals(indexedHash, currentHash, StringComparison.OrdinalIgnoreCase) ? "changed" : "unchanged");
 
-            var component = Path.GetFileNameWithoutExtension(doc.Path).Replace(' ', '-').ToLowerInvariant();
-            entries.Add(new ChangedDocEntry(doc.Path.Replace('\\', '/'), component, status, currentHash, indexedHash));
+            entries.Add(new ChangedDocEntry(path, DeriveComponent(path), status, currentHash, indexedHash));
         }
 
+        // Spec 079 FR-018: index sources whose document no longer exists on disk. (A doc that exists but was
+        // filtered out of discovery, e.g. an archived suite, is not deleted.)
+        var deleted = criteriaIndex.Sources
+            .Where(CriteriaPaths.IsDocumentSource)
+            .Select(s => (Source: s, Path: CriteriaPaths.NormalizeSourceDoc(s.SourceDoc, currentDir).Path
+                ?? CriteriaPaths.NormalizeLexical(s.SourceDoc)))
+            .Where(x => !discovered.Contains(x.Path) && !File.Exists(Path.Combine(currentDir, x.Path)))
+            .GroupBy(x => x.Path, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .Select(x => new ChangedDocEntry(x.Path, DeriveComponent(x.Path), "deleted", null, x.Source.DocHash,
+                CriteriaCount: x.Source.CriteriaCount))
+            .ToList();
+
+        // Spec 079 FR-019: exactly one new doc and exactly one deleted source with the same content hash is a
+        // move. Ambiguous matches stay new + deleted. Read-only: applying it is `spectra docs apply-move`.
+        foreach (var hashGroup in deleted.Where(d => d.IndexedHash is not null)
+                     .GroupBy(d => d.IndexedHash!, StringComparer.OrdinalIgnoreCase).ToList())
+        {
+            var candidates = entries
+                .Where(e => e.Status == "new" && string.Equals(e.CurrentHash, hashGroup.Key, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (hashGroup.Count() != 1 || candidates.Count != 1)
+            {
+                continue;
+            }
+
+            var from = hashGroup.Single();
+            var to = candidates.Single();
+            entries.Remove(to);
+            deleted.Remove(from);
+            entries.Add(to with { Status = "moved", From = from.Path, IndexedHash = from.IndexedHash, CriteriaCount = from.CriteriaCount });
+        }
+
+        entries.AddRange(deleted);
         entries.Sort((a, b) => string.CompareOrdinal(a.Path, b.Path)); // stable, deterministic order
+
+        var duplicates = CriteriaDuplicateScanner.Scan(
+            await CriteriaStore.ScanFilesAsync(Path.GetFullPath(Path.Combine(currentDir, config.Coverage.CriteriaDir)), ct));
+        var migrationNeeded = CriteriaPaths.IsOldLayout(criteriaIndex);
+        var warnings = new List<string>(loaded.Warnings);
+        if (migrationNeeded)
+        {
+            warnings.Add("Criteria files use the pre-2.6 layout; run 'spectra docs migrate-criteria' "
+                + "(criteria writes also migrate automatically).");
+        }
+
+        warnings.AddRange(duplicates.Select(d =>
+            $"Criterion id {d.Id} is defined more than once ({string.Join(", ", d.Files)}); not renumbered."));
 
         var changed = entries.Where(e => e.Status != "unchanged").ToList();
         var unchangedCount = entries.Count - changed.Count;
@@ -118,27 +166,63 @@ public sealed class DocsChangedHandler
                 changed = emitted.Select(e => new
                 {
                     path = e.Path,
+                    from = e.From,
                     component = e.Component,
                     status = e.Status,
                     current_hash = e.CurrentHash,
-                    indexed_hash = e.IndexedHash
+                    indexed_hash = e.IndexedHash,
+                    criteria_count = e.CriteriaCount
                 }).ToArray(),
-                unchanged_count = unchangedCount
-            }, new JsonSerializerOptions { WriteIndented = true }));
-        }
-        else if (emitted.Count == 0)
-        {
-            output.WriteLine("All documents up to date — no changed criteria to extract.");
+                unchanged_count = unchangedCount,
+                duplicate_ids = duplicates,
+                migration_needed = migrationNeeded,
+                warnings
+            }, JsonOutput));
         }
         else
         {
-            foreach (var e in emitted)
-                output.WriteLine($"  [{e.Status,-9}] {e.Path}  (component: {e.Component})");
-            output.WriteLine($"\n{changed.Count} changed, {unchangedCount} unchanged.");
+            if (emitted.Count == 0)
+            {
+                output.WriteLine("All documents up to date — no changed criteria to extract.");
+            }
+            else
+            {
+                foreach (var e in emitted)
+                {
+                    var detail = e.Status switch
+                    {
+                        "moved" => $"  (from: {e.From})",
+                        "deleted" => $"  ({e.CriteriaCount} criteria)",
+                        _ => $"  (component: {e.Component})"
+                    };
+                    output.WriteLine($"  [{e.Status,-9}] {e.Path}{detail}");
+                }
+
+                output.WriteLine($"\n{changed.Count} changed, {unchangedCount} unchanged.");
+            }
+
+            foreach (var warning in warnings)
+                output.WriteLine($"Warning: {warning}");
         }
 
         return ExitCodes.Success;
     }
 
-    private sealed record ChangedDocEntry(string Path, string Component, string Status, string CurrentHash, string? IndexedHash);
+    private static readonly JsonSerializerOptions JsonOutput = new()
+    {
+        WriteIndented = true,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
+
+    // Spec 081 C1: repo-aware comparison, so an index entry stored as an absolute path still matches.
+    private static CriteriaSource? FindDocumentSource(CriteriaIndex index, string path, string currentDir) =>
+        index.Sources.FirstOrDefault(s => CriteriaPaths.IsDocumentSource(s)
+            && CriteriaProvenance.SameDocument(s.SourceDoc, path, currentDir));
+
+    private static string DeriveComponent(string path) =>
+        Path.GetFileNameWithoutExtension(path).Replace(' ', '-').ToLowerInvariant();
+
+    private sealed record ChangedDocEntry(
+        string Path, string Component, string Status, string? CurrentHash, string? IndexedHash,
+        string? From = null, int? CriteriaCount = null);
 }

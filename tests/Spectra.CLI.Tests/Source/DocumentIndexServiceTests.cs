@@ -156,8 +156,8 @@ public class DocumentIndexServiceTests : IDisposable
     [Fact]
     public void ResolveIndexPath_StillReturnsLegacyPath()
     {
-        // ResolveIndexPath is still used by a few callers (e.g., GetDocumentMapTool
-        // for fallback paths). It returns the legacy path even though the legacy
+        // ResolveIndexPath is still used by a few callers
+        // (fallback paths). It returns the legacy path even though the legacy
         // file is no longer written by EnsureNewLayoutAsync.
         var config = new SourceConfig { LocalDir = "docs/" };
         var path = DocumentIndexService.ResolveIndexPath("/base", config);

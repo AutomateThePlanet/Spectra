@@ -5,6 +5,850 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-09-29 — Stable acceptance-criteria identity
+
+### Highlights
+
+What 2.5.0 and 2.6.0 (Specs 078–100) change for you, in short — the sections below have the detail:
+
+- **Tests stay current when the docs change.** `spectra ai update-triage` tells you, without a model, which tests a doc
+  change touches and why (LOAD, LIGHT, COSMETIC, REMOVED, RELINK, …), grouped by what changed; the `spectra-update`
+  skill relinks renamed docs (read-only git), edits the affected tests group by group with the old and new section
+  text in the prompt, re-verifies them with the critic and acknowledges the rest. The new
+  [When documentation changes](docs/usage.md#when-documentation-changes) guide walks the whole flow.
+- **Criterion IDs are stable.** Re-extraction keeps an ID when the requirement is reworded, never reuses one, keeps one
+  criteria file per document, and shows you every changeset.
+- **Edits never damage your files** — unknown keys, comments and body sections survive every write (2.5.0).
+- **Nothing is marked verified that wasn't.** An edit drops the old verdict; stale verdicts are refused; grounding is
+  written only for the tests the critic confirmed; `audit-grounding` says exactly what each test still needs.
+- **Smaller conversations.** Generation, updates and criteria extraction run in subagents, and generation works in
+  section-sized batches that skip behaviours your tests already cover.
+- **Safer workspace commands** — `update-skills` never overwrites a file you edited, `suite delete` and `delete` clean
+  up dependents and leftovers, `validate` fails on unparseable tests.
+- **Faster** — each ingest reads the suite once; read-only commands parse less.
+- **Docs, help and agent guidance describe the product as it is** — no more `spectra ai generate` or
+  `--extract-criteria` anywhere you are told to run something (Spec 100).
+
+### Changed (Spec 079)
+
+- **Re-extraction keeps criterion IDs.** `spectra ai compile-extraction-prompt` now lists the document's existing
+  criteria (`id`, `text`, `source_section`), and the model returns an existing `id` for a criterion that
+  expresses the same requirement, even when reworded. `spectra ai ingest-criteria` accepts that optional `id`
+  and honours it only when it belongs to this document and appears once; anything else exits **7**
+  (`INVALID_CRITERION_ID`) and writes nothing. A criterion without an `id` keeps its ID when its normalised text
+  (markup, whitespace and case ignored) is unchanged, and then its stored text is kept verbatim.
+- **IDs are never reused and unique across the repository.** New IDs come from `id_high_water_marks` in
+  `_criteria_index.yaml` (committed, per prefix such as `AC-CHECKOUT`) instead of "the highest number in this
+  doc's file". `ai analyze --import-criteria` uses the same allocator and merges before numbering, so a
+  re-import consumes no numbers.
+- **Every ingest reports a changeset**: `changeset` in the JSON result (`added`, `modified` with old/new text,
+  `removed` with `referencing_tests`/`test_ids` from the test indexes, `metadata` by field), plus `written`,
+  `duplicate_ids` and `migration`. A human summary is always printed — on stderr in JSON mode, so stdout stays
+  exactly the JSON. When nothing changed, nothing is written.
+- **One criteria file per document**, mirroring its path: `docs/a/login.md` → `docs/criteria/docs/a/login.criteria.yaml`.
+  `source_doc` is stored repository-relative with `/`, however `--doc` was typed.
+- **New `spectra docs migrate-criteria [--dry-run]`** moves an existing workspace to the new layout (IDs
+  preserved, idempotent, collisions reported). `ingest-criteria`, `docs retire`, `docs apply-move` and
+  `--import-criteria` run it automatically before they write; `docs changed` and `compile-extraction-prompt` only
+  warn.
+- **`spectra docs changed` reports `deleted` and `moved` documents**, plus `duplicate_ids`, `migration_needed` and
+  `warnings`. It compares normalised paths and stays read-only.
+- **New `spectra docs retire --doc <path> [--dry-run]`** retires a deleted document's criteria (index entry and
+  file) and reports every criterion as removed with the tests still referencing it. **New `spectra docs
+  apply-move --from <old> --to <new> [--dry-run]`** keeps a moved document's criteria and IDs without re-extraction.
+- **The `spectra-criteria` skill** applies moves, previews deleted documents and retires them only after you
+  confirm, and ends with a combined changeset summary including tests that reference removed criteria.
+- Criteria writers take `.spectra/criteria.lock` (added to the `spectra init` gitignore list), so concurrent
+  writers never lose an index update or issue the same ID.
+
+### Fixed (Spec 079)
+
+- Any rewording of a criterion used to give it a new ID, silently breaking the `criteria:` links in tests.
+- Removed criteria's numbers were handed out again, and two documents with the same component (including
+  same-named files in different folders) produced duplicate IDs.
+- `docs/a/login.md` and `docs/b/login.md` wrote the same `login.criteria.yaml` and overwrote each other.
+- The model's `source_section` was silently dropped when the extraction response was parsed.
+- A corrupt criteria file (or criteria index) was read as empty, restarting numbering; write paths now fail loud
+  with `CRITERIA_FILE_UNREADABLE`.
+- `spectra ai update` crashed on duplicate criterion IDs; it now uses the first definition and warns.
+- `source_doc` typed with backslashes or `./` never matched, so the document stayed `new` in `docs changed`.
+- The criteria index read-modify-write had no lock and a shared temp-file name.
+
+### Changed (review fixes, Spec 080)
+
+- **Config is loaded one way.** Every criteria command and the critic/repair compilers load
+  `spectra.config.json` through one loader. A malformed or invalid config is always an error (exit 1,
+  `spectra.config.json is invalid: …`); no command falls back to defaults on a config it could not parse (that
+  fallback emptied `existing_criteria` and churned IDs). A missing config gives the built-in defaults to read
+  commands (`compile-extraction-prompt`, `compile-critic-prompt`, `compile-repair-prompt`,
+  `compile-repair-batch`, `docs changed`) and exit 1 (`No spectra.config.json found. Run 'spectra init' first.`)
+  to write commands (`ingest-criteria`, `docs retire`, `docs apply-move`, `docs migrate-criteria`,
+  `ai analyze --import-criteria`). **`spectra docs changed` with no config now runs on the defaults** instead of
+  exiting 1.
+- **A source directory outside the repository works.** With `source.local_dir: ../product-docs/docs`, refs into
+  that folder resolve for `ai update` and the critic/repair compilers. Refs outside both the repository and the
+  source directory are still refused, and the message now says so ("outside the repository and the configured
+  source directory") instead of "not found".
+- **A rejected ingest reports `"outcome": "Rejected"`** (was `Extracted` with `success: false`). Exit codes are
+  unchanged.
+- **Failure output is always one JSON document in JSON mode.** `compile-extraction-prompt` failures carry a
+  `warnings` array (document not found → `DOCUMENT_NOT_FOUND`, unreadable → `DOCUMENT_UNREADABLE`); the early
+  errors of `ingest-criteria` (config, `--from` file not found) use the same failure shape as the other criteria
+  commands.
+
+### Fixed (review fixes, Spec 080)
+
+- `spectra ai update` wrote orphan marks and updates to `{id}.md` instead of the test's own file, creating a
+  second file with the same ID when the name differed, and `--delete-orphaned` deleted nothing (2.5.0).
+- YAML comments in test frontmatter were lost or moved on rewrite: a comment above a key belonged to the key
+  before it, and a leading comment travelled with the first key. Comments and blank lines now stay with the key
+  below them; the header stays at the top and trailing comments at the end. A removed key takes the comment above
+  it with it (2.5.0).
+- The known frontmatter keys were listed twice (parser and writer); they now come from one list, guarded by a
+  test against the frontmatter model (2.5.0).
+- Shared (pre-2.6 collided) criteria files: `compile-extraction-prompt` offered the other document's criteria (so
+  ingest rejected the IDs and the document could never be re-extracted), `docs apply-move` copied and relabelled
+  them, and a document leaving the file left its criteria behind, so they existed twice and a retired document's
+  criteria kept counting in coverage. All four now use the per-criterion `source_doc` provenance, and a document
+  leaving a shared file takes its criteria out of it.
+- Tags that differed only in order or case counted as a change and rewrote the criteria file; they now compare as
+  a set.
+- The text normaliser treated any `<letter…>` span as an HTML tag, so `total<limit and qty>5` lost text and two
+  different criteria could compare equal. Only well-formed tags of known HTML elements are stripped now.
+- `docs changed` had its own copy of the criteria-file scan; it now shares the criteria store's.
+- The `spectra-criteria` skill had no instruction for exit 1 from `ingest-criteria`, `apply-move` and `retire`;
+  it now reports the error code and stops for that document, retrying once on `LOCK_TIMEOUT`.
+
+### Changed (review fixes, Spec 081)
+
+- **Config sections a command doesn't read are never required.** A `spectra.config.json` without an `ai` section is
+  accepted by every criteria and compile command (none of them reads it). Each command checks only the sections it
+  reads. If one of those is missing, a read command (`compile-critic-prompt`, `compile-repair-prompt`,
+  `compile-repair-batch`, `docs changed`) uses that section's built-in defaults and prints a warning naming it. A write
+  command (`ingest-criteria`, `docs retire`) exits 1 with `spectra.config.json is invalid: missing '<section>' section`.
+  `coverage` stays optional. Malformed JSON and wrong types are still exit 1 everywhere.
+- **One failure shape for the criteria commands.** In JSON mode, every failure of `compile-extraction-prompt`,
+  `ingest-criteria`, `docs retire`, `docs apply-move` and `docs migrate-criteria` is one document on stderr:
+  `{ "command", "success": false, "error_code", "errors", "warnings" }`, plus `outcome` on ingest failures and
+  `missing_input` on compile refusals (`error_code: "MISSING_INPUT"`). `compile-extraction-prompt` no longer emits
+  `refused` or `message`. Exit codes and human-mode output are unchanged.
+- **More doc markup is ignored when comparing criteria.** The normaliser also strips `figure`, `figcaption`, `details`,
+  `summary`, `section`, `article`, `aside`, `caption`, `col`, `colgroup`, `tfoot`, `center`, `font`, `picture`, `source`,
+  `big`, `tt`, `wbr`, `samp`, `dfn`, `bdi`, `bdo`, `ruby`, `rt`, `rp`, `input`, `video`, `audio` and `iframe` tags,
+  and accepts bare boolean attributes (`<td nowrap>`, `<details open>`). Comparisons such as `a<b and c>d`, and
+  placeholder words such as `<data>`, `<time>`, `<label>` and `<header>`, stay text.
+
+### Fixed (review fixes, Spec 081)
+
+- In a shared (pre-2.6) criteria file, a criterion whose `source_doc` was stored as an absolute path belonged to no
+  document. Re-extraction changed every ID, and retire and apply-move left the criteria behind. Ownership, and the
+  index lookup in `compile-extraction-prompt`, `docs changed` and the write commands (incl. `--dry-run`), now compare
+  repository-relative paths.
+- A test file's keep-chomped block value (`|+`, `>+`) lost its trailing blank lines when the key after it was removed
+  on rewrite. Those lines now stay with the value.
+
+### Changed (review fixes, Spec 082)
+
+- **Criteria writes require `coverage`, not `tests`.** `ingest-criteria`, `docs retire`, `docs apply-move`,
+  `docs migrate-criteria` and `ai analyze --import-criteria` exit 1 with
+  `spectra.config.json is invalid: missing 'coverage' section` when `coverage` (where criteria are written) is
+  missing, also under `--dry-run`, and write nothing. A missing `tests` section, which only feeds the
+  referencing-test counts, is now a warning for `ingest-criteria` and `docs retire`, not an error.
+  `compile-extraction-prompt`, `compile-critic-prompt` and `docs changed` warn and use the default criteria location
+  when `coverage` is missing.
+- **A section set to `null` is treated as missing.** Before, it failed validation in every command, and
+  `"coverage": null` crashed.
+- **Named config error codes.** In JSON mode, config failures carry `error_code` `CONFIG_MISSING`, `CONFIG_INVALID`
+  or `CONFIG_SECTION_MISSING` instead of `null`. `ai analyze --import-criteria`'s `ErrorResult` gains `error_code`.
+  `compile-critic-prompt` and `docs changed` now report a config failure in JSON mode as the shared failure
+  document, where before it was a plain text line. Human-mode wording is unchanged. The `spectra-criteria` skill names
+  the codes.
+
+### Fixed (review fixes, Spec 082)
+
+- Capitalised placeholders that share a name with an HTML element (`<Source>`, `<Summary>`, `<Section>`, `<Input>`,
+  `<Details>`, `<Caption>`) were stripped as markup, so a change inside one went unnoticed. A tag now counts as markup
+  only in HTML form: lowercase, closing, with attributes, or opened and later closed (`<P>Para</P>`).
+
+### Changed (review fixes, Spec 083)
+
+- **One config rule; no section is ever required.** It replaces the per-section rules of the Spec 081 and 082
+  entries above:
+  - no `spectra.config.json`: read commands use the defaults, and write commands exit 1 with `CONFIG_MISSING`;
+  - a config that isn't valid JSON, isn't an object, can't be read, or has duplicate top-level keys (including keys
+    that differ only in case): exit 1 with `CONFIG_INVALID`;
+  - `source` or `tests` missing or `null`: the defaults, plus one warning, only in the commands that read that section;
+  - `coverage` missing or `null`: the defaults, with no warning;
+  - anything else: ignored.
+
+  **`CONFIG_SECTION_MISSING` is removed.**
+- **`spectra init` writes a `coverage` section** (`criteria_dir: docs/criteria`, `criteria_file:
+  docs/criteria/_criteria_index.yaml`), so new workspaces show where criteria go. Existing workspaces need no change.
+- **When criterion text counts as HTML.** A known element name in angle brackets is markup only as:
+  - a closing tag;
+  - a tag with attributes;
+  - a self-closing bare tag;
+  - a lowercase `<br>`, `<hr>` or `<wbr>`;
+  - or an opening tag closed later with exactly the same spelling.
+
+  Lowercase placeholders with no matching close (`<source>`, `<summary>`) are now text, and so is `<Summary>` when
+  only `</summary>` follows. Known residual: a lowercase placeholder with its exact lowercase close later in the text
+  counts as markup.
+
+### Fixed (review fixes, Spec 083)
+
+- **Criteria commands were broken in every real workspace.** The Spec 082 entry above made `ingest-criteria`,
+  `docs retire`, `docs apply-move`, `docs migrate-criteria` and `--import-criteria` refuse a config without
+  `coverage` (`CONFIG_SECTION_MISSING`). It also made `compile-extraction-prompt`, `compile-critic-prompt` and
+  `docs changed` warn about `coverage` on every run. But the config `spectra init` writes had no `coverage` section,
+  and neither do workspaces created before this release. The rule had been checked against the typed default config
+  and test fixtures, never against the init template. New end-to-end tests now run the real `spectra init`, and a
+  workspace without `coverage`, through the whole criteria workflow.
+- **Duplicate keys.** A config with an exact duplicate top-level key crashed the command with an unhandled exception.
+  Keys that differ only in case were silently resolved to the last one, possibly `null`. Both are now `CONFIG_INVALID`.
+
+### Added (Spec 084 — source change baseline, Phase 2a)
+
+- **Deterministic change detection for test updates, without git.** Each suite gets a committed
+  `test-cases/{suite}/_source-baseline.json`: per test, a fingerprint of every doc section its `source_refs` point at
+  (`file#anchor` → that heading through to the next heading of the same or a higher level; no anchor → the whole
+  file) and of every criterion it links. Normalised section snapshots live in `.spectra/source-snapshots/` (committed,
+  shared, never pruned). Anchors match tolerantly (lowercase letters and digits only), so GitBook, GitHub and
+  generator-style anchors all find "Create customer records".
+- **`spectra ai update-triage (--suite <s> | --all-suites) [--no-auto-ack] [--dry-run]`** reports each test's state
+  since its baseline — UNCHANGED, COSMETIC (markup/whitespace/case only; acknowledged automatically), LIGHT, LOAD (a
+  number, a modal word such as must/should/not, or more than `update.light_threshold_words` words changed), REMOVED,
+  CRITERIA_CHANGED, CRITERIA_REMOVED — buckets each test by its worst state, groups tests with the same changes
+  (`update.group_size`), and says why (`numbers: 10gb→50gb`). Tests without a baseline are UNBASELINED, never
+  changed. Compact JSON on stdout, word diffs in `.spectra/update-triage.json`, the summary table in every mode.
+  A 2,500-test workspace triages in about 2 s.
+- **`spectra ai update-ack --suite <s> (--ids a,b | --group <gid>)`** acknowledges reviewed tests (refreshes their
+  baseline, never their files). A group that changed since triage is refused (`TRIAGE_STALE`); a test that still
+  lists a REMOVED ref or criterion is refused (`REF_REMOVED` / `CRITERION_REMOVED`).
+- **`spectra ai source-baseline --init (--suite <s> | --all-suites) [--force]`** adopts current content as the
+  baseline for tests that have none — run it once in a workspace created before this release.
+- **Config:** optional `update.group_size` (default 10) and `update.light_threshold_words` (default 12). Missing or
+  `null` → the defaults, silently; the init template doesn't carry them.
+
+### Changed (Spec 084)
+
+- **`ingest-tests` and `ingest-update` record baselines.** They take `.spectra/baseline.lock` and load the suite
+  baseline before persisting (`LOCK_TIMEOUT` / `BASELINE_UNREADABLE` persist nothing), then record the persisted
+  tests' entries; their success JSON gains a `baseline` object. Their content and schema failures (exit 5/6) are
+  unchanged.
+- **The `spectra-update` skill drives triage:** summary → REMOVED / CRITERIA_REMOVED for review (fix the ref, or
+  delete the test with `spectra-delete`) → which buckets to edit (LOAD only, recommended, includes
+  CRITERIA_CHANGED; LOAD + LIGHT; chosen groups; report only) → the existing edit loop → `update-ack` for tests kept
+  as they are. The `spectra-generate` / `spectra-execute` update rows point at `update-triage --dry-run`.
+- **`spectra init`** gitignores `.spectra/baseline.lock` and `.spectra/update-triage.json`.
+- **Legacy:** `spectra ai update` and `TestClassifier` are unchanged but no longer used by any skill.
+
+### Fixed (Spec 084)
+
+- **Non-ASCII output on Windows.** The CLI now writes UTF-8 (no BOM) to stdout and stderr. A redirected stream —
+  how the skills read every command — used the legacy console code page, so characters such as `→`, `—` or `Ü` in
+  JSON results and compiled prompts arrived as `?` or a control character.
+
+### Fixed (review fixes, Spec 085)
+
+- **Anchors find headings with markup or explicit IDs.** A ref now matches a heading by its text with HTML, links and
+  a trailing `{#…}` block removed, then by an explicit ID (`id="…"`, `{#id}`), then by a GitHub duplicate suffix
+  (`#setup-1` = the second "Setup"). Under 084, refs to GitBook `<a id>` headings, `{#id}` headings and link headings
+  never resolved, so they were never baselined (partial for ever), and a plain heading that later gained such markup
+  turned REMOVED. Adding an anchor tag, a link or a custom ID to a heading is now COSMETIC. Refs to plain, emphasised
+  and inline-code headings resolve exactly as before, and no fingerprint changes. `no_tests` shows cleaned heading
+  text.
+- **An unparseable test file no longer loses its baseline.** No writer prunes a suite's baseline while any of its test
+  files fails to parse; each one warns, naming the files.
+- **A rebuild keeps dead refs.** `ingest-update`, `source-baseline --init --force` and `update-ack` keep the previous
+  fingerprint of a ref or criterion the test still lists but that is gone, so it keeps showing as REMOVED /
+  CRITERIA_REMOVED until the test drops it.
+- **Meaning flips are LOAD.** Negations, exceptions and quantifiers (no, never, none, can't, don't, without, unless,
+  except, always, all, any, every …) join the LOAD words; a curly apostrophe counts as a straight one.
+- **Repairs keep the baseline.** `spectra ai ingest-update --keep-baseline` (single and `--all`) leaves existing
+  fingerprints alone and only adds entries for new refs and criteria. The `spectra-generate` repair batch and
+  `spectra-review-flagged` pass it, so a repaired test no longer drops out of triage with a doc change pending.
+  `baseline.mode` and `warnings` are new in the ingest JSON.
+- **The console is left alone.** The 084 UTF-8 fix set the console's output encoding, which also switched the terminal
+  window's code page for the rest of the session. Now only redirected stdout and stderr get a UTF-8 writer.
+
+### Added (Spec 086 — git-aware relinking, Phase 2b)
+
+- **Renamed docs are relinked, not lost.** Triage has a new bucket, **RELINK** (above REMOVED): a referenced file is
+  missing and git history names the file it was renamed or moved to (`why: renamed to <path>`; groups split by
+  target). It covers refs and tests without a baseline too, so a restructure made before the first baseline is found.
+- **`spectra ai relink-sources (--suite <s> | --all-suites) [--min-similarity N] [--dry-run]`** rewrites only the
+  ref's path (anchor and quoting kept, the rest of the file byte-identical), updates `_index.json`, moves the baseline
+  key with its **old** fingerprint (so content the rename also changed shows at the next triage), and clears orphan
+  status when every ref then resolves. One rename scan per repository; renames to two places, chains ending at a
+  missing file and targets outside the repo/source dir are never candidates.
+- **History bootstrap.** `source-baseline --init --from-date <ISO date>` (each repository's last commit at or before
+  the date) and `--from-ref <rev> --owner <path>` fill missing entries from the docs as they were, following renames
+  back. Existing fingerprints are never changed; refs that didn't exist then stay unbaselined with the reason.
+- **`spectra docs topology`** lists the repositories (submodules included) that own the referenced docs, and the docs
+  in none, with the reason.
+- **The update skill relinks first.** `spectra-update` previews `relink-sources --dry-run`, asks, relinks only on a
+  yes, re-triages, and offers `--init --from-date` after relinking for a first-time setup. Its REMOVED step points at
+  `--min-similarity` for heavier-edited renames.
+- **Read-only git, never required.** Only `rev-parse`, `log`, `show`, `ls-files` and `cat-file` run, with
+  `GIT_OPTIONAL_LOCKS=0` and `core.quotepath=false`; no `index.lock` is ever created and SPECTRA never writes to a
+  repository. Without git (or outside a repository) everything works as under 085 with a reason.
+
+### Changed (Spec 086)
+
+- A missing file's REMOVED reason now names the git reason: `not found; no git`, `not found; not in a git repository`,
+  `not found; no rename found at 90% similarity`, `not found; ambiguous rename`, … (was `not found`).
+- `update-ack` refuses a test with a RELINK ref (`REF_REMOVED`, naming `relink-sources`), on `--ids` and `--group`, and
+  never creates an entry for one. New refusal code `GIT_REF_UNAVAILABLE` (exit 4) for an unusable `--from-ref` /
+  `--owner`.
+
+### Fixed (review fixes, Spec 087)
+
+- **A submodule that isn't checked out is a setup problem, not deleted docs.** In a clone made without
+  `--recurse-submodules`, refs into the empty submodule were REMOVED as "no rename found" and the update skill offered
+  to delete the tests. Now they are REMOVED with `not found; submodule not checked out: <path> (run git submodule update
+  --init)` — never RELINK — in one unchunked group per submodule; triage notes and every `source-baseline --init` warn
+  `N reference(s) from M test(s) point into submodule <path>, which isn't checked out …`, even when nothing is baselined
+  yet; `relink-sources` and the bootstrap report the reason; and the skill tells the user to initialise the submodule
+  and re-run triage instead of offering a review, a delete or a baseline.
+- **SPECTRA never runs a `git.exe` from the workspace.** Git was started by its bare name, which Windows also looks up
+  in the current folder. Now git is the first `git.exe` / `git` in an absolute PATH entry, started by that path with
+  arguments passed one by one — for every git call and for the execution identity (`git config user.name`).
+- **An inherited git environment no longer redirects a call.** Inside a git hook (or a shell with `GIT_DIR`,
+  `GIT_INDEX_FILE`, `GIT_CONFIG_PARAMETERS` …) SPECTRA's calls read the outer repository, so renames in submodules
+  vanished, and injected config could become the execution identity. Every git process now gets the environment
+  without those variables.
+- **Renames are found when only the casing differs.** On Windows and macOS a ref like `docs/Store-Manager/Setup.md`
+  for a file git records as `docs/store-manager/setup.md` is now matched ignoring case (git's casing in the new ref;
+  two paths differing only in case are `ambiguous rename`), in relinking and in the bootstrap. Linux stays exact.
+- **The bootstrap uses the chosen threshold and reports a failed history read.** `source-baseline --init --from-*`
+  accepts `--min-similarity` (50–100, as for `relink-sources`; also in the JSON `from`), and a failed "renames since"
+  read leaves the refs unbaselined with `git history unavailable: …` instead of reading them from the wrong path.
+
+### Added (Spec 088 — update prompt context, Phase 3)
+
+- **The edit prompt shows the doc.** `compile-update-prompt` now carries each referenced section as it is now (raw),
+  the previous version (the baseline snapshot, labelled normalised: lowercased, markup removed), triage's reasons and
+  the words that changed. Unchanged sections are shown as they are; unbaselined ones say the previous version is
+  unavailable; refs that no longer resolve give triage's reason (REMOVED, RELINK, submodule) and no text.
+- **Only linked criteria.** The criteria block lists exactly the criteria the tests link, marked `changed since
+  baseline` or `removed`; the suite-wide and repo-wide fallbacks are gone.
+- **One prompt per group.** `compile-update-prompt --suite <s> --group <G>` (validated like `update-ack --group`:
+  `TRIAGE_MISSING` / `GROUP_NOT_FOUND` / `TRIAGE_STALE`) lists each shared section and criterion once and each test
+  once under `### TEST <id>`. Identical inputs give byte-identical prompts.
+- **Unchanged = reviewed.** An edit identical to the original (line endings and trailing whitespace aside) is not
+  written; `ingest-update` reports `unchanged` and rebuilds the test's baseline, as `update-ack` would (not with
+  `--keep-baseline`).
+- **`ingest-update --all` cleans up and reports per test.** `results` gives each staging file's outcome (`written` /
+  `unchanged` / `failed` with a code, including the new `NO_ORIGINAL`, `ID_MISMATCH`, `UNREADABLE`); consumed files
+  are deleted after the baseline is recorded, failed ones are kept, so a second `--all` no longer re-ingests leftovers.
+- **The update skill edits per group**: compile `--group`, stage one file per test, one `ingest-update --all`, report
+  updated / unchanged / failed, retry a failure at most twice with `--test-id`.
+
+### Changed (Spec 088)
+
+- `compile-update-prompt` refuses (exit 4) only when a test has nothing to reconcile against (`NOTHING_TO_RECONCILE`:
+  no resolvable ref and no existing linked criterion), when the prompt exceeds `analysis.max_prompt_tokens`
+  (`PROMPT_TOO_LARGE`), or for a group with a customised template from before 088 (`TEMPLATE_OUTDATED`); it follows
+  the 083 read rule (defaults without a config). Refusals use the shared failure shape.
+- The built-in `test-update` template uses `source_diff`, `acceptance_criteria`, `tests` and `profile_format`. A custom
+  template without `{{tests}}` / `{{source_diff}}` still works for `--test-id` (sections through `current_source`)
+  with a warning to run `spectra prompts reset test-update`.
+- `ingest-update` single form: JSON gains `unchanged`. The `--all` JSON gains `unchanged` and `results`; the human
+  summary lists each test and is printed in JSON mode too (stderr).
+
+### Fixed (review fixes, Spec 089)
+
+- **Update edits and critic repairs no longer share a staging folder.** A file kept after a failed ingest was picked up
+  by the other flow's next batch and ingested in that flow's baseline mode — a leftover repair ingested by the update
+  flow marked pending doc changes as reviewed. Now `ingest-update <suite> --all` reads only `.spectra/updates/<suite>/`
+  and `--all --keep-baseline` reads only `.spectra/repairs/<suite>/repaired-<id>.json`, where `spectra-generate`'s
+  repair loop now stages its repairs.
+- **A staged file holding several tests fails loud.** Only the first test of a staged array was used and the file was
+  deleted. An edit (staged file or `--from`) must now hold exactly one test object; more than one fails with
+  `MULTIPLE_TESTS`, naming the count and the ids, and nothing is written (exit 5 in the single form; a kept `failed`
+  file in a batch).
+- **Returning a test unchanged no longer hides a substantive change.** An identical edit rebuilt the baseline whatever
+  was pending, so a missed LOAD change vanished from triage. Without `--keep-baseline`, an unchanged test with a
+  baseline entry is now classified as triage would: UNCHANGED, COSMETIC and LIGHT are `unchanged` (recorded, as
+  before); LOAD, CRITERIA_CHANGED, REMOVED, CRITERIA_REMOVED and RELINK are the new outcome `unchanged_pending` — nothing
+  recorded, `bucket` and `why` in the result, the change still in triage. `spectra-update` asks the user per group to
+  acknowledge or edit again (LOAD / CRITERIA_CHANGED) and never acknowledges on its own; for REMOVED, CRITERIA_REMOVED
+  and RELINK it says the docs changed again since triage and asks for a new triage.
+- **Criteria without a baseline value are no longer shown as unchanged.** The edit prompt labels them
+  `(not baselined — compare the test with the current text)`, like sections.
+- **A batch with failed files says so.** `ingest-update --all` exits 8 when at least one staged file failed (0 when
+  none did; `unchanged_pending` is not a failure); the JSON is unchanged. Both skills read `results` and retry instead
+  of stopping.
+- **The staging folders are gitignored.** `spectra init` adds `.spectra/updates/` and `.spectra/repairs/`; `spectra
+  update-skills` now applies the same list to existing workspaces (plain `init` still refuses on them).
+
+### Added (Spec 090 — re-verification after update edits, Phase 4)
+
+- **Edited tests are re-verified.** `spectra-update` gains a re-verify step after each group: it asks once per run
+  (default yes), runs the critic on each written test, writes the verdicts, and repairs a partial or hallucinated test
+  once (`.spectra/repairs/`, `ingest-update --all --keep-baseline`, re-critic, `--repaired --repair-attempts 1`). Still
+  partial → flagged for review. Still hallucinated → it stops for that test and asks you (edit again, restore from git,
+  or delete via the delete skill); the update flow never drops or deletes a test. The summary lists grounded, flagged,
+  hallucinated and unverified tests.
+- **Verdicts are tied to the content they judged.** `compile-critic-prompt` writes
+  `.spectra/verdicts/critic-input-<id>.json` (the test's content fingerprint). `ingest-verdict` and `ingest-grounding`
+  refuse a verdict whose test changed since: `VERDICT_STALE` (exit 4) in single mode, `skipped_stale` / `stale` with
+  `--all`.
+- **`ingest-update --dry-run`** (single and `--all`): the same outcomes and exit code as a real run; nothing written,
+  no lock taken.
+
+### Changed (Spec 090)
+
+- **An update edit drops the test's critic verdict.** A written edit (with or without `--keep-baseline`) removes the
+  critic grounding block in the same write and deletes the verdict file and fingerprint record. A Manual verdict is kept
+  and reported (`manual_verdict_kept`). `unchanged` / `unchanged_pending` touch nothing.
+- **`ingest-grounding` never overwrites a Manual verdict:** `MANUAL_VERDICT` (exit 4) with `--test`, `skipped_manual` /
+  `manual` with `--all`.
+- **`compile-repair-prompt` accepts hallucinated verdicts** (partial as before), so the update flow can repair instead of
+  dropping a test that existed before.
+- **`audit-grounding` lists every indexed test.** Tests without a verdict file are judged by their grounding block
+  (critic block → its verdict, Manual → `manual`, none → verdict `none`, `action_needed: critic`); the summary gains
+  `unverified`. Entries for tests with a verdict file are unchanged.
+- **`spectra delete` cleans up after the update workflow.** It also removes the deleted tests' baseline entries (under
+  the baseline lock), their `updated-` / `repaired-` / `failed-` staging files and their verdict files; the JSON adds
+  `baseline_entries_removed`, `staging_files_removed`, `verdict_files_removed` and `warnings`, and `--dry-run` lists
+  them. Legacy `ai update --delete-orphaned` deletes through the same service.
+
+### Fixed (Spec 090)
+
+- **An edited test no longer keeps a verdict given to different content.** `ingest-update` copied the original's
+  grounding block onto the edit, so an edited test stayed "grounded".
+- **`spectra delete` no longer damages dependents.** The `depends_on` cleanup matched any `- <ID>` line in the file
+  (body steps included), missed the scalar form `depends_on: TC-101`, read the dependent's id from the first `id:` line
+  anywhere, and collapsed every run of blank lines in the file. Now ids come from the parsed frontmatter and a scalar
+  `depends_on` naming a deleted test is dropped through the lossless writer; nothing else in the file changes.
+- **A failed staging file no longer fails every later batch (089 review).** It is renamed to `failed-<id>.json`, which
+  `--all` never reads; `results[].file` gives that path, and a later successful ingest of the id deletes it.
+- **`update-skills` respects your `.gitignore` (089 review).** It only adds patterns never offered to the workspace
+  before (recorded in the skills manifest as `gitignore_offered`), so a removed pattern stays removed; it never creates
+  a `.gitignore` (it says `no .gitignore; add: …`); it counts a pattern present only on a whole matching line, honours
+  `!pattern`; and it appends without changing existing bytes, in the file's own newline style, naming what it added.
+
+### Fixed (review fixes, Spec 091)
+
+- **A failed critic run no longer revives an old verdict.** After a test changed outside `ingest-update` (a hand edit,
+  `relink-sources`, a restore from git), a critic run that compiled the prompt but wrote no verdict paired the old
+  verdict with a record matching the new content, and the next grounding batch wrote it. The fingerprint record now
+  has `compiled_at`; a verdict file written more than 2 s before it is `VERDICT_STALE` ("older than the last critic
+  prompt") in `ingest-verdict` (`--from`, `--all`) and `ingest-grounding` (`--test`, `--all`). Times, not contents, are
+  compared, so a new verdict identical to the old one is still accepted.
+- **`--all --repaired` no longer marks unrepaired tests as repaired.** It wrote `repaired: true` blocks for every test
+  with a fresh verdict and no block, including a test whose repair failed to ingest. `ingest-grounding --all` gains
+  `--ids a,b` (unknown ids → `not_found`), and `--all --repaired` without it is refused with `IDS_REQUIRED` (exit 4).
+  Both skills pass exactly the re-critiqued tests; `spectra-update` retries a failed repair ingest at most twice and
+  then reports "repair failed" instead of re-critiquing it.
+- **Kept hallucinated tests are named, not counted as errors.** In `ingest-grounding --all`, a hallucinated verdict for
+  a test that still exists (kept by the update flow for the user) is `skipped_hallucinated` / `hallucinated`, and the
+  human summary says `TC-140: hallucinated, waiting for review`. Unreadable verdict files and refused writes are still
+  `errors`. The human summary of the batch now also goes to stderr in JSON mode.
+- **The critic agent describes the compile correctly:** it writes only the fingerprint record, never the verdict, and
+  calls no model.
+- **Invalid option combinations on `ingest-grounding` are refused:** `--test` with `--all` (where `--all` used to win)
+  and `--ids` without `--all` exit 1 with a plain message.
+
+### Changed (Spec 092 — update and criteria subagents, Phase 5)
+
+- **The update and criteria skills orchestrate; subagents do the heavy work.** A large update no longer fills the
+  conversation with doc sections, edit prompts, test JSON and verdicts, and criteria extraction no longer pulls whole
+  documents into it:
+  - `spectra-update` hands each triage group to the new `spectra-updater` subagent (compile → edit → stage → ingest,
+    bounded retries) and partial / hallucinated tests to the new `spectra-repairer`; it routes each edited test by the
+    critic's one-line answer instead of reading verdict files, and keeps every user decision (buckets, REMOVED review,
+    relink, `unchanged_pending`, still hallucinated). A "Context budget contract" says what the main session never
+    reads.
+  - `spectra-criteria` hands each changed document to the new `spectra-extractor` subagent; moves, retirements and
+    migration stay in the main session with your confirmation.
+  - Every per-test outcome, baseline summary, warning and criteria changeset line (added, modified old → new, removed
+    with referencing tests, metadata) is relayed to you, built from the subagents' returned lines.
+- **The critic ends with one line:** `<id> | <verdict> <score>` or `<id> | failed: <reason>`.
+- **Every bundled agent installs to `.claude/agents/`** by one rule (nothing goes to `.github/agents/`); `spectra init`
+  installs four agents and `spectra update-skills` adds the three new ones to an existing workspace.
+- No CLI command, flag, config key, prompt template or file format changed.
+
+### Changed (Spec 093 — generate subagents, Phase 5b)
+
+- **The generate skill orchestrates; subagents do the heavy work.** Analysis runs in the new `spectra-analyst`
+  subagent, which returns the recommendation and a batch plan (up to 8 behaviours from one document per batch); after
+  your approval each batch is generated by the new `spectra-generator` subagent; partial tests are repaired by
+  `spectra-repairer`. Documents, prompts, test JSON and verdicts stay out of the main conversation, and the assistant
+  relays every returned line. The final report lists every created test by id and title with its outcome.
+- **A test the critic could not judge is kept unverified** instead of being regenerated: the critic runs once more,
+  and if there is still no verdict the test gets no grounding block and is listed under "Unverified (critic could not
+  judge)" (it shows as `none` / `critic` in `audit-grounding`).
+- **`ingest-verdict --suite S --all` returns per-test `results`** (`{id, verdict, score, gate}`) and takes `--ids a,b`
+  (unknown ids → `not_found`); counts and lists are unchanged. Its human summary also goes to stderr in JSON mode.
+- `spectra init` installs six agents; `spectra update-skills` adds the analyst and generator to existing workspaces.
+
+### Fixed (092 review findings, Spec 093)
+
+- **Tests are routed by the verdict the CLI classified**, in both the generate and the update skill — never by the
+  critic's self-reported line; a disagreement leaves the test unverified, and a test is only dropped when both agree.
+- **The repairer reports every file it ingests**, including leftover repair files, by id.
+- **Every written edit or repair is re-verified or listed unverified** — a leftover from an earlier group, an "edit
+  again", or a re-edit after "still hallucinated" no longer loses its verification silently.
+
+### Changed (Spec 094 — section-scoped generation batches, Phase 5c)
+
+- **The analysis saves a generation plan.** `ingest-analysis` resolves each behaviour's `source` (now the most specific
+  `doc#anchor` it comes from) with the baseline's section rules, numbers the behaviours `B1…`, and writes
+  `.spectra/generation-plan/<suite>.json`: batches of up to `generation.batch_size` (new, default 8, 1–50) behaviours
+  from neighbouring sections of one document, with the section fingerprints. Its JSON adds `plan`, `planned_total`,
+  `count_rule`, `batches`, `unresolved` and `notes`; its human summary (stderr in JSON mode) lists the batches.
+  Behaviours whose source doesn't resolve form an `unsourced` batch, generated by reading the docs.
+- **`compile-prompt --batch <id>`** compiles one batch: its behaviours, each of its doc sections once and only their
+  acceptance criteria — the generator subagent reads no docs. Refusals (exit 4): `PLAN_MISSING`, `BATCH_NOT_FOUND`,
+  `PLAN_STALE` (a section changed since the analysis), `MISSING_INPUT`, `PROMPT_TOO_LARGE`. The mode and warnings go to
+  stderr.
+- The analyst copies the CLI's batch lines; the generator takes a batch id; the generate skill passes batch ids, never
+  generates a 0-count batch, and offers to re-run the analysis after a stale or oversized batch (then asks again).
+- `ingest-analysis` loads `spectra.config.json` through the checked loader (a missing config is `CONFIG_MISSING`).
+
+### Fixed (Spec 094)
+
+- **No batch is dropped any more:** every batch gets at least one test; the counts add up to `recommended` whenever
+  there are at least as many tests as batches (the 093 analyst dropped batches whose share rounded to 0).
+- **Generation prompts no longer name tools that don't exist** (`ListDocumentationFiles`, `ReadTestIndex`,
+  `CheckDuplicates`, `GetNextTestIds`) or say to read docs "ON-DEMAND"; count mode says to read the docs with the file
+  tools and that ids are assigned when the tests are ingested.
+- `documents_analyzed` counts documents, not sections, when sources name sections.
+
+### Fixed (review fixes, Spec 095)
+
+- **`already_covered` / `recommended` count behaviours, per behaviour.** A behaviour is covered when an existing test
+  of the suite has a title at least `generation.duplicate_threshold` similar (default 0.6); `covered_by` names that test.
+  Before, a suite with any test or criterion reported its test count as "already covered" — a suite with 50 tests
+  recommended 0 for an analysis that found 12 new behaviours.
+- **The generation plan batches only uncovered behaviours.** Covered behaviours stay in the plan with `covered_by`,
+  are listed (`covered` in the JSON, `covered: <title> (<test>)` lines, "Already covered — not generated" in the generate
+  skill) and never reach a batch prompt; each batch's count is one per uncovered behaviour. Before, batch prompts asked
+  for tests of covered behaviours while the counts excluded them.
+
+### Fixed (Spec 096 — workspace safety, Phase 6 part 1)
+
+- **`spectra update-skills` never overwrites an edited file.** `init` recorded templates, the profile,
+  `CUSTOMIZATION.md` and `USAGE.md` under relative keys, but `update-skills` looked them up by absolute path, found no
+  record and overwrote an edited copy whenever the bundled content changed. The skills manifest now has one key form
+  (repo-relative, `/`); older manifests are normalised on load (two records for one file both count; an absolute key
+  from another location is re-rooted by its install path, and only an unrecognised one is dropped, with one summary
+  warning). A file with no record is recorded when it equals the bundled content and otherwise skipped:
+  `skipped (no record — it may have been edited); run spectra prompts reset <id> or delete it to get the new version`.
+- **`spectra suite delete` cleans dependencies like `spectra delete`.** A single-value `depends_on` in another suite is
+  cleared through the lossless writer; a list or unparseable one is warned about and left alone. Before, a regex removed
+  every indented `- <id>` line in other suites' files (body included) and collapsed their blank-line runs. The suite's
+  staging folders (`.spectra/updates/<suite>/`, `.spectra/repairs/<suite>/`), generation plan and its tests' verdict and
+  fingerprint-record files are removed too; `--dry-run` lists all of it. JSON adds `dependents_cleaned`, `warnings`,
+  `leftovers_removed` (`leftovers` in a dry run); the human summary goes to stderr in JSON mode.
+- **`spectra show <id>`** finds tests through the suite folder plus the index's bare `file` (the legacy `suite/file` form
+  still works). Before, it missed every test written since 073.
+- **`spectra validate` fails on parse errors:** exit 1, status `failed`, `<n> error(s) found.`, and the parse errors in
+  the JSON `errors`. Before, a suite whose tests didn't parse reported "Validation passed".
+- **`.gitignore`:** the shared list gains `.spectra/verdicts/` and `.spectra/dropped-tests.json` (`update-skills` offers
+  them once). What was offered is recorded in `.gitignore` itself as `# spectra-offered: …` lines, so a pattern the
+  team removed is never re-added from a teammate's clone.
+- **`spectra delete` is faster** (2,500 tests: 3.8 s → 1.1 s): targets resolve through the suite indexes, only files that
+  mention `depends_on` have their frontmatter read, only targets and their single-value dependents are parsed in full,
+  and the files are read in parallel. Same results.
+- **Repository:** `.gitattributes` keeps `*.sh` at LF, so the acceptance scripts run in bash with `core.autocrlf=true`.
+- **Tests:** the `WorkingDirectory` collection is defined (no longer runs in parallel), and `ProfileFormatLoaderTests`
+  asserts a heading the usage guide has — the suite is fully green for the first time since 078.
+- **`ai.generation_batch_size`** is no longer written by `init`; it was read by nothing. `generation.batch_size` (094)
+  is the batch size. An existing config that has it still loads.
+
+### Fixed (Spec 097 — verification hardening, Phase 6 part 2)
+
+- **Grounding blocks only for confirmed tests.** The generate skill's critic step and the update skill's re-verify step
+  now call `ingest-grounding --all --ids <the tests the critic confirmed>` (skipped when there are none). Before, the
+  call had no ids: a test reported unverified still got a `grounded` block, and leftover verdicts of other tests were
+  written too, inflating `written` (a false "expected N" warning).
+- **`audit-grounding` tells the truth and stays small.** It lists only the suite's indexed tests (other suites' and stray
+  verdicts were listed before), flags a verdict the ingest would refuse as stale (`stale: true`, `action_needed:
+  critic`, `summary.stale`), and gains `--action critic|repair|review|none` and `--ids` filters (the summary keeps
+  covering the whole suite). The generate skill resumes with `--action repair`, so only the tests to repair reach the
+  session.
+- **No repair from a stale verdict.** `compile-repair-prompt` refuses it with `VERDICT_STALE` (exit 4);
+  `compile-repair-batch` leaves it out of its manifest and lists it on stderr under `stale`.
+- **One clock.** A verdict is compared with its fingerprint record's own file time (the same file system as the
+  verdict), not with `compiled_at` (the CLI's clock). On a network share or container mount with a skewed clock, every
+  new verdict was refused as stale.
+- **An empty `--ids` means "not given"** in `ingest-grounding` and `ingest-verdict` (it processed nothing before); with
+  `--repaired` it is still `IDS_REQUIRED`.
+- **`--dry-run` works** on `ingest-grounding --all`, `ingest-verdict` and `ingest-analysis`: the same JSON (plus
+  `dry_run: true`) and exit code, nothing written. The global flag was accepted and ignored before — these commands
+  wrote anyway. `ingest-grounding --test … --dry-run` is refused (exit 1).
+- **The critic's model is configurable:** `ai.critic.model` (default `sonnet`; an alias, a model id, or `inherit`) is
+  written into the installed critic agent by `init` and `update-skills`. The agent used to pin `claude-sonnet-4-6`, and
+  nothing selected it. The dead in-process critic classes (`CriticFactory`, `CriticModelResolver`, `ICriticRuntime`)
+  and the unused `ai.critic` members are removed.
+
+### Fixed (Spec 098 — correctness fixes, Phase 6 part 3)
+
+- **Pre-069 configs work again.** An `ai.critic` block with a key of the removed in-process critic (`provider`,
+  `api_key_env`, `base_url`, `enabled`, `timeout_seconds`, `max_concurrent`) is legacy: its `model` (e.g. the v1.45
+  template's `gpt-5-mini`) is ignored with a notice and the critic runs on `sonnet`. An invalid `ai.critic.model` (e.g.
+  `openai/gpt-4.1`, a number) is a warning, never `CONFIG_INVALID` — before, it failed every command that loads the
+  config, and `update-skills` installed `gpt-5-mini` as the critic's model.
+- **`audit-grounding` actions come from the verdict:** no block + grounded → `ground` (only the block is missing),
+  partial → `repair`, hallucinated → `review`. `--action ground` is new; the summary gains `pending_ground` /
+  `pending_review`. The generate skill's resume path grounds, repairs and reports by action — it used to repair all
+  three.
+- **`suite delete` reports each verdict file once**, under the new `verdict_files_removed`; `leftovers` /
+  `leftovers_removed` list only staging folders and the generation plan.
+- **`update-skills` keeps the newest manifest record.** A file recorded under two pre-096 keys keeps the hash SPECTRA
+  wrote last (or every candidate, in a new `candidates` field, when that can't be told); a user who restores that
+  content gets the file updated again instead of "customized" forever.
+- **A critic repair never baselines a test.** `ingest-update --keep-baseline` leaves a never-baselined test without an
+  entry (`baseline.left_unbaselined`), so triage keeps listing it; it used to record a full entry at the current docs.
+- **Heading anchors.** Only a whole `id=` attribute is a heading id (`data-id`, `aria-id` were ids); a heading with an
+  image also matches GitHub's anchor (`## ![logo](x.png) Setup` ↔ `#setup`); an id-only heading change against a
+  snapshot stored by 084 is cosmetic.
+- **Group update prompts** show each test's own state of a criterion (`AC-1 (unchanged)` / `AC-1 (not baselined)`)
+  when the group's tests see it differently.
+- **`compile-prompt --batch` in `count_fallback`** warns "the documentation changed since the analysis; behaviour
+  titles may be outdated" instead of refusing with `PLAN_STALE`; batch mode still refuses.
+- **`generation.coverage_threshold`** (default 0.6, 0–1) decides per-behaviour coverage; `duplicate_threshold` is
+  duplicate detection only (one release of fallback, with a notice, for a tuned `duplicate_threshold`). The init
+  template writes it.
+
+### Changed (Spec 099 — performance and cleanup, Phase 6 part 4)
+
+No behaviour change: every command writes the same files and prints the same JSON, text and exit codes (a golden check
+over a real-init workspace, captured on the 098 build, guards it).
+
+- **Ingest reads the suite once.** `ai ingest-tests` and `ai ingest-update` (single, `--all`, `--keep-baseline`) parse
+  each test file of the suite once per call; recording the baseline used to parse the whole suite again (N instead of
+  2N parses).
+- **Each document's headings are scanned once per run** by triage, update prompts, batch prompts and plan resolution
+  (one scan per document instead of one per ref and per lookup).
+- **Read-only commands no longer capture the lossless-writer layout** (`validate`, `show`, `index`, triage, audit,
+  coverage, dashboard, the compile commands, `ingest-analysis`, `ingest-verdict`, `review-flagged` listing). Commands
+  that rewrite tests keep it, and the writer now refuses a test read without it instead of rewriting the file
+  canonically.
+- **`ai ingest-update --all` parses each staged file's JSON once** (it was parsed three times).
+- **Dead code removed** — what the in-process generator, the Copilot SDK, the in-process critic and the MCP adapter
+  (Specs 058/059/069/070) left behind: the agent tool registry and its tools, the Testimize generation chain, the
+  interactive selectors, the session store, presenters, the critic response parser, the Copilot auth/usage helpers,
+  and the `Microsoft.Extensions.AI.Abstractions` package reference.
+- **Build:** the four compiler warnings are fixed, and the CLI and Core projects treat warnings as errors in every
+  configuration (NuGet vulnerability advisories stay warnings).
+- **Tests:** the CLI test suite runs in about 7 minutes again (597 s → 418–445 s on the reference machine): shared
+  init and git fixtures start fewer processes; no test was weakened, and only tests of deleted code were removed.
+
+### Changed (Spec 100 — docs and guidance, Phase 6 part 5)
+
+Text only: no condition, exit code, JSON key or written-file set changed (the 099 golden check proves it).
+
+- **Docs describe the current product.** README and every user guide present generation, criteria extraction, updates
+  and verification through the skills and the real commands; `spectra ai generate`, `spectra auth`, `ai.providers`,
+  the in-process critic keys, `ai analyze --extract-criteria` and SPECTRA's MCP server appear only as history. A guard
+  test keeps it that way, and `docs/cli-reference.md` now documents every command (`ai init-seam-progress`, `list`,
+  `config` and its automation-dir commands, `open`, `prompts`, `run list-active` were missing).
+- **New guide: [When documentation changes](docs/usage.md#when-documentation-changes)** — docs changed → criteria →
+  triage → relink → REMOVED review → group edits → unchanged/pending → re-verify → acknowledge → what to commit, with
+  one worked example whose commands are checked against the CLI.
+- **`depends_on`** is documented as one test id; a list is not supported (`validate` reports it, `delete` warns).
+- **Help and messages that named removed commands now name the skills:** `config --help` (keys `source.local_dir`,
+  `tests.dir`), `run` and `ai update` descriptions (`ai update` is marked legacy), `docs index --skip-criteria` /
+  `--include-archived` (accepted, ignored), the init next-step hints (the Copilot Spaces hint is gone), the comments in
+  the criteria files `init` writes, the coverage report's and the prompt compilers' "no criteria" text, the dashboard's
+  empty-criteria text, the token pre-flight suggestion (`compile-analysis-prompt --doc-suite`,
+  `analysis.max_prompt_tokens`), the legacy `ai update` messages, and the run report footer ("Generated by SPECTRA").
+  Four bundled skills/agents name the right commands and key. `update-skills` refreshes unedited installed copies;
+  `USAGE.md` / `CUSTOMIZATION.md` you edited are kept (delete one and run `update-skills` to get the new text).
+- **Agent guidance:** CLAUDE.md is rewritten to the current state (≤ 150 lines; checked against the command tree and the
+  folders), AGENTS.md points to it, and PROJECT-KNOWLEDGE.md / architecture-v5.md are marked historical.
+- **Constitution 2.1.0:** CLI command contracts instead of MCP tools; the JSON-mode rule (stdout is only the JSON, the
+  human summary goes to stderr); the agent writes only `.spectra/` staging inputs that a validated ingest reads;
+  batch ingest commands support `--dry-run`.
+
+### Changed (Spec 101 — token economy follow-up)
+
+Fewer tokens per authoring run; only what the critic sees and how the skills and agents are packaged change.
+
+- **The critic reads the sections a test cites.** `compile-critic-prompt` gives each anchor ref's section (with its
+  subsections) and each anchor-less ref's whole file, instead of each referenced document whole. Before, every document
+  was cut at 8,000 characters, so a cited section deep in a long document could be missing from the critic's prompt;
+  now it is there. An anchor that no longer matches a heading gives the whole document with a note. The critic still
+  sees no acceptance criteria — it never did (the criteria were loaded and dropped; that unused load is gone).
+- **`compile-critic-prompt --full-docs`** gives the pre-101 input (whole documents) — the escape hatch for one test,
+  and the baseline of the quality comparison. The `spectra-critic` agent passes it only when asked (`full_docs: true`).
+- **The critic runs inside the work subagents.** `spectra-generator`, `spectra-updater` and `spectra-repairer` start
+  `spectra-critic` for each test they wrote (a fresh context per test, on `ai.critic.model`), classify the verdicts with
+  one `ingest-verdict --all --ids` call and return one verdict line per test (`<id> | verdict <v> <score>`,
+  `critic-disagrees …` or `unverified: …`). The skills route by those lines exactly as before; grounding, drops and
+  deletes stay in the main session's CLI calls. When nested subagents are off (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`),
+  the subagent returns `critic: not run` and the main session runs the critic itself.
+- **The update skill asks "Re-verify the edited tests with the critic now? (recommended)" before the first group is
+  edited** (it used to ask when the first edited test came back), and passes the answer to the updater and repairer.
+- **Lean skills.** `spectra-generate` and `spectra-update` SKILL.md are under 16,000 characters each, so all of each
+  comes back after Claude Code compacts a long run. Command tables, exit codes, the bucket list, the resume procedure
+  and examples moved to `reference.md` next to each SKILL.md; `init` and `update-skills` install and refresh it under
+  the 096 rules (an edited one is kept). The NON-STOP contract and the `written == 0` guard are unchanged, word for word.
+- **Agent frontmatter Claude Code reads.** The six bundled agents drop `disable-model-invocation` and `context: fork`
+  (skill fields, ignored on a subagent); each description now starts "Only for use by the … skill" and says not to
+  delegate to it directly, so Claude picks the skill (and its triage or analysis) instead of the agent.
+
+### Fixed (Spec 102 — review fixes for 101 and the critic prompt template)
+
+- **The critic uses its prompt template.** `compile-critic-prompt` now builds the critic's instructions from
+  `critic-verification.md` (`.spectra/prompts/` if present and valid, else the bundled one) in every form and doc mode.
+  Since Spec 055 it had used a built-in prompt without the template's ISTQB "Technique Verification" (037) and
+  "Arithmetic Verification" (075) sections, and an edited template was ignored. Verdicts may change because the critic
+  now applies those checks. The test and documents the critic sees are unchanged.
+- **Refs that differ only in case reach the critic together.** On Windows and macOS, `docs/Auth.md#login` plus
+  `docs/auth.md#logout` gave the critic only the Login section, and an anchor-less mixed-case ref didn't give the whole
+  file. Refs are now grouped by file with the resolver's own comparer.
+- **A test title can't be read as a verdict.** The generator reports a created test as `<id> | created: <title>`;
+  a title such as "Verdict banner is shown" no longer looks like a `<id> | verdict …` line.
+- **The ambiguous-anchor warning** ("more than one heading shares the anchor key") appears only for a section the critic
+  actually gets, not for one absorbed into another cited section.
+
+### Changed (Spec 102)
+
+- **A repair that changed nothing is not judged again.** The repairer starts the critic only for `written` repairs;
+  an `unchanged` repair keeps the verdict that sent it to repair, which comes back from the same
+  `ingest-verdict --all --ids` call and is routed as before. The skills' fallback (`critic: not run`) follows the same
+  rule. This deliberately changes Spec 101 FR-026 ("outcomes unchanged apart from the critic's input") for unchanged
+  repairs only.
+- **`Agent` is the subagent tool's one name** in the skills' tool list and text (Claude Code renamed `Task` in
+  v2.1.63; `Task` still works as an alias). `update-skills` refreshes unedited installed skills and agents and keeps
+  edited ones (096).
+- **Internal:** the unused criteria parameter of the critic prompt compiler is gone; the critic loader matches each
+  cited anchor once and slices each document once (same output); a content test keeps the three copies of the agents'
+  "Verify with the critic" step identical; `spectra-generate` SKILL.md drops its "(Spec …)" annotations and keeps the
+  Key rule to one line (its explanation is in `reference.md`) to stay under the 16,000-character budget.
+- **Docs:** `customization.md` says the critic template is used and that the critic model is `ai.critic.model`
+  (rendered by `init` / `update-skills`), not an edit to the agent's `model:` field.
+
+### Notes
+
+- **`audit-grounding` (Spec 097)** no longer lists other suites' tests or verdicts of ids in no index. A stale verdict
+  shows as `critic (stale)` instead of its old action.
+- **`update-skills` (Spec 097) reads `spectra.config.json`** for `ai.critic.model`. An invalid config never fails it:
+  one warning, the critic agent keeps its installed model line, everything else is refreshed. A critic agent installed
+  before 097 and never edited moves from `claude-sonnet-4-6` to `sonnet`; an edited one is kept.
+- **`--dry-run` (Spec 097)** on `ingest-grounding --all` and `ingest-analysis` now writes nothing; a script that passed
+  the flag and relied on the writes must drop it.
+- **Verdict freshness (Spec 097)** compares file times; a verdict written within 2 s before its record is still fresh.
+
+- **Changed meaning (Spec 095):** `already_covered` is now the number of covered *behaviours*, `recommended` the number
+  of uncovered ones. A plan written by 094 still compiles, with a warning to re-run the analysis for the corrected
+  counts. `generation.duplicate_threshold` outside (0, 1] is used as given, with a warning: at or below 0 every behaviour
+  of a suite that has tests counts as covered, above 1 none does.
+- **One-time `source_section` churn.** Because `source_section` is now read, the first re-extraction after
+  upgrading reports a `source_section` metadata change on criteria extracted before.
+- **Custom prompt templates.** A `.spectra/prompts/criteria-extraction.md` override doesn't include the existing
+  criteria; `compile-extraction-prompt` warns. Run `spectra prompts reset criteria-extraction` to get ID reuse.
+- **Upgrading.** Run `spectra docs migrate-criteria --dry-run`, then without `--dry-run` (or let the next criteria
+  write do it). Two docs that already shared one file are reported as collisions; re-extract both.
+- **Known issue, not changed here:** an imported criterion with neither an `id` nor a `source` can't be matched
+  on re-import, so re-importing it adds a copy.
+- **Repair leftovers from before 089 (Spec 089).** A repair loop from before 089 staged its repairs in
+  `.spectra/updates/<suite>/`; one kept there after a failure can't be told apart from an update edit, so the next
+  update batch (`ingest-update <suite> --all`) would ingest it and rebuild that test's baseline. Before the first update
+  batch after upgrading, look in `.spectra/updates/*/` and delete any `updated-*.json` a repair run left behind.
+- **Existing workspaces (Spec 089):** run `spectra update-skills` to get the new skills, the new `test-update` template
+  and the two new `.gitignore` entries.
+- **Verdicts from before 090 (Spec 090)** have no fingerprint record and are accepted as before.
+- **`compile-critic-prompt` now writes a file** (`.spectra/verdicts/critic-input-<id>.json`, next to the verdict files).
+- **`depends_on` lists are not supported** (such tests don't parse today); `spectra delete` leaves a dependent with a
+  list unchanged and warns.
+- **`spectra suite delete` (Spec 096)** no longer edits a dependent whose `depends_on` is a list (it never parsed); it
+  warns instead, like `spectra delete`.
+- **Skills manifest keys (Spec 096)** are rewritten in the one repo-relative form on the next `update-skills`. A
+  `.spectra/skills-manifest.json` key that matches no SPECTRA install path is dropped with one warning.
+- **Gitignore marker (Spec 096):** `init` and `update-skills` write a `# spectra-offered: …` line; keep it in the
+  committed `.gitignore`. The old per-clone record (`gitignore_offered` in the skills manifest) is migrated once.
+- **`spectra validate` (Spec 096)** now exits 1 when a test doesn't parse; a CI step that ran it on such a suite passed
+  before and fails now.
+- **Customised skills (Spec 091):** a skill copy that calls `ingest-grounding --all --repaired` without `--ids` now
+  fails with `IDS_REQUIRED`; run `spectra update-skills` (unmodified copies) or add `--ids`.
+- **090 records (Spec 091)** keep the fingerprint-only rule until the critic prompt is compiled again for that test.
+- **Compiling the whole suite** (`compile-critic-prompt --suite S` without `--test`) makes every older verdict stale.
+- **`ingest-grounding --test` together with `--all` is now refused** (exit 1); `--all` used to win.
+- **Existing workspaces (Spec 094):** run `spectra update-skills` — it refreshes unedited copies of the agents, the
+  generate skill and `.spectra/prompts/test-generation.md` / `behavior-analysis.md`, and offers the
+  `.spectra/generation-plan/` gitignore entry once. A customised `test-generation.md` keeps working: its batches compile
+  in count mode with a warning until you run `spectra prompts reset test-generation`. An unedited pre-094 copy uses the
+  bundled template until `update-skills` refreshes it.
+- **Existing workspaces (Spec 093):** run `spectra update-skills` to get the analyst and generator subagents and the
+  orchestrating generate skill; a customised `spectra-generate` skill keeps the in-session flow until you refresh it.
+- **Existing workspaces (Spec 092):** run `spectra update-skills` to get the three new subagents and the orchestrating
+  update / criteria skills. A customised `spectra-update` or `spectra-criteria` skill is skipped and keeps the
+  in-session flow until you refresh it (`spectra update-skills` after discarding your changes).
+
+## [2.5.0] - 2026-09-24 — Lossless test writes and doc-reference resolution
+
+### Changed — Breaking (Spec 078)
+
+- **`spectra ai update --no-interaction` no longer applies changes.** On its own it now classifies
+  and reports only: it prints the classification tables, writes `.spectra-result.json`, and leaves
+  every test file and `_index.json` untouched. Applying without interactive review needs the global
+  `--no-review` flag. **CI that relied on `--no-interaction` to mark or delete orphans must add
+  `--no-review`**, e.g. `spectra ai update checkout --no-interaction --no-review`.
+- **`--dry-run` now produces the full result.** With `--diff` it used to exit before writing
+  `.spectra-result.json`; without `--diff` it still reached the interactive reviewer. A dry run now
+  classifies, prints the tables, writes the result and never prompts.
+- **`.spectra-result.json` gains `applied`** — `false` for dry runs and classify-only runs, `true`
+  when the apply step ran — so a run that changed nothing can be told apart from one that was not
+  allowed to.
+- **The critic and repair prompt compilers resolve `source_refs` with the same rules as
+  `ai update`.** Legacy bare refs (`file.md`) now resolve through `source.local_dir`; refs that point
+  outside the repository now fail loud in `compile-critic-prompt` and `compile-repair-prompt`
+  (`compile-repair-batch` still skips them).
+- **`spectra init` gitignores `.spectra-result.json` and `.spectra-progress.html`.** Every
+  long-running command writes them, including classify-only runs. Existing workspaces can add the
+  two lines to `.gitignore` by hand.
+
+### Fixed (Spec 078)
+
+- **Rewriting a test no longer loses data.** Every writer — `ingest-tests`, `ingest-update`,
+  `ingest-grounding`, `review-flagged` accept, orphan marking, batch write and interactive review
+  edits — now keeps every field the parser reads. Previously `description`, `environment`,
+  `related_work_items`, `custom`, `automated_by`, `requirements` and `bugs` were silently dropped
+  (losing `automated_by` also broke automation coverage), and `ingest-update` lost
+  `estimated_duration`.
+- **Unchanged content is reproduced verbatim.** Frontmatter keys SPECTRA does not know and body
+  sections it does not read (e.g. a hand-written `## Notes`, step sub-bullets) are kept exactly as
+  written. Known keys are emitted in one fixed order, so writing a test twice gives identical bytes,
+  and changing one field changes only that field's lines.
+- **Orphan marking changes only `status`, `orphaned_reason` and `orphaned_date`**, and a test that
+  was already orphaned keeps its original `orphaned_date`. Previously it rebuilt the test and dropped
+  criteria, grounding, links and more.
+- **`status` / `orphaned_reason` / `orphaned_date` are now read back**, so a later rewrite no longer
+  silently un-orphans a test.
+- **Grounding round-trips.** `source`, `created_by` and `note` are kept; a manual verdict's
+  `verified_at` comes from the file instead of the current time; `score` and `verified_at` are
+  written culture-invariant and in UTC.
+- **YAML escaping.** Changed values containing `: `, ` #`, backslashes, quotes, leading indicator
+  characters or line breaks are now quoted correctly instead of producing invalid or different YAML.
+  Durations keep their seconds (`1m30s` instead of `1m`).
+- **`spectra ai update` finds the documents tests reference.** Refs in the default profile's format
+  (`docs/file.md#Section`) were joined onto the source directory and looked up with the fragment,
+  so such tests were classified ORPHANED ("Source document not found or empty"). One shared
+  resolver now strips the fragment, normalises separators, resolves against the repository root and
+  falls back to `source.local_dir` for bare legacy refs. A test is orphaned for a missing source only
+  when none of its referenced files exist, and it is classified against the text of **all** its
+  referenced documents.
+- **The `spectra-update` skill's classification step no longer writes files.** It and the update
+  delegation rows in `spectra-generate` / `spectra-execute` now pass `--dry-run`.
+- **The `spectra-criteria` skill reads each document once.** The compiled extraction prompt already
+  embeds the document text; the skill no longer tells the session to read the file as well.
+
+### Notes
+
+- **Data already lost is not recovered.** Fields dropped by earlier versions are gone from the
+  working tree; restore them from Git history (e.g. `git log -p -- test-cases/`).
+- **Known issues, not changed here:** `spectra delete` / `spectra suite delete` strip every
+  `- TC-n` list line from other test files, not only `depends_on` entries; `spectra doctor ids --fix`
+  replaces the id anywhere in the file; coverage analysis compares `source_refs` inconsistently
+  (fragments, bare refs); a test with no `source_refs` is still classified ORPHANED.
+
 ## [2.4.0] - 2026-07-09 — Claude Code migration (v2)
 
 ### Added (Spec 077 — non-stop seam coverage: batch verbs, manifest consumption, general contract preamble)

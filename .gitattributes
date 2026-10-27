@@ -1,0 +1,5 @@
+# Spec 096 (FR-012): shell scripts keep LF on every checkout (core.autocrlf=true turned them into CRLF, which bash rejects).
+*.sh text eol=lf
+
+# Spec 099: golden outputs are compared byte for byte (platform newlines included); git must not convert them.
+tests/Spectra.CLI.Tests/Golden/099/** -text

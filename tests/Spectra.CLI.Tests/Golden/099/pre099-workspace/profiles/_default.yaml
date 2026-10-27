@@ -1,0 +1,79 @@
+# SPECTRA Default Test Case Format
+# =================================
+# This file defines the JSON output schema that the AI uses when generating
+# test cases. It controls what fields appear in test YAML frontmatter and
+# how test steps/expected results are structured.
+#
+# To customize:
+#   Option 1: Edit this file directly (affects all generation)
+#   Option 2: Copy to profiles/myteam.yaml and edit (named profiles - future)
+#
+# The AI receives the `format` field as part of its generation prompt and
+# must produce a JSON array matching this exact structure.
+#
+# See CUSTOMIZATION.md for full documentation on all customization options.
+
+# --- JSON Schema sent to the AI ---
+format: |
+  [
+    {
+      "id": "TC-XXX",
+      "title": "Descriptive title based on documentation",
+      "priority": "high|medium|low",
+      "tags": ["tag1", "tag2"],
+      "component": "component-name",
+      "preconditions": "Setup requirements",
+      "steps": ["Step 1", "Step 2", "Step 3"],
+      "expected_result": "Specific outcome from documentation",
+      "test_data": "Test data if needed",
+      "source_refs": ["docs/file.md#Section-Name"],
+      "scenario_from_doc": "Quote or paraphrase the documented behavior",
+      "estimated_duration": "5m",
+      "criteria": ["AC-ID-1", "AC-ID-2"]
+    }
+  ]
+
+# --- Field descriptions (for human reference, NOT sent to AI) ---
+fields:
+  id:
+    description: "Unique test case ID. SPECTRA allocates IDs automatically via GetNextTestIds."
+    required: true
+  title:
+    description: "Clear, descriptive title. Should describe the scenario, not the feature."
+    required: true
+  priority:
+    description: "Test priority. Allowed values: high, medium, low."
+    required: true
+    allowed_values: [high, medium, low]
+  tags:
+    description: "Classification tags. Used for filtering and reporting."
+    required: true
+  component:
+    description: "Functional component this test covers. Used for coverage grouping."
+    required: true
+  preconditions:
+    description: "Setup state required before test execution."
+    required: false
+  steps:
+    description: "Ordered list of test steps. Each step should be concrete and actionable."
+    required: true
+  expected_result:
+    description: "Observable outcome that determines pass/fail."
+    required: true
+  test_data:
+    description: "Optional test data values."
+    required: false
+  source_refs:
+    description: "Documentation references the test was grounded against (e.g., docs/checkout.md#Validation)."
+    required: true
+  scenario_from_doc:
+    description: "Quote or paraphrase of the documented behavior this test verifies."
+    required: true
+  estimated_duration:
+    description: "Expected execution time. Format: Nm (minutes) or Nh (hours)."
+    required: false
+    default: "5m"
+  criteria:
+    description: "Array of acceptance criteria IDs this test verifies (e.g., AC-CHECKOUT-001)."
+    required: false
+    note: "Auto-populated when acceptance criteria are available during generation."

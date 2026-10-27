@@ -58,7 +58,7 @@ pairwise covering arrays, and ABC heuristic optimization.
 ## How it works
 
 When `testimize.enabled` is `true`, SPECTRA runs the Testimize engine
-**in-process** during test generation, with no child process, no MCP server, and no
+**in-process** during test generation, with no child process, no separate server, and no
 JSON-RPC. The flow integrates into the existing generation pipeline:
 
 1. Behavior analysis (AI step, unchanged) is where the AI analyzes your

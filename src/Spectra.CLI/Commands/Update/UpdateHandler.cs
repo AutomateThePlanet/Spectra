@@ -8,6 +8,7 @@ using Spectra.CLI.Interactive;
 using Spectra.CLI.IO;
 using Spectra.CLI.Output;
 using Spectra.CLI.Review;
+using Spectra.Core.Coverage;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
@@ -21,13 +22,15 @@ namespace Spectra.CLI.Commands.Update;
 /// </summary>
 public sealed class UpdateHandler
 {
-    private static readonly Progress.ProgressManager _progressManager =
+    // Per handler (not static) so the result/progress paths follow the working directory of this run
+    // (Spec 078: the classify-only result must land in the workspace being classified).
+    private readonly Progress.ProgressManager _progressManager =
         new("update", Progress.ProgressPhases.Update, title: "Test Update");
 
     // Spec 041: in-flight progress snapshot for the current update run.
     // Mutated by the proposal apply loop and serialized into .spectra-result.json
     // via _progressManager.Update(updateResult).
-    private static Progress.ProgressSnapshot? _currentProgress;
+    private Progress.ProgressSnapshot? _currentProgress;
 
     private readonly VerbosityLevel _verbosity;
     private readonly bool _dryRun;
@@ -179,7 +182,7 @@ public sealed class UpdateHandler
             {
                 _progress.Error("No test suites found.");
                 Console.Error.WriteLine();
-                Console.Error.WriteLine("Run 'spectra ai generate' first to create tests.");
+                Console.Error.WriteLine("Ask your assistant to generate tests first (the spectra-generate skill).");
                 return ExitCodes.Error;
             }
 
@@ -276,7 +279,7 @@ public sealed class UpdateHandler
         var sourceDir = Path.Combine(basePath, config.Source.LocalDir ?? "docs");
         var sourceContents = await _progress.StatusAsync(
             "Loading documentation...",
-            async () => await LoadSourceDocumentsAsync(sourceDir, readResult.Tests, ct));
+            async () => await LoadSourceDocumentsAsync(basePath, sourceDir, readResult.Tests, ct));
 
         _progress.Success($"Loading documentation... {sourceContents.Count} files");
 
@@ -292,6 +295,17 @@ public sealed class UpdateHandler
         catch
         {
             // Criteria loading is best-effort; continue without criteria
+        }
+
+        // Spec 079 FR-011: duplicate criterion IDs (from older workspaces) are reported, never fatal.
+        foreach (var duplicate in (suiteCriteria ?? [])
+                     .Where(c => !string.IsNullOrWhiteSpace(c.Id))
+                     .GroupBy(c => c.Id, StringComparer.OrdinalIgnoreCase)
+                     .Where(g => g.Count() > 1)
+                     .Select(g => g.Key)
+                     .OrderBy(id => id, StringComparer.Ordinal))
+        {
+            _progress.Warning($"Criterion id {duplicate} is defined more than once; using the first definition.");
         }
 
         // Classify tests using the classifier directly for better presentation
@@ -325,7 +339,7 @@ public sealed class UpdateHandler
                     $"{unlinkedCriteria.Count} acceptance criteria for '{suite}' have no linked tests: " +
                     string.Join(", ", unlinkedCriteria.Select(c => c.Id)));
                 _progress.Info(
-                    $"Run 'spectra ai generate {suite}' to generate tests covering these criteria.");
+                    $"Ask your assistant to generate tests for '{suite}' (the spectra-generate skill) to cover these criteria.");
             }
         }
 
@@ -351,18 +365,23 @@ public sealed class UpdateHandler
             {
                 diffPresenter.ShowProposal(proposal);
             }
-
-            if (_dryRun)
-            {
-                _progress.Info("Dry run - no changes were made.");
-                return ExitCodes.Success;
-            }
         }
+
+        // Spec 078: a dry run, or --no-interaction without --no-review, classifies and reports only.
+        // Nothing is written except the run-status files; applying without review needs --no-review.
+        var classifyOnly = _dryRun || (_noInteraction && !_noReview);
 
         // Review or auto-approve
         UpdateReviewResult reviewResult;
 
-        if (_noReview || _noInteraction)
+        if (classifyOnly)
+        {
+            _progress.Info(_dryRun
+                ? "Dry run - no changes were made."
+                : "Classification only — no changes written. Pass --no-review to apply.");
+            reviewResult = new UpdateReviewResult { Completed = true };
+        }
+        else if (_noReview)
         {
             var reviewer = new UpdateReviewer();
             reviewResult = reviewer.AutoReview(
@@ -384,10 +403,11 @@ public sealed class UpdateHandler
         }
 
         // Apply changes
-        _progressManager.Update("updating", $"Applying changes to {suite}...");
         var orphanedCount = 0;
-        if (!_dryRun)
+        if (!classifyOnly)
         {
+            _progressManager.Update("updating", $"Applying changes to {suite}...");
+
             // Spec 041: per-proposal progress bar. Total counts every proposal
             // that ApplyChangesAsync will touch (updates + orphaned marks +
             // deletes). The snapshot mirrors the bar so the progress page
@@ -420,13 +440,9 @@ public sealed class UpdateHandler
                     });
             });
         }
-        else
-        {
-            _progress.Info("Dry run - no changes were made.");
-        }
 
         // Update index with redundant test info
-        if (!_dryRun && (reviewResult.ToUpdate.Count > 0 || reviewResult.ToDelete.Count > 0 || orphanedCount > 0))
+        if (!classifyOnly && (reviewResult.ToUpdate.Count > 0 || reviewResult.ToDelete.Count > 0 || orphanedCount > 0))
         {
             // Re-read all tests to rebuild index
             var rereadResult = await batchReader.ExecuteAsync(suitePath, ct: ct);
@@ -478,10 +494,13 @@ public sealed class UpdateHandler
         }
 
         // Summary
-        _classificationPresenter.ShowUpdateComplete(
-            reviewResult.ToUpdate.Count,
-            orphanedCount,
-            reviewResult.ToDelete.Count);
+        if (!classifyOnly)
+        {
+            _classificationPresenter.ShowUpdateComplete(
+                reviewResult.ToUpdate.Count,
+                orphanedCount,
+                reviewResult.ToDelete.Count);
+        }
 
         sw.Stop();
 
@@ -515,6 +534,7 @@ public sealed class UpdateHandler
             TestsUpdated = reviewResult.ToUpdate.Count,
             TestsRemoved = orphanedCount + reviewResult.ToDelete.Count,
             TestsUnchanged = proposals.Count(p => p.Classification == UpdateClassification.UpToDate),
+            Applied = !classifyOnly,
             Classification = new Results.UpdateClassificationCounts
             {
                 UpToDate = proposals.Count(p => p.Classification == UpdateClassification.UpToDate),
@@ -561,43 +581,35 @@ public sealed class UpdateHandler
         return ExitCodes.Success;
     }
 
+    /// <summary>
+    /// Loads the text of every document the tests reference, keyed by the ref exactly as written in the test
+    /// (so <see cref="TestClassifier"/> can look it up). Refs are resolved by the shared
+    /// <see cref="SourceRefResolver"/> (Spec 078): fragments stripped, separators normalised, repo-root first,
+    /// then the source dir for legacy bare refs. Each file is read once; unresolved refs get no entry.
+    /// </summary>
     private static async Task<Dictionary<string, string>> LoadSourceDocumentsAsync(
+        string repoRoot,
         string sourceDir,
         IReadOnlyList<TestCase> tests,
         CancellationToken ct)
     {
-        var contents = new Dictionary<string, string>();
+        var contents = new Dictionary<string, string>(StringComparer.Ordinal);
+        var fileText = new Dictionary<string, string>(StringComparer.Ordinal);
+        var resolver = new SourceRefResolver(repoRoot, sourceDir);
 
-        if (!Directory.Exists(sourceDir))
-        {
-            return contents;
-        }
+        var sourceRefs = tests.SelectMany(t => t.SourceRefs).Distinct(StringComparer.Ordinal).ToList();
 
-        // Collect all source refs
-        var sourceRefs = tests
-            .SelectMany(t => t.SourceRefs)
-            .Distinct()
-            .ToList();
-
-        foreach (var sourceRef in sourceRefs)
+        foreach (var resolved in resolver.Resolve(sourceRefs).Resolved)
         {
             ct.ThrowIfCancellationRequested();
 
-            var fullPath = Path.Combine(sourceDir, sourceRef);
-            if (File.Exists(fullPath))
+            if (!fileText.TryGetValue(resolved.FullPath, out var text))
             {
-                contents[sourceRef] = await File.ReadAllTextAsync(fullPath, ct);
+                text = await File.ReadAllTextAsync(resolved.FullPath, ct);
+                fileText[resolved.FullPath] = text;
             }
-        }
 
-        // Also load all markdown files in the source directory
-        foreach (var file in Directory.GetFiles(sourceDir, "*.md", SearchOption.AllDirectories))
-        {
-            var relativePath = Path.GetRelativePath(sourceDir, file).Replace('\\', '/');
-            if (!contents.ContainsKey(relativePath))
-            {
-                contents[relativePath] = await File.ReadAllTextAsync(file, ct);
-            }
+            contents[resolved.Ref] = text;
         }
 
         return contents;
@@ -645,7 +657,7 @@ public sealed class UpdateHandler
         {
             if (proposal.ProposedTest is not null)
             {
-                var path = Path.Combine(suitePath, $"{proposal.OriginalTest.Id}.md");
+                var path = TestFilePathOf(proposal.OriginalTest, suitePath);
                 await writer.WriteAsync(path, proposal.ProposedTest, ct);
                 Console.WriteLine($"  Updated: {proposal.OriginalTest.Id}");
             }
@@ -656,45 +668,55 @@ public sealed class UpdateHandler
         foreach (var proposal in result.Skipped.Where(p => p.Classification == UpdateClassification.Orphaned))
         {
             var originalTest = proposal.OriginalTest;
-            var orphanedTest = new TestCase
+
+            // Spec 078: change only the three orphan fields; everything else (and the source layout) is kept.
+            // A test that is already orphaned keeps the date it was first orphaned.
+            var orphanedTest = originalTest with
             {
-                Id = originalTest.Id,
-                FilePath = originalTest.FilePath,
-                Priority = originalTest.Priority,
-                Tags = originalTest.Tags,
-                Component = originalTest.Component,
-                Preconditions = originalTest.Preconditions,
-                Environment = originalTest.Environment,
-                EstimatedDuration = originalTest.EstimatedDuration,
-                DependsOn = originalTest.DependsOn,
-                SourceRefs = originalTest.SourceRefs,
-                RelatedWorkItems = originalTest.RelatedWorkItems,
-                Custom = originalTest.Custom,
-                Title = originalTest.Title,
-                Steps = originalTest.Steps,
-                ExpectedResult = originalTest.ExpectedResult,
-                TestData = originalTest.TestData,
                 Status = "orphaned",
                 OrphanedReason = proposal.Reason ?? "Source documentation no longer exists",
-                OrphanedDate = DateTimeOffset.UtcNow
+                OrphanedDate = originalTest.Status == "orphaned" && originalTest.OrphanedDate is not null
+                    ? originalTest.OrphanedDate
+                    : new DateTimeOffset(DateTime.UtcNow.Date, TimeSpan.Zero)
             };
 
-            var path = Path.Combine(suitePath, $"{originalTest.Id}.md");
+            var path = TestFilePathOf(originalTest, suitePath);
             await writer.WriteAsync(path, orphanedTest, ct);
             Console.WriteLine($"  Marked orphaned: {originalTest.Id}");
             orphanedCount++;
             onProposalApplied?.Invoke(originalTest.Id);
         }
 
-        // Delete tests
+        // Delete tests — Spec 090 (FR-C3): through the shared delete service (index, scalar depends_on, baseline entry,
+        // staging and verdict files), never a bare file delete.
+        if (result.ToDelete.Count > 0)
+        {
+            var service = await Delete.TestDeletionService.LoadAsync(
+                Directory.GetCurrentDirectory(), Path.GetDirectoryName(Path.GetFullPath(suitePath))!, ct);
+            var targets = service.Resolve(result.ToDelete.Select(p => p.OriginalTest.Id))
+                .Where(r => r.Target is not null)
+                .Select(r => r.Target!)
+                .ToList();
+            var plan = await service.PlanAsync(targets, ct);
+            var outcome = await service.ApplyAsync(plan, ct);
+            foreach (var deleted in outcome.Deleted)
+            {
+                Console.WriteLine($"  Deleted: {deleted.Id}");
+            }
+
+            foreach (var warning in plan.Warnings)
+            {
+                Console.Error.WriteLine($"  Warning: {warning}");
+            }
+
+            foreach (var (id, message) in outcome.Errors)
+            {
+                Console.Error.WriteLine($"  Delete of {id}: {message}");
+            }
+        }
+
         foreach (var proposal in result.ToDelete)
         {
-            var path = Path.Combine(suitePath, $"{proposal.OriginalTest.Id}.md");
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-                Console.WriteLine($"  Deleted: {proposal.OriginalTest.Id}");
-            }
             onProposalApplied?.Invoke(proposal.OriginalTest.Id);
         }
 
@@ -702,10 +724,26 @@ public sealed class UpdateHandler
     }
 
     /// <summary>
+    /// Spec 080 A1: the file a parsed test came from. Writes and deletes go there, never to a rebuilt
+    /// <c>{id}.md</c>, which for a file named differently would create a second test with the same ID.
+    /// </summary>
+    private static string TestFilePathOf(TestCase test, string suitePath)
+    {
+        if (string.IsNullOrWhiteSpace(test.FilePath))
+        {
+            return Path.Combine(suitePath, $"{test.Id}.md");
+        }
+
+        return Path.IsPathRooted(test.FilePath)
+            ? test.FilePath
+            : Path.GetFullPath(Path.Combine(suitePath, test.FilePath));
+    }
+
+    /// <summary>
     /// Spec 041: writes an in-flight update result with the current progress
     /// snapshot attached, so the progress page picks it up on next refresh.
     /// </summary>
-    private static void WriteUpdateProgress(string suite, Progress.ProgressSnapshot snapshot)
+    private void WriteUpdateProgress(string suite, Progress.ProgressSnapshot snapshot)
     {
         var partial = new Results.UpdateResult
         {

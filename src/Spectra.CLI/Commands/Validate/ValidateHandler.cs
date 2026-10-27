@@ -49,14 +49,18 @@ public sealed class ValidateHandler
                 });
 
                 // Spec 058 (FR-006): names any retired provider-config keys still present so they are
-                // surfaced (non-blocking) rather than silently ignored — never a silent drop.
+                // surfaced (non-blocking) rather than silently ignored — never a silent drop. Spec 098 (F1): the keys of
+                // the removed in-process critic make its block legacy, and its model is ignored too.
                 var deprecated = Spectra.Core.Config.ConfigLoader.DetectDeprecatedKeys(configJson);
                 if (deprecated.Count > 0)
                 {
+                    var legacyModel = config?.Ai?.Critic is { IsLegacy: true } critic && critic.Choose().Warning is not null
+                        ? $" {CriticConfig.LegacyModelWarning}."
+                        : "";
                     configNotes.Add(
                         $"spectra.config.json contains retired key(s): {string.Join(", ", deprecated)}. " +
-                        "These are ignored (Spec 058 — the critic runs as the spectra-critic subagent; " +
-                        "ai.critic.model is the only critic selector). Remove them at your convenience.");
+                        "These are ignored (the critic runs as the spectra-critic subagent). Remove them at your convenience." +
+                        legacyModel);
                 }
             }
             catch (JsonException ex)
@@ -98,10 +102,11 @@ public sealed class ValidateHandler
 
         // Parse and validate each suite
         var orchestrator = new ValidationOrchestrator(config?.Validation);
-        var parser = new TestCaseParser();
+        var parser = new TestCaseParser(captureLayout: false);
         var allSuites = new List<TestSuite>();
         var totalErrors = 0;
         var totalWarnings = 0;
+        var parseErrors = new List<Results.ValidationError>();
 
         foreach (var suitePath in suitesToValidate)
         {
@@ -133,6 +138,7 @@ public sealed class ValidateHandler
                     foreach (var error in parseResult.Errors)
                     {
                         Console.Error.WriteLine($"  [{error.Code}] {error.Message}");
+                        parseErrors.Add(new Results.ValidationError { File = relativePath, Line = 0, Message = $"[{error.Code}] {error.Message}" });
                     }
                     totalErrors += parseResult.Errors.Count;
                     continue;
@@ -188,14 +194,17 @@ public sealed class ValidateHandler
         var testCount = allSuites.Sum(s => s.TestCount);
         var suiteCount = allSuites.Count;
 
+        // Spec 096 (FR-007): a test that doesn't parse, or a counted profile error, fails validation like a validator
+        // error — before 096 only the validator's own result decided the exit code.
+        var passed = result.IsValid && totalErrors == 0;
         var validateResult = new ValidateResult
         {
             Command = "validate",
-            Status = result.IsValid ? "success" : "failed",
-            Message = result.IsValid ? "Validation passed." : $"{totalErrors} error(s) found.",
+            Status = passed ? "success" : "failed",
+            Message = passed ? "Validation passed." : $"{totalErrors} error(s) found.",
             TotalFiles = testCount,
             Valid = testCount - allErrors.Count,
-            Errors = allErrors,
+            Errors = [.. parseErrors, .. allErrors],
             Notes = configNotes.Count > 0 ? configNotes : null
         };
         _progressManager.WriteResultOnly(validateResult);
@@ -203,7 +212,7 @@ public sealed class ValidateHandler
         if (_outputFormat == OutputFormat.Json)
         {
             JsonResultWriter.Write(validateResult);
-            return result.IsValid ? ExitCodes.Success : ExitCodes.Error;
+            return passed ? ExitCodes.Success : ExitCodes.Error;
         }
 
         // Human output
@@ -247,7 +256,7 @@ public sealed class ValidateHandler
             Console.WriteLine($"Errors: {totalErrors}, Warnings: {totalWarnings}");
         }
 
-        if (result.IsValid)
+        if (passed)
         {
             if (_verbosity >= VerbosityLevel.Minimal)
             {

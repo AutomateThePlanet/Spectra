@@ -1,3 +1,4 @@
+using Spectra.CLI.Prompts;
 using Spectra.CLI.Verification;
 using Spectra.Core.Models;
 
@@ -10,6 +11,10 @@ namespace Spectra.CLI.Tests.Verification;
 /// </summary>
 public sealed class CriticPromptCompilerTests
 {
+    // Spec 102 (F1): the compiler needs a template loader; a folder with no .spectra/prompts gives the bundled template.
+    private static readonly PromptTemplateLoader Templates =
+        new(Path.Combine(Path.GetTempPath(), $"spectra-102-no-workspace-{Guid.NewGuid():N}"));
+
     private static TestCase Test(string id = "TC-900", string title = "Checkout totals update") => new()
     {
         Id = id,
@@ -31,7 +36,7 @@ public sealed class CriticPromptCompilerTests
     [Fact]
     public void Compile_WithValidTest_Succeeds_AndEmitsGroundedPrompt()
     {
-        var result = CriticPromptCompiler.Compile(Test(), Docs());
+        var result = CriticPromptCompiler.Compile(Test(), Docs(), Templates);
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(result.Prompt);
@@ -44,8 +49,8 @@ public sealed class CriticPromptCompilerTests
     [Fact]
     public void Assemble_WithIdenticalInputs_IsByteIdentical()
     {
-        var a = CriticPromptCompiler.Assemble(Test(), Docs());
-        var b = CriticPromptCompiler.Assemble(Test(), Docs());
+        var a = CriticPromptCompiler.Assemble(Test(), Docs(), Templates);
+        var b = CriticPromptCompiler.Assemble(Test(), Docs(), Templates);
 
         Assert.Equal(a, b); // determinism (FR-002) — no timestamps/GUIDs/unordered content
     }
@@ -54,7 +59,7 @@ public sealed class CriticPromptCompilerTests
     public void Compile_PerformsNoModelCall()
     {
         // Pure compilation: returns synchronously with no provider configured.
-        var result = CriticPromptCompiler.Compile(Test(), Docs());
+        var result = CriticPromptCompiler.Compile(Test(), Docs(), Templates);
         Assert.True(result.IsSuccess);
     }
 
@@ -62,7 +67,7 @@ public sealed class CriticPromptCompilerTests
     public void Compile_DoesNotLeakGeneratorState()
     {
         // The prompt is grounded ONLY in the artifact + docs — never generator reasoning/tokens.
-        var prompt = CriticPromptCompiler.Compile(Test(), Docs()).Prompt!;
+        var prompt = CriticPromptCompiler.Compile(Test(), Docs(), Templates).Prompt!;
         Assert.DoesNotContain("token", prompt, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("generator reasoning", prompt, StringComparison.OrdinalIgnoreCase);
     }
@@ -70,7 +75,7 @@ public sealed class CriticPromptCompilerTests
     [Fact]
     public void Compile_WithEmptyDocs_IsNotARefusal()
     {
-        var result = CriticPromptCompiler.Compile(Test(), []);
+        var result = CriticPromptCompiler.Compile(Test(), [], Templates);
         Assert.True(result.IsSuccess); // empty doc set is allowed (the builder notes "no documentation")
     }
 
@@ -79,7 +84,7 @@ public sealed class CriticPromptCompilerTests
     [Fact]
     public void Compile_WithNullTest_Refuses()
     {
-        var result = CriticPromptCompiler.Compile(null, Docs());
+        var result = CriticPromptCompiler.Compile(null, Docs(), Templates);
 
         Assert.False(result.IsSuccess);
         Assert.Equal("test_artifact", result.MissingInput);
@@ -100,7 +105,7 @@ public sealed class CriticPromptCompilerTests
             ExpectedResult = "ok"
         };
 
-        var result = CriticPromptCompiler.Compile(test, Docs());
+        var result = CriticPromptCompiler.Compile(test, Docs(), Templates);
 
         Assert.False(result.IsSuccess);
         Assert.Equal("test_artifact", result.MissingInput);

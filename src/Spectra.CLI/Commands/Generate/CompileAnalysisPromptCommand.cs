@@ -196,7 +196,7 @@ public sealed class CompileAnalysisPromptCommand : Command
         if (!Directory.Exists(suitePath))
             return tests;
 
-        var parser = new TestCaseParser();
+        var parser = new TestCaseParser(captureLayout: false);
         var files = Directory.GetFiles(suitePath, "*.md")
             .Where(f => !Path.GetFileName(f).StartsWith('_'));
 

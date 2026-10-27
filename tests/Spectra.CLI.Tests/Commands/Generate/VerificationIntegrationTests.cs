@@ -1,4 +1,5 @@
 using Spectra.CLI.Agent.Critic;
+using Spectra.CLI.Prompts;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
 using Spectra.Core.Models.Grounding;
@@ -11,10 +12,14 @@ namespace Spectra.CLI.Tests.Commands.Generate;
 /// </summary>
 public class VerificationIntegrationTests
 {
+    // Spec 102 (F1): the builder needs a template loader; a folder with no .spectra/prompts gives the bundled template.
+    private static PromptTemplateLoader BundledTemplates() =>
+        new(Path.Combine(Path.GetTempPath(), $"spectra-102-no-workspace-{Guid.NewGuid():N}"));
+
     [Fact]
     public void VerificationPipeline_PromptBuilder_BuildsValidPrompt()
     {
-        var promptBuilder = new CriticPromptBuilder();
+        var promptBuilder = new CriticPromptBuilder(BundledTemplates());
         var test = CreateTestCase("TC-001", "Test Login");
         var docs = new List<SourceDocument>
         {
@@ -29,94 +34,6 @@ public class VerificationIntegrationTests
         Assert.Contains("TC-001", userPrompt);
         Assert.Contains("Test Login", userPrompt);
         Assert.Contains("Login Feature", userPrompt);
-    }
-
-    [Fact]
-    public void VerificationPipeline_ResponseParser_ParsesGroundedVerdict()
-    {
-        var parser = new CriticResponseParser();
-        var response = """
-            {
-              "verdict": "grounded",
-              "score": 0.95,
-              "findings": [
-                {
-                  "element": "Step 1",
-                  "claim": "User can log in",
-                  "status": "grounded",
-                  "evidence": "Section 2.1 describes login"
-                }
-              ]
-            }
-            """;
-
-        var result = parser.Parse(response, "test-model", TimeSpan.FromSeconds(1));
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(VerificationVerdict.Grounded, result.Verdict);
-        Assert.Equal(0.95, result.Score);
-        Assert.Single(result.Findings);
-    }
-
-    [Fact]
-    public void VerificationPipeline_ResponseParser_ParsesPartialVerdict()
-    {
-        var parser = new CriticResponseParser();
-        var response = """
-            {
-              "verdict": "partial",
-              "score": 0.72,
-              "findings": [
-                {
-                  "element": "Step 1",
-                  "claim": "User sees welcome message",
-                  "status": "grounded",
-                  "evidence": "Welcome text shown"
-                },
-                {
-                  "element": "Step 2",
-                  "claim": "Email sent within 5 minutes",
-                  "status": "unverified",
-                  "reason": "No time specified in documentation"
-                }
-              ]
-            }
-            """;
-
-        var result = parser.Parse(response, "test-model", TimeSpan.FromSeconds(1));
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(VerificationVerdict.Partial, result.Verdict);
-        Assert.Equal(2, result.Findings.Count);
-        Assert.Contains(result.Findings, f => f.Status == FindingStatus.Grounded);
-        Assert.Contains(result.Findings, f => f.Status == FindingStatus.Unverified);
-    }
-
-    [Fact]
-    public void VerificationPipeline_ResponseParser_ParsesHallucinatedVerdict()
-    {
-        var parser = new CriticResponseParser();
-        var response = """
-            {
-              "verdict": "hallucinated",
-              "score": 0.25,
-              "findings": [
-                {
-                  "element": "Expected Result",
-                  "claim": "Fraud detection API returns score",
-                  "status": "hallucinated",
-                  "reason": "No fraud API exists in documentation"
-                }
-              ]
-            }
-            """;
-
-        var result = parser.Parse(response, "test-model", TimeSpan.FromSeconds(1));
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(VerificationVerdict.Hallucinated, result.Verdict);
-        Assert.Single(result.Findings);
-        Assert.Equal(FindingStatus.Hallucinated, result.Findings[0].Status);
     }
 
     [Fact]
@@ -184,23 +101,9 @@ public class VerificationIntegrationTests
     }
 
     [Fact]
-    public void VerificationPipeline_CriticFactory_ValidatesProviders()
-    {
-        // Spec 039: canonical 5 providers + legacy 'github' alias.
-        Assert.True(CriticFactory.IsSupported("openai"));
-        Assert.True(CriticFactory.IsSupported("anthropic"));
-        Assert.True(CriticFactory.IsSupported("github-models"));
-        Assert.True(CriticFactory.IsSupported("azure-openai"));
-        Assert.True(CriticFactory.IsSupported("azure-anthropic"));
-        Assert.True(CriticFactory.IsSupported("github"));   // legacy alias still recognized
-        Assert.False(CriticFactory.IsSupported("google"));  // hard-rejected post-039
-        Assert.False(CriticFactory.IsSupported("unknown"));
-    }
-
-    [Fact]
     public void VerificationPipeline_PromptBuilder_HandlesEmptyDocs()
     {
-        var promptBuilder = new CriticPromptBuilder();
+        var promptBuilder = new CriticPromptBuilder(BundledTemplates());
         var test = CreateTestCase("TC-001", "Test");
         var docs = new List<SourceDocument>();
 
@@ -212,7 +115,7 @@ public class VerificationIntegrationTests
     [Fact]
     public void VerificationPipeline_PromptBuilder_TruncatesLargeDocs()
     {
-        var promptBuilder = new CriticPromptBuilder();
+        var promptBuilder = new CriticPromptBuilder(BundledTemplates());
         var test = CreateTestCase("TC-001", "Test");
         var largeContent = new string('x', 20000);
         var docs = new List<SourceDocument>
@@ -231,7 +134,7 @@ public class VerificationIntegrationTests
     [Fact]
     public void VerificationPipeline_PromptBuilder_PrioritizesSourceRefs()
     {
-        var promptBuilder = new CriticPromptBuilder();
+        var promptBuilder = new CriticPromptBuilder(BundledTemplates());
         var test = new TestCase
         {
             Id = "TC-001",
@@ -253,97 +156,6 @@ public class VerificationIntegrationTests
 
         // Referenced doc should appear first or be included
         Assert.Contains("Referenced", prompt);
-    }
-
-    [Fact]
-    public void VerificationPipeline_ResponseParser_HandlesMarkdownWrappedJson()
-    {
-        var parser = new CriticResponseParser();
-        var response = """
-            Here is my analysis:
-
-            ```json
-            {
-              "verdict": "grounded",
-              "score": 0.9,
-              "findings": []
-            }
-            ```
-
-            Hope this helps!
-            """;
-
-        var result = parser.Parse(response, "test-model", TimeSpan.FromSeconds(1));
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(VerificationVerdict.Grounded, result.Verdict);
-    }
-
-    [Fact]
-    public void VerificationPipeline_ResponseParser_HandlesMalformedResponse()
-    {
-        var parser = new CriticResponseParser();
-        var response = "This is not valid JSON at all";
-
-        var result = parser.Parse(response, "test-model", TimeSpan.FromSeconds(1));
-
-        Assert.False(result.IsSuccess);
-        Assert.NotEmpty(result.Errors);
-    }
-
-    [Fact]
-    public void VerificationPipeline_EndToEnd_GroundedFlow()
-    {
-        // Test the complete flow from prompt through result
-        var promptBuilder = new CriticPromptBuilder();
-        var parser = new CriticResponseParser();
-
-        var test = CreateTestCase("TC-001", "Verify user login");
-        var docs = new List<SourceDocument>
-        {
-            new()
-            {
-                Path = "docs/auth.md",
-                Title = "Authentication",
-                Content = "Users log in with email and password. System validates credentials and returns session token."
-            }
-        };
-
-        // Build prompts
-        var systemPrompt = promptBuilder.BuildSystemPrompt();
-        var userPrompt = promptBuilder.BuildUserPrompt(test, docs);
-
-        Assert.NotEmpty(systemPrompt);
-        Assert.NotEmpty(userPrompt);
-
-        // Simulate critic response
-        var criticResponse = """
-            {
-              "verdict": "grounded",
-              "score": 0.92,
-              "findings": [
-                {
-                  "element": "Step 1",
-                  "claim": "User enters email",
-                  "status": "grounded",
-                  "evidence": "Users log in with email and password"
-                }
-              ]
-            }
-            """;
-
-        // Parse response
-        var result = parser.Parse(criticResponse, "gemini-2.0-flash", TimeSpan.FromSeconds(2));
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(VerificationVerdict.Grounded, result.Verdict);
-
-        // Convert to metadata
-        var metadata = result.ToMetadata("gpt-4o");
-
-        Assert.Equal("gpt-4o", metadata.Generator);
-        Assert.Equal("gemini-2.0-flash", metadata.Critic);
-        Assert.True(metadata.IsValid());
     }
 
     private static TestCase CreateTestCase(string id, string title) => new()

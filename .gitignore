@@ -28,15 +28,18 @@ packages/
 
 # Test results
 TestResults/
-coverage/
+/coverage/
 
 # SPECTRA lock files
 .spectra.lock
+.spectra/baseline.lock
+.spectra/update-triage.json
 
 # SPECTRA per-session verdict files, drop trail, and repair scratch (scratch, not committed)
 .spectra/verdicts/
 .spectra/dropped-tests.json
 .spectra/repairs/
+.spectra/updates/
 
 # Node (for runner-ui)
 node_modules/

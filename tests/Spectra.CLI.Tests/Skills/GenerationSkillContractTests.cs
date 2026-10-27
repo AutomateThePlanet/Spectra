@@ -18,8 +18,8 @@ public sealed class GenerationSkillContractTests
         var skill = Generate();
         Assert.Contains("spectra-critic", skill);
         Assert.Contains("MANDATORY", skill);
-        // The critic step is explicit and not auto-invoked.
-        Assert.Contains("never auto-invoked", skill);
+        // The critic step is explicit. Spec 101 F4: "never auto-invoked" claimed an agent field Claude Code ignores.
+        Assert.Contains("mandatory and explicit", skill);
     }
 
     [Fact]
@@ -38,13 +38,14 @@ public sealed class GenerationSkillContractTests
     public void GenerationSkill_DrivesFailLoudBoundedLoop()
     {
         var skill = Generate();
-        // Hands the verdict to the deterministic boundary and reacts to its fail-loud exit codes.
+        // Hands the verdict to the deterministic boundary.
         Assert.Contains("spectra ai ingest-verdict", skill);
         Assert.Contains("compile-critic-prompt", skill);
-        Assert.Contains("fail loud", skill);
-        // Bounded retry on the specific error; stop at the limit.
-        Assert.Contains("retry limit", skill);
-        Assert.Contains("Regenerate", skill);
+        // Spec 093: the fail-loud, bounded generate → ingest → regenerate loop runs in the spectra-generator subagent.
+        var generator = System.Text.RegularExpressions.Regex.Replace(AgentContent.All["spectra-generator.agent.md"], @"\s+", " ");
+        Assert.Contains("fail-loud", generator);
+        Assert.Contains("retry limit", generator);
+        Assert.Contains("regenerate", generator, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -58,8 +59,8 @@ public sealed class GenerationSkillContractTests
     [Fact]
     public void GenerationSkill_ResolvedToolsInclude_Task()
     {
-        // The skill needs the Task tool to invoke the context:fork critic subagent.
-        Assert.Contains("Task", Generate());
+        // The skill starts its subagents with the Agent tool (Spec 102: Claude Code's name since v2.1.63, was Task).
+        Assert.Contains("Agent", Generate());
     }
 
     [Fact]

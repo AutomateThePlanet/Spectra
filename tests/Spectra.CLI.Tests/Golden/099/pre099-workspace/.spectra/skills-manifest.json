@@ -1,0 +1,12 @@
+{
+  "version": "1.0",
+  "files": {
+    ".spectra/prompts/behavior-analysis.md": "4c19052521794265aebf93b45dc7af97e368d1463bd026ac3a1286bf892c6189",
+    ".spectra/prompts/criteria-extraction.md": "6ce3b68a24bc5b3ab733408359f03af4d55e41bf9cd3194cda53ca94ab06c07e",
+    ".spectra/prompts/critic-verification.md": "d8f752862cc3a7978be9c6116d31b84d8d86d77a23cc1d2ac8e00d9665acaa86",
+    ".spectra/prompts/test-generation.md": "ef6791f9973be3d2eda2d28f3efb9856ac69f739627df70f0a619cedc03a99e9",
+    ".spectra/prompts/test-update.md": "393ad4b782de7155dd093983ec3426164da8bfa318311ef36b6d7335b1c462a1",
+    "profiles/_default.yaml": "2188c0eeb095ec2df7646dc735a676f0b5fa18bd143af36c0a0a986b7a54cfbd",
+    "CUSTOMIZATION.md": "c018776de63555cf0e4046fd2f488c579c1d0a35bfccbe28f40baa7b7f2bd7ff"
+  }
+}

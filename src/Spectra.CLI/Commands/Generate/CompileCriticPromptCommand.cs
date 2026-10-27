@@ -1,9 +1,12 @@
 using System.CommandLine;
 using System.Text.Json;
-using Spectra.CLI.Generation;
+using Spectra.CLI.Criteria;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
+using Spectra.CLI.Prompts;
+using Spectra.CLI.Source;
 using Spectra.CLI.Verification;
+using Spectra.Core.Config;
 using Spectra.Core.Index;
 using Spectra.Core.Models;
 using Spectra.Core.Models.Config;
@@ -16,9 +19,10 @@ namespace Spectra.CLI.Commands.Generate;
 /// the critic verification prompt for one generated test. Writes nothing to disk; no model call.
 /// Mirrors <see cref="CompilePromptCommand"/> / <see cref="CompileExtractionPromptCommand"/>.
 ///
-/// The <c>spectra-critic</c> <c>context: fork</c> subagent runs the emitted prompt in a fresh,
-/// isolated context (artifact + selected source docs only) and hands its verdict JSON to
-/// <see cref="IngestVerdictCommand"/>.
+/// The <c>spectra-critic</c> subagent (on <c>ai.critic.model</c>) runs the emitted prompt in a fresh, isolated
+/// context (artifact + selected source docs only) and hands its verdict JSON to <see cref="IngestVerdictCommand"/>.
+/// Spec 102 (F1): the system part is the <c>critic-verification</c> template (the workspace copy, else the bundled
+/// one) in every form and doc mode, with the same loader rules as the other compile commands.
 /// </summary>
 public sealed class CompileCriticPromptCommand : Command
 {
@@ -36,31 +40,37 @@ public sealed class CompileCriticPromptCommand : Command
         var suiteOption = new Option<string?>(["--suite", "-s"], "Suite to resolve the test(s) from (makes --test an ID, not a path; omit --test to emit all)");
         var testOption = new Option<string?>(["--test", "-t"], "Test artifact: a path (legacy) or, with --suite, the test ID to resolve");
         var docsOption = new Option<string?>(["--docs", "-d"], "Source document(s) to ground against (file or directory)");
+        // Spec 101 F1 (FR-004): the pre-101 input — each referenced document whole — as the escape hatch and the
+        // quality gate's baseline. Without it the critic gets the sections the test cites.
+        var fullDocsOption = new Option<bool>("--full-docs", "Give the critic each referenced document whole (the pre-101 input) instead of the cited sections");
 
         AddOption(suiteOption);
         AddOption(testOption);
         AddOption(docsOption);
+        AddOption(fullDocsOption);
 
         this.SetHandler(async (context) =>
         {
             var suite = context.ParseResult.GetValueForOption(suiteOption);
             var test = context.ParseResult.GetValueForOption(testOption);
             var docs = context.ParseResult.GetValueForOption(docsOption);
+            var fullDocs = context.ParseResult.GetValueForOption(fullDocsOption);
             var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
-            context.ExitCode = await RunAsync(suite, test, docs, outputFormat == OutputFormat.Json, context.GetCancellationToken());
+            context.ExitCode = await RunAsync(suite, test, docs, fullDocs, outputFormat == OutputFormat.Json, context.GetCancellationToken());
         });
     }
 
-    private static async Task<int> RunAsync(string? suite, string? testPath, string? docsPath, bool json, CancellationToken ct)
+    private static async Task<int> RunAsync(string? suite, string? testPath, string? docsPath, bool fullDocs, bool json, CancellationToken ct)
     {
         var currentDir = Directory.GetCurrentDirectory();
+        var templateLoader = new PromptTemplateLoader(currentDir);
 
         // Suite-aware resolution (Spec 071): the agent supplies the suite name (and optionally the test
         // ID) it already knows; the command resolves the test file(s) from _index.json on disk — no
         // hand-built paths, no enumeration. This branch runs BEFORE the legacy path check below.
         if (!string.IsNullOrWhiteSpace(suite))
         {
-            return await RunSuiteAsync(suite, testPath, docsPath, currentDir, json, ct);
+            return await RunSuiteAsync(suite, testPath, docsPath, fullDocs, currentDir, templateLoader, json, ct);
         }
 
         if (string.IsNullOrWhiteSpace(testPath))
@@ -98,12 +108,14 @@ public sealed class CompileCriticPromptCommand : Command
             return ExitError;
         }
 
-        var result = CriticPromptCompiler.Compile(test, docs);
+        var result = CriticPromptCompiler.Compile(test, docs, templateLoader);
         if (!result.IsSuccess)
         {
             EmitRefusal(json, result.MissingInput!, result.Message!);
             return ExitRefused;
         }
+
+        await RecordAsync(currentDir, test!.Id, suite: null, testFull, test, ct);
 
         if (json)
         {
@@ -123,10 +135,27 @@ public sealed class CompileCriticPromptCommand : Command
     /// Fails loud (exit 1) when the suite/index or the requested id cannot be resolved — never silently skips.
     /// </summary>
     private static async Task<int> RunSuiteAsync(
-        string suite, string? testId, string? docsPath, string currentDir, bool json, CancellationToken ct)
+        string suite, string? testId, string? docsPath, bool fullDocs, string currentDir, PromptTemplateLoader templateLoader,
+        bool json, CancellationToken ct)
     {
-        var (testsDir, config) = await ResolveTestsDirAndConfigAsync(currentDir, ct);
-        var suitePath = Path.Combine(currentDir, testsDir, suite);
+        // Spec 080 A5: read command — defaults when there is no config, exit 1 on a malformed or invalid one.
+        var loaded = await ConfigLoader.LoadForReadAsync(
+            currentDir, ConfigSections.Source | ConfigSections.Tests, ct);
+        if (!loaded.IsSuccess)
+        {
+            // Spec 082 A4: in JSON mode a config failure is the shared failure document with its named code.
+            if (json)
+                CriteriaCommandIO.WriteFailureJson("compile-critic-prompt", loaded.ErrorCode, [loaded.Error!]);
+            else
+                Console.Error.WriteLine(loaded.Error);
+            return ExitError;
+        }
+        var config = loaded.Config!;
+        foreach (var warning in loaded.Warnings)
+        {
+            Console.Error.WriteLine($"Warning: {warning}");
+        }
+        var suitePath = Path.Combine(currentDir, config.Tests.Dir, suite);
         var indexPath = IndexWriter.GetIndexPath(suitePath);
 
         MetadataIndex? index;
@@ -177,10 +206,6 @@ public sealed class CompileCriticPromptCommand : Command
             }
         }
 
-        // Load criteria for this suite once — mirrors the generation path (CompilePromptCommand).
-        var criteria = await CriteriaContextLoader.LoadCriteriaContextAsync(
-            currentDir, suite, config, ct);
-
         var compiled = new List<(string Id, string Prompt)>();
         foreach (var entry in targets)
         {
@@ -202,7 +227,8 @@ public sealed class CompileCriticPromptCommand : Command
                 return ExitError;
             }
 
-            // Resolve the source docs for this test: --docs override > auto-resolve from source_refs.
+            // Resolve the source docs for this test: --docs override > auto-resolve from source_refs (Spec 101: the
+            // cited sections; --full-docs: each referenced document whole, as before).
             IReadOnlyList<SourceDocument> docs;
             if (sharedDocs is not null)
             {
@@ -212,7 +238,11 @@ public sealed class CompileCriticPromptCommand : Command
             {
                 try
                 {
-                    docs = await LoadDocumentsFromRefsAsync(test.SourceRefs, currentDir, ct);
+                    var sourceDir = config.Source.LocalDir ?? "docs";
+                    docs = fullDocs
+                        ? await SourceRefDocumentLoader.LoadAsync(test.SourceRefs, currentDir, sourceDir, failOnMissing: true, ct)
+                        : await CriticSourceLoader.LoadAsync(
+                            test.SourceRefs, currentDir, sourceDir, note => Console.Error.WriteLine($"Warning: {note}"), ct);
                 }
                 catch (FileNotFoundException ex)
                 {
@@ -225,13 +255,16 @@ public sealed class CompileCriticPromptCommand : Command
                 docs = [];
             }
 
-            var result = CriticPromptCompiler.Compile(test, docs, criteria.Context);
+            // Spec 102 (F1): the system part is the critic-verification template; its placeholders resolve to empty (the
+            // test and documents are in the user part, and the critic gets no criteria, as in Spec 101).
+            var result = CriticPromptCompiler.Compile(test, docs, templateLoader);
             if (!result.IsSuccess)
             {
                 EmitRefusal(json, result.MissingInput!, result.Message!);
                 return ExitRefused;
             }
             compiled.Add((entry.Id, result.Prompt!));
+            await RecordAsync(currentDir, entry.Id, suite, full, test!, ct);
         }
 
         if (json)
@@ -260,26 +293,21 @@ public sealed class CompileCriticPromptCommand : Command
     }
 
     /// <summary>
-    /// Resolves the configured tests directory (default <c>test-cases</c>) from spectra.config.json if present.
-    /// Lenient by design: a missing/unparseable config falls back to the default, mirroring the sibling compilers.
+    /// Spec 090 (FR-A2): records the fingerprint of the content the critic is given, so a verdict can only be ingested
+    /// onto that content. A failed write is a warning: the verdict is then accepted as one without a record.
     /// </summary>
-    private static async Task<(string Dir, SpectraConfig? Config)> ResolveTestsDirAndConfigAsync(
-        string currentDir, CancellationToken ct)
+    private static async Task RecordAsync(string root, string id, string? suite, string testPath, TestCase test, CancellationToken ct)
     {
-        var configPath = Path.Combine(currentDir, "spectra.config.json");
-        if (!File.Exists(configPath))
-            return ("test-cases", null);
-
         try
         {
-            var configJson = await File.ReadAllTextAsync(configPath, ct);
-            var config = JsonSerializer.Deserialize<SpectraConfig>(configJson,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return (config?.Tests?.Dir ?? "test-cases", config);
+            var file = Path.GetRelativePath(root, testPath).Replace(Path.DirectorySeparatorChar, '/');
+            // Spec 091 (FR-001): the record also says when the prompt was compiled; a verdict written before that is stale.
+            await VerdictFreshness.WriteRecordAsync(
+                root, new VerdictRecord(id, suite, file, TestContentFingerprint.Of(test), DateTimeOffset.UtcNow), ct);
         }
-        catch (JsonException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return ("test-cases", null);
+            Console.Error.WriteLine($"Warning: could not record the critic input for {id}: {ex.Message}");
         }
     }
 
@@ -290,7 +318,7 @@ public sealed class CompileCriticPromptCommand : Command
         if (fullPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
         {
             var rel = Path.GetRelativePath(currentDir, fullPath);
-            var parsed = new TestCaseParser().Parse(content, rel);
+            var parsed = new TestCaseParser(captureLayout: false).Parse(content, rel);
             return parsed.IsSuccess ? parsed.Value : null;
         }
 
@@ -332,37 +360,6 @@ public sealed class CompileCriticPromptCommand : Command
                 if (item.GetString() is string s) values.Add(s);
         }
         return values;
-    }
-
-    /// <summary>
-    /// Resolves each source_ref to its file on disk (stripping any fragment) and loads its content.
-    /// Deduplicates by resolved path. Throws <see cref="FileNotFoundException"/> when a ref cannot
-    /// be found — callers should surface this as a distinct error (not a silent empty list).
-    /// </summary>
-    private static async Task<IReadOnlyList<SourceDocument>> LoadDocumentsFromRefsAsync(
-        IReadOnlyList<string> sourceRefs, string currentDir, CancellationToken ct)
-    {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var docs = new List<SourceDocument>();
-        foreach (var r in sourceRefs)
-        {
-            var file = r.Split('#')[0].Trim();
-            if (string.IsNullOrWhiteSpace(file))
-                continue;
-            var full = Path.IsPathRooted(file) ? file : Path.Combine(currentDir, file);
-            if (!seen.Add(Path.GetFullPath(full)))
-                continue;
-            if (!File.Exists(full))
-                throw new FileNotFoundException($"Source ref not found: {r}", full);
-            var content = await File.ReadAllTextAsync(full, ct);
-            docs.Add(new SourceDocument
-            {
-                Path = Path.GetRelativePath(currentDir, full).Replace('\\', '/'),
-                Title = Path.GetFileNameWithoutExtension(full),
-                Content = content
-            });
-        }
-        return docs;
     }
 
     private static async Task<IReadOnlyList<SourceDocument>> LoadDocumentsAsync(

@@ -1,152 +1,154 @@
 using System.CommandLine;
-using System.Text.Json;
+using Spectra.CLI.Baseline;
 using Spectra.CLI.Generation;
+using Spectra.CLI.Index;
 using Spectra.CLI.Infrastructure;
 using Spectra.CLI.Options;
 using Spectra.CLI.Profile;
 using Spectra.CLI.Prompts;
+using Spectra.CLI.Services;
+using Spectra.Core.Config;
 using Spectra.Core.Models;
-using Spectra.Core.Models.Config;
-using Spectra.Core.Parsing;
 
 namespace Spectra.CLI.Commands.Generate;
 
 /// <summary>
-/// Spec 063: <c>spectra ai compile-update-prompt</c>. Deterministic, model-free compiler for the
-/// inverted update seam. Emits — to stdout, writing nothing — an <i>edit</i> prompt for ONE
-/// OUTDATED test: the existing test (serialized) + the changed source/criteria + explicit
-/// "edit, don't regenerate; preserve id/structure/manual fields" directives. Refuses (exit 4)
-/// when a required input is missing (suite, test id, the test itself, or any grounding context).
+/// Spec 063 / 088: <c>spectra ai compile-update-prompt --suite &lt;s&gt; (--test-id &lt;id&gt; | --group &lt;gid&gt;)</c>.
+/// Deterministic, model-free compiler for the update seam. Emits — to stdout, writing nothing — an <i>edit</i> prompt
+/// for one test or a whole triage group: each referenced doc section once (current text, previous normalised version,
+/// what changed — or why it no longer resolves), only the criteria the tests link, and each test under
+/// <c>### TEST &lt;id&gt;</c>. Refusals are one JSON document on stderr in the shared shape (exit 4).
 /// </summary>
 public sealed class CompileUpdatePromptCommand : Command
 {
-    private const int ExitSuccess = 0;
-    private const int ExitRefused = 4;
-    private const int ExitError = 1;
+    public const string CommandName = "compile-update-prompt";
+    public const string ErrorNothingToReconcile = "NOTHING_TO_RECONCILE";
+    public const string ErrorPromptTooLarge = "PROMPT_TOO_LARGE";
 
     public CompileUpdatePromptCommand()
-        : base("compile-update-prompt", "Compile an edit prompt for one OUTDATED test (deterministic, no model call)")
+        : base("compile-update-prompt", "Compile an edit prompt for one test or a triage group (deterministic, no model call)")
     {
-        var suiteOption = new Option<string?>(["--suite", "-s"], "Suite containing the test to update");
-        var testIdOption = new Option<string?>("--test-id", "Id of the OUTDATED test to compile an update prompt for");
+        var suiteOption = new Option<string?>(["--suite", "-s"], "Suite containing the tests to update");
+        var testIdOption = new Option<string?>("--test-id", "One test to compile an update prompt for");
+        var groupOption = new Option<string?>("--group", "A group from the last update-triage (G1, G2, …): one prompt for all its tests");
 
         AddOption(suiteOption);
         AddOption(testIdOption);
+        AddOption(groupOption);
 
-        this.SetHandler(async (context) =>
+        this.SetHandler(async context =>
         {
-            var suite = context.ParseResult.GetValueForOption(suiteOption);
-            var testId = context.ParseResult.GetValueForOption(testIdOption);
-            var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
-            context.ExitCode = await RunAsync(suite, testId, outputFormat == OutputFormat.Json, context.GetCancellationToken());
+            var parse = context.ParseResult;
+            context.ExitCode = await RunAsync(
+                Directory.GetCurrentDirectory(),
+                parse.GetValueForOption(suiteOption),
+                parse.GetValueForOption(testIdOption),
+                parse.GetValueForOption(groupOption),
+                parse.GetValueForOption(GlobalOptions.OutputFormatOption) == OutputFormat.Json,
+                context.GetCancellationToken());
         });
     }
 
-    private static async Task<int> RunAsync(string? suite, string? testId, bool json, CancellationToken ct)
+    public static async Task<int> RunAsync(
+        string root, string? suite, string? testId, string? group, bool json, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(suite))
+        if (string.IsNullOrWhiteSpace(suite) || string.IsNullOrWhiteSpace(testId) == string.IsNullOrWhiteSpace(group))
         {
-            EmitRefusal(json, "suite", "A target suite is required.");
-            return ExitRefused;
-        }
-        if (string.IsNullOrWhiteSpace(testId))
-        {
-            EmitRefusal(json, "test-id", "A target test id is required.");
-            return ExitRefused;
+            return BaselineCommandIO.Fail(json, CommandName, BaselineCommandIO.ErrorInvalidArguments,
+                "Give --suite <name> and exactly one of --test-id <id> and --group <id>.");
         }
 
-        var currentDir = Directory.GetCurrentDirectory();
-        var configPath = Path.Combine(currentDir, "spectra.config.json");
-        if (!File.Exists(configPath))
+        // Spec 083 read rule: a missing config means defaults; source and tests are read.
+        var loaded = await ConfigLoader.LoadForReadAsync(root, ConfigSections.Source | ConfigSections.Tests, ct);
+        if (!loaded.IsSuccess)
         {
-            Console.Error.WriteLine("No spectra.config.json found. Run 'spectra init' first.");
-            return ExitError;
+            return BaselineCommandIO.Fail(json, CommandName, loaded.ErrorCode!, loaded.Error!);
         }
 
-        SpectraConfig? config;
+        var config = loaded.Config!;
+        var warnings = new List<string>(loaded.Warnings);
+        BaselineCommandIO.PrintWarnings(loaded.Warnings);
+        var testsPath = BaselineCommandIO.TestsPath(root, config);
+        var (suites, scopeError, scopeMessage) = BaselineCommandIO.ResolveScope(testsPath, suite, allSuites: false);
+        if (suites is null)
+        {
+            return BaselineCommandIO.Fail(json, CommandName, scopeError!, scopeMessage!, warnings);
+        }
+
+        string prompt;
         try
         {
-            config = JsonSerializer.Deserialize<SpectraConfig>(
-                await File.ReadAllTextAsync(configPath, ct),
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        }
-        catch (JsonException ex)
-        {
-            Console.Error.WriteLine($"Error reading config: {ex.Message}");
-            return ExitError;
-        }
-        if (config is null)
-        {
-            Console.Error.WriteLine("Could not parse spectra.config.json.");
-            return ExitError;
-        }
+            var suiteTests = await BaselineCommandIO.LoadSuiteTestsAsync(root, testsPath, suite!, warnings, ct);
+            var context = await BaselineContext.CreateAsync(root, config, ct);
+            var baseline = await BaselineStore.LoadSuiteAsync(root, testsPath, suite!, ct);
 
-        var testsDir = config.Tests?.Dir ?? "test-cases";
-        var testsPath = Path.Combine(currentDir, testsDir);
-        var original = await LoadTestByIdAsync(testsPath, suite, testId, ct);
-        if (original is null)
-        {
-            EmitRefusal(json, "test-id", $"Test '{testId}' was not found in suite '{suite}'.");
-            return ExitRefused;
-        }
-
-        // Resolve grounding the same way the generation compile does. The criteria/source context
-        // is what the edit reconciles the test against.
-        var criteria = await CriteriaContextLoader.LoadCriteriaContextAsync(currentDir, suite, config, ct);
-        var profileFormat = ProfileFormatLoader.LoadFormat(currentDir);
-        var templateLoader = new PromptTemplateLoader(currentDir);
-
-        var result = UpdatePromptCompiler.Compile(
-            originalTest: original,
-            sourceContext: null,
-            criteriaContext: criteria.Context,
-            templateLoader: templateLoader,
-            profileFormat: profileFormat);
-
-        if (!result.IsSuccess)
-        {
-            EmitRefusal(json, result.MissingInput!, result.Message!);
-            return ExitRefused;
-        }
-
-        Console.Out.Write(result.Prompt);
-        if (!result.Prompt!.EndsWith('\n')) Console.Out.WriteLine();
-        return ExitSuccess;
-    }
-
-    private static async Task<TestCase?> LoadTestByIdAsync(
-        string testsPath, string suite, string testId, CancellationToken ct)
-    {
-        var suitePath = Path.Combine(testsPath, suite);
-        if (!Directory.Exists(suitePath))
-            return null;
-
-        var parser = new TestCaseParser();
-        foreach (var file in Directory.GetFiles(suitePath, "*.md")
-                     .Where(f => !Path.GetFileName(f).StartsWith('_')))
-        {
-            var relativePath = Path.GetRelativePath(testsPath, file);
-            var parsed = parser.Parse(await File.ReadAllTextAsync(file, ct), relativePath);
-            if (parsed.IsSuccess && string.Equals(parsed.Value!.Id, testId, StringComparison.OrdinalIgnoreCase))
-                return parsed.Value;
-        }
-        return null;
-    }
-
-    private static void EmitRefusal(bool json, string missingInput, string message)
-    {
-        if (json)
-        {
-            Console.Error.WriteLine(JsonSerializer.Serialize(new
+            List<TestCase> targets;
+            if (group is null)
             {
-                refused = true,
-                missing_input = missingInput,
-                message
-            }));
+                var test = suiteTests.Tests.FirstOrDefault(t => string.Equals(t.Id, testId, StringComparison.OrdinalIgnoreCase));
+                if (test is null)
+                {
+                    return BaselineCommandIO.Fail(json, CommandName, BaselineCommandIO.ErrorTestNotFound,
+                        $"Test '{testId}' was not found in suite '{suite}'.", warnings);
+                }
+
+                targets = [test];
+            }
+            else
+            {
+                var byId = suiteTests.Tests
+                    .GroupBy(t => t.Id, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+                (_, targets) = await TriageGroupResolver.ResolveAsync(root, suite!, group, byId, context, null, ct);
+            }
+
+            // Spec 088 C1: the same light threshold triage uses.
+            var threshold = config.Update?.EffectiveLightThresholdWords ?? 12;
+            var updateContext = await UpdateContextBuilder.BuildAsync(targets, baseline, context, threshold, ct);
+            if (updateContext.NothingToReconcile.Count > 0)
+            {
+                return BaselineCommandIO.Fail(json, CommandName, ErrorNothingToReconcile,
+                    $"Nothing to reconcile for {string.Join(", ", updateContext.NothingToReconcile)}: no referenced doc section "
+                    + "resolves and no linked acceptance criterion exists. Fix the source_refs / criteria (or delete the test) first.",
+                    warnings);
+            }
+
+            var template = new PromptTemplateLoader(root).LoadTemplate("test-update");
+            var compiled = UpdatePromptCompiler.CompileContext(updateContext, template, ProfileFormatLoader.LoadFormat(root), group is not null);
+            if (!compiled.IsSuccess)
+            {
+                return BaselineCommandIO.Fail(json, CommandName, compiled.RefusalCode!, compiled.Message!, warnings);
+            }
+
+            // Spec 088 FR-013: the existing token estimator and budget.
+            var estimated = TokenEstimator.Estimate(compiled.Prompt);
+            var limit = config.Analysis?.MaxPromptTokens ?? PreFlightTokenChecker.DefaultBudgetTokens;
+            if (estimated > limit)
+            {
+                return BaselineCommandIO.Fail(json, CommandName, ErrorPromptTooLarge,
+                    $"The prompt is about {estimated} tokens, over the {limit}-token budget (analysis.max_prompt_tokens). "
+                    + "Compile the tests one by one with --test-id, or lower update.group_size and triage again.", warnings);
+            }
+
+            if (compiled.Warning is not null)
+            {
+                BaselineCommandIO.PrintWarnings([compiled.Warning]);
+            }
+
+            prompt = compiled.Prompt!;
         }
-        else
+        catch (BaselineStoreException ex)
         {
-            Console.Error.WriteLine($"Refusing to emit prompt — missing required input '{missingInput}': {message}");
+            return BaselineCommandIO.Fail(json, CommandName, ex.ErrorCode, ex.Message, warnings);
         }
+
+        BaselineCommandIO.PrintLateWarnings(warnings, loaded.Warnings.Count);
+        Console.Out.Write(prompt);
+        if (!prompt.EndsWith('\n'))
+        {
+            Console.Out.WriteLine();
+        }
+
+        return ExitCodes.Success;
     }
 }

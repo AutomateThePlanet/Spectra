@@ -1,0 +1,12 @@
+# step: 16-ingest-update-all spectra ai ingest-update payments --all --output-format json
+# exit: 8
+## stdout
+{"command":"ingest-update","mode":"batch","suite":"payments","dry_run":false,"written":1,"unchanged":0,"unchanged_pending":0,"skipped_no_original":0,"errors":2,"manual_verdict_kept":[],"results":[{"test":"TC-103","file":".spectra/updates/payments/updated-TC-103.json","outcome":"written"},{"test":"TC-104","file":".spectra/updates/payments/failed-TC-104.json","outcome":"failed","error_code":"MULTIPLE_TESTS","errors":["The edit holds 2 test objects (TC-104, TC-109); a staged file holds exactly one test."]},{"test":"TC-105","file":".spectra/updates/payments/failed-TC-105.json","outcome":"failed","error_code":"ID_MISMATCH","errors":["The staged test\u0027s id \u0027TC-999\u0027 differs from the file name\u0027s \u0027TC-105\u0027."]}],"baseline":{"created":0,"updated":1,"unchanged":0,"snapshots_written":1,"mode":"rebuild"},"warnings":["test-cases/payments/TC-106.md could not be parsed; no baseline entries were pruned in suite \u0027payments\u0027."]}
+
+## stderr
+Warning: test-cases/payments/TC-106.md could not be parsed; no baseline entries were pruned in suite 'payments'.
+Batch update-ingest for suite 'payments': written=1 unchanged=0 unchanged_pending=0 skipped_no_original=0 errors=2
+  TC-103: updated
+  TC-104: failed [MULTIPLE_TESTS] The edit holds 2 test objects (TC-104, TC-109); a staged file holds exactly one test. (kept .spectra/updates/payments/failed-TC-104.json)
+  TC-105: failed [ID_MISMATCH] The staged test's id 'TC-999' differs from the file name's 'TC-105'. (kept .spectra/updates/payments/failed-TC-105.json)
+

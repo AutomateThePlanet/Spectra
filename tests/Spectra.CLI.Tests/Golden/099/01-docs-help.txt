@@ -1,0 +1,30 @@
+# step: 01-docs-help spectra docs --help
+# exit: 0
+## stdout
+Description:
+  Documentation management commands
+
+Usage:
+  testhost docs [command] [options]
+
+Options:
+  -v, --verbosity <Detailed|Diagnostic|Minimal|Normal|Quiet>  Output verbosity: quiet, minimal, normal, detailed, diagnostic [default: Normal]
+  --dry-run                                                   Preview changes without executing [default: False]
+  --no-review                                                 Skip interactive review (CI mode) [default: False]
+  --output-format <Human|Json>                                Output format: human (default) or json [default: Human]
+  --no-interaction                                            Disable interactive prompts (for CI/automation) [default: False]
+  -?, -h, --help                                              Show help and usage information
+
+Commands:
+  index                  Build or refresh the documentation index (docs/_index/_manifest.yaml + per-suite files)
+  changed                List documents changed since the last criteria extraction (deterministic, no model call)
+  list-suites            List documentation suites in the v2 manifest
+  show-suite <suite-id>  Print a suite's index file from the v2 manifest
+  migrate-criteria       Move criteria files to the per-document layout (deterministic, idempotent)
+  retire                 Retire a deleted document's acceptance criteria (explicit; --dry-run to preview)
+  apply-move             Apply a document move reported by 'docs changed' (keeps criteria and IDs)
+  topology               List the git repositories that own referenced docs (read-only diagnostic)
+
+
+## stderr
+

@@ -119,8 +119,8 @@ public sealed class DoctorIdsHandlerTests : IDisposable
         // because we only renumber the *later* duplicates' IDs and leave
         // depends_on references targeting the kept-oldest's ID untouched.
         var dependent = await File.ReadAllTextAsync(Path.Combine(_ws.TestCasesDir, "orders", "TC-200.md"));
-        Assert.Contains("depends_on:", dependent);
-        // The dependent should still depend on TC-100 — that's the kept-oldest's ID.
-        Assert.Contains("- TC-100", dependent);
+        // The dependent should still depend on TC-100 — that's the kept-oldest's ID. (Spec 090: TempWorkspace writes a
+        // single dependency as the scalar form, the only one TestCase parses.)
+        Assert.Contains("depends_on: TC-100", dependent);
     }
 }

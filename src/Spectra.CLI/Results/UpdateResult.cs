@@ -36,6 +36,13 @@ public sealed class UpdateResult : CommandResult
     [JsonPropertyName("testsUnchanged")]
     public int TestsUnchanged { get; init; }
 
+    /// <summary>
+    /// Spec 078: true when the apply step ran; false for a dry run or a classify-only
+    /// <c>--no-interaction</c> run (applying without review needs <c>--no-review</c>).
+    /// </summary>
+    [JsonPropertyName("applied")]
+    public bool Applied { get; init; }
+
     [JsonPropertyName("classification")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public UpdateClassificationCounts? Classification { get; init; }

@@ -1,0 +1,23 @@
+# step: 04-retire-help spectra docs retire --help
+# exit: 0
+## stdout
+Description:
+  Retire a deleted document's acceptance criteria (explicit; --dry-run to preview)
+
+Usage:
+  testhost docs retire [options]
+
+Options:
+  -d, --doc <doc> (REQUIRED)                                  The deleted document (as listed by 'docs changed')
+  --dry-run                                                   Report the changeset, but write nothing
+  -v, --verbosity <Detailed|Diagnostic|Minimal|Normal|Quiet>  Output verbosity: quiet, minimal, normal, detailed, diagnostic [default: Normal]
+  --dry-run                                                   Preview changes without executing [default: False]
+  --no-review                                                 Skip interactive review (CI mode) [default: False]
+  --output-format <Human|Json>                                Output format: human (default) or json [default: Human]
+  --no-interaction                                            Disable interactive prompts (for CI/automation) [default: False]
+  -?, -h, --help                                              Show help and usage information
+
+
+
+## stderr
+

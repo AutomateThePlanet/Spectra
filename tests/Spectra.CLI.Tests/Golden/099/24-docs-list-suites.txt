@@ -1,0 +1,23 @@
+# step: 24-docs-list-suites spectra docs list-suites --output-format json
+# exit: 0
+## stdout
+{
+  "suites": [
+    {
+      "id": "payments",
+      "document_count": 3,
+      "tokens_estimated": 103,
+      "skip_analysis": false,
+      "excluded_by": "none",
+      "index_file": "docs/_index/groups/payments.index.md"
+    }
+  ],
+  "total_suites": 1,
+  "total_documents": 3,
+  "command": "docs-list-suites",
+  "status": "completed",
+  "timestamp": "<mask:timestamp>"
+}
+
+## stderr
+

@@ -1,0 +1,14 @@
+# step: 10-update-triage spectra ai update-triage --suite payments --output-format json
+# exit: 0
+## stdout
+{"command":"update-triage","success":true,"scope":{"suite":"payments"},"dry_run":false,"suites":[{"suite":"payments","tests":7,"counts":{"load":3,"unchanged":4}}],"groups":[{"id":"G1","suite":"payments","bucket":"LOAD","refs":[{"ref":"docs/payments/checkout.md#cards","state":"LOAD"}],"tests":["TC-101"],"why":["numbers: 5000→3000"]},{"id":"G2","suite":"payments","bucket":"LOAD","refs":[{"ref":"docs/payments/checkout.md#refund-window","state":"LOAD"}],"tests":["TC-103"],"why":["numbers: 30→∅"]},{"id":"G3","suite":"payments","bucket":"LOAD","refs":[{"ref":"docs/payments/checkout.md","state":"LOAD"}],"tests":["TC-105"],"why":["numbers: 5000,30→3000"]}],"removed":[],"unbaselined":[],"no_tests":[],"notes":["docs/payments/checkout.md#limits: more than one heading shares the anchor key 'limits'; the first was used"],"auto_acked":0,"detail_file":".spectra/update-triage.json","warnings":["test-cases/payments/TC-106.md could not be parsed and was skipped."]}
+
+## stderr
+Warning: test-cases/payments/TC-106.md could not be parsed and was skipped.
+Update triage — payments (7 tests)
+  REMOVED 0 · CRITERIA_REMOVED 0 · LOAD 3 · CRITERIA_CHANGED 0 · LIGHT 0 · COSMETIC 0 · UNCHANGED 4
+  G1   LOAD             1 test    docs/payments/checkout.md#cards   numbers: 5000→3000
+  G2   LOAD             1 test    docs/payments/checkout.md#refund-window   numbers: 30→∅
+  G3   LOAD             1 test    docs/payments/checkout.md   numbers: 5000,30→3000
+  note: docs/payments/checkout.md#limits: more than one heading shares the anchor key 'limits'; the first was used
+

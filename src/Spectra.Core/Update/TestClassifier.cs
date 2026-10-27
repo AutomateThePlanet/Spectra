@@ -48,7 +48,10 @@ public sealed class TestClassifier
         // Check criteria-based classification first (if criteria data is available)
         if (criteria is not null && test.Criteria.Count > 0)
         {
-            var criteriaById = criteria.ToDictionary(c => c.Id, StringComparer.OrdinalIgnoreCase);
+            // Spec 079 FR-011: tolerate duplicate IDs from older workspaces — first definition wins (reported by the caller).
+            var criteriaById = criteria
+                .GroupBy(c => c.Id, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
             foreach (var criterionId in test.Criteria)
             {
@@ -169,16 +172,14 @@ public sealed class TestClassifier
 
         foreach (var test in tests)
         {
-            // Find source content for this test
-            string? sourceContent = null;
-            foreach (var sourceRef in test.SourceRefs)
-            {
-                if (sourceContents.TryGetValue(sourceRef, out var content))
-                {
-                    sourceContent = content;
-                    break;
-                }
-            }
+            // Classify against every referenced document that was found, not just the first:
+            // join the distinct contents (refs to sections of one file share its content).
+            var found = test.SourceRefs
+                .Select(sourceRef => sourceContents.TryGetValue(sourceRef, out var content) ? content : null)
+                .Where(content => content is not null)
+                .Distinct()
+                .ToList();
+            var sourceContent = found.Count > 0 ? string.Join("\n\n", found) : null;
 
             var otherTests = tests.Where(t => t.Id != test.Id).ToList();
             results.Add(Classify(test, sourceContent, otherTests, criteria));
