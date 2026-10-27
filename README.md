@@ -75,6 +75,10 @@ Every generated or edited test is verified by the `spectra-critic` subagent (on 
 against the source documentation. Hallucinated steps are caught and rejected; partial tests get one repair. The
 critic reads only the doc sections each test cites, so verification stays cheap on large documentation sets.
 
+Flagged tests go to a human reviewer (`spectra ai review-flagged`, or the `spectra-review-flagged` skill): accepting,
+giving feedback or deleting records who reviewed the test, when, and why in its `grounding:` block, next to the
+critic's verdict. Feedback can also challenge a test the critic passed and send it back for repair.
+
 ### Keeping Tests Current When Docs Change
 
 When documentation changes, SPECTRA tells you which tests are affected and why — without a model: `spectra ai

@@ -119,6 +119,7 @@ that drives the system under test is unrelated to SPECTRA's removed execution ad
 
 | Spec | Summary |
 |------|---------|
+| 103 | Human review record (merged from `078-human-review-record`): `review-flagged --action`, `reviewed_by/at`, `--re-verify`, suppression, staged `--fix` review |
 | 102 | Review fixes for 101: critic uses the critic-verification template, case-insensitive ref grouping, no re-critic for unchanged repairs, `created:` lines, `Agent` tool name |
 | 101 | Token economy: critic gets cited sections (`--full-docs` = old input), critic runs in work subagents, lean skills + `reference.md`, agent frontmatter |
 | 100 | Docs, agent guidance and constitution 2.1.0 catch up with 078–099; "When documentation changes" guide; text only |

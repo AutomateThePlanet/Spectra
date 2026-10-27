@@ -101,7 +101,7 @@ jobs:
           echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
 
 ### end
-### .gitignore (1177 bytes)
+### .gitignore (1214 bytes)
 # SPECTRA
 .execution/*.db
 .execution/*.db-*
@@ -128,7 +128,8 @@ jobs:
 .spectra/generation-plan/
 .spectra/verdicts/
 .spectra/dropped-tests.json
-# spectra-offered: .execution/*.db, .execution/*.db-*, .spectra.lock, .spectra/.pid, .spectra/.cancel, .spectra/id-allocator.lock, .spectra/id-allocator.json, .spectra/progress.json, .spectra/analysis.json, .spectra/generated.json, .spectra/updated.json, .spectra/criteria.json, .spectra/critic-verdict.json, .spectra/seam-progress.html, .spectra/skills-manifest.json, .spectra-result.json, .spectra-progress.html, .spectra/criteria.lock, .spectra/baseline.lock, .spectra/update-triage.json, .spectra/updates/, .spectra/repairs/, .spectra/generation-plan/, .spectra/verdicts/, .spectra/dropped-tests.json
+.spectra/reviews/
+# spectra-offered: .execution/*.db, .execution/*.db-*, .spectra.lock, .spectra/.pid, .spectra/.cancel, .spectra/id-allocator.lock, .spectra/id-allocator.json, .spectra/progress.json, .spectra/analysis.json, .spectra/generated.json, .spectra/updated.json, .spectra/criteria.json, .spectra/critic-verdict.json, .spectra/seam-progress.html, .spectra/skills-manifest.json, .spectra-result.json, .spectra-progress.html, .spectra/criteria.lock, .spectra/baseline.lock, .spectra/update-triage.json, .spectra/updates/, .spectra/repairs/, .spectra/generation-plan/, .spectra/verdicts/, .spectra/dropped-tests.json, .spectra/reviews/
 
 ### end
 ### .spectra-progress.html (<mask:size> bytes)
@@ -807,7 +808,7 @@ keeping its original `id`, following this schema:
     ".spectra/prompts/test-generation.md": "ef6791f9973be3d2eda2d28f3efb9856ac69f739627df70f0a619cedc03a99e9",
     ".spectra/prompts/test-update.md": "393ad4b782de7155dd093983ec3426164da8bfa318311ef36b6d7335b1c462a1",
     "profiles/_default.yaml": "2188c0eeb095ec2df7646dc735a676f0b5fa18bd143af36c0a0a986b7a54cfbd",
-    "CUSTOMIZATION.md": "045755afe624b6ee143b3afb503d55813f88119d54242a2a6ebbcf667948c6ce"
+    "CUSTOMIZATION.md": "106f18870de126ff36011d33c886dcb72ff6ce6ac80f92ccdb6be875624d24f3"
   }
 }
 ### end
@@ -858,7 +859,7 @@ keeping its original `id`, following this schema:
 ### .spectra/verdicts/critic-verdict-TC-105.json (187 bytes)
 {"verdict":"hallucinated","score":0.9,"critic_model":"claude-sonnet-4-6","findings":[{"element":"Step 2","claim":"1 KB = 1000 bytes","status":"hallucinated","reason":"contradicts docs"}]}
 ### end
-### CUSTOMIZATION.md (14555 bytes)
+### CUSTOMIZATION.md (14505 bytes)
 # SPECTRA Customization Guide
 
 This guide covers every way you can customize SPECTRA's behavior, from test case
@@ -1080,7 +1081,7 @@ Key settings include:
 This section controls how generation batches are sized and which model verifies the tests.
 
 > SPECTRA makes no model calls of its own, so there is no provider or model-routing config. The GitHub Copilot SDK
-> and `ai.providers` were removed in Spec 069; a config that still has them loads, and the keys are ignored.
+> and `ai.providers` were removed; a config that still has them loads, and the keys are ignored.
 > Generation and analysis run as ordinary turns in your own Claude Code session; the model is whatever your session is
 > using (`/model`). See [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) and the
 > [AI Models & Cost Guide](ai-models-cost-guide.md) for the history.
@@ -1102,7 +1103,7 @@ This section controls how generation batches are sized and which model verifies 
 - `generation.batch_size` is the most behaviors one generation batch holds (default 8, 1–50); the analysis's
   generation plan groups neighbouring doc sections into batches of this size.
 - `ai.generation_timeout_minutes` / `ai.analysis_timeout_minutes` are still accepted, but nothing reads them since the
-  in-process generator was removed (Spec 069).
+  in-process generator was removed.
 
 ---
 
@@ -1143,7 +1144,7 @@ This section controls how Claude Code interacts with the SPECTRA CLI.
 
 The relevant files are:
 - `.claude/skills/<name>/SKILL.md`, the authoring SKILL files (one per command group)
-- `.claude/skills/spectra-generate/reference.md` and `.claude/skills/spectra-update/reference.md` (Spec 101),
+- `.claude/skills/spectra-generate/reference.md` and `.claude/skills/spectra-update/reference.md`,
   material those two skills read only when needed (command tables, exit codes, examples); `update-skills`
   keeps an edited one, like any other file
 - `.claude/agents/*.agent.md`, the subagents (each runs in a fresh context; Claude Code reads only their
@@ -1205,7 +1206,7 @@ All user files are created by `spectra init` and tracked by
 
 ### "I want stricter verification"
 
-Edit `.spectra/prompts/critic-verification.md` to tighten verdict rules: `spectra ai compile-critic-prompt` builds the critic's instructions from it (Spec 102; before that the critic ignored a customised copy). To switch to a stronger critic model, set `ai.critic.model` (`spectra config ai.critic.model opus`) and run `spectra update-skills`, which writes it into `.claude/agents/spectra-critic.agent.md` — don't edit the agent's `model:` field by hand.
+Edit `.spectra/prompts/critic-verification.md` to tighten verdict rules: `spectra ai compile-critic-prompt` builds the critic's instructions from it (earlier versions ignored a customised copy). To switch to a stronger critic model, set `ai.critic.model` (`spectra config ai.critic.model opus`) and run `spectra update-skills`, which writes it into `.claude/agents/spectra-critic.agent.md` — don't edit the agent's `model:` field by hand.
 
 ### "I want the AI to focus on specific areas"
 

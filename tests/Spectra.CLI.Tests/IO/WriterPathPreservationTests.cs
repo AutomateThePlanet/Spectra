@@ -148,8 +148,19 @@ public sealed class WriterPathPreservationTests : IDisposable
 
         var written = ReadBack();
         Assert.False(written.Grounding!.FlaggedForReview);
+        // Spec 103: accept also records who reviewed it and when; the note stays (no new note given).
+        Assert.NotNull(written.Grounding.ReviewedBy);
+        Assert.NotNull(written.Grounding.ReviewedAt);
         TestCaseEquivalence.AssertEquivalent(
-            original with { Grounding = original.Grounding with { FlaggedForReview = false } },
+            original with
+            {
+                Grounding = original.Grounding with
+                {
+                    FlaggedForReview = false,
+                    ReviewedBy = written.Grounding.ReviewedBy,
+                    ReviewedAt = written.Grounding.ReviewedAt
+                }
+            },
             written,
             includeLayout: false);
         Assert.Equal(["  flagged_for_review: true"], LostLines(FullFieldTestCase.Markdown));

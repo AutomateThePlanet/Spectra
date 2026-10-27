@@ -48,6 +48,15 @@ public sealed class GroundingFrontmatter
     [YamlMember(Alias = "note")]
     public string? Note { get; set; }
 
+    [YamlMember(Alias = "reviewed_by")]
+    public string? ReviewedBy { get; set; }
+
+    [YamlMember(Alias = "reviewed_at")]
+    public string? ReviewedAt { get; set; }
+
+    [YamlMember(Alias = "reraise_suppressed_at")]
+    public string? ReraiseSuppressedAt { get; set; }
+
     /// <summary>
     /// Converts the frontmatter DTO to a GroundingMetadata record.
     /// Returns null if required fields are missing.
@@ -106,7 +115,10 @@ public sealed class GroundingFrontmatter
             CondensedFindings = MapFindings(),
             Source = Source,
             CreatedBy = CreatedBy,
-            Note = Note
+            Note = Note,
+            ReviewedBy = ReviewedBy,
+            ReviewedAt = ParseTimestamp(ReviewedAt),
+            ReraiseSuppressedAt = ParseTimestamp(ReraiseSuppressedAt)
         };
     }
 
@@ -115,10 +127,13 @@ public sealed class GroundingFrontmatter
         .Select(f => new CondensedFinding { Element = f.Element!, Reason = f.Reason ?? "" })
         .ToList();
 
-    private static DateTimeOffset ParseVerifiedAt(string? value) =>
+    private static DateTimeOffset ParseVerifiedAt(string? value) => ParseTimestamp(value) ?? DateTimeOffset.MinValue;
+
+    /// <summary>Spec 103: an optional ISO-8601 timestamp; null when absent or unparseable (never throws).</summary>
+    private static DateTimeOffset? ParseTimestamp(string? value) =>
         DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed)
             ? parsed
-            : DateTimeOffset.MinValue;
+            : null;
 
     private static bool TryParseVerdict(string value, out VerificationVerdict verdict)
     {

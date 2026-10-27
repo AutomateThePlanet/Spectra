@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Highlights
 
-What 2.5.0 and 2.6.0 (Specs 078–102) change for you, in short — the sections below have the detail:
+What 2.5.0 and 2.6.0 (Specs 078–103) change for you, in short — the sections below have the detail:
 
 - **Tests stay current when the docs change.** `spectra ai update-triage` tells you, without a model, which tests a doc
   change touches and why (LOAD, LIGHT, COSMETIC, REMOVED, RELINK, …), grouped by what changed; the `spectra-update`
@@ -31,6 +31,9 @@ What 2.5.0 and 2.6.0 (Specs 078–102) change for you, in short — the sections
 - **Faster** — each ingest reads the suite once; read-only commands parse less.
 - **Docs, help and agent guidance describe the product as it is** — no more `spectra ai generate` or
   `--extract-criteria` anywhere you are told to run something (Spec 100).
+- **A durable human review record.** `review-flagged --action accept|feedback|delete` records who reviewed a flagged
+  test, when and why in its grounding block; the record survives re-verification and repair, and a fresh review
+  quiets the next `partial` re-raise once.
 
 ### Changed (Spec 079)
 
@@ -727,6 +730,40 @@ Fewer tokens per authoring run; only what the critic sees and how the skills and
   Key rule to one line (its explanation is in `reference.md`) to stay under the 16,000-character budget.
 - **Docs:** `customization.md` says the critic template is used and that the critic model is `ai.critic.model`
   (rendered by `init` / `update-skills`), not an edit to the agent's `model:` field.
+
+### Added (Spec 103 — human review record; Oleg Kuzmanov's `078-human-review-record` branch, renumbered)
+
+- **A durable review record.** `review-flagged --action accept|feedback|delete --test <id> [--note "…"] [--reviewer "…"]`
+  runs one action non-interactively. `accept` and `feedback` write `reviewed_by` (git `user.name`, else the OS user),
+  `reviewed_at` and the note into the grounding block; the critic's verdict and score are never changed. `feedback`
+  is the only action on an unflagged test, and raises it (a test the critic was confident about can be challenged).
+  `accept` and `delete` refuse an unflagged test (`NOT_FLAGGED`), a hand-written (`manual`) or `hallucinated` block,
+  and a note with an unrepresentable control character, before anything is written.
+- **The record survives verification.** Every grounding write carries `reviewed_by`, `reviewed_at`, `note`, `source`
+  and `created_by` forward. A review newer than the test's last verification suppresses the next `partial` re-raise
+  once (`reraise_suppressed_at`); a flag a reviewer raised stays until `accept` or a changed verdict.
+- **`ingest-grounding --all --re-verify`** rewrites grounded tests that have a newer verdict file, so preservation and
+  suppression happen in the real flow. Its JSON gains the review counts only when it runs or a review is involved.
+- **`feedback --fix`** records the review and prints the repair chain; `compile-repair-prompt --feedback "…"` /
+  `--feedback-from-review` put the reviewer's objection in the repair prompt.
+- **Visibility.** `review-flagged` lists the review record and a `suppressed` array; `audit-grounding` adds
+  `reviewed_by`, `reviewed_at`, `note`, `reraise_suppressed_at`, `review_stale`, `inconsistent` per test and
+  `reviewed`, `reraises_suppressed`, `reviews_stale` counts (omitted at 0).
+
+### Fixed (Spec 103 — merge into the integration branch and review fixes)
+
+- **A `feedback --fix` review survives the repair.** The repair's `ingest-update` drops the critic block (Spec 090) and
+  the review with it; the review is now staged in `.spectra/reviews/<suite>/<id>.json` and the chain's final
+  `ingest-grounding` writes it to the new block. The chain uses `--from .spectra/repaired.json --keep-baseline`.
+- **A re-ingested verdict is not a verification pass.** `--re-verify` rewrites a grounded test only from a verdict file
+  written after its `verified_at`; re-ingesting the same verdict used to move `verified_at` past the review and spend
+  its suppression. A re-verified `partial` is written without `--repaired` (which also needs `--ids`, Spec 091).
+- **`feedback --fix` works on a `grounded` test.** `compile-repair-prompt` refused a grounded verdict and empty
+  findings; reviewer feedback alone is now something to repair.
+- **`feedback --all --fix` is refused** (`BULK_FIX_REFUSED`): it flagged every test and printed no chain.
+- **Review actions find the test through the suite index** (`<id>.md` when it isn't indexed).
+- **`action_needed` is unchanged** (no new `reviewed` value), so `audit-grounding --action` and the skills keep working.
+- The SDK bump in that branch (`global.json` 10.0.101, CI on 8.0.x + 10.0.x) was left out.
 
 ### Fixed (merge into main)
 
