@@ -23,7 +23,8 @@ namespace Spectra.CLI.Tests.Golden;
 /// fixtures. Spec 102 re-captured <c>files.txt</c> once more for its one <c>CUSTOMIZATION.md</c> sentence (the critic
 /// template is used; the critic model is <c>ai.critic.model</c>); every command output stayed byte-identical. Spec 103
 /// re-captured it for one new <c>.gitignore</c> entry (<c>.spectra/reviews/</c>); every command output stayed
-/// byte-identical.</para>
+/// byte-identical. The merge of main re-captured it for main's <c>CUSTOMIZATION.md</c> rewording (spec numbers
+/// dropped from user docs); every command output stayed byte-identical.</para>
 /// </remarks>
 [Collection(CriteriaCommandsCollection.Name)]
 public sealed class GoldenOutputTests : IDisposable

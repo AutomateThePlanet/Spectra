@@ -72,7 +72,8 @@ Behavior analysis applies six **ISTQB test design techniques** systematically (E
 ### Grounding Verification
 
 Every generated or edited test is verified by the `spectra-critic` subagent (on its own model, `ai.critic.model`)
-against the source documentation. Hallucinated steps are caught and rejected; partial tests get one repair.
+against the source documentation. Hallucinated steps are caught and rejected; partial tests get one repair. The
+critic reads only the doc sections each test cites, so verification stays cheap on large documentation sets.
 
 ### Keeping Tests Current When Docs Change
 

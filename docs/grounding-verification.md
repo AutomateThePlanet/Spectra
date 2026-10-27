@@ -20,14 +20,14 @@ When AI generates test cases, it can hallucinate, inventing steps, expected resu
 
 1. **Generator** creates draft test cases from your documentation
 2. **Critic** verifies each test case against the same docs. The critic runs in a fresh, isolated
-   subagent context, so it sees only the test artifact and the source text it cites (Spec 101: the cited
+   subagent context, so it sees only the test artifact and the source text it cites (the cited
    sections; `compile-critic-prompt --full-docs` gives whole documents),
    never the generator's prompt, reasoning, tool calls, or token usage. Its instructions are the
-   `critic-verification` prompt template (customise `.spectra/prompts/critic-verification.md`; Spec 102).
+   `critic-verification` prompt template (customise `.spectra/prompts/critic-verification.md`).
 3. Test cases receive a verdict: `grounded`, `partial`, or `hallucinated`
 4. Only grounded and partial test cases are written to disk
 5. A partial test gets one repair attempt. Only a repair that changed the test is judged again; a repair that left
-   it unchanged keeps the verdict it already has (Spec 102), which routes it as before
+   it unchanged keeps the verdict it already has, which routes it as before
 
 ### Advisory verdict, fail-loud damage
 
