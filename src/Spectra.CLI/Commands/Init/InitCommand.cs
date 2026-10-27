@@ -35,12 +35,25 @@ public static class InitCommand
             getDefaultValue: () => false,
             description: "Skip creation of SKILL and agent files");
 
+        // Spec 104: install for other AI agents too. Omitted → Claude Code, exactly as before.
+        var agentOption = new Option<string?>(
+            name: "--agent",
+            description: "AI agents to install SPECTRA for, comma-separated: " + string.Join(", ", Install.AgentSelection.Names)
+                + " (aliases: windsurf → devin, agy → antigravity), or auto to detect. Default: claude");
+
+        var regenerateOption = new Option<bool>(
+            name: "--regenerate",
+            getDefaultValue: () => false,
+            description: "With --agent: overwrite agent files you edited since SPECTRA wrote them");
+
         var command = new Command("init", "Initialize SPECTRA in this repository")
         {
             forceOption,
             interactiveOption,
             noInteractiveOption,
-            skipSkillsOption
+            skipSkillsOption,
+            agentOption,
+            regenerateOption
         };
 
         command.SetHandler(async (InvocationContext context) =>
@@ -72,7 +85,25 @@ public static class InitCommand
             var logger = LoggingSetup.CreateLogger<InitHandler>(verbosity);
             var handler = new InitHandler(logger, interactive: isInteractive, outputFormat: outputFormat);
 
-            context.ExitCode = await handler.HandleAsync(force, skipSkills, context.GetCancellationToken());
+            var agent = context.ParseResult.GetValueForOption(agentOption);
+            if (agent is null)
+            {
+                context.ExitCode = await handler.HandleAsync(force, skipSkills, context.GetCancellationToken());
+                if (context.ExitCode == ExitCodes.Success)
+                {
+                    Console.Error.WriteLine(
+                        $"[spectra init] Installed for Claude Code. Other agents: spectra init --agent <{Install.AgentSelection.OthersList}> (comma-separated).");
+                }
+
+                return;
+            }
+
+            var output = outputFormat == OutputFormat.Json ? Console.Error : Console.Out;
+            context.ExitCode = await Install.AgentInitRunner.RunAsync(
+                handler, Directory.GetCurrentDirectory(), agent, force, skipSkills,
+                context.ParseResult.GetValueForOption(regenerateOption),
+                context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption),
+                output, Console.Error, context.GetCancellationToken());
         });
 
         return command;

@@ -40,8 +40,10 @@ public sealed class InitHandler
     /// Initializes SPECTRA in the current directory.
     /// </summary>
     /// <param name="force">Overwrite existing configuration if true</param>
+    /// <param name="installClaude">Spec 104: false when <c>--agent</c> leaves Claude out — skips only the Claude files
+    /// (<c>.claude/skills</c>, <c>.claude/agents</c>, <c>.claude/settings.json</c>); everything else is unchanged.</param>
     /// <returns>Exit code</returns>
-    public async Task<int> HandleAsync(bool force, bool skipSkills = false, CancellationToken ct = default)
+    public async Task<int> HandleAsync(bool force, bool skipSkills = false, CancellationToken ct = default, bool installClaude = true)
     {
         try
         {
@@ -64,7 +66,10 @@ public sealed class InitHandler
             if (!skipSkills)
             {
                 // Create bundled SKILL files (incl. the execution skill under .claude/skills/)
-                await CreateBundledSkillFilesAsync(force, ct);
+                if (installClaude)
+                {
+                    await CreateBundledSkillFilesAsync(force, ct);
+                }
 
                 // Create offline usage guide (USAGE.md)
                 await CreateUsageGuideAsync(force, ct);
@@ -80,7 +85,10 @@ public sealed class InitHandler
             await CreateDeployWorkflowAsync(ct);
 
             // Emit .claude/settings.json with spectra CLI + .spectra/ write permissions
-            await Skills.ClaudeSettingsInstaller.EnsureInstalledAsync(_workingDirectory, ct);
+            if (installClaude)
+            {
+                await Skills.ClaudeSettingsInstaller.EnsureInstalledAsync(_workingDirectory, ct);
+            }
 
             // Update .gitignore
             await UpdateGitIgnoreAsync(ct);
@@ -96,7 +104,10 @@ public sealed class InitHandler
             _logger.LogInformation("  - {ConfigPath}", ConfigFileName);
             _logger.LogInformation("  - {DocsDir}/", DocsDir);
             _logger.LogInformation("  - {TestsDir}/", TestsDir);
-            _logger.LogInformation("  - .claude/skills/spectra-execute/SKILL.md");
+            if (installClaude)
+            {
+                _logger.LogInformation("  - .claude/skills/spectra-execute/SKILL.md");
+            }
             _logger.LogInformation("  - {WorkflowPath}", DeployWorkflowPath);
             _logger.LogInformation("");
             _logger.LogInformation("  - {TemplatePath}", BugReportTemplatePath);
