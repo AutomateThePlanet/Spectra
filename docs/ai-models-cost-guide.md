@@ -61,12 +61,13 @@ tests per turn); fewer, larger turns cost less overhead than many small ones, at
 longer single response.
 
 The critic is different: it always runs as a subagent (`.claude/agents/spectra-critic.agent.md`
-in your project, seeded from SPECTRA's bundled copy), invoked once per generated test — since Spec 101 by
+in your project, seeded from SPECTRA's bundled copy), invoked once per generated test — by
 the generator, updater or repairer subagent that wrote the test. Each critic call starts from a clean,
 isolated context (just the test artifact + the sections it cites), so it doesn't grow your main session's context window, but each call still counts as
-normal Claude Code usage. The critic's model is a static `model:` field in that agent file (shipped
-as `claude-sonnet-4-6`); there is no `spectra.config.json` knob for it anymore, so edit the agent
-file directly (and re-apply your edit after `spectra update-skills` if you've customized it).
+normal Claude Code usage. The critic's model is `ai.critic.model` in `spectra.config.json` (default
+`sonnet`; an alias, a model id, or `inherit` for your session's model). `spectra init` and
+`spectra update-skills` write it into the agent file's `model:` line, so change the config and run
+`spectra update-skills` rather than editing the agent file.
 
 ---
 

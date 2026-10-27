@@ -42,7 +42,7 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 |----------|------|---------|-------------|
 | `mode` | string | `"local"` | Source mode; `local` is the only working value |
 | `local_dir` | string | `"docs/"` | Path to documentation directory |
-| `space_name` | string | — | Accepted and ignored — the Copilot Spaces lookup was removed in Spec 070 |
+| `space_name` | string | — | Accepted and ignored — the Copilot Spaces lookup was removed |
 | `doc_index_dir` | string | `"docs/_index"` | Directory containing the v2 index layout (`_manifest.yaml`, `_checksums.json`, `groups/{suite}.index.md`). |
 | `doc_index` | string | — | Legacy single-file path. Used only by the auto-migrator on first run after upgrading. New writes always use `doc_index_dir`. |
 | `group_overrides` | object | `{}` | Per-document suite overrides: `{ "docs/path.md": "suite-id" }`. Consulted after frontmatter overrides and before the directory-default rule. |
@@ -63,7 +63,7 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 > `ai.providers` and the in-process critic were removed entirely along with the GitHub Copilot SDK.
 > SPECTRA makes no model calls of its own. Generation and analysis run as ordinary turns in your
 > interactive Claude Code session, and the critic runs as the `spectra-critic` subagent, on the model
-> `ai.critic.model` names (Spec 097, below). There is nothing left here to route to a provider or pick a
+> `ai.critic.model` names (see below). There is nothing left here to route to a provider or pick a
 > generator model; a legacy config with `ai.providers` or old `ai.critic.*` keys still loads (those keys
 > are ignored).
 > See [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) and the
@@ -81,11 +81,11 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `critic.model` | string | `sonnet` | Spec 097: the model the `spectra-critic` subagent runs on — an alias (`sonnet`, `opus`, `haiku`), a model id, or `inherit` (the session's model). One word that starts with a letter or digit (letters, digits, `.`, `-`, `_`, `:`, `[`, `]`). Spec 098: anything else is ignored with a warning and `sonnet` is used — never `CONFIG_INVALID`. Optional (missing → `sonnet`). |
-| `generation_timeout_minutes` | int | `5` | Accepted; nothing reads it since the in-process generator was removed (Spec 069). |
-| `analysis_timeout_minutes` | int | `2` | Accepted; nothing reads it since the in-process analysis was removed (Spec 069). |
+| `critic.model` | string | `sonnet` | The model the `spectra-critic` subagent runs on — an alias (`sonnet`, `opus`, `haiku`), a model id, or `inherit` (the session's model). One word that starts with a letter or digit (letters, digits, `.`, `-`, `_`, `:`, `[`, `]`). Anything else is ignored with a warning and `sonnet` is used — never `CONFIG_INVALID`. Optional (missing → `sonnet`). |
+| `generation_timeout_minutes` | int | `5` | Accepted; nothing reads it since the in-process generator was removed. |
+| `analysis_timeout_minutes` | int | `2` | Accepted; nothing reads it since the in-process analysis was removed. |
 
-`ai.generation_batch_size` is read by nothing (Spec 096): the batch size is `generation.batch_size` (see below). An
+`ai.generation_batch_size` is read by nothing: the batch size is `generation.batch_size` (see below). An
 existing config that still has it loads as before; `spectra init` no longer writes it.
 
 To choose a model, pick it the same way you'd pick a model for any other Claude Code work
@@ -94,13 +94,13 @@ To choose a model, pick it the same way you'd pick a model for any other Claude 
 [AI Models & Cost Guide](ai-models-cost-guide.md#choosing-a-session-model) for guidance on
 Haiku/Sonnet/Opus trade-offs.
 
-The critic model is `ai.critic.model` (Spec 097). `spectra init` and `spectra update-skills` write it into the
+The critic model is `ai.critic.model`. `spectra init` and `spectra update-skills` write it into the
 `model:` frontmatter field of `.claude/agents/spectra-critic.agent.md`, which is what Claude Code reads. After changing
 the key, run `spectra update-skills`: an unedited agent file is rewritten with the new model, an edited one is never
 overwritten (it is reported as customized). By default the critic runs on `sonnet`, independent of the model your
 session generates with (dual-model verification); `inherit` makes it use the session's model. `update-skills` never fails
 because of the config: when it is invalid, it warns, keeps the agent's installed model and refreshes everything else.
-An invalid `ai.critic.model` alone (Spec 098) doesn't make the config invalid: `update-skills` warns
+An invalid `ai.critic.model` alone doesn't make the config invalid: `update-skills` warns
 `ai.critic.model <value> is not valid (…); using sonnet` and installs `sonnet`.
 
 #### `.spectra-debug.log` — no longer tracks per-call AI timing
@@ -124,7 +124,7 @@ Grounding verification runs as the `spectra-critic` subagent (`.claude/agents/sp
 `ai.critic.model` (above); its timeout and concurrency come from how Claude Code itself schedules subagent calls, not
 from `spectra.config.json`.
 
-**Legacy blocks (Spec 098).** Workspaces created before Spec 069 still carry the in-process critic's block — the v1.45
+**Legacy blocks.** Workspaces created while the critic still ran in-process still carry its block — the v1.45
 template wrote `{"enabled": true, "provider": "github-models", "model": "gpt-5-mini"}`, later templates
 `{"enabled": true, "model": "claude-sonnet-4-6", "max_concurrent": 1}`. Its `model` named a provider model, not a Claude
 Code one. So an `ai.critic` block with **any** of the retired keys `provider`, `api_key_env`, `base_url`, `enabled`,
@@ -141,10 +141,10 @@ No command ever fails because of `ai.critic` (a non-object block or a non-string
 |----------|------|---------|-------------|
 | `default_count` | int | `15` | Default number of test cases to generate |
 | `require_review` | bool | `true` | Require interactive review before writing |
-| `duplicate_threshold` | double | `0.6` | Similarity threshold for duplicate detection. (Spec 095 also used it for coverage; Spec 098 moved that to `coverage_threshold`. For one release, a config without `coverage_threshold` whose `duplicate_threshold` is not 0.6 keeps using it for coverage, with a notice asking to set `coverage_threshold`.) |
-| `coverage_threshold` | double | `0.6` | Spec 098: the analysis coverage threshold — a behaviour whose title is at least this similar to an existing test's title counts as already covered and is not generated. Optional (missing or `null` → 0.6); valid 0–1 (`CONFIG_INVALID` outside); outside (0, 1] the analysis warns (0 = every behaviour covered). |
+| `duplicate_threshold` | double | `0.6` | Similarity threshold for duplicate detection. (Earlier versions also used it for coverage; that is now `coverage_threshold`. For one release, a config without `coverage_threshold` whose `duplicate_threshold` is not 0.6 keeps using it for coverage, with a notice asking to set `coverage_threshold`.) |
+| `coverage_threshold` | double | `0.6` | The analysis coverage threshold — a behaviour whose title is at least this similar to an existing test's title counts as already covered and is not generated. Optional (missing or `null` → 0.6); valid 0–1 (`CONFIG_INVALID` outside); outside (0, 1] the analysis warns (0 = every behaviour covered). |
 | `categories` | string[] | `["happy_path", "negative", "boundary", "integration"]` | Test case categories to generate |
-| `batch_size` | int | `8` | Spec 094: at most this many behaviors per generation batch in the analysis's generation plan. Optional; valid 1–50 (`CONFIG_INVALID` outside). |
+| `batch_size` | int | `8` | At most this many behaviors per generation batch in the analysis's generation plan. Optional; valid 1–50 (`CONFIG_INVALID` outside). |
 
 ## `analysis` — Behavior Analysis Categories
 

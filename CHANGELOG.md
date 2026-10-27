@@ -5,11 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.6.0] - 2026-09-29 — Stable acceptance-criteria identity
+## [2.6.0] - 2026-10-27 — Doc-change update workflow, stable criteria IDs, lower token use
 
 ### Highlights
 
-What 2.5.0 and 2.6.0 (Specs 078–100) change for you, in short — the sections below have the detail:
+What 2.5.0 and 2.6.0 (Specs 078–102) change for you, in short — the sections below have the detail:
 
 - **Tests stay current when the docs change.** `spectra ai update-triage` tells you, without a model, which tests a doc
   change touches and why (LOAD, LIGHT, COSMETIC, REMOVED, RELINK, …), grouped by what changed; the `spectra-update`
@@ -23,6 +23,9 @@ What 2.5.0 and 2.6.0 (Specs 078–100) change for you, in short — the sections
   written only for the tests the critic confirmed; `audit-grounding` says exactly what each test still needs.
 - **Smaller conversations.** Generation, updates and criteria extraction run in subagents, and generation works in
   section-sized batches that skip behaviours your tests already cover.
+- **Lower token use.** The critic reads only the doc sections a test cites (not whole documents, which used to be cut
+  off at 8,000 characters) and runs inside the subagents; the skills stay under 16k characters, with the detail moved
+  to `reference.md`. The critic now uses its prompt template, so its ISTQB and arithmetic checks apply again.
 - **Safer workspace commands** — `update-skills` never overwrites a file you edited, `suite delete` and `delete` clean
   up dependents and leftovers, `validate` fails on unparseable tests.
 - **Faster** — each ingest reads the suite once; read-only commands parse less.
@@ -724,6 +727,23 @@ Fewer tokens per authoring run; only what the critic sees and how the skills and
   Key rule to one line (its explanation is in `reference.md`) to stay under the 16,000-character budget.
 - **Docs:** `customization.md` says the critic template is used and that the critic model is `ai.critic.model`
   (rendered by `init` / `update-skills`), not an edit to the agent's `model:` field.
+
+### Fixed (merge into main)
+
+- **Linux:** `ingest-criteria` and `compile-extraction-prompt` accept a Windows-style `--doc docs\file.md` (the path
+  is normalised before the file is read, so the doc hash is recorded and `docs changed` sees it as unchanged).
+- **Linux:** a source ref that is an absolute path to a real file outside the repository and the source directory is
+  reported as outside the allowed roots, not as missing (Windows already did this).
+- **Build:** NuGet vulnerability-audit warnings (NU1901–NU1904) stay warnings in Release, so a local
+  `dotnet build -c Release` no longer fails on the ImageSharp 3.1.12 advisories, which have no patched release yet.
+- **Tests:** git fixtures set the author identity through the environment, so submodule tests pass on CI runners
+  without a global git identity.
+
+### Changed (dependencies)
+
+- Microsoft.Data.Sqlite and Microsoft.Extensions.Logging 10.0.14, YamlDotNet 17.1.0, Spectre.Console 0.55.2,
+  Markdig 1.2.0; test SDK 18.11.0 and coverlet 10.1.0. Versions are aligned across all projects. Dependabot now groups
+  NuGet minor/patch and GitHub Actions updates.
 
 ### Notes
 
