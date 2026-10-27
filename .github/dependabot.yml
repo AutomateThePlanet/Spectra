@@ -11,9 +11,9 @@ updates:
     ignore:
       # 2.0 is a breaking API change from the beta in use; migrate deliberately, not via a bump
       - dependency-name: "System.CommandLine"
-      # 4.x requires a Six Labors commercial license key to build
+      # 3.2+ and 4.x require a Six Labors commercial license key to build; stay on 3.1.x patches
       - dependency-name: "SixLabors.ImageSharp"
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       # 4.x targets xunit v3; the test projects are on xunit v2
       - dependency-name: "xunit.runner.visualstudio"
         update-types: ["version-update:semver-major"]
