@@ -8,6 +8,15 @@ updates:
     groups:
       nuget-minor-patch:
         update-types: [minor, patch]
+    ignore:
+      # 2.0 is a breaking API change from the beta in use; migrate deliberately, not via a bump
+      - dependency-name: "System.CommandLine"
+      # 4.x requires a Six Labors commercial license key to build
+      - dependency-name: "SixLabors.ImageSharp"
+        update-types: ["version-update:semver-major"]
+      # 4.x targets xunit v3; the test projects are on xunit v2
+      - dependency-name: "xunit.runner.visualstudio"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
