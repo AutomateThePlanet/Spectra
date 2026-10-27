@@ -17,6 +17,7 @@ public static class SpectraGitIgnore
     private const string GenerationPlan = ".spectra/generation-plan/";
     private const string Verdicts = ".spectra/verdicts/";
     private const string Dropped = ".spectra/dropped-tests.json";
+    private const string Reviews = ".spectra/reviews/";
 
     /// <summary>Spec 096 (FR-009): the prefix of an offered-marker line.</summary>
     public const string MarkerPrefix = "# spectra-offered:";
@@ -56,6 +57,8 @@ public static class SpectraGitIgnore
         // Spec 096 (FR-008): critic verdicts and fingerprint records (Spec 071/090), and the drop trail (Spec 071).
         Verdicts,
         Dropped,
+        // Spec 103: reviews staged by `review-flagged --action feedback --fix` (scratch, consumed by ingest-grounding).
+        Reviews,
     ];
 
     /// <summary>
@@ -64,7 +67,8 @@ public static class SpectraGitIgnore
     /// pre-090 workspace is offered those too.
     /// </summary>
     public static IReadOnlyList<string> Pre090Offered { get; } =
-        Patterns.Where(p => p is not Updates and not Repairs and not GenerationPlan and not Verdicts and not Dropped).ToList();
+        Patterns.Where(p => p is not Updates and not Repairs and not GenerationPlan and not Verdicts and not Dropped
+            and not Reviews).ToList();
 
     /// <summary>Spec 096 (FR-009): every pattern named by a <c># spectra-offered:</c> line.</summary>
     public static IReadOnlyList<string> Marked(IEnumerable<string> lines) =>

@@ -45,3 +45,7 @@ TestResults/
 node_modules/
 dist/
 .next/
+
+# Visual Studio / editor scratch (spec 103 setup verification)
+.vs/
+*.tmp

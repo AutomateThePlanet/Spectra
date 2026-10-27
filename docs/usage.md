@@ -448,6 +448,51 @@ spectra ai audit-grounding --suite smoke --action ground,repair,review --output-
 generate with. Set it in `spectra.config.json` (an alias such as `opus`, a model id, or `inherit` for your session's
 model) and run `spectra update-skills`; an agent file you edited by hand is never overwritten.
 
+### The human review record
+
+Every reviewer action records **who** looked at the test and **when** in its `grounding:` block, so it is committed
+to git and visible to anyone who opens the file (Spec 103):
+
+```bash
+# Approve, with the reasoning attached
+spectra ai review-flagged --suite smoke --action accept --test TC-142 \
+  --note "Confirmed the refund interval against the support runbook."
+
+# Raise a concern on a test the critic was confident about
+spectra ai review-flagged --suite smoke --action feedback --test TC-151 \
+  --note "Step 2 references a loyalty tier field that does not exist in the checkout UI."
+
+# ...and ask for it to be fixed: prints the repair chain for the skill to drive
+spectra ai review-flagged --suite smoke --action feedback --test TC-151 --note "..." --fix
+```
+
+```yaml
+grounding:
+  verdict: partial            # unchanged: the critic's assessment stays the critic's
+  score: 0.72                 # unchanged
+  reviewed_by: Oleg Kuzmanov
+  reviewed_at: 2026-08-28T10:15:00Z
+  note: "Confirmed the refund interval against the support runbook."
+```
+
+`reviewed_by` is a name (git `user.name`, else the OS user name); `--reviewer` overrides it. `feedback` is the only
+action valid on an unflagged test; `accept` and `delete` refuse one with `NOT_FLAGGED`. `--fix` works on one test, and
+the reviewer's note becomes part of the repair prompt, so a test the critic marked `grounded` can be repaired too.
+
+**Re-verification keeps the record.** `ingest-grounding --all --re-verify` rewrites grounded tests that have a new
+verdict, carrying the review record forward. If the review is newer than the test's last verification and the new
+verdict is `partial`, the re-raise is suppressed once (`reraise_suppressed_at`); the next new verdict re-raises. A flag
+you raised with `feedback` stays until you `accept` it or the verdict changes.
+
+```bash
+spectra ai review-flagged --suite smoke --no-interaction --output-format json  # flagged + suppressed arrays
+spectra ai audit-grounding --suite smoke                                       # reviewed / suppressed / reviews-stale
+```
+
+Suppressed tests are unflagged, so they appear in the listing's separate `suppressed` array. `audit-grounding` keeps
+`action_needed` as before and adds `reviewed_by`, `reviewed_at`, `note`, `reraise_suppressed_at` and `review_stale` per
+test, plus `reviewed`, `reraises_suppressed` and `reviews_stale` counts.
+
 ---
 
 ## Executing Tests

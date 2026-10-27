@@ -41,6 +41,7 @@ public sealed class IngestGroundingCommand : Command
     internal const string TestWithAllMessage = "Use either --test <id> or --all, not both.";
     internal const string IdsWithoutAllMessage = IdList.IdsWithoutAllMessage;
     internal const string NeitherMessage = "Either --test <id> or --all must be specified.";
+    internal const string ReVerifyWithoutAllMessage = "--re-verify works with --all only.";
     private const int ExitVerdictEmpty = 5;
     private const int ExitVerdictParseFailed = 6;
 
@@ -54,6 +55,10 @@ public sealed class IngestGroundingCommand : Command
         var repairedFlag = new Option<bool>("--repaired", "Mark test as repaired (sets repaired: true in the grounding block)");
         var repairAttemptsOption = new Option<int>("--repair-attempts", () => 0, "Number of repair attempts performed");
         var idsOption = new Option<string?>("--ids", "With --all: only these tests (comma-separated); required with --all --repaired (Spec 091)");
+        // Spec 103 (FR-003/FR-010): without it the batch skips every grounded test, so a second verification pass writes
+        // nothing: the review record is never carried forward and suppression never fires. The default skip stays.
+        var reVerifyFlag = new Option<bool>("--re-verify",
+            "With --all: also rewrite grounded tests that have a newer verdict, keeping the review record (Spec 103)");
 
         AddOption(suiteOption);
         AddOption(testOption);
@@ -62,6 +67,7 @@ public sealed class IngestGroundingCommand : Command
         AddOption(repairedFlag);
         AddOption(repairAttemptsOption);
         AddOption(idsOption);
+        AddOption(reVerifyFlag);
 
         this.SetHandler(async (context) =>
         {
@@ -76,6 +82,7 @@ public sealed class IngestGroundingCommand : Command
             var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
             var json = outputFormat == OutputFormat.Json;
             var dryRun = context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption);
+            var reVerify = context.ParseResult.GetValueForOption(reVerifyFlag);
 
             // Spec 091 (FR-006a, FR-007): argument checks, in order, before any config, index or verdict is read.
             if (all && !string.IsNullOrEmpty(testId))
@@ -93,6 +100,11 @@ public sealed class IngestGroundingCommand : Command
                 Console.Error.WriteLine(NeitherMessage);
                 context.ExitCode = ExitError;
             }
+            else if (reVerify && !all)
+            {
+                Console.Error.WriteLine(ReVerifyWithoutAllMessage);
+                context.ExitCode = ExitError;
+            }
             else if (!all && dryRun)
             {
                 // Spec 097 (FR-018): a dry run never writes, and only the batch form supports it.
@@ -108,7 +120,7 @@ public sealed class IngestGroundingCommand : Command
             else if (all)
             {
                 context.ExitCode = await RunBatchAsync(
-                    suite, repaired, repairAttempts, idsGiven ? ids : null, json, dryRun, context.GetCancellationToken());
+                    suite, repaired, repairAttempts, idsGiven ? ids : null, reVerify, json, dryRun, context.GetCancellationToken());
             }
             else
             {
@@ -121,7 +133,8 @@ public sealed class IngestGroundingCommand : Command
     internal static IReadOnlyList<string> ParseIds(string? value) => IdList.Parse(value);
 
     private static async Task<int> RunBatchAsync(
-        string suite, bool repaired, int repairAttempts, IReadOnlyList<string>? ids, bool json, bool dryRun, CancellationToken ct)
+        string suite, bool repaired, int repairAttempts, IReadOnlyList<string>? ids, bool reVerify, bool json, bool dryRun,
+        CancellationToken ct)
     {
         var currentDir = Directory.GetCurrentDirectory();
         var testsDir = await ResolveTestsDirAsync(currentDir, ct);
@@ -145,7 +158,7 @@ public sealed class IngestGroundingCommand : Command
         var verdictDir = Path.Combine(currentDir, ".spectra", "verdicts");
         if (!Directory.Exists(verdictDir))
         {
-            EmitBatchResult(json, dryRun, suite, 0, 0, 0, 0, [], [], [], notFound);
+            EmitBatchResult(json, dryRun, suite, 0, 0, 0, 0, [], [], [], notFound, reVerify, [], 0, 0);
             return ExitSuccess;
         }
 
@@ -155,6 +168,10 @@ public sealed class IngestGroundingCommand : Command
         var manual = new List<string>();
         var stale = new List<string>();
         var hallucinated = new List<string>();
+        // Spec 103 (FR-011): a withheld re-raise is reported by id, never silent.
+        var suppressed = new List<string>();
+        int reviewRecordsPreserved = 0, reviewsApplied = 0;
+        var pendingReviews = new PendingReviewStore(currentDir);
 
         var verdictFiles = Directory.GetFiles(verdictDir, "critic-verdict-*.json").OrderBy(f => f);
         foreach (var vf in verdictFiles)
@@ -191,8 +208,11 @@ public sealed class IngestGroundingCommand : Command
                 continue;
             }
 
-            // Idempotent: skip tests whose .md already has a grounding block
-            if (existing?.Grounding is not null)
+            // Idempotent: skip tests whose .md already has a grounding block. Spec 103: --re-verify rewrites one only for
+            // a verdict written after its verified_at. Re-ingesting a verdict already written is not a verification
+            // pass, and would otherwise move verified_at past the review and spend its suppression.
+            var previouslyGrounded = existing?.Grounding is not null;
+            if (previouslyGrounded && (!reVerify || !IsNewerVerdict(vf, existing!.Grounding!.VerifiedAt)))
             {
                 skippedAlreadyWritten++;
                 continue;
@@ -222,21 +242,52 @@ public sealed class IngestGroundingCommand : Command
             }
 
             // Pre-repair filter: without --repaired, skip partial verdicts.
-            // Partial tests need one repair attempt before their grounding block is written.
-            if (!repaired && string.Equals(verdictStr, "partial", StringComparison.OrdinalIgnoreCase))
+            // Partial tests need one repair attempt before their grounding block is written. Spec 103: a re-verified test
+            // is past that stage; its partial verdict is written, which is what re-raises (or suppresses) it.
+            if (!repaired && !(reVerify && previouslyGrounded)
+                && string.Equals(verdictStr, "partial", StringComparison.OrdinalIgnoreCase))
             {
                 skippedPartialPreRepair++;
                 continue;
             }
 
             // Write grounding block — reuses same service as per-test mode (no code duplication)
-            var result = await service.WriteAsync(testFilePath, verdictJson, repairAttempts, repaired, ct, dryRun);
-            if (result.IsSuccess) written++;
+            var pending = await pendingReviews.LoadAsync(suite, testId, ct);
+            var result = await service.WriteAsync(
+                testFilePath, verdictJson, repairAttempts, repaired, ct, dryRun, pendingReview: pending);
+            if (result.IsSuccess)
+            {
+                written++;
+                if (result.ReraiseSuppressed) suppressed.Add(testId);
+                if (result.ReviewRecordPreserved) reviewRecordsPreserved++;
+                if (result.PendingReviewApplied)
+                {
+                    reviewsApplied++;
+                    if (!dryRun) pendingReviews.Remove(suite, testId);
+                }
+            }
             else errors++;
         }
 
-        EmitBatchResult(json, dryRun, suite, written, skippedAlreadyWritten, skippedPartialPreRepair, errors, manual, stale, hallucinated, notFound);
+        EmitBatchResult(json, dryRun, suite, written, skippedAlreadyWritten, skippedPartialPreRepair, errors, manual, stale,
+            hallucinated, notFound, reVerify, suppressed, reviewRecordsPreserved, reviewsApplied);
         return ExitSuccess;
+    }
+
+    /// <summary>
+    /// Spec 103: whether the verdict file was written after <paramref name="verifiedAt"/> (the block's last ingest), i.e.
+    /// the critic ran again. A file whose time can't be read counts as newer.
+    /// </summary>
+    private static bool IsNewerVerdict(string verdictPath, DateTimeOffset verifiedAt)
+    {
+        try
+        {
+            return File.GetLastWriteTimeUtc(verdictPath) > verifiedAt.UtcDateTime;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
     }
 
     /// <summary>The verdict string of a critic JSON, or null when it can't be parsed.</summary>
@@ -259,11 +310,12 @@ public sealed class IngestGroundingCommand : Command
     private static void EmitBatchResult(bool json, bool dryRun, string suite, int written,
         int skippedAlreadyWritten, int skippedPartialPreRepair, int errors,
         IReadOnlyList<string> manual, IReadOnlyList<string> stale, IReadOnlyList<string> hallucinated,
-        IReadOnlyList<string> notFound)
+        IReadOnlyList<string> notFound, bool reVerify, IReadOnlyList<string> suppressed, int reviewRecordsPreserved,
+        int reviewsApplied)
     {
         if (json)
         {
-            Console.Out.WriteLine(DryRunJson.Serialize(new
+            var payload = JsonSerializer.SerializeToNode(new
             {
                 command = "ingest-grounding",
                 mode = "batch",
@@ -279,7 +331,20 @@ public sealed class IngestGroundingCommand : Command
                 skipped_hallucinated = hallucinated.Count,
                 hallucinated,
                 not_found = notFound
-            }, dryRun));
+            })!.AsObject();
+
+            // Spec 103 (FR-011): the review counts, only when --re-verify ran or a review was involved, so the JSON
+            // of a default run is exactly what it was.
+            if (reVerify || suppressed.Count > 0 || reviewRecordsPreserved > 0 || reviewsApplied > 0)
+            {
+                payload["re_verify"] = reVerify;
+                payload["reraises_suppressed"] = suppressed.Count;
+                payload["suppressed"] = JsonSerializer.SerializeToNode(suppressed);
+                payload["review_records_preserved"] = reviewRecordsPreserved;
+                payload["review_records_applied"] = reviewsApplied;
+            }
+
+            Console.Out.WriteLine(DryRunJson.Serialize(payload, dryRun));
         }
 
         // The human summary: stdout in human mode, stderr in JSON mode (never suppressed).
@@ -299,6 +364,22 @@ public sealed class IngestGroundingCommand : Command
         foreach (var id in notFound)
         {
             human.WriteLine($"{id}: not found in suite '{suite}'");
+        }
+
+        if (reviewRecordsPreserved > 0)
+        {
+            human.WriteLine($"  Review records preserved: {reviewRecordsPreserved}");
+        }
+
+        if (reviewsApplied > 0)
+        {
+            human.WriteLine($"  Requested reviews recorded: {reviewsApplied}");
+        }
+
+        // Naming the ids matters: a count alone doesn't tell a reviewer which concerns were withheld.
+        if (suppressed.Count > 0)
+        {
+            human.WriteLine($"  Re-raises suppressed: {suppressed.Count} ({string.Join(", ", suppressed)})");
         }
     }
 
@@ -362,11 +443,18 @@ public sealed class IngestGroundingCommand : Command
             return ExitHallucinatedRefused;
         }
 
+        var pendingReviews = new PendingReviewStore(currentDir);
         var service = new GroundingWriteBackService(new TestFileWriter());
-        var result = await service.WriteAsync(testFilePath, verdictJson, repairAttempts, repaired, ct);
+        var result = await service.WriteAsync(testFilePath, verdictJson, repairAttempts, repaired, ct,
+            pendingReview: await pendingReviews.LoadAsync(suite, testId, ct));
 
         if (result.IsSuccess)
         {
+            if (result.PendingReviewApplied)
+            {
+                pendingReviews.Remove(suite, testId);
+            }
+
             var g = result.Grounding!;
             if (json)
             {
@@ -379,7 +467,12 @@ public sealed class IngestGroundingCommand : Command
                     score = g.Score,
                     flagged_for_review = g.FlaggedForReview,
                     repair_attempts = g.RepairAttempts,
-                    repaired = g.Repaired
+                    repaired = g.Repaired,
+                    // Spec 103 (FR-011)
+                    reraise_suppressed = result.ReraiseSuppressed,
+                    suppressed_by_review_at = result.SuppressedByReviewAt?.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                    review_record_preserved = result.ReviewRecordPreserved,
+                    review_record_applied = result.PendingReviewApplied
                 }));
             }
             else
@@ -389,6 +482,14 @@ public sealed class IngestGroundingCommand : Command
                     Console.Out.WriteLine($"  Flagged for review ({g.CondensedFindings.Count} condensed finding(s)).");
                 if (g.Repaired)
                     Console.Out.WriteLine($"  Repaired after {g.RepairAttempts} attempt(s).");
+                if (result.ReraiseSuppressed)
+                    Console.Out.WriteLine(
+                        $"  Re-raise suppressed: review by {g.ReviewedBy} on " +
+                        $"{result.SuppressedByReviewAt?.UtcDateTime:yyyy-MM-dd} is newer than the prior verification.");
+                if (result.ReviewRecordPreserved)
+                    Console.Out.WriteLine("  Review record preserved.");
+                if (result.PendingReviewApplied)
+                    Console.Out.WriteLine($"  Review recorded: requested by {g.ReviewedBy}.");
             }
             return ExitSuccess;
         }

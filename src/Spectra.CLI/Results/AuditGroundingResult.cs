@@ -50,6 +50,36 @@ public sealed class AuditGroundingEntry
     [JsonPropertyName("stale")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Stale { get; init; }
+
+    // --- Spec 103 (FR-011/FR-018): the review record and suppression state. Additive: action_needed is unchanged. ---
+
+    [JsonPropertyName("reviewed_by")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReviewedBy { get; init; }
+
+    [JsonPropertyName("reviewed_at")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReviewedAt { get; init; }
+
+    /// <summary>The reviewer's note; only with a review record.</summary>
+    [JsonPropertyName("note")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Note { get; init; }
+
+    /// <summary>Non-null means a re-raise is being withheld right now (never together with a flag).</summary>
+    [JsonPropertyName("reraise_suppressed_at")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReraiseSuppressedAt { get; init; }
+
+    /// <summary>Set for the impossible flagged-plus-marker combination (a hand-edited file).</summary>
+    [JsonPropertyName("inconsistent")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Inconsistent { get; init; }
+
+    /// <summary>True when verification is newer than the sign-off and nothing is withheld: the next partial re-raises.</summary>
+    [JsonPropertyName("review_stale")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool ReviewStale { get; init; }
 }
 
 public sealed class AuditGroundingSummary
@@ -81,4 +111,19 @@ public sealed class AuditGroundingSummary
     /// <summary>Spec 097 (FR-007): entries whose verdict is stale.</summary>
     [JsonPropertyName("stale")]
     public int Stale { get; init; }
+
+    /// <summary>Spec 103: tests a human cleared (a review record, not flagged). The three review counts are omitted at 0.</summary>
+    [JsonPropertyName("reviewed")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int Reviewed { get; init; }
+
+    /// <summary>Spec 103 (FR-011): concerns being withheld right now.</summary>
+    [JsonPropertyName("reraises_suppressed")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int ReraisesSuppressed { get; init; }
+
+    /// <summary>Spec 103: sign-offs verification has overtaken with nothing withheld (disjoint from the above).</summary>
+    [JsonPropertyName("reviews_stale")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int ReviewsStale { get; init; }
 }

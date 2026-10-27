@@ -90,6 +90,7 @@ public sealed class AuditGroundingHandler
             bool groundingWritten = false;
             bool flaggedForReview = false;
             bool stale = false;
+            Spectra.Core.Models.Grounding.GroundingMetadata? block = null;
 
             var testFilePath = Path.Combine(suitePath, testEntry.File);
             var filePath = Path.GetRelativePath(_currentDir, testFilePath).Replace('\\', '/');
@@ -103,6 +104,7 @@ public sealed class AuditGroundingHandler
                     var parsed = parser.Parse(content, rel);
                     if (parsed.IsSuccess && parsed.Value is { } tc)
                     {
+                        block = tc.Grounding;
                         groundingWritten = tc.Grounding is not null;
                         flaggedForReview = tc.Grounding is { FlaggedForReview: true };
                         // Spec 097 (FR-007): the check the ingest applies (fingerprint, record file time).
@@ -114,7 +116,7 @@ public sealed class AuditGroundingHandler
 
             var actionNeeded = ActionFor(stale, groundingWritten, flaggedForReview, verdict);
 
-            entries.Add(new AuditGroundingEntry
+            entries.Add(WithReview(new AuditGroundingEntry
             {
                 Id = id,
                 Verdict = verdict,
@@ -124,7 +126,7 @@ public sealed class AuditGroundingHandler
                 ActionNeeded = actionNeeded,
                 File = filePath,
                 Stale = stale ? true : null
-            });
+            }, block));
         }
 
         // Spec 090 (FR-A7): every indexed test without a verdict file is listed too, judged by its grounding block —
@@ -146,7 +148,8 @@ public sealed class AuditGroundingHandler
                 catch { /* unreadable: reported as unverified */ }
             }
 
-            entries.Add(EntryFromBlock(test.Id, grounding, Path.GetRelativePath(_currentDir, testFilePath).Replace('\\', '/')));
+            entries.Add(WithReview(
+                EntryFromBlock(test.Id, grounding, Path.GetRelativePath(_currentDir, testFilePath).Replace('\\', '/')), grounding));
         }
 
         // Spec 097 (FR-006): listed ids that aren't in this suite.
@@ -168,7 +171,10 @@ public sealed class AuditGroundingHandler
             PendingReview = entries.Count(e => e.ActionNeeded == "review" && !e.GroundingWritten),
             FlaggedForReview = entries.Count(e => e.FlaggedForReview),
             Unverified = entries.Count(e => e.Verdict == Unverified),
-            Stale = entries.Count(e => e.Stale == true)
+            Stale = entries.Count(e => e.Stale == true),
+            Reviewed = entries.Count(e => e.ReviewedBy is not null && !e.FlaggedForReview),
+            ReraisesSuppressed = entries.Count(e => e.ReraiseSuppressedAt is not null),
+            ReviewsStale = entries.Count(e => e.ReviewStale)
         };
 
         // Spec 097 (FR-005, FR-006): the filters apply to the listed entries only.
@@ -222,6 +228,40 @@ public sealed class AuditGroundingHandler
             "partial" => "repair",
             "hallucinated" => "review",
             _ => "critic"
+        };
+    }
+
+    /// <summary>
+    /// Spec 103 (FR-011/FR-018): <paramref name="entry"/> with the block's review record and suppression state. A review
+    /// is stale when verification is newer and nothing is withheld; a suppressing pass moves <c>verified_at</c> past the
+    /// review it honoured, so the marker check keeps the two counts disjoint.
+    /// </summary>
+    private static AuditGroundingEntry WithReview(AuditGroundingEntry entry, Spectra.Core.Models.Grounding.GroundingMetadata? g)
+    {
+        if (g?.ReviewedBy is null && g?.ReraiseSuppressedAt is null)
+        {
+            return entry;
+        }
+
+        return new AuditGroundingEntry
+        {
+            Id = entry.Id,
+            Verdict = entry.Verdict,
+            Score = entry.Score,
+            GroundingWritten = entry.GroundingWritten,
+            FlaggedForReview = entry.FlaggedForReview,
+            ActionNeeded = entry.ActionNeeded,
+            File = entry.File,
+            Stale = entry.Stale,
+            ReviewedBy = g.ReviewedBy,
+            ReviewedAt = g.ReviewedAt?.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            Note = g.ReviewedBy is null ? null : g.Note,
+            ReraiseSuppressedAt = g.ReraiseSuppressedAt?.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            Inconsistent = g.ReraiseSuppressedAt is { } at && g.FlaggedForReview
+                ? $"flagged for review, but reraise_suppressed_at is set ({at:yyyy-MM-dd}); the file may have been edited by hand"
+                : null,
+            ReviewStale = g.ReviewedAt is { } reviewedAt && !g.FlaggedForReview && g.ReraiseSuppressedAt is null
+                && g.VerifiedAt > reviewedAt
         };
     }
 
@@ -313,6 +353,16 @@ public sealed class AuditGroundingHandler
             {
                 Console.WriteLine(
                     $"  {e.Id,-12} {e.Verdict,-10} {e.Score,5:F2}  {(e.GroundingWritten ? "yes" : "no"),-8}  {(e.FlaggedForReview ? "yes" : "no"),-7}  {e.ActionNeeded}{(e.Stale == true ? " (stale)" : "")}");
+
+                // Spec 103: a count alone doesn't say which concerns were withheld or which sign-off is overtaken.
+                if (e.ReviewedBy is not null)
+                    Console.WriteLine($"          reviewed by {e.ReviewedBy} on {e.ReviewedAt?[..10]}");
+                if (e.ReraiseSuppressedAt is not null)
+                    Console.WriteLine($"          re-raise suppressed {e.ReraiseSuppressedAt[..10]}: the review is newer than the prior verification");
+                if (e.ReviewStale)
+                    Console.WriteLine("          verification is newer than the review; nothing withheld, the next partial verdict re-raises");
+                if (e.Inconsistent is not null)
+                    Console.WriteLine($"          inconsistent: {e.Inconsistent}");
             }
         }
 
@@ -323,7 +373,10 @@ public sealed class AuditGroundingHandler
             (summary.PendingGround > 0 ? $" | {summary.PendingGround} pending ground" : "") +
             (summary.PendingReview > 0 ? $" | {summary.PendingReview} pending review" : "") +
             (summary.Unverified > 0 ? $" | {summary.Unverified} unverified" : "") +
-            (summary.Stale > 0 ? $" | {summary.Stale} stale" : ""));
+            (summary.Stale > 0 ? $" | {summary.Stale} stale" : "") +
+            (summary.Reviewed > 0 ? $" | {summary.Reviewed} reviewed" : "") +
+            (summary.ReraisesSuppressed > 0 ? $" | {summary.ReraisesSuppressed} suppressed" : "") +
+            (summary.ReviewsStale > 0 ? $" | {summary.ReviewsStale} reviews stale" : ""));
     }
 
     public static async Task<string> ResolveTestsDirAsync(string currentDir, CancellationToken ct)

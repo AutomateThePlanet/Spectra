@@ -18,25 +18,54 @@ public static class RepairPromptCompiler
     /// Compiles a plain-text repair prompt for a partial test.
     /// Refuses (returns null + reason) if the test has no id/title, or if findings are empty.
     /// </summary>
+    /// <param name="reviewerFeedback">
+    /// Spec 103 FR-015: the reviewer's own objection, when the repair was requested through
+    /// <c>feedback --fix</c>. Emitted as its own labelled section so the rewrite addresses what the
+    /// human actually flagged, not only what the critic originally found. Null on the automatic
+    /// repair path, where the output is byte-identical to before.
+    /// </param>
     public static (string? Prompt, string? RefusalReason) Compile(
         TestCase test,
         IReadOnlyList<CriticFinding> nonGroundedFindings,
-        IReadOnlyList<SourceDocument> sourceDocs)
+        IReadOnlyList<SourceDocument> sourceDocs,
+        string? reviewerFeedback = null)
     {
         if (string.IsNullOrWhiteSpace(test.Id) || string.IsNullOrWhiteSpace(test.Title))
             return (null, "Test artifact is missing id or title.");
 
-        if (nonGroundedFindings.Count == 0)
+        // Spec 103: reviewer feedback alone is something to repair — a test the critic got wrong has no findings.
+        var hasFeedback = !string.IsNullOrWhiteSpace(reviewerFeedback);
+        if (nonGroundedFindings.Count == 0 && !hasFeedback)
             return (null, "No non-grounded findings to repair — the critic marked all claims as grounded.");
 
         var sb = new StringBuilder();
         sb.AppendLine("# SPECTRA Test Repair");
         sb.AppendLine();
-        sb.AppendLine("You are correcting a generated test that the critic found partially ungrounded.");
-        sb.AppendLine($"Your task: rewrite ONLY the elements listed in the critic findings below.");
+        if (hasFeedback)
+        {
+            sb.AppendLine("You are correcting a generated test that a human reviewer found wrong.");
+            sb.AppendLine("Your task: rewrite ONLY the elements the reviewer feedback and the critic findings below call out.");
+        }
+        else
+        {
+            sb.AppendLine("You are correcting a generated test that the critic found partially ungrounded.");
+            sb.AppendLine($"Your task: rewrite ONLY the elements listed in the critic findings below.");
+        }
+
         sb.AppendLine($"Preserve the test id ({test.Id}), priority, component, tags, and any elements the critic found grounded.");
         sb.AppendLine("Return a JSON array containing the ONE corrected test, using the same schema as the generation output.");
         sb.AppendLine();
+
+        if (hasFeedback)
+        {
+            sb.AppendLine("## Reviewer feedback (address this as well as the critic findings)");
+            sb.AppendLine();
+            sb.AppendLine("A human reviewer requested this repair and described the problem as follows.");
+            sb.AppendLine("Treat it as authoritative: it may identify something the critic missed entirely.");
+            sb.AppendLine();
+            sb.AppendLine("> " + reviewerFeedback!.Trim().Replace("\n", "\n> "));
+            sb.AppendLine();
+        }
 
         // Test artifact
         sb.AppendLine($"## Test to repair: {test.Id}");
@@ -65,23 +94,26 @@ public static class RepairPromptCompiler
         sb.AppendLine();
 
         // Critic findings
-        sb.AppendLine("## Critic findings (elements that could not be grounded)");
-        sb.AppendLine();
-        sb.AppendLine("The critic identified these specific elements as unverified against the documentation:");
-        sb.AppendLine();
-        for (var i = 0; i < nonGroundedFindings.Count; i++)
+        if (nonGroundedFindings.Count > 0)
         {
-            var f = nonGroundedFindings[i];
-            var statusLabel = f.Status == FindingStatus.Hallucinated ? "HALLUCINATED" : "UNVERIFIED";
-            sb.AppendLine($"{i + 1}. **{f.Element}** [{statusLabel}]");
-            sb.AppendLine($"   Claim: \"{f.Claim}\"");
-            if (!string.IsNullOrWhiteSpace(f.Reason))
-                sb.AppendLine($"   Reason: {f.Reason}");
-        }
+            sb.AppendLine("## Critic findings (elements that could not be grounded)");
+            sb.AppendLine();
+            sb.AppendLine("The critic identified these specific elements as unverified against the documentation:");
+            sb.AppendLine();
+            for (var i = 0; i < nonGroundedFindings.Count; i++)
+            {
+                var f = nonGroundedFindings[i];
+                var statusLabel = f.Status == FindingStatus.Hallucinated ? "HALLUCINATED" : "UNVERIFIED";
+                sb.AppendLine($"{i + 1}. **{f.Element}** [{statusLabel}]");
+                sb.AppendLine($"   Claim: \"{f.Claim}\"");
+                if (!string.IsNullOrWhiteSpace(f.Reason))
+                    sb.AppendLine($"   Reason: {f.Reason}");
+            }
 
-        sb.AppendLine();
-        sb.AppendLine("---");
-        sb.AppendLine();
+            sb.AppendLine();
+            sb.AppendLine("---");
+            sb.AppendLine();
+        }
 
         // Source documentation
         if (sourceDocs.Count > 0)

@@ -233,7 +233,7 @@ public sealed class TestFileWriter
         EmitPlain(e, "critic");
         EmitString(e, g.Critic);
         EmitPlain(e, "verified_at");
-        EmitPlain(e, g.VerifiedAt.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.FFFFFFFZ", CultureInfo.InvariantCulture));
+        EmitPlain(e, FormatTimestamp(g.VerifiedAt));
 
         if (g.UnverifiedClaims.Count > 0)
         {
@@ -294,7 +294,51 @@ public sealed class TestFileWriter
             EmitString(e, g.Note, freeText: true);
         }
 
+        // Spec 103: the human review record. Every field is conditional, so a block without one is unchanged.
+        if (!string.IsNullOrWhiteSpace(g.ReviewedBy))
+        {
+            EmitPlain(e, "reviewed_by");
+            EmitString(e, g.ReviewedBy);
+        }
+
+        if (g.ReviewedAt is { } reviewedAt)
+        {
+            EmitPlain(e, "reviewed_at");
+            EmitPlain(e, FormatTimestamp(reviewedAt));
+        }
+
+        if (g.ReraiseSuppressedAt is { } suppressedAt)
+        {
+            EmitPlain(e, "reraise_suppressed_at");
+            EmitPlain(e, FormatTimestamp(suppressedAt));
+        }
+
         e.Emit(new MappingEnd());
+    }
+
+    private static string FormatTimestamp(DateTimeOffset value) =>
+        value.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.FFFFFFFZ", CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// Spec 103 (FR-006): an error when <paramref name="value"/> holds a control character other than tab, LF or
+    /// CR, which a review note refuses before anything is written; null when it can be stored.
+    /// </summary>
+    public static string? ValidateAnnotation(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return null;
+        }
+
+        foreach (var ch in value)
+        {
+            if (char.IsControl(ch) && ch is not ('\n' or '\r' or '\t'))
+            {
+                return $"contains a control character (U+{(int)ch:X4}) that cannot be represented in frontmatter";
+            }
+        }
+
+        return null;
     }
 
     private static void EmitNode(IEmitter e, object? value)
