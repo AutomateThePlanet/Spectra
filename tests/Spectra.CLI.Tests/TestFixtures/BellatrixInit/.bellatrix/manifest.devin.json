@@ -1,0 +1,67 @@
+{
+  "version": "2.5",
+  "target": "devin",
+  "language": "csharp",
+  "files": [
+    {
+      "path": ".devin/rules/bellatrix.md",
+      "sha256": "615d78892fdc357d2cfd184155d6e56b57cd7796118b3e02c95b05b3f28bbecc"
+    },
+    {
+      "path": ".claude/skills/bellatrix-web-app-services/SKILL.md",
+      "sha256": "eb4c5ae834f1379033d531cf8dcacef87a8844b400561bebeea538ce7436d36d"
+    },
+    {
+      "path": ".claude/skills/bellatrix-web-automate-spectra-test/SKILL.md",
+      "sha256": "aa01b6fe44d4640c92c3c2a8a292748527f31d329e24bc5a590c927e173919db"
+    },
+    {
+      "path": ".claude/skills/bellatrix-web-components/SKILL.md",
+      "sha256": "44c49a7c80259b389b5ddccc2a17cdb3ea1377541ca6670fbc3c4e96a0338aab"
+    },
+    {
+      "path": ".claude/skills/bellatrix-web-execute-scenario/SKILL.md",
+      "sha256": "a45a89409ed7ce10f5fcc4b84262bdf7554beaa2411f2d34efbfdaaa1283d294"
+    },
+    {
+      "path": ".claude/skills/bellatrix-web-execute-spectra-test/SKILL.md",
+      "sha256": "21b8be4e9ff7873ea2f7ad34e18b14ac33de81b7d515ef621f5729db1d9f3059"
+    },
+    {
+      "path": ".claude/skills/bellatrix-web-generate-code/SKILL.md",
+      "sha256": "2873d1be6cdf27b06c565c817d3f688917d20c5f53a6edf92afa854212eb5399"
+    },
+    {
+      "path": ".claude/skills/bellatrix-web-locators-and-waits/SKILL.md",
+      "sha256": "b7704b4b76a852746505c029014938e39659cc89756c4740c0164c62b7a1ef0b"
+    },
+    {
+      "path": ".claude/skills/bellatrix-web-page-objects-and-patterns/SKILL.md",
+      "sha256": "375e96de24951e9454dc3bc4c8a08233f80fd5901173e91baa04f71b21b78ebb"
+    },
+    {
+      "path": ".claude/skills/bellatrix-web-project-structure/SKILL.md",
+      "sha256": "a13f90526a95529d2a1d7ba969f5fcfe090f34903353fdf57bb08b57002ca6e3"
+    },
+    {
+      "path": ".claude/skills/bellatrix-web-system-tests-recipes/SKILL.md",
+      "sha256": "5a233a356e6152f74a648798670128f4d3df4774e4dd70266addb9c9b6062df7"
+    },
+    {
+      "path": ".claude/skills/bellatrix-web-test-structure-and-lifecycle/SKILL.md",
+      "sha256": "27fdf8d7ddc0ba3e5c03707c914387cdda03e175e6270871c4135f0f3283af8d"
+    },
+    {
+      "path": ".claude/skills/bellatrix-web-validations-and-assertions/SKILL.md",
+      "sha256": "7d3f3178e7dcc4ae7b8b82e93bff30f7ac4e720285edcbe9d54e3a4a89216464"
+    },
+    {
+      "path": ".devin/agents/bellatrix-web-locator-specialist.md",
+      "sha256": "a47bd9922589cb84184a84b626279c2bd37e770d530056c5ab7db58df67a3e0e"
+    },
+    {
+      "path": ".devin/agents/bellatrix-web-system-tests-generator.md",
+      "sha256": "a546e37d54d5e0d435e517e66174feeb2e7b26c2926b015dd0e6c5d3ea458373"
+    }
+  ]
+}

@@ -10,8 +10,8 @@ Golden rule: the Claude install stays byte-identical; ADD, don't change.
 | s.0 sync | done | baseline: see below |
 | golden Claude test | done | `ClaudeInstallGoldenTests`, 40 files pinned (Golden/104) |
 | s.1 investigation | done | `FINDINGS-multi-client-gap-v2.md`, `specs/104-multi-agent-init/spec.md` |
-| s.2 implement | todo | |
-| s.3 tests | todo | |
+| s.2 implement | done | `src/Spectra.CLI/Install/` + `--agent`/`--regenerate`; Claude golden green |
+| s.3 tests | done | 44 new/related tests green (incl. live bellatrix 3.1.1, both orders) |
 | s.4 docs + release | todo | |
 | final push | todo | feature branch only, no merge, no PR |
 
@@ -40,4 +40,5 @@ keeps Write (verdict file) so no Cursor `readonly`; allowlists only Cursor/Devin
 
 ## Next action
 
-s.2: content transform (neutral text) + emitters + planner + manifests + `--agent` option; Claude golden must stay green.
+s.4: docs (README, getting-started, skills-integration, cli-reference, CHANGELOG, live-verification checklist),
+minor version bump, pack (no publish), full CLI suite in the background, push the branch (no PR).
