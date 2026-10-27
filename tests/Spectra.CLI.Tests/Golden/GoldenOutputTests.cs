@@ -21,7 +21,9 @@ namespace Spectra.CLI.Tests.Golden;
 /// byte copy of the 099 capture, which proves every command still writes byte-identical files on an existing workspace.
 /// The record mode never rewrites <c>pre099-workspace/</c> or <c>files-pre099.txt</c>: both are frozen c24d23e
 /// fixtures. Spec 102 re-captured <c>files.txt</c> once more for its one <c>CUSTOMIZATION.md</c> sentence (the critic
-/// template is used; the critic model is <c>ai.critic.model</c>); every command output stayed byte-identical.</para>
+/// template is used; the critic model is <c>ai.critic.model</c>); every command output stayed byte-identical. Spec 103
+/// re-captured it for one new <c>.gitignore</c> entry (<c>.spectra/reviews/</c>); every command output stayed
+/// byte-identical.</para>
 /// </remarks>
 [Collection(CriteriaCommandsCollection.Name)]
 public sealed class GoldenOutputTests : IDisposable

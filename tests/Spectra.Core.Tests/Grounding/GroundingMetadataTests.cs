@@ -45,10 +45,27 @@ public class GroundingMetadataTests
         Assert.True(grounding.IsValid());
     }
 
+    /// <summary>
+    /// Spec 103 FR-008 deliberately relaxed this: a confidently-verified test can now be flagged by
+    /// a human through the <c>feedback</c> action, because a confident-but-wrong critic verdict is
+    /// exactly the failure mode a human reviewer exists to catch. Before 078 this returned false.
+    /// </summary>
     [Fact]
-    public void IsValid_FlaggedForReviewOnGrounded_ReturnsFalse()
+    public void IsValid_FlaggedForReviewOnGrounded_ReturnsTrue()
     {
         var grounding = ValidGrounded() with { FlaggedForReview = true };
+        Assert.True(grounding.IsValid());
+    }
+
+    [Fact]
+    public void IsValid_FlaggedForReviewOnHallucinated_ReturnsFalse()
+    {
+        // Still ineligible (FR-007) — only Grounded and Partial reach the review workflow.
+        var grounding = ValidGrounded() with
+        {
+            Verdict = VerificationVerdict.Hallucinated,
+            FlaggedForReview = true
+        };
         Assert.False(grounding.IsValid());
     }
 
@@ -164,5 +181,115 @@ public class GroundingMetadataTests
         Assert.NotNull(metadata);
         Assert.Single(metadata!.CondensedFindings);
         Assert.Equal("Step 1", metadata.CondensedFindings[0].Element);
+    }
+
+    // --- Spec 103: provenance + human review record round-trip (FR-001, FR-002) ---
+
+    [Fact]
+    public void ToMetadata_MapsProvenanceFieldsThatWerePreviouslyDropped()
+    {
+        var frontmatter = new GroundingFrontmatter
+        {
+            Verdict = "partial",
+            Score = 0.72,
+            Generator = "claude-code-session",
+            Critic = "claude-opus-5",
+            VerifiedAt = "2026-08-20T09:14:00Z",
+            UnverifiedClaims = ["Step 3: interval absent from docs"],
+            Source = "user-described",
+            CreatedBy = "Oleg Kuzmanov",
+            Note = "Confirmed against the support runbook."
+        };
+
+        var metadata = frontmatter.ToMetadata();
+
+        Assert.NotNull(metadata);
+        Assert.Equal("user-described", metadata!.Source);
+        Assert.Equal("Oleg Kuzmanov", metadata.CreatedBy);
+        Assert.Equal("Confirmed against the support runbook.", metadata.Note);
+    }
+
+    [Fact]
+    public void ToMetadata_MapsReviewRecord()
+    {
+        var frontmatter = new GroundingFrontmatter
+        {
+            Verdict = "partial",
+            Score = 0.72,
+            Generator = "claude-code-session",
+            Critic = "claude-opus-5",
+            VerifiedAt = "2026-08-20T09:14:00Z",
+            UnverifiedClaims = ["Step 3: interval absent from docs"],
+            ReviewedBy = "Oleg Kuzmanov",
+            ReviewedAt = "2026-08-28T10:15:00Z",
+            ReraiseSuppressedAt = "2026-08-31T08:00:00Z"
+        };
+
+        var metadata = frontmatter.ToMetadata();
+
+        Assert.NotNull(metadata);
+        Assert.Equal("Oleg Kuzmanov", metadata!.ReviewedBy);
+        Assert.Equal(DateTimeOffset.Parse("2026-08-28T10:15:00Z"), metadata.ReviewedAt);
+        Assert.Equal(DateTimeOffset.Parse("2026-08-31T08:00:00Z"), metadata.ReraiseSuppressedAt);
+    }
+
+    [Fact]
+    public void ToMetadata_ManualVerdict_PreservesProvenance()
+    {
+        // The user-described generation path is instructed to populate exactly these three.
+        var frontmatter = new GroundingFrontmatter
+        {
+            Verdict = "manual",
+            Source = "user-described",
+            CreatedBy = "Oleg Kuzmanov",
+            Note = "No documentation source for this behaviour."
+        };
+
+        var metadata = frontmatter.ToMetadata();
+
+        Assert.NotNull(metadata);
+        Assert.Equal(VerificationVerdict.Manual, metadata!.Verdict);
+        Assert.Equal("user-described", metadata.Source);
+        Assert.Equal("Oleg Kuzmanov", metadata.CreatedBy);
+        Assert.Equal("No documentation source for this behaviour.", metadata.Note);
+    }
+
+    [Fact]
+    public void ToMetadata_AbsentReviewFields_MapToNull()
+    {
+        var metadata = new GroundingFrontmatter
+        {
+            Verdict = "grounded",
+            Score = 0.95,
+            Generator = "g",
+            Critic = "c",
+            VerifiedAt = "2026-08-20T09:14:00Z"
+        }.ToMetadata();
+
+        Assert.NotNull(metadata);
+        Assert.Null(metadata!.ReviewedBy);
+        Assert.Null(metadata.ReviewedAt);
+        Assert.Null(metadata.ReraiseSuppressedAt);
+        Assert.Null(metadata.Source);
+        Assert.Null(metadata.CreatedBy);
+        Assert.Null(metadata.Note);
+    }
+
+    [Fact]
+    public void ToMetadata_UnparseableReviewTimestamp_TreatedAsAbsent()
+    {
+        var metadata = new GroundingFrontmatter
+        {
+            Verdict = "grounded",
+            Score = 0.95,
+            Generator = "g",
+            Critic = "c",
+            VerifiedAt = "2026-08-20T09:14:00Z",
+            ReviewedBy = "Oleg Kuzmanov",
+            ReviewedAt = "not-a-timestamp"
+        }.ToMetadata();
+
+        Assert.NotNull(metadata);
+        Assert.Null(metadata!.ReviewedAt);
     }
 }

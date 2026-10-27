@@ -752,6 +752,24 @@ Spec 097:
   the update skill's re-verify step the group's grounded ids (skipped when there are none), so a test reported
   unverified never gets a block.
 
+Spec 103 (human review record):
+- **`--all --re-verify`** also rewrites tests that already have a grounding block, but only from a verdict file written
+  after the block's `verified_at` (the critic ran again); re-ingesting the same verdict is not a verification pass.
+  A re-verified test's `partial` verdict is written without `--repaired`. `--re-verify` without `--all` → exit `1`,
+  `--re-verify works with --all only.` The default (no `--re-verify`) is unchanged and repeat-safe.
+- **The review record is carried forward** (`reviewed_by`, `reviewed_at`, `note`, `source`, `created_by`) on every
+  write; the critic's own fields update as normal.
+- **Suppression.** When the review is newer than the `verified_at` already on the test and the new verdict is
+  `partial`, the re-raise is withheld: `flagged_for_review` stays as the reviewer left it and `reraise_suppressed_at`
+  is set. Equal timestamps re-raise. The pass moves `verified_at` past the review, so the next new verdict re-raises.
+- **A human raise survives.** A flag set with `review-flagged --action feedback` stays through any pass whose verdict
+  equals the one already on the test; `accept` or a verdict that changes clears it.
+- **A staged `feedback --fix` review is written back.** The repair's `ingest-update` drops the critic block, so the
+  review is kept in `.spectra/reviews/<suite>/<id>.json` and written by the next `ingest-grounding` for that test.
+- Batch JSON adds `re_verify`, `reraises_suppressed`, `suppressed` (ids), `review_records_preserved`,
+  `review_records_applied`; `--test` JSON adds `reraise_suppressed`, `suppressed_by_review_at`,
+  `review_record_preserved`, `review_record_applied`.
+
 - **grounded** → condensed "verified clean" block (`verdict: grounded`, `score`, `verified_at`).
 - **partial** → block with condensed findings + `flagged_for_review: true` (unless `--repaired`; the `spectra-review-flagged` skill then dispositions flagged tests).
 - **hallucinated** → `--test` refuses (exit 4); use `record-drop` + `spectra delete` instead. `--all` lists it under `hallucinated` (Spec 091).
@@ -807,6 +825,50 @@ spectra ai review-flagged --suite reporting --no-interaction --output-format jso
 - In interactive mode, the prompts are `[A]ccept`, `[D]elete`, `[S]kip`, `[Q]uit` per flagged test.
 - In non-interactive mode (or with `--output-format json`), the command exits `2` if undisposed flagged tests remain.
 - Exit code is `0` when all tests are dispositioned, `2` when undisposed flagged tests remain (non-interactive), and `1` on error.
+
+#### Non-interactive actions and the human review record
+
+Every action is invocable without an interactive session, and each one records **who** reviewed the
+test and **when** in the `grounding:` block:
+
+```bash
+spectra ai review-flagged --suite reporting --action accept   --test TC-142 --note "Checked the runbook."
+spectra ai review-flagged --suite reporting --action feedback --test TC-151 --note "Step 2 field does not exist."
+spectra ai review-flagged --suite reporting --action feedback --test TC-151 --note "..." --fix
+spectra ai review-flagged --suite reporting --action delete   --test TC-160
+spectra ai review-flagged --suite reporting --action accept   --all
+```
+
+| Option | Purpose |
+|---|---|
+| `--action accept\|delete\|feedback` | The action to perform. Omit for the listing / interactive loop. |
+| `--test <id>` | Target test. Required with `--action` unless `--all`. |
+| `--all` | Apply to every eligible test in scope. Refused for `delete`. |
+| `--note "<text>"` | Reviewer's note. Optional on `accept`, **required** on `feedback`. |
+| `--reviewer "<name>"` | Explicit identity. Defaults to git `user.name`, then the OS user name. A **name**, not an email address. |
+| `--fix` | `feedback` only. Records the review and returns the repair chain as `next_step` — it does not run the repair. |
+
+**`feedback` is the only action valid on a test that is not currently flagged.** That is how a
+confidently-`grounded` test the critic got wrong is raised at all; `accept`, retry-repair, and
+`delete` refuse an unflagged test with `NOT_FLAGGED`.
+
+Review record fields written to `grounding:`:
+
+| Field | Meaning |
+|---|---|
+| `reviewed_by` | Who last reviewed the verdict. Non-null is the sole "has been reviewed" signal. |
+| `reviewed_at` | When. UTC ISO-8601. |
+| `note` | The reviewer's note (or generator provenance for `verdict: manual` tests). |
+| `reraise_suppressed_at` | Machine-written. Non-null means an automatic re-raise is being withheld **right now** by a newer review. Mutually exclusive with `flagged_for_review: true`. |
+
+Alongside these, `source` and `created_by` now round-trip correctly; before this they were parsed off
+disk and silently discarded on the next write.
+
+Exit codes: `0` success · `2` invalid option combination or an unrepresentable note (`TARGET_REQUIRED`,
+`TARGET_AMBIGUOUS`, `NOTE_REQUIRED`, `FIX_NOT_APPLICABLE`, `BULK_DELETE_REFUSED`,
+`NOTE_UNREPRESENTABLE`) · `4` target not found or ineligible (`TEST_NOT_FOUND`, `SUITE_NOT_FOUND`,
+`NOT_FLAGGED`, `NOT_VERIFIED`, `VERDICT_INELIGIBLE_MANUAL`, `VERDICT_INELIGIBLE_HALLUCINATED`) · `1`
+I/O error. Every refusal happens before any file is modified.
 
 ### `spectra ai audit-grounding` (resume oracle + inspection)
 
