@@ -12,7 +12,7 @@ Golden rule: the Claude install stays byte-identical; ADD, don't change.
 | s.1 investigation | done | `FINDINGS-multi-client-gap-v2.md`, `specs/104-multi-agent-init/spec.md` |
 | s.2 implement | done | `src/Spectra.CLI/Install/` + `--agent`/`--regenerate`; Claude golden green |
 | s.3 tests | done | 44 new/related tests green (incl. live bellatrix 3.1.1, both orders) |
-| s.4 docs + release | todo | |
+| s.4 docs + release | done | README, getting-started, skills-integration, cli-reference, CHANGELOG 2.7.0, live checklist; version 2.7.0; packed to scratch (not published) |
 | final push | todo | feature branch only, no merge, no PR |
 
 ## s.0 sync (2026-10-27)
@@ -40,5 +40,5 @@ keeps Write (verdict file) so no Cursor `readonly`; allowlists only Cursor/Devin
 
 ## Next action
 
-s.4: docs (README, getting-started, skills-integration, cli-reference, CHANGELOG, live-verification checklist),
-minor version bump, pack (no publish), full CLI suite in the background, push the branch (no PR).
+Push the feature branch (no PR). Open item: the full CLI suite was stopped twice by Claude Code for low memory; run it
+where memory allows (targeted classes: 538 green; Core/Execution/Integration green).

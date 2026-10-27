@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-10-27 — SPECTRA for the other AI agents (`spectra init --agent`)
+
+### Added
+
+- **`spectra init --agent <list>`** installs SPECTRA for GitHub Copilot, Cursor, Devin (`windsurf`), Codex CLI, Gemini CLI
+  (enterprise), Antigravity CLI (`agy`), Kiro CLI and OpenCode, next to or instead of Claude Code: the 16 skills, the six
+  subagents in each agent's own format and tool names, and an always-on instructions file (`.github/instructions/`,
+  `.cursor/rules/`, `.devin/rules/`, `.agents/rules/`, `.kiro/steering/`, or one SPECTRA block in `AGENTS.md` /
+  `GEMINI.md` pointing at `.spectra/spectra.instructions.md`). `--agent auto` detects the agents already installed, else
+  the one agent whose folder is in the repository. Names, aliases and detection match BELLATRIX Agent, so both tools can be
+  installed in one repository.
+- A skills folder several agents read is written once, and `.claude/skills/` / `.claude/agents/` are reused by agents
+  that read them when Claude is installed.
+- `.spectra/manifest.<agent>.json` per agent: re-runs refresh SPECTRA's files, skip files you edited (unless
+  `--regenerate`) and remove files a newer version no longer installs when you did not edit them.
+- `spectra` allowlist entries for the agents that document a project-level one (`.cursor/cli.json`, `.devin/config.json`,
+  `opencode.json`), merged by key.
+- `--dry-run` with `--agent` writes nothing and prints every planned file, decision and skip.
+- On an initialised repository `--agent` adds agents without `--force` and leaves `spectra.config.json` and the Claude
+  files alone.
+- New page: [Live verification checklist](docs/live-verification-agents.md) per agent.
+
+### Unchanged
+
+- `spectra init` without `--agent` writes exactly the same files as 2.6.0 (pinned by a golden test), plus one notice line
+  on stderr in human output naming the other agents. Skill, subagent and prompt content for Claude Code, and every
+  workflow (generation, critic, verdicts, repair, review, execution), are unchanged; the content for the other agents is
+  the same text with Claude-specific wording replaced at install time.
+- `spectra update-skills` refreshes only the Claude install; re-run `spectra init --agent <agent>` for the others.
+
+### Known limitation
+
+- The critic's isolated, mandatory run is enforced by the platform only in Claude Code. In the other agents the critic
+  runs when the agent follows the skill's instruction to start it. A critic gate enforced by the CLI is planned.
+
 ## [2.6.0] - 2026-10-27 — Doc-change update workflow, stable criteria IDs, lower token use
 
 ### Highlights

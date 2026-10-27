@@ -96,6 +96,31 @@ docs/criteria/_criteria_index.yaml`), `docs/`, `test-cases/`, `docs/criteria/_cr
 | `--interactive` / `-i` | Enable interactive setup |
 | `--no-interactive` | Disable interactive setup |
 | `--skip-skills` | Skip creation of SKILL and agent files |
+| `--agent <list>` | Also install for other AI agents: `claude`, `copilot`, `cursor`, `devin` (alias `windsurf`), `codex`, `gemini`, `antigravity` (alias `agy`), `kiro`, `opencode`, comma-separated; or `auto` to detect. Omitted: Claude Code only, as before |
+| `--regenerate` | With `--agent`: overwrite agent files you edited since SPECTRA wrote them |
+| `--dry-run` (global) | With `--agent`: write nothing; print every planned file, decision and skip |
+
+**Other AI agents (`--agent`).** Each agent gets the 16 skills, the six subagents in its own format and an always-on
+instructions file (or one SPECTRA block in `AGENTS.md` / `GEMINI.md`); see the per-agent table in
+[Skills Integration](skills-integration.md#other-ai-agents). Without `--agent` the output is exactly the Claude Code
+install above, plus one notice line on stderr (human output only) naming the other agents.
+
+- On a fresh repository, or with `--force`, the standard setup runs first; the Claude files are installed only when
+  `claude` is in the list.
+- On an initialised repository (a `spectra.config.json` exists), `--agent` installs only the listed non-Claude agents and
+  leaves the config and the Claude files alone; `claude` in the list is reported as "refresh it with
+  `spectra update-skills`".
+- `auto` uses the agents already installed (their `.spectra/manifest.<agent>.json`, or Claude's skills), else the one
+  agent whose folder is in the repo (`.cursor`, `.kiro`, …). None or several → exit `2` with the choices.
+- An unknown name → exit `2`. `windsurf` prints a notice and installs `devin`.
+- Every file written for an agent is recorded in `.spectra/manifest.<agent>.json` (path + SHA-256, line endings ignored).
+  A re-run skips files you edited (listed as "skipped (edited by you)") unless `--regenerate`, and removes files a newer
+  version no longer installs when you did not edit them.
+- A `spectra` allowlist entry is merged into the agent's documented project settings — `.cursor/cli.json`
+  (`Shell(spectra)`), `.devin/config.json` (`Exec(spectra)`), `opencode.json` (`"spectra *": "allow"`) — by key, never
+  overwriting a value you set; a file with comments is left alone and reported. The other agents document no
+  project-level command allowlist, which `--dry-run` reports.
+- `spectra update-skills` refreshes only the Claude install; re-run `spectra init --agent <agent>` for the others.
 
 ### `spectra validate`
 

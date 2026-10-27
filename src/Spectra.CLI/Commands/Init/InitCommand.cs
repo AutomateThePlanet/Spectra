@@ -89,7 +89,8 @@ public static class InitCommand
             if (agent is null)
             {
                 context.ExitCode = await handler.HandleAsync(force, skipSkills, context.GetCancellationToken());
-                if (context.ExitCode == ExitCodes.Success)
+                // Human mode only: JSON-mode output (scripts, the 099 golden) stays exactly as before.
+                if (context.ExitCode == ExitCodes.Success && outputFormat != OutputFormat.Json)
                 {
                     Console.Error.WriteLine(
                         $"[spectra init] Installed for Claude Code. Other agents: spectra init --agent <{Install.AgentSelection.OthersList}> (comma-separated).");
