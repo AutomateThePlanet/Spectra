@@ -85,14 +85,14 @@ public static class AgentInitRunner
             output.WriteLine($"  instructions: {target.FragmentPath}");
             if (agent.HostFile is not null)
             {
-                output.WriteLine($"  {agent.HostFile}: SPECTRA block {agent.HostStatus}");
+                output.WriteLine($"  {agent.HostFile}: SPECTRA block {(result.DryRun ? "would be " : string.Empty)}{agent.HostStatus}");
             }
 
             if (agent.Allowlist is not null && agent.AllowlistOutcome is not null)
             {
                 output.WriteLine(agent.AllowlistOutcome.Status == "skipped"
                     ? $"  allowlist: skipped — {agent.AllowlistOutcome.Reason}"
-                    : $"  allowlist: {agent.Allowlist.Description} ({agent.AllowlistOutcome.Status})");
+                    : $"  allowlist: {agent.Allowlist.Description} ({(result.DryRun ? "would be " : string.Empty)}{agent.AllowlistOutcome.Status})");
             }
 
             if (result.DryRun)

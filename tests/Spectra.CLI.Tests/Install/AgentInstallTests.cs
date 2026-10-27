@@ -225,7 +225,8 @@ public sealed class AgentInstallTests : IDisposable
         Assert.Contains("write    .agents/skills/spectra-generate/SKILL.md", output, StringComparison.Ordinal);
         Assert.Contains("write    .codex/agents/spectra-critic.toml", output, StringComparison.Ordinal);
         Assert.Contains("codex allowlist: none (no documented project-level command allowlist) — skipped", output, StringComparison.Ordinal);
-        Assert.Contains("AGENTS.md: SPECTRA block created", output, StringComparison.Ordinal);
+        Assert.Contains("AGENTS.md: SPECTRA block would be created", output, StringComparison.Ordinal);
+        Assert.Contains(".cursor/cli.json permissions.allow += \"Shell(spectra)\" (would be added)", output, StringComparison.Ordinal);
     }
 
     [Fact]
