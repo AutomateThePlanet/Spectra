@@ -10,7 +10,7 @@ The automated tests check every file `spectra init --agent` writes, byte for byt
 actually loads those files and follows them; that takes a person and a real session. Run this checklist once per agent
 after a release, and record the results in the table at the end.
 
-Related: [Skills Integration](skills-integration.md#other-ai-agents) | [CLI Reference](cli-reference.md#spectra-init)
+Related: [AI Agents](ai-agents.md) | [Skills Integration](skills-integration.md#other-ai-agents) | [CLI Reference](cli-reference.md#spectra-init)
 
 ## Setup (once)
 
@@ -24,7 +24,7 @@ Related: [Skills Integration](skills-integration.md#other-ai-agents) | [CLI Refe
 ### A. Scaffold
 
 - [ ] `spectra init --agent <agent> --dry-run` lists the files from the table in
-      [Skills Integration](skills-integration.md#other-ai-agents) and writes nothing (`git status` is clean).
+      [AI Agents](ai-agents.md#what-is-installed-for-each-agent) and writes nothing (`git status` is clean).
 - [ ] `spectra init --agent <agent>` exits 0 and prints the agent's line, its instructions file and its decisions.
 - [ ] The instructions file, 16 `spectra-*` skill folders (or the reused folder named in the decisions) and six
       `spectra-*` subagents exist; `.spectra/manifest.<agent>.json` lists them.

@@ -53,7 +53,9 @@ Azure DevOps / Jira / Teams        <- Bug logging via their own separate MCPs
 
 - **Language:** C# 12, .NET 8+
 - **AI Runtime:** Claude Code (the user's interactive session). SPECTRA makes no model calls of
-  its own; authoring orchestration ships as `.claude/skills/` + `.claude/agents/`
+  its own; authoring orchestration ships as `.claude/skills/` + `.claude/agents/`. `spectra init --agent`
+  installs the same skills and subagents for eight other AI agents, adapted at install time
+  (`src/Spectra.CLI/Install/`; see [AI Agents](../ai-agents.md))
 - **CLI Framework:** System.CommandLine + Spectre.Console
 - **Serialization:** System.Text.Json (data), YamlDotNet (frontmatter)
 - **Execution store:** Microsoft.Data.Sqlite, WAL mode (`.execution/spectra.db`), CLI-only with no

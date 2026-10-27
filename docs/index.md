@@ -33,11 +33,13 @@ From documentation to verified, grounded test cases, automatically.
 Your docs → spectra-generate skill (analysis → batches) → critic verification → test-cases/*.md
 ```
 
-Or just say it in Claude Code: **"Generate test cases for checkout"**
+Or just say it in Claude Code, or any of eight other AI agents: **"Generate test cases for checkout"**
 
 ## Key capabilities
 
 - **AI Test Case Generation** driven from your Claude Code session, with independent critic verification
+- **Works in your AI agent**: Claude Code by default; `spectra init --agent` also installs for Copilot, Cursor, Devin,
+  Codex, Gemini, Antigravity, Kiro and OpenCode — see [AI Agents](ai-agents)
 - **Acceptance Criteria Extraction** using MUST/SHOULD/MAY from docs with SHA-256 change tracking
 - **Three-Dimensional Coverage** spanning docs, criteria, and automation in one dashboard
 - **Doc-Change Updates** that find the tests a doc change touches, edit them and re-verify them — see
@@ -53,7 +55,8 @@ dotnet tool install -g Spectra.CLI
 spectra init
 ```
 
-Then open Claude Code in your project and ask it to generate test cases. See
+Then open Claude Code in your project and ask it to generate test cases. Using another agent? Run
+`spectra init --agent <name>` instead (for example `--agent cursor`); see [AI Agents](ai-agents). See
 [Getting Started](getting-started) for the full walkthrough.
 
 ## Part of the Automate The Planet ecosystem

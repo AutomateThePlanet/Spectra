@@ -157,7 +157,8 @@ re-run unless you pass `--regenerate`.
 > In the other agents the critic runs when the agent follows the skill's instruction to start it. A critic gate enforced
 > by the CLI is planned for a later version.
 
-See [Skills Integration](docs/skills-integration.md#other-ai-agents) for the details per agent.
+See [AI Agents](docs/ai-agents.md) for the full guide: choosing agents, what is installed where, re-runs and upgrades,
+coexistence with BELLATRIX Agent, removing an agent and troubleshooting.
 
 ### Generation Profiles
 
@@ -272,6 +273,7 @@ SPECTRA is part of the [Automate The Planet](https://www.automatetheplanet.com/)
 | [Grounding Verification](docs/grounding-verification.md) | Dual-model critic for hallucination detection |
 | [Document Index](docs/document-index.md) | Pre-built doc index for efficient generation |
 | [Skills Integration](docs/skills-integration.md) | Claude Code skills and subagents |
+| [AI Agents](docs/ai-agents.md) | `spectra init --agent`: SPECTRA in Copilot, Cursor, Devin, Codex, Gemini, Antigravity, Kiro, OpenCode |
 | [Usage (Claude Code)](docs/usage.md) | Workflow-by-workflow guide for driving SPECTRA from Claude Code |
 | [When documentation changes](docs/usage.md#when-documentation-changes) | Bringing tests up to date after a doc change, end to end |
 | [Customization](docs/customization.md) | Every customization knob — config, profiles, prompts, palettes |

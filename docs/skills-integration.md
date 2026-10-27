@@ -179,7 +179,8 @@ spectra update-skills
 ## Other AI Agents
 
 `spectra init --agent <list>` installs the same skills and subagents for other AI coding agents, in each agent's own
-layout. Without `--agent`, `spectra init` installs for Claude Code exactly as described above.
+layout. Without `--agent`, `spectra init` installs for Claude Code exactly as described above. This section is the
+summary; the full guide is [AI Agents](ai-agents.md).
 
 ```bash
 spectra init --agent copilot,codex         # comma-separated; claude can be in the list too

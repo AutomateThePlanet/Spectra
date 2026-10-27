@@ -106,7 +106,7 @@ spectra init --agent auto                 # detect the agent whose folder is in 
 
 Each agent gets the same skills and subagents in its own folders, plus an always-on SPECTRA instructions file. Add
 `--dry-run` to see every file first. On a repository that is already initialised, `--agent` adds the agents without
-touching your configuration. The per-agent layout is in [Skills Integration](skills-integration.md#other-ai-agents).
+touching your configuration. The full guide, with the files per agent, is [AI Agents](ai-agents.md).
 
 > Outside Claude Code, the agent decides when to start a subagent, so the critic runs when the agent follows the
 > skill's instruction. Check it on your first run: every new test should get a verdict

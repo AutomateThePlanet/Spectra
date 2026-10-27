@@ -101,8 +101,7 @@ docs/criteria/_criteria_index.yaml`), `docs/`, `test-cases/`, `docs/criteria/_cr
 | `--dry-run` (global) | With `--agent`: write nothing; print every planned file, decision and skip |
 
 **Other AI agents (`--agent`).** Each agent gets the 16 skills, the six subagents in its own format and an always-on
-instructions file (or one SPECTRA block in `AGENTS.md` / `GEMINI.md`); see the per-agent table in
-[Skills Integration](skills-integration.md#other-ai-agents). Without `--agent` the output is exactly the Claude Code
+instructions file (or one SPECTRA block in `AGENTS.md` / `GEMINI.md`); see the guide [AI Agents](ai-agents.md). Without `--agent` the output is exactly the Claude Code
 install above, plus one notice line on stderr (human output only) naming the other agents.
 
 - On a fresh repository, or with `--force`, the standard setup runs first; the Claude files are installed only when
