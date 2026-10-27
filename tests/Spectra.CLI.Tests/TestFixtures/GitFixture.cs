@@ -26,6 +26,10 @@ public static class GitFixture
         };
         foreach (var arg in args) info.ArgumentList.Add(arg);
         info.Environment["GIT_TERMINAL_PROMPT"] = "0";
+        // A submodule checkout's .git is a pointer file, so IdentityConfig never reaches it; a CI runner has no
+        // global identity either. Fixture commits always get one.
+        info.Environment["GIT_AUTHOR_NAME"] = info.Environment["GIT_COMMITTER_NAME"] = "Spectra Test";
+        info.Environment["GIT_AUTHOR_EMAIL"] = info.Environment["GIT_COMMITTER_EMAIL"] = "test@example.com";
         if (env is not null)
         {
             foreach (var (key, value) in env) info.Environment[key] = value;

@@ -74,7 +74,9 @@ public sealed class CompileExtractionPromptCommand : Command
         var config = loaded.Config!;
         warnings.AddRange(loaded.Warnings);
 
-        var docFullPath = Path.IsPathRooted(doc) ? doc : Path.Combine(currentDir, doc);
+        // A Windows-style docs\file.md is not a path on Unix; '/' works on every OS.
+        var docOnDisk = doc.Replace('\\', '/');
+        var docFullPath = Path.IsPathRooted(docOnDisk) ? docOnDisk : Path.Combine(currentDir, docOnDisk);
         if (!File.Exists(docFullPath))
         {
             WriteFailure(json, ErrorDocumentNotFound, $"Document not found: {doc}", warnings);

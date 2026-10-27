@@ -85,7 +85,9 @@ public sealed class IngestCriteriaCommand : Command
         }
 
         // Best-effort source-document hash for the cache entry (skipped if the doc is unreadable).
-        var docFullPath = Path.IsPathRooted(doc) ? doc : Path.Combine(currentDir, doc);
+        // A Windows-style docs\file.md is not a path on Unix; '/' works on every OS.
+        var docOnDisk = doc.Replace('\\', '/');
+        var docFullPath = Path.IsPathRooted(docOnDisk) ? docOnDisk : Path.Combine(currentDir, docOnDisk);
         var docHash = File.Exists(docFullPath)
             ? await CriteriaIngestor.TryComputeDocHashAsync(docFullPath, ct)
             : null;
