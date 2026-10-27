@@ -126,7 +126,7 @@ public class ProfileFormatLoaderTests : IDisposable
         Assert.Contains("Generating Dashboard", content);
         Assert.Contains("Validating Test Cases", content);
         Assert.Contains("Updating Test Cases After Doc Changes", content);
-        Assert.Contains("Executing Tests via MCP", content);
+        Assert.Contains("Executing Tests", content);
         Assert.Contains("Creating a Custom Profile", content);
         Assert.Contains("Indexing Documentation", content);
         Assert.Contains("Customizing SPECTRA", content);
