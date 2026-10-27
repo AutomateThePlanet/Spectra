@@ -122,6 +122,7 @@ public sealed class SourceRefResolver
         }
 
         // 1. Fully-qualified path (e.g. C:/repo/docs/a.md, or /abs on Unix) under an allowed root.
+        var existsOutsideRoots = false;
         if (Path.IsPathFullyQualified(path))
         {
             if (TryFile(path) is { } absolute)
@@ -134,6 +135,10 @@ public sealed class SourceRefResolver
             {
                 return (null, MissingReason.NotFound);
             }
+
+            // On Unix "/docs/a.md" is also fully qualified, so it falls through to the repo-relative reading below;
+            // if that finds nothing either, a real file outside both roots is reported as such, not as missing.
+            existsOutsideRoots = full is not null && File.Exists(full);
         }
 
         var relative = path.TrimStart('/');
@@ -153,7 +158,7 @@ public sealed class SourceRefResolver
         // 3. Legacy fallback: relative to the configured source directory (bare refs such as file.md).
         var found = TryFile(repoCandidate) ?? TryFile(Path.Combine(_sourceDir, relative));
         return found is null
-            ? (null, MissingReason.NotFound)
+            ? (null, existsOutsideRoots ? MissingReason.OutsideAllowedRoots : MissingReason.NotFound)
             : (Resolved(sourceRef, found), MissingReason.NotFound);
     }
 
