@@ -225,7 +225,7 @@ Key settings include:
 This section controls how generation batches are sized and which model verifies the tests.
 
 > SPECTRA makes no model calls of its own, so there is no provider or model-routing config. The GitHub Copilot SDK
-> and `ai.providers` were removed in Spec 069; a config that still has them loads, and the keys are ignored.
+> and `ai.providers` were removed; a config that still has them loads, and the keys are ignored.
 > Generation and analysis run as ordinary turns in your own Claude Code session; the model is whatever your session is
 > using (`/model`). See [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) and the
 > [AI Models & Cost Guide](ai-models-cost-guide.md) for the history.
@@ -247,7 +247,7 @@ This section controls how generation batches are sized and which model verifies 
 - `generation.batch_size` is the most behaviors one generation batch holds (default 8, 1–50); the analysis's
   generation plan groups neighbouring doc sections into batches of this size.
 - `ai.generation_timeout_minutes` / `ai.analysis_timeout_minutes` are still accepted, but nothing reads them since the
-  in-process generator was removed (Spec 069).
+  in-process generator was removed.
 
 ---
 
@@ -288,7 +288,7 @@ This section controls how Claude Code interacts with the SPECTRA CLI.
 
 The relevant files are:
 - `.claude/skills/<name>/SKILL.md`, the authoring SKILL files (one per command group)
-- `.claude/skills/spectra-generate/reference.md` and `.claude/skills/spectra-update/reference.md` (Spec 101),
+- `.claude/skills/spectra-generate/reference.md` and `.claude/skills/spectra-update/reference.md`,
   material those two skills read only when needed (command tables, exit codes, examples); `update-skills`
   keeps an edited one, like any other file
 - `.claude/agents/*.agent.md`, the subagents (each runs in a fresh context; Claude Code reads only their
@@ -350,7 +350,7 @@ All user files are created by `spectra init` and tracked by
 
 ### "I want stricter verification"
 
-Edit `.spectra/prompts/critic-verification.md` to tighten verdict rules: `spectra ai compile-critic-prompt` builds the critic's instructions from it (Spec 102; before that the critic ignored a customised copy). To switch to a stronger critic model, set `ai.critic.model` (`spectra config ai.critic.model opus`) and run `spectra update-skills`, which writes it into `.claude/agents/spectra-critic.agent.md` — don't edit the agent's `model:` field by hand.
+Edit `.spectra/prompts/critic-verification.md` to tighten verdict rules: `spectra ai compile-critic-prompt` builds the critic's instructions from it (earlier versions ignored a customised copy). To switch to a stronger critic model, set `ai.critic.model` (`spectra config ai.critic.model opus`) and run `spectra update-skills`, which writes it into `.claude/agents/spectra-critic.agent.md` — don't edit the agent's `model:` field by hand.
 
 ### "I want the AI to focus on specific areas"
 

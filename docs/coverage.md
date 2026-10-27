@@ -192,11 +192,10 @@ Generation never runs without criteria by accident:
 
 - `spectra ai compile-prompt` refuses (exit `4`, `MISSING_INPUT` for `criteria_context`) when no acceptance criteria
   resolve for the suite, naming the `spectra-criteria` skill as the fix.
-- A generation batch whose doc sections have no criteria of their own uses all criteria of its documents, with a warning
-  (Spec 094).
+- A generation batch whose doc sections have no criteria of their own uses all criteria of its documents, with a warning.
 
-The `docs index` zero-criteria warning (`criteria_warning`) and the generation "no criteria matched" note of Spec 048
-were removed in Spec 069 together with the in-process extraction they reported on.
+The `docs index` zero-criteria warning (`criteria_warning`) and the generation "no criteria matched" note were removed
+together with the in-process extraction they reported on.
 
 ## Automation Coverage
 
