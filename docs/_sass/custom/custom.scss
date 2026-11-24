@@ -13,6 +13,7 @@
 
 $bp-md: 50rem;        // just-the-docs "md" (800px): mobile header below this
 $bp-nav-full: 1500px; // full ATP nav fits in the header row from here (see REPORT.md)
+$bp-side: 62.5rem;    // 1000px: docs nav beside the content (sticky) from here, below the content under it
 
 // --- Fonts (self-hosted, design system fonts/) ---
 @font-face { font-family: "Nunito"; font-style: normal; font-weight: 400; font-display: swap; src: url("../fonts/nunito-latin-400-normal.woff2") format("woff2"); }
@@ -237,7 +238,7 @@ body.spectra-docs {
   transition: none;
 
   &::placeholder {
-    color: t.$gray-500;
+    color: t.$gray-600;
   }
 
   &:focus {
@@ -617,14 +618,38 @@ html.search-active {
   align-self: flex-start;
 }
 
+// Sticky docs nav, only while it sits beside the content.
+// The aside itself is the sticky box: its containing block is .spectra-layout
+// (as tall as the content). The design put `sticky` on the inner wrapper, whose
+// containing block is the aside, which is exactly as tall as the wrapper, so it
+// could never move. The ATP header scrolls away (not fixed), so top is 0.
+@media (min-width: $bp-side) {
+  .spectra-layout {
+    flex-wrap: nowrap;
+  }
+
+  .spectra-aside {
+    position: sticky;
+    top: 0;
+    max-height: 100vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+// Narrower: the aside drops below the content, as designed.
+@media (max-width: #{$bp-side - 0.02rem}) {
+  .spectra-aside {
+    max-width: none;
+    margin-top: 0;
+    flex-basis: 100%;
+  }
+}
+
 .spectra-aside-inner {
-  position: sticky;
-  top: 0;
   box-sizing: border-box;
   display: flex;
-  max-height: 100vh;
   padding: 0 0 60px;
-  overflow-y: auto;
   flex-direction: column;
   gap: 12px;
 }
@@ -717,7 +742,7 @@ html.search-active {
 
   .breadcrumb-nav-list-item {
     font-size: 15px !important;
-    color: t.$gray-500;
+    color: t.$gray-600;
   }
 
   a {
@@ -852,6 +877,17 @@ html.search-active {
   .highlight {
     color: t.$gray-600;
     background-color: transparent;
+
+    // Comments: the JTD light syntax colour #6e7781 is 4.24:1 on gray-100 (fails AA).
+    .c,
+    .c1,
+    .cm,
+    .cs,
+    .cd,
+    .ch,
+    .cpf {
+      color: t.$gray-600;
+    }
   }
 
   pre.highlight code,
@@ -975,7 +1011,7 @@ html.search-active {
 // Footer inside the content column (JTD components/footer.html: back to top)
 .spectra-content-col .main-content > footer {
   font-size: 15px;
-  color: t.$gray-500;
+  color: t.$gray-600;
 
   a {
     color: t.$navy-700;
@@ -1543,7 +1579,7 @@ html.search-active {
   small {
     font-size: 14px;
     line-height: 1.5;
-    color: t.$gray-500;
+    color: t.$lavender-300; // design gray-500 is 2.39:1 on navy-700
   }
 
   a {

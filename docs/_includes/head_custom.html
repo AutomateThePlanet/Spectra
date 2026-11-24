@@ -13,7 +13,7 @@
     Element.prototype.scrollIntoView = function () {
       var nav = this.closest && this.closest('#site-nav');
       if (!nav) { return nativeScrollIntoView.apply(this, arguments); }
-      var box = nav.closest('.spectra-aside-inner');
+      var box = nav.closest('.spectra-aside');
       if (box && box.scrollHeight > box.clientHeight) {
         var top = this.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
         box.scrollTop = Math.max(0, top - box.clientHeight / 2);

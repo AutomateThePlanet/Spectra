@@ -21,6 +21,7 @@ $blue-hover: #002895; // link hover (light theme)
 $sky-50: #def1f7;     // docs nav aside, cards, footer frame
 $lavender-100: #dbe1f0;
 $lavender-200: #d4dae9;
+$lavender-300: #c4cad9;   // light text on navy (footer small print)
 $search-bg: #f5f8ff;
 
 // --- Action ---
@@ -43,7 +44,7 @@ $gray-300: #ccc;
 $gray-400: #c8c8c8;
 $gray-500: #7b839a;   // muted: footer small print
 $gray-600: #61687c;   // body text, nav links, code text
-$gray-nav-current: #777; // current item in the docs nav
+$gray-nav-current: #61687c; // current docs-nav item. Design: #777, 3.84:1 on sky-50 (fails AA at 18px); gray-600 is 4.77:1
 
 // --- SPECTRA brand (inline values in SPECTRA Docs v2) ---
 $spectra-hero: #3d8f7d;     // hero band rgb(61,143,125)
@@ -65,7 +66,7 @@ $linkedin: #0077b5;
 // --- Typography (typography.css) ---
 $font-sans: "Nunito", sans-serif;
 $font-mono: Consolas, Monaco, "Courier New", monospace;
-$fs-button: 1.125rem;
+$fs-button: 1.1875rem; // design 1.125rem (18px). 19px bold is WCAG "large" text, so white on red-500 (3.37:1) passes AA
 $ls-button: -0.5px;
 
 // --- Radii / shadows / motion (effects.css) ---
