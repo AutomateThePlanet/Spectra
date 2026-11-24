@@ -1,6 +1,7 @@
 ---
 title: Development
-nav_order: 6
+parent: Architecture
+nav_order: 3
 ---
 
 # Development Guide

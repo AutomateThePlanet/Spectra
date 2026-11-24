@@ -1,0 +1,69 @@
+{%- comment -%}
+  Automate The Planet site footer for the SPECTRA docs.
+  Layout: "SPECTRA Docs v2" design. Links, phone and social URLs: the live ATP footer
+  (Automate-The-Planet-Website-v2/src/components/layout/Footer.astro), made absolute.
+  The live footer has no e-mail address or postal address, so none is shown.
+  Bottom row: site.footer_content from _config.yml (ecosystem + Apache 2.0 licence).
+{%- endcomment -%}
+{%- assign atp = "https://www.automatetheplanet.com" -%}
+<div class="atp-footer-frame">
+  <footer class="atp-footer">
+    <div class="atp-footer-grid">
+      <div class="atp-footer-brand">
+        <a href="{{ atp }}/" aria-label="Automate The Planet">
+          <img src="{{ '/assets/images/atp-logo.svg' | relative_url }}" alt="Automate The Planet" width="200" height="50">
+        </a>
+        <div class="atp-footer-cta">
+          <a class="atp-button atp-button-red" href="{{ atp }}/contact-us">Contact Us</a>
+        </div>
+      </div>
+      <div>
+        <a class="atp-footer-link" href="{{ atp }}/services/">Services</a>
+        <ul class="atp-footer-list">
+          <li><a class="atp-footer-link" href="{{ atp }}/services/web-automation/">Web Automation</a></li>
+          <li><a class="atp-footer-link" href="{{ atp }}/services/api-automation/">API Automation</a></li>
+          <li><a class="atp-footer-link" href="{{ atp }}/services/mobile-automation/">Mobile Automation</a></li>
+          <li><a class="atp-footer-link" href="{{ atp }}/services/desktop-automation/">Desktop Automation</a></li>
+          <li><a class="atp-footer-link" href="{{ atp }}/services/private-training/">Private Trainings</a></li>
+        </ul>
+      </div>
+      <div>
+        <ul class="atp-footer-list">
+          <li><a class="atp-footer-link" href="{{ atp }}/reviving-windows-app-automation-novawindows-driver-for-appium-2">Tools</a></li>
+          <li><a class="atp-footer-link" href="{{ atp }}/resources">Resources</a></li>
+          <li><a class="atp-footer-link" href="{{ atp }}/resources">Books</a></li>
+          <li><a class="atp-footer-link" href="{{ atp }}/blog">Blog</a></li>
+        </ul>
+      </div>
+      <div>
+        <ul class="atp-footer-list">
+          <li><a class="atp-footer-link" href="{{ atp }}/about-us">About Us</a></li>
+          <li><a class="atp-footer-link" href="{{ atp }}/careers">Careers</a></li>
+          <li><a class="atp-footer-link" href="tel:+15096434300">+1 509 643 4300</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="atp-footer-follow">Follow us</p>
+        <div class="atp-social">
+          <a class="atp-social-link atp-social-yt" href="https://www.youtube.com/channel/UCeE3O5IQEmjw29GV_9XrDHg" target="_blank" rel="noopener noreferrer" aria-label="Automate The Planet on YouTube">
+            <svg viewBox="0 0 200 200" aria-hidden="true"><path fill="#fff" d="M197.002,58.015 C197.002,58.015 195.085,43.782 189.131,37.502 C181.627,29.304 173.185,29.263 169.351,28.774 C141.619,26.694 100.061,26.694 100.061,26.694 L99.98,26.694 C99.98,26.694 58.422,26.694 30.731,28.774 C26.856,29.223 18.455,29.304 10.869,37.502 C4.956,43.782 2.998,58.015 2.998,58.015 C2.998,58.015 1,74.695 1,91.416 L1,93.415 L1,107.036 C1,123.757 2.998,140.478 2.998,140.478 C2.998,140.478 4.915,154.711 10.869,160.951 C18.414,169.189 28.324,168.903 32.688,169.76 C48.512,171.35 99.98,171.84 99.98,171.84 C99.98,171.84 141.578,171.758 169.31,169.678 C173.185,169.189 181.586,169.148 189.131,160.91 C195.044,154.67 197.002,140.437 197.002,140.437 C197.002,140.437 199,123.757 199,107.036 L199,94.271 L199,91.375 C199,74.736 197.002,58.015 197.002,58.015 z M79.588,126.082 L79.588,81.588 L79.588,68.048 L103.691,81.18 L133.054,97.167 L79.588,126.082 z"/></svg>
+          </a>
+          <a class="atp-social-link atp-social-tw" href="https://twitter.com/automateplanet" target="_blank" rel="noopener noreferrer" aria-label="Automate The Planet on Twitter">
+            <svg viewBox="0 0 200 200" aria-hidden="true"><path fill="#fff" d="M178.203,57.773 C178.281,59.492 178.32,61.211 178.32,62.891 C178.32,70.781 177.383,78.867 175.586,86.875 C165.352,132.188 126.602,175.898 63.555,175.898 C40.781,175.898 19.57,169.336 1.719,158.047 C4.883,158.398 8.086,158.594 11.367,158.594 C30.273,158.594 47.656,152.266 61.484,141.602 C43.828,141.289 28.945,129.805 23.789,114.023 C26.25,114.492 28.789,114.766 31.367,114.766 C35.078,114.766 38.594,114.258 41.992,113.359 C28.398,110.664 17.305,101.25 12.383,88.789 C10.625,84.336 9.609,79.492 9.609,74.414 C9.609,74.258 9.609,74.102 9.609,73.906 C15.039,76.875 21.289,78.672 27.891,78.867 C17.07,71.758 9.961,59.609 9.961,45.82 C9.961,38.555 11.953,31.719 15.43,25.859 C35.312,49.883 65.039,65.703 98.555,67.344 C97.891,64.414 97.539,61.406 97.539,58.281 C97.539,36.367 115.586,18.555 137.891,18.555 C149.492,18.555 159.961,23.359 167.344,31.094 C176.523,29.297 185.195,26.016 192.969,21.445 C189.961,30.742 183.555,38.516 175.234,43.438 C183.398,42.461 191.172,40.352 198.398,37.188 C192.93,45.195 186.094,52.188 178.203,57.773 z"/></svg>
+          </a>
+          <a class="atp-social-link atp-social-li" href="https://www.linkedin.com/company/automate-the-planet/" target="_blank" rel="noopener noreferrer" aria-label="Automate The Planet on LinkedIn">
+            <svg viewBox="0 0 200 200" aria-hidden="true"><path fill="#fff" d="M184.557,184 L149.729,184 L149.729,129.539 C149.729,116.563 149.503,99.826 131.638,99.826 C113.509,99.826 110.763,113.968 110.763,128.598 L110.763,184 L75.973,184 L75.973,71.993 L109.372,71.993 L109.372,87.301 L109.861,87.301 C114.487,78.5 125.883,69.21 142.808,69.21 C178.05,69.21 184.594,92.416 184.594,122.581 L184.594,184 z"/><path fill="#fff" d="M18.051,71.429 L52.917,71.429 L52.917,183.473 L18.051,183.473 z"/><path fill="#fff" d="M35.503,55.595 C24.332,55.595 15.306,46.53 15.306,35.397 C15.306,24.264 24.332,15.2 35.503,15.2 C46.636,15.2 55.7,24.264 55.7,35.397 C55.663,46.53 46.636,55.595 35.503,55.595 z"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="atp-footer-sub">
+      <small>©{{ site.time | date: "%Y" }} Automate The Planet LTD All Rights Reserved <a href="{{ atp }}/privacy-policy/">Privacy Policy</a></small>
+    </div>
+    {%- if site.footer_content %}
+    <div class="atp-footer-sub atp-footer-content">
+      <small>{{ site.footer_content }}</small>
+    </div>
+    {%- endif %}
+  </footer>
+</div>

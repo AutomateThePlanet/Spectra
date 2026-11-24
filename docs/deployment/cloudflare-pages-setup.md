@@ -1,5 +1,6 @@
 ---
 title: Cloudflare Pages Setup
+grand_parent: Guides
 parent: Deployment
 nav_order: 1
 ---

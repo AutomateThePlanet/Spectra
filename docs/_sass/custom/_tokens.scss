@@ -1,0 +1,89 @@
+// =============================================================
+// SPECTRA docs — design tokens
+// Ported from the Automate The Planet design system used by
+// "SPECTRA Docs v2" (ds/automate-the-planet-design-system/tokens/*.css).
+// Values that the design uses inline (hero green, step colours,
+// code-block accent) are named here so every rule reads from one place.
+//
+// Loaded with `@use` from color_schemes/spectra.scss and custom/custom.scss.
+// It defines variables only (no CSS output), so it is safe in every
+// Just the Docs entry point, including just-the-docs-dark/light.scss.
+// =============================================================
+
+// --- Navy / blue scale (colors.css) ---
+$navy-950: #0c234c;
+$navy-900: #14234c;   // headings, dark panels
+$navy-850: #14244d;   // round search button
+$navy-700: #274492;   // brand blue: footer, links, nav links
+$blue-hover: #002895; // link hover (light theme)
+
+// --- Sky / lavender ---
+$sky-50: #def1f7;     // docs nav aside, cards, footer frame
+$lavender-100: #dbe1f0;
+$lavender-200: #d4dae9;
+$search-bg: #f5f8ff;
+
+// --- Action ---
+$red-500: #ff473f;    // primary CTA ("Get SPECTRA", "Contact Us")
+$red-600: #ff2d12;    // CTA hover
+
+// --- Cyan / teal / amber accents ---
+$cyan-600: #00aed3;
+$cyan-700: #0891b2;
+$cyan-ink: #0e4f72;   // links inside note boxes
+$teal-400: #4ec9b0;   // "grounded" label on dark
+$amber-600: #c98600;  // note box
+
+// --- Neutrals ---
+$white: #fff;
+$black: #000;
+$gray-100: #f7f7f7;   // code block background
+$gray-150: #f3f3f5;   // card / chip row background
+$gray-300: #ccc;
+$gray-400: #c8c8c8;
+$gray-500: #7b839a;   // muted: footer small print
+$gray-600: #61687c;   // body text, nav links, code text
+$gray-nav-current: #777; // current item in the docs nav
+
+// --- SPECTRA brand (inline values in SPECTRA Docs v2) ---
+$spectra-hero: #3d8f7d;     // hero band rgb(61,143,125)
+$spectra-code-accent: #2b7bb5; // code block left border rgb(43,123,181)
+$spectra-divider: #e6ebed;  // dividers rgb(230,235,237)
+$spectra-connector: #c4d0d6; // dashed step connector rgb(196,208,214)
+$spectra-step-1: #43a85f;   // Index
+$spectra-step-2: #1f9a8a;   // Generate
+$spectra-step-3: #d9a93c;   // Verify
+$spectra-step-4: #e2763a;   // Execute
+$spectra-step-5: #d23a33;   // Cover
+$spectra-rejected: #ff8a80; // "hallucinated" label on dark
+
+// --- Social (colors.css) ---
+$youtube: #f15a4b;
+$twitter: #43bdef;
+$linkedin: #0077b5;
+
+// --- Typography (typography.css) ---
+$font-sans: "Nunito", sans-serif;
+$font-mono: Consolas, Monaco, "Courier New", monospace;
+$fs-button: 1.125rem;
+$ls-button: -0.5px;
+
+// --- Radii / shadows / motion (effects.css) ---
+$radius-sm: 3px;
+$radius-img: 4px;
+$radius-md: 8px;
+$radius-pill: 1.625rem;
+$radius-full: 100px;
+$shadow-submenu: 0 0 5px rgba(0, 0, 0, 0.3);
+$shadow-glow: 0 0 20px #dbe1f0;
+$dur-slow: 0.5s;
+
+// --- Spacing / layout (spacing.css + SPECTRA Docs v2 layout) ---
+$frame-padding: 31px;
+$frame-padding-mobile: 12px;
+$header-height: 6rem;        // 96px
+$header-height-mobile: 5rem; // 80px below 48em
+$container-pad: 5%;
+$layout-max: 1632px;         // hero / main max-width in the design
+$aside-max: 440px;
+$aside-overlap: 210px;       // aside pulls up into the hero on wide screens

@@ -1,5 +1,6 @@
 ---
-title: User Guide
+title: Reference
+description: "Reference for the SPECTRA CLI commands, spectra.config.json, the Markdown test case format, the document index, AI model costs and version migrations."
 nav_order: 2
 has_children: true
 permalink: /user-guide

@@ -1,7 +1,7 @@
 ---
 title: Generation Profiles
-parent: User Guide
-nav_order: 4
+parent: Guides
+nav_order: 5
 ---
 
 # Generation Profiles

@@ -49,3 +49,6 @@ dist/
 # Visual Studio / editor scratch (spec 103 setup verification)
 .vs/
 *.tmp
+
+# Local design capture and redesign report (not deployed)
+docs-design-reference/

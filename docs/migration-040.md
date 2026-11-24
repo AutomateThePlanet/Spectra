@@ -1,8 +1,8 @@
 ---
 layout: default
 title: "Migration: Document Index Restructure (v1.51.0)"
-parent: Migration Guides
-nav_order: 40
+parent: Reference
+nav_order: 6
 ---
 
 # Migration: Document Index Restructure (v1.51.0)

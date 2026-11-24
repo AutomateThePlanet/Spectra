@@ -1,6 +1,7 @@
 ---
 title: Testimize Integration
-nav_order: 12
+parent: Guides
+nav_order: 7
 ---
 
 # Testimize Integration

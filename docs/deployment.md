@@ -1,6 +1,7 @@
 ---
 title: Deployment
-nav_order: 5
+parent: Guides
+nav_order: 8
 has_children: true
 permalink: /deployment
 ---

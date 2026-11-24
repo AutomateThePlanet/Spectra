@@ -1,7 +1,7 @@
 ---
 title: Skills Integration
-parent: User Guide
-nav_order: 8
+parent: Guides
+nav_order: 4
 ---
 
 # Skills Integration

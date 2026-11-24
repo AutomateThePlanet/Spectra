@@ -1,7 +1,7 @@
 ---
 title: AI Agents
-parent: User Guide
-nav_order: 8.5
+parent: Guides
+nav_order: 3
 ---
 
 # Using SPECTRA with other AI agents

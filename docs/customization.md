@@ -1,7 +1,7 @@
 ---
 title: Customization
-parent: User Guide
-nav_order: 10
+parent: Guides
+nav_order: 6
 ---
 
 # SPECTRA Customization Guide

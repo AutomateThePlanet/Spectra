@@ -1,0 +1,91 @@
+---
+layout: table_wrappers
+---
+{%- comment -%}
+  SPECTRA docs layout. Forked from just-the-docs 0.12.0 `_layouts/default.html`
+  (the version bundler resolves for docs/Gemfile `just-the-docs ~> 0.10`; there is no Gemfile.lock).
+  Only the structure changed:
+    - ATP site header on top (_includes/atp_header.html). It contains JTD's own
+      components/header.html, i.e. #main-header with the search input, header_custom and aux_nav.
+    - Hero band with the page title + description (_includes/spectra_hero.html).
+    - Content column on the left, the docs nav (JTD components/site_nav.html, #site-nav)
+      in a right-hand aside; below the content on narrow screens.
+    - ATP site footer at the bottom (_includes/atp_footer.html).
+  JTD includes still used unchanged: head.html, icons/icons.html, components/header.html,
+  components/site_nav.html, components/breadcrumbs.html, vendor/anchor_headings.html,
+  components/children_nav.html, components/footer.html, components/search_footer.html,
+  components/mermaid.html.
+  Not used: components/sidebar.html (its logo lives in the ATP header; #menu-button is
+  rendered by atp_header.html with the same markup).
+  Kept ids for just-the-docs.js: #site-nav, #main-header, #menu-button, #search-input,
+  #search-results, #search-button, #main-content, #top.
+  If you upgrade just-the-docs, diff its default.html against this file.
+{%- endcomment -%}
+<!DOCTYPE html>
+
+<html lang="{{ site.lang | default: 'en-US' }}">
+{% include head.html %}
+<body class="spectra-docs">
+  <a class="skip-to-main" href="#main-content">Skip to main content</a>
+  {% include icons/icons.html %}
+  <div class="spectra-page" id="top">
+    {% include atp_header.html %}
+    {% include spectra_hero.html %}
+
+    {%- comment -%}
+      A page whose Markdown starts with an h1 that repeats the page title would show the
+      title twice (hero + content). Only that exact duplicate is left out of the content
+      column; any h1 that says something else stays.
+    {%- endcomment -%}
+    {%- assign spectra_content = content -%}
+    {%- assign spectra_trimmed = content | strip -%}
+    {%- assign spectra_first3 = spectra_trimmed | slice: 0, 3 -%}
+    {%- if spectra_first3 == "<h1" -%}
+      {%- assign spectra_h1_html = spectra_trimmed | split: "</h1>" | first | append: "</h1>" -%}
+      {%- assign spectra_h1_text = spectra_h1_html | strip_html | strip | downcase -%}
+      {%- assign spectra_title_text = page.title | strip_html | strip | downcase -%}
+      {%- if spectra_h1_text == spectra_title_text -%}
+        {%- assign spectra_content = spectra_trimmed | remove_first: spectra_h1_html -%}
+      {%- endif -%}
+    {%- endif -%}
+
+    <div class="spectra-layout">
+      <div class="spectra-content-col">
+        {% include components/breadcrumbs.html %}
+        <div id="main-content" class="main-content">
+          <main>
+            {% if site.heading_anchors != false %}
+              {% include vendor/anchor_headings.html html=spectra_content beforeHeading="true" anchorBody="<svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><use xlink:href=\"#svg-link\"></use></svg>" anchorClass="anchor-heading" anchorAttrs="aria-labelledby=\"%html_id%\"" %}
+            {% else %}
+              {{ spectra_content }}
+            {% endif %}
+
+            {% if page.has_toc != false %}
+              {% include components/children_nav.html %}
+            {% endif %}
+          </main>
+          {% include components/footer.html %}
+        </div>
+      </div>
+
+      {% if page.nav_enabled != false and site.nav_enabled != false %}
+      <aside class="spectra-aside" aria-label="SPECTRA documentation">
+        <div class="spectra-aside-inner">
+          {% include_cached components/site_nav.html %}
+        </div>
+      </aside>
+      {% endif %}
+    </div>
+
+    {% include atp_footer.html %}
+
+    {% if site.search_enabled != false %}
+      {% include components/search_footer.html %}
+    {% endif %}
+  </div>
+
+  {% if site.mermaid %}
+    {% include components/mermaid.html %}
+  {% endif %}
+</body>
+</html>

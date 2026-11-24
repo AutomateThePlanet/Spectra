@@ -1,7 +1,7 @@
 ---
 title: Live Verification (AI Agents)
-parent: User Guide
-nav_order: 12
+parent: Quality
+nav_order: 3
 ---
 
 # Live verification checklist: SPECTRA in each AI agent

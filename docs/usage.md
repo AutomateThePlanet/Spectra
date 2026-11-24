@@ -1,7 +1,7 @@
 ---
 title: Usage Guide
-parent: User Guide
-nav_order: 9
+parent: Guides
+nav_order: 2
 ---
 
 # SPECTRA Usage Guide

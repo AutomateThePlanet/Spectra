@@ -1,7 +1,7 @@
 ---
 title: Grounding Verification
-parent: User Guide
-nav_order: 5
+parent: Quality
+nav_order: 1
 ---
 
 # Grounding Verification

@@ -1,6 +1,6 @@
 ---
 title: Test Format
-parent: User Guide
+parent: Reference
 nav_order: 3
 ---
 

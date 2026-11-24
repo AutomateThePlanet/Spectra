@@ -1,7 +1,7 @@
 ---
 title: Coverage Analysis
-parent: User Guide
-nav_order: 6
+parent: Quality
+nav_order: 2
 ---
 
 # Coverage Analysis

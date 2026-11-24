@@ -1,6 +1,6 @@
 ---
 title: CLI Reference
-parent: User Guide
+parent: Reference
 nav_order: 1
 ---
 

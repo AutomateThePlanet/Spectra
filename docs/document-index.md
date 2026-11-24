@@ -1,7 +1,7 @@
 ---
 title: Document Index
-parent: User Guide
-nav_order: 7
+parent: Reference
+nav_order: 4
 ---
 
 # Document Index

@@ -1,7 +1,7 @@
 ---
 title: "Claude Code v2 vs. the GitHub Copilot SDK v1"
-parent: Migration Guides
-nav_order: 41
+parent: Reference
+nav_order: 7
 ---
 
 # Claude Code v2 vs. the GitHub Copilot SDK v1

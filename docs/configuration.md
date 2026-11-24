@@ -1,6 +1,6 @@
 ---
 title: Configuration
-parent: User Guide
+parent: Reference
 nav_order: 2
 ---
 
