@@ -76,6 +76,6 @@ The skill and subagent text is the same for every agent; only agent-specific wor
 change. Each agent's files are listed in `.spectra/manifest.<agent>.json`. The model setting `ai.critic.model`
 applies to Claude Code only. Folders, detection rules, shared folders and troubleshooting:
 [AI agent installs](ai-agents-reference). To verify an installation in a real session:
-[Live verification checklist](live-verification-agents).
+[Live verification in each AI agent](DEVELOPMENT.md#live-verification-in-each-ai-agent-maintainers).
 
 </details>

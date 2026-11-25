@@ -18,5 +18,4 @@ How SPECTRA works, for readers who want to know what happens behind a request.
 | [How test case generation works](analysis/cli-vs-chat-generation) | the generation flow |
 | [Document index](document-index) | how SPECTRA summarises your docs for prompts |
 | [Glossary](glossary) | every term, defined once |
-| [Live verification checklist](live-verification-agents) | checking SPECTRA in each AI agent (maintainers) |
-| [Development](DEVELOPMENT) | building SPECTRA and these docs from source |
+| [Development](DEVELOPMENT) | building SPECTRA and these docs from source; the live check in each AI agent |
