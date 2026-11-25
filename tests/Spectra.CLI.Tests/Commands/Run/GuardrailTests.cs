@@ -20,7 +20,7 @@ public class GuardrailTests
 
     private static async Task<TestStatus> ReadStatus(string root, string testId)
     {
-        await using var db = new ExecutionDb(Path.Combine(root, ".execution"));
+        await using var db = new ExecutionDb(root);
         var runs = await new RunRepository(db).GetAllAsync(limit: 1);
         var rows = await new ResultRepository(db).GetByRunIdAsync(runs[0].RunId);
         return rows.First(r => r.TestId == testId).Status;

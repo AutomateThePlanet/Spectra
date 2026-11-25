@@ -22,7 +22,7 @@ public class ParityTests
 
     private static (ExecutionEngine Engine, ExecutionDb Db) Engine(string root)
     {
-        var db = new ExecutionDb(Path.Combine(root, ".execution"));
+        var db = new ExecutionDb(root);
         var engine = new ExecutionEngine(new RunRepository(db), new ResultRepository(db),
             new QueueSnapshotRepository(db), new UserIdentityResolver(), new McpConfig { BasePath = root });
         return (engine, db);
@@ -121,7 +121,7 @@ public class ParityTests
 
     private static async Task<List<TestResult>> ReadAllResults(string root, string testId)
     {
-        await using var db = new ExecutionDb(Path.Combine(root, ".execution"));
+        await using var db = new ExecutionDb(root);
         var runRepo = new RunRepository(db);
         var resultRepo = new ResultRepository(db);
         var runs = await runRepo.GetAllAsync(limit: 50);
@@ -139,7 +139,7 @@ public class ParityTests
 
     private static async Task<string?> ReadActiveOrAnyRunId(string root)
     {
-        await using var db = new ExecutionDb(Path.Combine(root, ".execution"));
+        await using var db = new ExecutionDb(root);
         var runs = await new RunRepository(db).GetAllAsync(limit: 1);
         return runs.FirstOrDefault()?.RunId;
     }

@@ -90,7 +90,7 @@ public class ConsoleGuardrailTests
 
     private static async Task<TestStatus> ReadStatus(string root, string testId)
     {
-        await using var db = new ExecutionDb(Path.Combine(root, ".execution"));
+        await using var db = new ExecutionDb(root);
         var runs = await new RunRepository(db).GetAllAsync(limit: 50);
         var resultRepo = new ResultRepository(db);
         foreach (var r in runs)

@@ -40,7 +40,7 @@ public class RunLoopSmokeTests
         // Finalize and confirm the run completed + results are durable in the DB.
         Assert.Equal(ExitCodes.Success, await handler.FinalizeAsync(null, force: false));
 
-        await using var db = new ExecutionDb(Path.Combine(ws.Root, ".execution"));
+        await using var db = new ExecutionDb(ws.Root);
         var engine = new ExecutionEngine(new RunRepository(db), new ResultRepository(db),
             new QueueSnapshotRepository(db), new UserIdentityResolver(), new McpConfig { BasePath = ws.Root });
         var active = await engine.GetActiveRunAsync();

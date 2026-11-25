@@ -49,7 +49,7 @@ public class SelectionStartTests
             await Handler(ws.Root).StartAsync(null, null, null, null, null, "high-only", null));
 
         // The run enqueued exactly the two high-priority tests — not all four.
-        await using var db = new ExecutionDb(Path.Combine(ws.Root, ".execution"));
+        await using var db = new ExecutionDb(ws.Root);
         var engine = new ExecutionEngine(new RunRepository(db), new ResultRepository(db),
             new QueueSnapshotRepository(db), new UserIdentityResolver(), new McpConfig { BasePath = ws.Root });
         var active = await engine.GetActiveRunAsync();

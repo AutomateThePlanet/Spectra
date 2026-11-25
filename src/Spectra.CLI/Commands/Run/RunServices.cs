@@ -45,7 +45,23 @@ public sealed class RunServices : IAsyncDisposable
         Directory.CreateDirectory(Path.Combine(BasePath, ".execution"));
         Directory.CreateDirectory(reportsPath);
 
-        _db = new ExecutionDb(Path.Combine(BasePath, ".execution"));
+        // ExecutionDb appends .execution/spectra.db to the base path itself. Earlier builds passed
+        // <repo>/.execution here and stored runs in .execution/.execution/spectra.db, where the
+        // dashboard never looked; move such a database once, then open the shared path.
+        switch (ExecutionDbLocation.MigrateNestedDatabase(BasePath))
+        {
+            case ExecutionDbLocation.MigrationOutcome.Moved:
+                Console.Error.WriteLine(
+                    "Moved the run database from .execution/.execution/spectra.db to .execution/spectra.db.");
+                break;
+            case ExecutionDbLocation.MigrationOutcome.BothExist:
+                Console.Error.WriteLine(
+                    "Warning: .execution/.execution/spectra.db (written by an older SPECTRA) was left in place "
+                    + "because .execution/spectra.db exists. Runs in the older file are not shown.");
+                break;
+        }
+
+        _db = new ExecutionDb(BasePath);
         RunRepo = new RunRepository(_db);
         ResultRepo = new ResultRepository(_db);
         SnapshotRepo = new QueueSnapshotRepository(_db);

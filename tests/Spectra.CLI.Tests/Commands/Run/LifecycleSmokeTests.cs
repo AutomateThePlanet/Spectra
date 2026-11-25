@@ -47,7 +47,7 @@ public class LifecycleSmokeTests
         // Finalize completes the run and writes a durable HTML report — with no MCP server at any point.
         Assert.Equal(ExitCodes.Success, await h.FinalizeAsync(null, force: false));
 
-        await using var db = new ExecutionDb(Path.Combine(ws.Root, ".execution"));
+        await using var db = new ExecutionDb(ws.Root);
         var engine = new ExecutionEngine(new RunRepository(db), new ResultRepository(db),
             new QueueSnapshotRepository(db), new UserIdentityResolver(), new McpConfig { BasePath = ws.Root });
         Assert.Null(await engine.GetActiveRunAsync()); // finalized → no active run

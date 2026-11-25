@@ -44,7 +44,7 @@ public class ConsoleScreenshotTests
 
     private static async Task<IReadOnlyList<string>> ReadScreenshotPaths(string root, string testId)
     {
-        await using var db = new ExecutionDb(Path.Combine(root, ".execution"));
+        await using var db = new ExecutionDb(root);
         var runs = await new RunRepository(db).GetAllAsync(limit: 50);
         var resultRepo = new ResultRepository(db);
         foreach (var r in runs)
