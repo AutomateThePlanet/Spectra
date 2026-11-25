@@ -33,22 +33,22 @@ chat, with the uncovered docs, the untested criteria and the test cases that hav
 While it scans, SPECTRA also links test cases to your automated tests. It searches your automation code for test IDs,
 for example `[ManualTestCase("TC-1186")]`, and records each match in the test case.
 
-**Dashboard.** The agent builds the site and opens it. The first view lists your suites:
+**Dashboard.** The agent builds the site and opens it. The first view lists your suites, on a desktop and on a phone:
 
-{% include screenshot.html file="dashboard-suites" alt="SPECTRA dashboard home with the test count per suite for the Windows Calculator demo" %}
+<div class="screenshot-pair">
+{% include screenshot.html file="dashboard-suites" alt="SPECTRA dashboard suite cards for the Windows Calculator demo: tests per priority, total tests and automation per suite" %}
+{% include screenshot.html phone=true file="dashboard-suites-mobile" alt="The same SPECTRA dashboard on a 390-pixel-wide phone screen" %}
+</div>
 
 Click a test to see its priority, tags, preconditions, steps and expected result:
 
-{% include screenshot.html file="dashboard-test-detail" alt="Dashboard test detail panel for TC-1186 with tags, suite, preconditions, four steps and the expected result" %}
+{% include screenshot.html file="dashboard-test-detail" narrow=true alt="Dashboard test detail panel for TC-1186 with tags, suite, preconditions, four steps and the expected result" %}
 
 The **Coverage** tab shows the three numbers with drill-down lists:
 
 {% include screenshot.html file="dashboard-coverage" alt="Dashboard coverage tab: documentation 100 percent, acceptance criteria 98.6 percent, automation 25.2 percent" caption="The Calculator demo: every doc has tests, 69 of 70 extracted criteria have tests, and 275 of 1,091 test cases are automated." %}
 
-The **Run History** tab lists past test runs ([Run tests with your agent](execution-agents)). The dashboard also works on
-a phone:
-
-{% include screenshot.html file="dashboard-suites-mobile" alt="SPECTRA dashboard suites view on a 390-pixel-wide phone screen" %}
+The **Run History** tab lists past test runs ([Run tests with your agent](execution-agents)).
 
 ## Where the results are
 

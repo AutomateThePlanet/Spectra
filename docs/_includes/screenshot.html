@@ -1,7 +1,15 @@
 {%- comment -%}
   A real screenshot from docs/assets/images/screenshots/ (see DEVELOPMENT.md, "Documentation screenshots").
-  Params: file (name without .webp), alt (what the image shows), caption (optional, Markdown-free text),
-  narrow (optional: cap the width, for small pages such as the progress page).
+  Params:
+    file     name without .webp; its display size comes from _data/screenshots.yml (written by the capture script)
+    alt      what the image shows
+    caption  optional, plain text
+    narrow   optional: cap the width (small pages such as the progress page)
+    phone    optional: a mobile capture, shown at most 340 px wide in a phone frame
+  Wrap a desktop and a phone screenshot in <div class="screenshot-pair">…</div> to show them side by side.
+  The image links to the full-size file; assets/js/screenshot-lightbox.js opens it in a lightbox.
   Output stays on one line so it works inside Markdown list items.
 {%- endcomment -%}
-<figure class="screenshot{% if include.narrow %} screenshot-narrow{% endif %}"><img src="{{ '/assets/images/screenshots/' | append: include.file | append: '.webp' | relative_url }}" alt="{{ include.alt }}" loading="lazy">{% if include.caption %}<figcaption>{{ include.caption }}</figcaption>{% endif %}</figure>
+{%- assign shot_size = site.data.screenshots[include.file] -%}
+{%- assign shot_src = '/assets/images/screenshots/' | append: include.file | append: '.webp' | relative_url -%}
+<figure class="screenshot{% if include.narrow %} screenshot-narrow{% endif %}{% if include.phone %} screenshot-phone{% endif %}"><a class="screenshot-link" href="{{ shot_src }}" aria-label="Open full size: {{ include.alt }}"><img src="{{ shot_src }}" alt="{{ include.alt }}"{% if shot_size %} width="{{ shot_size.width }}" height="{{ shot_size.height }}"{% endif %} loading="lazy" decoding="async"></a>{% if include.caption %}<figcaption>{{ include.caption }}</figcaption>{% endif %}</figure>

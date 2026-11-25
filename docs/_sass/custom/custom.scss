@@ -1007,9 +1007,23 @@ html.search-active {
     color: t.$navy-700;
   }
 
-  // --- Screenshots: real captures from the demo repository ---
+  // --- Screenshots: real captures from the demo repository (_includes/screenshot.html) ---
+  // Desktop captures show at most at the content-column width (760px) and never larger than their own
+  // display size (width/height attributes). Phone captures sit in a phone frame, at most 340px wide.
   .screenshot {
+    max-width: 760px;
     margin: 0 0 24px;
+
+    .screenshot-link {
+      display: block;
+      cursor: zoom-in;
+      border-radius: t.$radius-img;
+
+      &:focus-visible {
+        outline: 3px solid t.$navy-700;
+        outline-offset: 3px;
+      }
+    }
 
     img {
       display: block;
@@ -1019,15 +1033,57 @@ html.search-active {
       border-radius: t.$radius-img;
     }
 
-    &.screenshot-narrow img {
-      max-width: min(100%, 560px);
-    }
-
     figcaption {
       margin-top: 8px;
       font-size: 15px;
       line-height: 1.5;
       color: t.$gray-600;
+    }
+  }
+
+  .screenshot-narrow {
+    max-width: 560px;
+  }
+
+  .screenshot-phone {
+    max-width: 340px;
+
+    .screenshot-link {
+      padding: 10px;
+      background: t.$navy-900;
+      border-radius: 34px;
+      box-shadow: t.$shadow-glow;
+    }
+
+    img {
+      border: 0;
+      border-radius: 24px;
+    }
+
+    figcaption {
+      text-align: center;
+    }
+  }
+
+  // A desktop and a phone capture side by side; stacked on narrow screens.
+  .screenshot-pair {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    align-items: flex-start;
+    margin: 0 0 24px;
+
+    > .screenshot {
+      margin: 0;
+    }
+
+    > .screenshot:not(.screenshot-phone) {
+      flex: 1 1 360px;
+      min-width: 0;
+    }
+
+    > .screenshot-phone {
+      flex: 0 1 240px;
     }
   }
 
@@ -1636,4 +1692,56 @@ html.search-active {
 .atp-footer-content {
   min-height: 0;
   padding-bottom: 1.25rem;
+}
+
+// --- Screenshot lightbox (assets/js/screenshot-lightbox.js); the dialog sits outside .main-content ---
+.screenshot-lightbox {
+  max-width: min(96vw, 1600px);
+  max-height: 96vh;
+  padding: 16px;
+  background: t.$white;
+  border: 0;
+  border-radius: t.$radius-md;
+
+  &::backdrop {
+    background: rgba(20, 35, 76, 0.75);
+  }
+
+  img {
+    display: block;
+    max-width: 100%;
+    max-height: calc(96vh - 96px);
+    margin: 0 auto;
+  }
+
+  .screenshot-lightbox-caption {
+    margin: 12px 40px 0 0;
+    font-size: 15px;
+    line-height: 1.5;
+    color: t.$gray-600;
+  }
+
+  .screenshot-lightbox-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 40px;
+    height: 40px;
+    font-size: 28px;
+    line-height: 1;
+    color: t.$navy-900;
+    cursor: pointer;
+    background: t.$white;
+    border: 1px solid t.$spectra-divider;
+    border-radius: 50%;
+
+    &:focus-visible {
+      outline: 3px solid t.$navy-700;
+      outline-offset: 2px;
+    }
+  }
+}
+
+.screenshot-lightbox-open {
+  overflow: hidden;
 }

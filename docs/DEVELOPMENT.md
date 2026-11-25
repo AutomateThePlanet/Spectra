@@ -165,8 +165,30 @@ node capture.js --demo <path-to-demo-repo> --spectra <path-to-the-spectra-build-
 The script writes to the demo repository: `ai analyze --coverage --auto-link` updates its coverage files and
 `.spectra-progress.html`; the dashboard is built in a temporary folder. The generate and criteria progress pages
 (`progress-generate-*`, `progress-criteria-*`) change only while an agent runs, so run `--seam` once per phase
-during a real "generate test cases" or "extract criteria" conversation. Write every new image's alt text in the
-page that uses it.
+during a real "generate test cases" or "extract criteria" conversation. To re-crop a raw PNG of such a capture:
+`node images.js crop <in.png> <name>`.
+
+Every image is captured at device scale factor 2 and cropped to the relevant part (the progress pages to their cards,
+the dashboard to its content area). `images.js` writes each image's display size (half its pixel size) to
+`docs/_data/screenshots.yml`; the page include reads it for the `width` and `height` attributes, so the browser
+reserves the right space and never shows an image larger than it was captured.
+
+Use the include, never a bare `<img>`:
+
+```liquid
+{% raw %}{% include screenshot.html file="dashboard-coverage" alt="What the image shows" caption="Optional." %}
+{% include screenshot.html narrow=true file="progress-generate-critic" alt="…" %}
+
+<div class="screenshot-pair">
+{% include screenshot.html file="dashboard-suites" alt="…" %}
+{% include screenshot.html phone=true file="dashboard-suites-mobile" alt="…" %}
+</div>{% endraw %}
+```
+
+Desktop images show at most 760 px wide (`narrow`: 560 px); phone captures (`phone=true`) at most 340 px, in a phone
+frame; a `screenshot-pair` puts them side by side and stacks them on small screens. Each image links to its full-size
+file, which `assets/js/screenshot-lightbox.js` opens in a lightbox (Esc or the close button closes it). Write every
+new image's alt text in the page that uses it.
 
 ## Using TestFixtures
 
