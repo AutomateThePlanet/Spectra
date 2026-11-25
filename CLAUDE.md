@@ -100,6 +100,11 @@ spectra run skip|note|screenshot|screenshot-clipboard [<handle>] | spectra run b
 spectra run retest|pause|resume|cancel|finalize [<run-id>] | spectra run cancel-all | spectra run console [--stop]
 ```
 
+## Commits
+
+Never add Co-Authored-By, Claude-Session or 'Generated with Claude Code' lines to commits, tags, releases or PR
+descriptions. Commits are authored only by Anton.
+
 ## Code Style
 - PascalCase types/methods, camelCase locals; nullable reference types enabled.
 - All I/O async with the `Async` suffix.
