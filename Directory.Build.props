@@ -27,6 +27,6 @@
 
   <!-- Shared analyzers for all projects -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.*" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="11.*" PrivateAssets="all" />
   </ItemGroup>
 </Project>
