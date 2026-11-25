@@ -7,146 +7,76 @@ description: "How the critic checks each generated test against the doc sections
 
 # How SPECTRA double-checks your tests
 
-Every generated or edited test case is checked by a separate AI step, the *critic*, before SPECTRA keeps it. This page
-explains how that check works. To act on its results, see [Review flagged tests](review).
+An AI model can write a test that sounds right but isn't in your docs: a step that doesn't exist, an error message
+nobody documented, a wrong number. So every test SPECTRA writes or edits is checked by a second, separate AI step,
+the *critic*, before it's kept. This page explains that check. To act on its results, see
+[Review flagged tests](review).
 
-Related: [CLI Reference](cli-reference) | [Configuration](configuration) | [Test Format](test-format)
+{% include flow.html name="double-check" %}
 
----
+## The labels
 
-## Overview
+Every checked test gets one of these labels. They are the exact words the skills, the test files and
+`spectra ai audit-grounding` use.
 
-When AI generates test cases, it can hallucinate, inventing steps, expected results, or behaviors that don't exist in your documentation. SPECTRA's grounding verification has a separate AI step, the critic, check each test case against the source documentation. The critic runs in its own context on the model set in `ai.critic.model`; that can be the same model family that wrote the test.
+| Label | What it means | What happens |
+|---|---|---|
+| **grounded** | Every step and expected result is backed by your docs. | The test is kept. |
+| **partial** | Most of the test is backed by your docs, but at least one detail isn't. | One automatic repair, then a new check. If it's still partial, the test is **flagged**. |
+| **hallucinated** | The test invents behaviour or contradicts your docs. | The test is deleted and the reason is recorded. |
+| **flagged** | A partial test that the repair didn't fix. | It waits for you: accept, fix, regenerate or delete ([Review flagged tests](review)). |
+| **unverified** | The check hasn't run for this test, or couldn't finish. | Ask your agent to run the critic again; `spectra ai audit-grounding` lists these tests. |
 
-## How It Works
+## What the critic looks at
 
-1. **Generator** creates draft test cases from your documentation
-2. **Critic** verifies each test case against the same docs. The critic runs in a fresh, isolated
-   subagent context, so it sees only the test artifact and the source text it cites (the cited
-   sections; `compile-critic-prompt --full-docs` gives whole documents),
-   never the generator's prompt, reasoning, tool calls, or token usage. Its instructions are the
-   `critic-verification` prompt template (customise `.spectra/prompts/critic-verification.md`).
-3. Test cases receive a verdict: `grounded`, `partial`, or `hallucinated`
-4. A `hallucinated` test is deleted, and the reason is recorded (`spectra ai record-drop`). `grounded` and
-   `partial` tests are kept.
-5. A partial test gets one repair attempt. Only a repair that changed the test is judged again; a repair that left
-   it unchanged keeps the verdict it already has, which routes it as before
+- **Only the doc sections the test cites.** It never sees how the test was written: not the prompt, not the
+  reasoning, not the other tests. That keeps its judgement independent.
+- **Every element on its own.** Each step, the preconditions, the expected result and the test data are checked
+  against the text, and every finding names the element.
+- **Numbers are recalculated.** When the expected result is a computed value (a unit conversion, a formula), the
+  critic works it out itself. The right method with a wrong number isn't **grounded**. Example: a test expecting
+  `1×10⁻⁹ km → 1E-9 nm` fails, because the right result is `1000 nm`.
+- **Vague docs aren't treated as invention.** When the docs simply don't say, the detail is reported as unverified
+  and the test is at most **partial**. **hallucinated** is kept for clear inventions and contradictions.
 
-### Advisory verdict, fail-loud damage
+## What it doesn't check
 
-The verdict is advisory-gating, meaning a clear `hallucinated` verdict drops the test while `grounded`,
-`partial`, and manually-marked tests pass through. But the critic's *damage* paths fail loud rather
-than silently passing:
+The critic answers "is everything in this test backed by the docs?" It doesn't ask whether the tests cover
+everything they should. That is the job of the analysis before generation, which also lists boundary cases the docs
+imply but no test covers yet (min/max, off-by-one, empty values, timeouts). See [Generate test cases](usage).
 
-- A critic response missing its `verdict` or `score`, or otherwise unparseable, is surfaced as a
-  specific error. It is **not** smoothed into a soft `partial` / `0.5` pass.
-- A critic *call* that fails or times out is non-blocking (the test is marked unverified and
-  generation continues) but is recorded **distinctly** from a malformed response, so a failed
-  critic and a bad critic response are never conflated.
+## Where the result is saved
 
-### Grounding vs. boundary/edge completeness: two distinct checks
-
-Grounding answers **"does each claim in a generated test trace back to the docs?"** It is a
-*retrospective, per-artifact* check, and it is deliberately scoped to grounding only: the critic
-judges what is in front of it and treats anything it wasn't given as `unverified`, never as a missing
-test. It does **not** ask whether the edges that *should* be tested are covered.
-
-That second question, **"are the boundary/edge conditions the docs imply actually covered?"**, is
-completeness, and it lives in the analysis phase rather than the critic. When you run the
-analyze step, `ingest-analysis` reports boundary-coverage gaps (min/max, off-by-one, empty/null,
-overflow, timeout) implied by the docs/criteria but not covered by existing or planned tests, in a
-`boundary_gaps` array alongside the `technique_breakdown`. It is *proactive*, surfacing the gap so the
-edge case gets generated, and advisory: it never blocks generation and never changes the critic's
-verdict.
-
-Keeping these separate is intentional: folding completeness into the critic would erode its clean
-grounding-only contract. See [Generate test cases](usage) for where boundary gaps
-surface in the analyze recommendation.
-
-| Concern | Where | Question | Timing |
-|---------|-------|----------|--------|
-| **Grounding** | `spectra-critic` subagent | Does each claim trace to the docs? | Retrospective (after generation) |
-| **Boundary/edge completeness** | Analysis phase (`ingest-analysis`) | Are the implied edges covered? | Proactive (before generation) |
-
-## Arithmetic Verification
-
-When a test's expected result is a **computed value** (a unit conversion result, formula output,
-scientific-notation magnitude, or derived constant), the critic **must independently compute the
-value and compare it** to what the test asserts. Documenting the *principle* (e.g. "use scientific
-notation", "convert via the SI factor") is not sufficient if the *number* is wrong.
-
-**Rule:** principle in docs AND number arithmetically correct → eligible for `grounded`. Principle
-in docs BUT number arithmetically wrong → NOT `grounded` (use `partial` or `hallucinated` with an
-`unverified` or `hallucinated` finding on the Expected Result element).
-
-This is additive to the existing doc-presence rules, not a replacement.
-
-Example: a test asserting `1×10⁻⁹ km → 1E-9 nm` would NOT be `grounded`, because the correct result is
-`1000 nm` (1 km = 10¹² nm, so 1×10⁻⁹ km = 10³ nm), even if the scientific-notation convention is
-documented. The arithmetic error must surface in a finding.
-
-## Verdicts
-
-These are the labels the skills, the test files and `spectra ai audit-grounding` use.
-
-| Label | Meaning | What happens |
-|---------|---------|--------|
-| `grounded` | Every step traces to the documentation, and any computed expected value is arithmetically correct | Kept |
-| `partial` | Most of the test is backed by the docs, but at least one detail isn't | One automatic repair; if it's still partial, the test is **flagged** |
-| `hallucinated` | The test invents behaviour or contradicts the docs | Deleted; the reason is recorded |
-| flagged | A partial test waiting for a person: accept, fix, regenerate or delete ([Review flagged tests](review)) | Stays until reviewed |
-| unverified | The critic hasn't run for this test, or couldn't finish | Run the critic again (`spectra ai audit-grounding` lists these) |
-
-## Grounding Metadata
-
-Verified test cases include grounding metadata in their frontmatter:
-
-```yaml
-grounding:
-  verdict: grounded
-  score: 0.95
-  generator: claude-code-session
-  critic: claude-sonnet-4-6
-  verified_at: 2026-03-19T10:30:00Z
-  unverified_claims: []
-```
-
-`generator` is always `claude-code-session`. There's no specific generator model to name, since
-generation runs as a turn in whatever your Claude Code session happens to be running. `critic` names
-the model that actually verified the test (from the `spectra-critic` subagent's `model:`
-frontmatter). When the main session runs the critic as a fallback, `critic` can read `unknown` (a known issue).
-
-For partial verdicts, `unverified_claims` lists what couldn't be verified:
+The label is written into the test file, in its `grounding:` section:
 
 ```yaml
 grounding:
   verdict: partial
   score: 0.72
+  generator: claude-code-session
+  critic: claude-sonnet-4-6
+  verified_at: 2026-03-19T10:30:00Z
   unverified_claims:
     - "Step 3: assumes refund email sent within 5 minutes"
     - "Expected Result: specific error code not in docs"
 ```
 
-## What you see after generation
+`critic` names the model that checked the test. When your agent's main session runs the check as a fallback, it can
+read `unknown` (a known issue). When you review a flagged test, your name, the date and your note are added here too;
+a later check keeps them.
 
-The `spectra-generate` skill ends with a report: per test the ID, title and label, grouped as kept grounded,
-repaired to grounded, flagged partial, dropped hallucinated and unverified, plus a hint to run
-[Review flagged tests](review) when any are flagged. A real run from the Calculator demo: 5 tests, 3 grounded at once,
-2 partial, both repaired to grounded.
+## When the check fails
 
-## Configuration
+A check that can't produce a valid result never passes quietly. A critic answer without a label or a score is
+reported as an error, not counted as **partial**. A critic call that fails or times out leaves the test
+**unverified**, recorded separately from a bad answer, so you can tell the two apart.
 
-There's no `spectra.config.json` block for the critic anymore. Grounding verification runs as the
-`spectra-critic` subagent (`.claude/agents/spectra-critic.agent.md`), a Claude Code subagent
-(a fresh context per test) started by the generation and update subagents for each test they wrote, not an in-process model call, and not
-something `ai.providers`/`ai.critic` route to. (A legacy config that still carries those keys loads
-unchanged; `spectra validate` surfaces a non-blocking notice naming them.)
+## Settings
 
-The critic model is `ai.critic.model` in `spectra.config.json` (default `sonnet`; an alias such as `opus`, a model
-id, or `inherit` for your session's model). `spectra init` and `spectra update-skills` write it into
-`.claude/agents/spectra-critic.agent.md`; an agent file you edited by hand is never overwritten. There's no separate
-provider/timeout/concurrency config; Claude Code itself schedules subagent calls.
+The critic is the `spectra-critic` subagent. Its model is `ai.critic.model` in `spectra.config.json` (default
+`sonnet`; also an alias such as `opus`, a full model ID, or `inherit` for your session's model). `spectra init` and
+`spectra update-skills` write it into `.claude/agents/spectra-critic.agent.md`; a copy you edited is never
+overwritten. To change what the critic is told, edit `.spectra/prompts/critic-verification.md`
+([Tune how tests are written](generation-profiles)). Older `ai.critic` and `ai.providers` settings are ignored.
 
-The generator isn't configurable either. Generation runs as an ordinary turn in your own Claude
-Code session, driven by the `spectra-generate` skill over the compile→ingest seam. See
-[Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) for the history (the SDK was removed).
+Related: [Skills and agents](skills-integration) · [Configuration](configuration) · [Test format](test-format)
