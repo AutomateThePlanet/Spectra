@@ -1,0 +1,7 @@
+{%- comment -%}
+  A real screenshot from docs/assets/images/screenshots/ (see DEVELOPMENT.md, "Documentation screenshots").
+  Params: file (name without .webp), alt (what the image shows), caption (optional, Markdown-free text),
+  narrow (optional: cap the width, for small pages such as the progress page).
+  Output stays on one line so it works inside Markdown list items.
+{%- endcomment -%}
+<figure class="screenshot{% if include.narrow %} screenshot-narrow{% endif %}"><img src="{{ '/assets/images/screenshots/' | append: include.file | append: '.webp' | relative_url }}" alt="{{ include.alt }}" loading="lazy">{% if include.caption %}<figcaption>{{ include.caption }}</figcaption>{% endif %}</figure>

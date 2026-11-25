@@ -1,6 +1,6 @@
 ---
 title: Document Index
-parent: Reference
+parent: Architecture
 nav_order: 4
 ---
 

@@ -1,7 +1,7 @@
 ---
 title: How Test Case Generation Works
 parent: Architecture
-nav_order: 2
+nav_order: 3
 ---
 
 # How Test Case Generation Works

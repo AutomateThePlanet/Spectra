@@ -2,10 +2,12 @@
 layout: default
 title: "Migration: Document Index Restructure (v1.51.0)"
 parent: Reference
-nav_order: 6
+nav_order: 9
 ---
 
 # Migration: Document Index Restructure (v1.51.0)
+
+> Historical: this page covers the 1.51.0 index change. Current behaviour: [Document index](document-index).
 
 **Affects releases:** 1.51.0 and later
 **Breaking change:** No (auto-migration on first run)

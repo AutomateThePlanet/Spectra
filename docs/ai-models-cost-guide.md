@@ -1,7 +1,7 @@
 ---
 title: AI Models & Cost Guide
 parent: Reference
-nav_order: 5
+nav_order: 8
 ---
 
 # AI Models & Cost Guide

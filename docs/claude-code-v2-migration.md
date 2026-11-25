@@ -1,10 +1,13 @@
 ---
 title: "Claude Code v2 vs. the GitHub Copilot SDK v1"
 parent: Reference
-nav_order: 7
+nav_order: 10
 ---
 
 # Claude Code v2 vs. the GitHub Copilot SDK v1
+
+> Historical: this page explains the move to 2.0.0 (and the execution changes in 2.4.0). For current usage, start at
+> [Getting started](getting-started).
 
 This guide covers releases 2.0.0 and later. It's a partially breaking change, since the command
 surface changed even though config remains backward compatible; nothing needs to be backed up,
@@ -168,3 +171,23 @@ that used to run inside SPECTRA's own SDK session now run inside yours. Full det
    peer tool's entry (e.g. a BELLATRIX/Nova MCP server) is left untouched either way.
 4. **Retire any script that called `spectra ai generate` or `spectra auth` directly.** See
    "Scripting / CI" above.
+
+## Execution: there is no MCP server anymore
+
+Pre-v2 SPECTRA shipped a separate `Spectra.MCP` global tool that any MCP-compatible client
+(Claude Desktop, GitHub Copilot CLI/Chat, or a generic MCP client) could connect to over stdio.
+**That server was removed entirely in v2.4.0.** There is nothing to `dotnet tool install`,
+nothing to add to a client's MCP config, and no per-client setup page anymore. Execution is
+CLI-only, and the agent that drives it is a native Claude Code skill
+(`.claude/skills/spectra-execute/`), not something bolted on through MCP.
+
+If you have an old `.vscode/mcp.json` entry or `mcp__spectra__*` permission from a pre-v2 install,
+it's dead weight and safe to remove. `spectra init` no longer writes either.
+
+Today's flow: [Run tests with your agent](execution-agents).
+
+### The separate BELLATRIX/Nova MCP
+
+None of the above is related to BELLATRIX/Nova, the MCP server that drives your **system under
+test** during automation. That MCP is a peer tool, unaffected by anything in this page; `spectra init`
+never writes or changes `.vscode/mcp.json`, so a BELLATRIX/Nova entry there is left untouched.

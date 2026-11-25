@@ -9,7 +9,7 @@ nav_order: 1
 How SPECTRA's two subsystems work together, as of the v2 (Claude Code) migration.
 
 Related: [the v2 migration](../claude-code-v2-migration.md) (history: the GitHub Copilot SDK runtime was removed) |
-[How Test Case Generation Works](analysis/cli-vs-chat-generation.md)
+[How Test Case Generation Works](../analysis/cli-vs-chat-generation.md)
 
 ---
 
@@ -71,6 +71,26 @@ src/
 ├── Spectra.Execution/  # Transport-neutral execution engine, driven solely by spectra run
 └── Spectra.GitHub/     # GitHub integration (future)
 ```
+
+## What to commit
+
+Commit the files that record results; the rest is scratch that `spectra init` (new workspaces) and
+`spectra update-skills` (existing ones) add to `.gitignore`:
+
+| Path | Committed? |
+|------|-----------|
+| `test-cases/<suite>/*.md`, `_index.json`, `_source-baseline.json` | yes |
+| `docs/criteria/**` (incl. `_criteria_index.yaml`), `docs/_index/**` | yes |
+| `.spectra/source-snapshots/` (lets triage show word diffs) | yes |
+| `.spectra/update-triage.json` | no (scratch) |
+| `.spectra/updates/`, `.spectra/repairs/` | no (scratch) |
+| `.spectra/verdicts/`, `.spectra/dropped-tests.json` | no (scratch) |
+| `.spectra/generation-plan/` | no (scratch) |
+| `.spectra/baseline.lock`, `.spectra/criteria.lock` | no (scratch) |
+| `.execution/spectra.db` (run state) | no |
+
+Keep the `# spectra-offered: …` lines in `.gitignore` when you commit it: they record which patterns SPECTRA already
+offered, so one your team removed stays removed in every clone.
 
 ## Key Design Decisions
 

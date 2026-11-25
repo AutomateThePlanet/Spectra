@@ -1006,6 +1006,52 @@ html.search-active {
   .anchor-heading svg {
     color: t.$navy-700;
   }
+
+  // --- Screenshots: real captures from the demo repository ---
+  .screenshot {
+    margin: 0 0 24px;
+
+    img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border: 1px solid t.$spectra-divider;
+      border-radius: t.$radius-img;
+    }
+
+    &.screenshot-narrow img {
+      max-width: min(100%, 560px);
+    }
+
+    figcaption {
+      margin-top: 8px;
+      font-size: 15px;
+      line-height: 1.5;
+      color: t.$gray-600;
+    }
+  }
+
+  // --- "Under the hood": collapsed detail at the end of a guide ---
+  details {
+    padding: 12px 20px;
+    margin: 0 0 24px;
+    background: t.$gray-150;
+    border-radius: t.$radius-md;
+
+    > summary {
+      font-weight: 700;
+      color: t.$navy-700;
+      cursor: pointer;
+    }
+
+    &[open] > summary {
+      margin-bottom: 12px;
+    }
+
+    > :last-child {
+      margin-bottom: 0;
+    }
+  }
 }
 
 // Footer inside the content column (JTD components/footer.html: back to top)

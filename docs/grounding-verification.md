@@ -1,20 +1,22 @@
 ---
-title: Grounding Verification
-parent: Quality
-nav_order: 1
+title: How SPECTRA double-checks tests
+parent: Architecture
+nav_order: 2
+description: "How the critic checks each generated test against the doc sections it cites, what grounded, partial, hallucinated, flagged and unverified mean."
 ---
 
-# Grounding Verification
+# How SPECTRA double-checks your tests
 
-Dual-model critic flow to detect hallucinated test cases.
+Every generated or edited test case is checked by a separate AI step, the *critic*, before SPECTRA keeps it. This page
+explains how that check works. To act on its results, see [Review flagged tests](review).
 
-Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md) | [Test Format](test-format.md)
+Related: [CLI Reference](cli-reference) | [Configuration](configuration) | [Test Format](test-format)
 
 ---
 
 ## Overview
 
-When AI generates test cases, it can hallucinate, inventing steps, expected results, or behaviors that don't exist in your documentation. SPECTRA's grounding verification uses a second AI model (the "critic") to verify each test case against the source documentation.
+When AI generates test cases, it can hallucinate, inventing steps, expected results, or behaviors that don't exist in your documentation. SPECTRA's grounding verification has a separate AI step, the critic, check each test case against the source documentation. The critic runs in its own context on the model set in `ai.critic.model`; that can be the same model family that wrote the test.
 
 ## How It Works
 
@@ -25,7 +27,8 @@ When AI generates test cases, it can hallucinate, inventing steps, expected resu
    never the generator's prompt, reasoning, tool calls, or token usage. Its instructions are the
    `critic-verification` prompt template (customise `.spectra/prompts/critic-verification.md`).
 3. Test cases receive a verdict: `grounded`, `partial`, or `hallucinated`
-4. Only grounded and partial test cases are written to disk
+4. A `hallucinated` test is deleted, and the reason is recorded (`spectra ai record-drop`). `grounded` and
+   `partial` tests are kept.
 5. A partial test gets one repair attempt. Only a repair that changed the test is judged again; a repair that left
    it unchanged keeps the verdict it already has, which routes it as before
 
@@ -57,7 +60,7 @@ edge case gets generated, and advisory: it never blocks generation and never cha
 verdict.
 
 Keeping these separate is intentional: folding completeness into the critic would erode its clean
-grounding-only contract. See the [generation/analysis flow](user-guide.md) for where boundary gaps
+grounding-only contract. See [Generate test cases](usage) for where boundary gaps
 surface in the analyze recommendation.
 
 | Concern | Where | Question | Timing |
@@ -84,11 +87,15 @@ documented. The arithmetic error must surface in a finding.
 
 ## Verdicts
 
-| Verdict | Meaning | Action |
+These are the labels the skills, the test files and `spectra ai audit-grounding` use.
+
+| Label | Meaning | What happens |
 |---------|---------|--------|
-| `grounded` | All steps trace to documentation AND any computed expected values are arithmetically correct | Written as-is |
-| `partial` | Some steps have assumptions or an expected value is flagged | Written with warnings |
-| `hallucinated` | Contains invented behaviors | Rejected |
+| `grounded` | Every step traces to the documentation, and any computed expected value is arithmetically correct | Kept |
+| `partial` | Most of the test is backed by the docs, but at least one detail isn't | One automatic repair; if it's still partial, the test is **flagged** |
+| `hallucinated` | The test invents behaviour or contradicts the docs | Deleted; the reason is recorded |
+| flagged | A partial test waiting for a person: accept, fix, regenerate or delete ([Review flagged tests](review)) | Stays until reviewed |
+| unverified | The critic hasn't run for this test, or couldn't finish | Run the critic again (`spectra ai audit-grounding` lists these) |
 
 ## Grounding Metadata
 
@@ -107,7 +114,7 @@ grounding:
 `generator` is always `claude-code-session`. There's no specific generator model to name, since
 generation runs as a turn in whatever your Claude Code session happens to be running. `critic` names
 the model that actually verified the test (from the `spectra-critic` subagent's `model:`
-frontmatter).
+frontmatter). When the main session runs the critic as a fallback, `critic` can read `unknown` (a known issue).
 
 For partial verdicts, `unverified_claims` lists what couldn't be verified:
 
@@ -120,28 +127,12 @@ grounding:
     - "Expected Result: specific error code not in docs"
 ```
 
-## Verification Output
+## What you see after generation
 
-After generation, SPECTRA displays verification results:
-
-```
-Generating test cases...
-✓ Generated 10 test cases
-
-  ✓ 7 grounded
-  ⚠ 2 partial — written with grounding warnings
-  ✗ 1 hallucinated — rejected
-
-✓ 9 test cases written to test-cases/checkout/
-✓ Index updated
-
-ℹ Partial test cases (review recommended):
-   TC-209  Assumes refund email is sent within 5 minutes — not confirmed in docs
-   TC-212  Navigation path to currency settings not documented
-
-ℹ Rejected test cases:
-   TC-220  References "fraud detection API" — not mentioned in any documentation
-```
+The `spectra-generate` skill ends with a report: per test the ID, title and label, grouped as kept grounded,
+repaired to grounded, flagged partial, dropped hallucinated and unverified, plus a hint to run
+[Review flagged tests](review) when any are flagged. A real run from the Calculator demo: 5 tests, 3 grounded at once,
+2 partial, both repaired to grounded.
 
 ## Configuration
 

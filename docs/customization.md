@@ -1,7 +1,7 @@
 ---
 title: Customization
-parent: Guides
-nav_order: 6
+parent: Reference
+nav_order: 7
 ---
 
 # SPECTRA Customization Guide
@@ -9,7 +9,7 @@ nav_order: 6
 This guide covers every way you can customize SPECTRA's behavior, from test case
 output format to AI reasoning strategy.
 
-> **Looking for workflow how-tos instead of customization?** See [`USAGE.md`](USAGE.md), the workflow guide for using SPECTRA from Claude Code.
+> **Looking for workflow how-tos instead of customization?** See the [Guides](guides.md).
 
 ---
 

@@ -1,161 +1,68 @@
 ---
-title: Generation Profiles
+title: Tune how tests are written
 parent: Guides
-nav_order: 5
+nav_order: 8
+description: "Change the fields every generated test has, the instructions the AI follows when it analyzes docs and writes tests, and where to find each setting."
 ---
 
-# Generation Profiles
+# Tune how tests are written
 
-Customize how AI generates test cases with repository-level and suite-level profiles.
+Three files decide what generated test cases look like. All three have sensible defaults, so change them only when
+the output doesn't fit your team.
 
-Related: [CLI Reference](cli-reference.md) | [Test Format](test-format.md) | [Configuration](configuration.md)
+| To change | Edit | Takes effect |
+|---|---|---|
+| The fields of every test (for example add `test_data` or a custom field) | `profiles/_default.yaml` | next generation |
+| How the AI analyzes docs, writes tests, extracts criteria and checks tests | `.spectra/prompts/<template>.md` | next run |
+| The concrete test data values (boundaries, combinations) | `testimize` in `spectra.config.json` ([Testimize](testimize-integration)) | next generation |
 
----
+## What to say
 
-## Overview
-
-Profiles control test generation **style**: detail level, negative scenario count, step formatting, domain-specific considerations, and more. They're optional but recommended for consistent output.
-
-> Profiles, prompt templates, and Testimize are three orthogonal customization layers:
+> "Show me the test generation prompt template"
 >
-> | Layer | What it controls | Where it lives | Default |
-> |-------|-----------------|---------------|---------|
-> | **Profile** | Output format and style (step granularity, priority defaults, domain hints) | `profiles/_default.yaml` | Built-in default |
-> | **Prompt template** | Reasoning strategy (which ISTQB techniques to apply, which categories to use, how to structure analysis) | `.spectra/prompts/*.md` | ISTQB-enhanced built-ins |
-> | **Testimize** (optional) | Test data values (boundary numbers, equivalence class examples, pairwise combinations), see [Testimize Integration](testimize-integration.md) | `testimize` section in `spectra.config.json` | Disabled |
+> "Reset the prompt templates to the defaults"
 >
-> A typical setup uses the default profile, the default ISTQB prompts, and
-> leaves Testimize disabled. Power users mix and match independently.
+> "Create a test generation profile for our API team"
 
-## Create a Profile
+The first two use the `spectra-prompts` skill; the last one uses `spectra-init-profile`.
 
-### Interactive Mode (Recommended)
+## The test format: `profiles/_default.yaml`
 
-```bash
-spectra init-profile
-```
+`spectra init` writes this file. Its `format` field is the JSON shape the AI must return for each test: `title`,
+`priority`, `steps`, `expected_result`, `source_refs` and the rest. Add a field there and new tests get it.
+Remove one and new tests won't have it. Existing tests aren't changed.
 
-The wizard guides you through options:
+## The instructions: prompt templates
 
-```
-SPECTRA Test Generation Profile Setup
+Five templates control the AI's reasoning:
 
-[1/7] Detail Level
-How detailed should test steps be?
-  1. High-level - Brief steps, assumes tester knowledge
-  2. Detailed - Comprehensive steps with expected results
-  3. Very detailed - Granular steps, no assumptions
-> 2
+| Template | Used when |
+|---|---|
+| `behavior-analysis` | finding what to test in your docs |
+| `test-generation` | writing the tests |
+| `criteria-extraction` | extracting acceptance criteria |
+| `critic-verification` | checking a test against the docs |
+| `test-update` | editing tests after a doc change |
 
-[2/7] Minimum Negative Scenarios
-How many negative test cases per feature (minimum)?
-> 3
+Your copies are in `.spectra/prompts/`. Edit one, for example to add domain rules ("every payment test needs a
+currency"), and the next run uses it. After you upgrade SPECTRA, ask the agent to reset a template to get the new
+default; your other edits stay.
 
-...
+## Generation profiles (`spectra.profile.md`)
 
-Profile created: spectra.profile.md
-```
+The `spectra-init-profile` skill asks about detail level, negative scenarios, domain and default priority, and saves
+the answers in `spectra.profile.md` (or `test-cases/<suite>/_profile.md` for one suite).
 
-### Non-Interactive Mode (CI/Scripts)
+> **Known limitation (2.7.0):** test generation doesn't read `spectra.profile.md` yet. Only `spectra profile show`
+> and `spectra validate` use it. To change generated tests today, edit `profiles/_default.yaml` or the
+> `test-generation` template.
 
-```bash
-spectra init-profile \
-  --non-interactive \
-  --detail-level detailed \
-  --min-negative 3 \
-  --priority medium \
-  --step-format numbered \
-  --domains payments,authentication \
-  --pii-sensitivity standard
-```
+<details markdown="1">
+<summary>Under the hood</summary>
 
-## View Current Profile
+`spectra ai compile-prompt` fills the `test-generation` template and inserts the `format` from
+`profiles/_default.yaml` as `{{profile_format}}`. Template commands: `spectra prompts list|show|validate|reset`.
+Profile commands: `spectra init-profile` and `spectra profile show`. All flags: [CLI reference](cli-reference).
+Every setting in one place: [Customization](customization).
 
-```bash
-spectra profile show              # Show effective profile
-spectra profile show --json       # Show as JSON
-spectra profile show --context    # Show AI context that would be generated
-spectra profile show --suite tests/checkout  # Show profile for a specific suite
-```
-
-## Suite-Level Overrides
-
-Create a profile that only applies to a specific test suite:
-
-```bash
-spectra init-profile --suite test-cases/checkout
-```
-
-This creates `test-cases/checkout/_profile.md` that inherits from and overrides the repository profile.
-
-## Profile Resolution Order
-
-When generating tests for the `checkout` suite:
-
-1. `test-cases/checkout/_profile.md` (suite override)
-2. `spectra.profile.md` (repository profile)
-3. Built-in defaults
-
-The profile content is injected into the AI prompt context.
-
-## Profile Options
-
-| Option | Values | Description |
-|--------|--------|-------------|
-| `--detail-level` | `high_level`, `detailed`, `very_detailed` | How granular steps should be |
-| `--min-negative` | `1-10` | Minimum negative scenarios per feature |
-| `--priority` | `high`, `medium`, `low` | Default test priority |
-| `--step-format` | `numbered`, `bullets`, `paragraphs` | How steps are formatted |
-| `--action-verbs` | `true/false` | Start steps with action verbs |
-| `--screenshots` | `true/false` | Include screenshot suggestions |
-| `--domains` | `payments`, `authentication`, `pii_gdpr`, `healthcare`, `financial`, `accessibility` | Domain-specific considerations |
-| `--pii-sensitivity` | `none`, `standard`, `strict` | PII handling level |
-| `--exclusions` | `performance`, `security`, `edge_cases`, etc. | Categories to exclude |
-
-## Edit Existing Profile
-
-```bash
-spectra init-profile --edit --min-negative 5 --priority high   # Update specific options
-spectra init-profile --force                                    # Re-run full wizard
-```
-
-## Effect on Generated Tests
-
-### Without Profile
-
-```markdown
-## TC-101: User Login
-
-**Steps:**
-1. Go to login page
-2. Enter credentials
-3. Click Login
-```
-
-### With Detailed Profile + Domains
-
-```markdown
-## TC-101: User Login
-
-**Priority:** High
-**Component:** Authentication
-
-**Preconditions:**
-- User account exists with valid credentials
-- Browser cache cleared
-
-**Steps:**
-1. Navigate to the application login page at /login
-2. Verify the login form displays username and password fields
-3. Enter the test username "testuser@example.com" in the username field
-4. Enter the test password in the password field
-5. Click the "Sign In" button
-6. Verify redirect to dashboard page within 3 seconds
-
-**Expected Result:**
-User is logged in and sees personalized dashboard.
-
-**Compliance Notes:**
-- Password field should mask input
-- Failed login should not reveal whether username exists
-```
+</details>
