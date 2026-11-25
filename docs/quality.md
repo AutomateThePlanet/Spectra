@@ -12,4 +12,4 @@ This section moved:
 
 - [Check coverage and build the dashboard](coverage) is a guide.
 - [How SPECTRA double-checks your tests](grounding-verification) is under Architecture.
-- The live verification checklist for maintainers is in [Development](DEVELOPMENT.md#live-verification-in-each-ai-agent-maintainers).
+- The live verification checklist for maintainers is [in the repository](https://github.com/AutomateThePlanet/Spectra/blob/main/docs/contributing/LIVE-VERIFICATION-CHECKLIST.md).

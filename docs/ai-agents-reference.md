@@ -177,4 +177,4 @@ folder), delete the SPECTRA block from `AGENTS.md` or `GEMINI.md` if that agent 
 | The agent does not use the skills | The agent did not load the folder | Restart the agent session in the repository; check its skills list |
 
 To check an installation step by step in a real session, follow the
-[live verification checklist](DEVELOPMENT.md#live-verification-in-each-ai-agent-maintainers).
+[live verification checklist](https://github.com/AutomateThePlanet/Spectra/blob/main/docs/contributing/LIVE-VERIFICATION-CHECKLIST.md).
