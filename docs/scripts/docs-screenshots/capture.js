@@ -121,8 +121,14 @@ async function shot(page, selector, name, pad = 0) {
   await page.click('[data-view="runs"]');
   await page.waitForTimeout(500);
   await shot(page, '#app', 'dashboard-runs');
-  if (await page.$('.run-table-row')) {
-    await page.click('.run-table-row');
+  // Prefer a completed run: a running one has no per-test results yet.
+  const rows = await page.$$('.run-table-row');
+  let row = rows[0];
+  for (const r of rows) {
+    if (/completed/i.test(await r.innerText())) { row = r; break; }
+  }
+  if (row) {
+    await row.click();
     await page.waitForTimeout(500);
     await shot(page, '#app', 'dashboard-run-report');
   } else {
