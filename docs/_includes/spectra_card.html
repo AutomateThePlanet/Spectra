@@ -1,0 +1,9 @@
+{%- comment -%}
+  One "Start Here" card. The title and URL come from the target page's front matter, so the
+  card follows renames. desc: the page's front matter description, else the given text.
+  Params: page (source path, e.g. "getting-started.md"), desc.
+{%- endcomment -%}
+{%- assign spectra_card_page = site.pages | where: "path", include.page | first -%}
+{%- if spectra_card_page -%}
+<a class="spectra-card" href="{{ spectra_card_page.url | relative_url }}"><span class="title">{{ spectra_card_page.title }}</span><span class="desc">{{ spectra_card_page.description | default: include.desc }}</span></a>
+{%- endif -%}

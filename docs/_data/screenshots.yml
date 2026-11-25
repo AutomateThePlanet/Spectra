@@ -1,0 +1,16 @@
+# Display size (CSS px) of each screenshot. Written by docs/scripts/docs-screenshots/images.js.
+dashboard-coverage: { width: 1000, height: 489 }
+dashboard-run-report: { width: 1000, height: 1115 }
+dashboard-runs: { width: 1000, height: 955 }
+dashboard-suites: { width: 1000, height: 530 }
+dashboard-suites-mobile: { width: 390, height: 844 }
+dashboard-test-detail: { width: 450, height: 900 }
+progress-coverage-done: { width: 784, height: 416 }
+progress-criteria-done: { width: 624, height: 399 }
+progress-criteria-extracting: { width: 624, height: 399 }
+progress-generate-analyzing: { width: 624, height: 663 }
+progress-generate-complete: { width: 624, height: 663 }
+progress-generate-critic: { width: 624, height: 663 }
+progress-generate-generating: { width: 624, height: 663 }
+progress-generate-waiting-approval: { width: 624, height: 663 }
+run-console: { width: 980, height: 989 }

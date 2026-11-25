@@ -1,0 +1,17 @@
+{%- comment -%}
+  Hero band (SPECTRA Docs v2): page title (or hero_title, when the nav label must differ) + front matter description,
+  falling back to the site description. One style for every page; the design
+  shows only the overview page, so no separate compact variant is implied.
+{%- endcomment -%}
+{%- assign spectra_hero_lead = page.description | default: site.description -%}
+<div class="spectra-hero">
+  <div class="spectra-hero-inner">
+    <div class="spectra-hero-text">
+      <h1 class="spectra-hero-title">{{ page.hero_title | default: page.title }}</h1>
+      {%- if spectra_hero_lead %}
+      <p class="spectra-hero-lead">{{ spectra_hero_lead }}</p>
+      {%- endif %}
+    </div>
+    <div class="spectra-hero-spacer" aria-hidden="true"></div>
+  </div>
+</div>

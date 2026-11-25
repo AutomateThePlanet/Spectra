@@ -1,196 +1,88 @@
 ---
-title: Getting Started
+title: Getting started
+parent: Guides
 nav_order: 1
+description: "Install SPECTRA, set up your repository and ask your AI agent for your first test cases. Takes about ten minutes; no API key or separate AI account needed."
 ---
 
-# Getting Started
+# Getting started
 
-Install SPECTRA, authenticate, and generate your first test case suite.
+In this tutorial you install SPECTRA, set up a repository and get your first test cases from your AI agent. It takes
+about ten minutes plus the agent's working time.
 
-Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md)
+{% include flow.html name="user-journey" %}
 
-> **Behavior analysis** applies six ISTQB test design
-> techniques (EP, BVA, DT, ST, EG, UC), and the analysis output includes a
-> technique breakdown alongside the category breakdown. Existing projects can
-> adopt the latest templates by running `spectra prompts reset --all`; your
-> customized templates are preserved.
+This tutorial covers the first two steps. The guides linked at the end cover the rest.
 
-> SPECTRA can optionally integrate with [Testimize](testimize-integration.md) for *algorithmic*
-> test data optimization (BVA, EP, pairwise, ABC). It's disabled by default, and runs **in-process**
-> as a NuGet dependency, with no separate install or server needed (v1.48.3 moved it off the old
-> `Testimize.MCP.Server` child-process model). Set `testimize.enabled` to `true` in
-> `spectra.config.json`, then verify with `spectra testimize check`. SPECTRA works fine without it.
+## Before you start
 
----
+- The [.NET 8 SDK](https://dotnet.microsoft.com/download) or later.
+- [Claude Code](https://claude.com/claude-code), signed in. (Using Copilot, Cursor or another agent? See
+  [Use SPECTRA with other agents](ai-agents); the steps below are the same after `init`.)
+- A repository with your product documentation as Markdown files in a `docs/` folder. One page with a few "MUST"
+  statements is enough to try it.
 
-## Prerequisites
+SPECTRA doesn't call an AI model itself. All AI work runs in your agent's session, so there is no API key to set up.
 
-- .NET 8.0+ SDK
-- Git
-- [Claude Code](https://claude.com/claude-code), installed and signed in to your account
-
-That's the whole list. SPECTRA (v2) makes no model calls of its own, since generation, analysis, and
-verification all run as turns/subagent calls inside your own Claude Code session, so there's no
-separate AI provider, API key, or authentication step to configure. See
-[Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) if you're upgrading
-from a pre-v2 install that used to require `gh auth login` / `spectra auth`.
-
-## Install
+## 1. Install SPECTRA
 
 ```bash
 dotnet tool install -g Spectra.CLI
 ```
 
-## Initialize a Repository
+## 2. Set up your repository
+
+In the root of your repository, run:
 
 ```bash
-cd my-project
 spectra init
 ```
 
-This creates:
+SPECTRA asks one question: where your automated test code lives, so it can link automated tests later. Press
+**Enter** to keep the defaults.
 
-```
-my-project/
-├── spectra.config.json                          # Configuration
-├── docs/                                        # Put your documentation here
-│   └── _index/                                  # Document index v2 (auto-built)
-│       ├── _manifest.yaml                       # Always loaded into AI prompts (~2-5K tokens)
-│       ├── _checksums.json                      # Hash table; never sent to AI
-│       └── groups/{suite}.index.md              # Per-suite index files, lazy-loaded
-├── test-cases/                                  # Generated test cases go here
-├── docs/criteria/
-│   └── _criteria_index.yaml                     # Acceptance criteria index
-├── .claude/
-│   ├── agents/
-│   │   └── spectra-critic.agent.md              # Critic subagent (fresh context)
-│   ├── settings.json                            # Tool allowlist (see execution setup)
-│   └── skills/
-│       ├── spectra-generate/SKILL.md            # Generate tests via Claude Code
-│       ├── spectra-coverage/SKILL.md            # Check coverage via Claude Code
-│       ├── spectra-dashboard/SKILL.md           # Build dashboard via Claude Code
-│       ├── spectra-validate/SKILL.md            # Validate tests via Claude Code
-│       ├── spectra-list/SKILL.md                # Browse tests via Claude Code
-│       ├── spectra-init-profile/SKILL.md        # Configure profile via Claude Code
-│       ├── spectra-help/SKILL.md                # Help and command reference
-│       ├── spectra-criteria/SKILL.md            # Manage acceptance criteria
-│       ├── spectra-docs/SKILL.md                # Index documentation via Claude Code
-│       └── spectra-execute/SKILL.md             # Drive test execution via Claude Code (launches the run console)
-└── templates/bug-report.md                      # Bug report template
-```
+`init` creates `spectra.config.json`, a `test-cases/` folder, and the skills and subagents your agent uses (in
+`.claude/`). If `docs/` already has files, it also indexes them. Commit these files.
 
-`spectra init` also merges `.claude/settings.json` with the permissions Claude Code needs to drive
-SPECTRA: `Bash(spectra *)` plus write/edit access to the `.spectra/` scratch directory. There is no
-MCP allowlist, because execution is CLI-only. See [Skills Integration](skills-integration.md).
+## 3. Extract acceptance criteria
 
-> For manual test runs, ask the agent to run a suite and it starts the run, launches the local web
-> console (`spectra run console`), and hands you a `http://127.0.0.1:<port>/` URL. You record verdicts
-> (PASS / FAIL / BLOCKED, comment, screenshot) in the browser, and the agent stays on-call. See
-> [CLI Reference](cli-reference.md) (`spectra run console`).
+Open Claude Code in the repository and say:
 
-> The test **execution** agent is a native Claude Code skill (`.claude/skills/spectra-execute/`); it
-> orchestrates the run and launches the web console rather than driving a per-test loop in chat.
+> "Extract acceptance criteria"
 
-Use `spectra init --skip-skills` if you don't use an AI coding agent.
+The agent reads each document and saves the testable requirements it finds. Test generation needs them.
+More: [Extract acceptance criteria](criteria).
 
-### Using another AI agent
+## 4. Ask for test cases
 
-`spectra init` installs for Claude Code. For GitHub Copilot, Cursor, Devin (Windsurf), Codex CLI, Gemini CLI,
-Antigravity CLI, Kiro CLI or OpenCode, name the agent:
+Pick a name for your first suite, for example `checkout`, and say:
 
-```bash
-spectra init --agent copilot              # instead of Claude Code
-spectra init --agent claude,cursor        # several agents in one repository
-spectra init --agent auto                 # detect the agent whose folder is in the repository
-```
+> "Generate test cases for checkout"
 
-Each agent gets the same skills and subagents in its own folders, plus an always-on SPECTRA instructions file. Add
-`--dry-run` to see every file first. On a repository that is already initialised, `--agent` adds the agents without
-touching your configuration. The full guide, with the files per agent, is [AI Agents](ai-agents.md).
+A progress page opens in your browser. After a minute or two the agent shows what it would test and how many tests
+it recommends, then asks "Shall I proceed?":
 
-> Outside Claude Code, the agent decides when to start a subagent, so the critic runs when the agent follows the
-> skill's instruction. Check it on your first run: every new test should get a verdict
-> (`spectra ai audit-grounding --suite <suite>`).
+{% include screenshot.html narrow=true file="progress-generate-waiting-approval" alt="SPECTRA progress page stopped at step 4, Review (waiting for approval)" %}
 
-## Add Your Documentation
+Read the recommendation and say "yes". You can also change it first: "only the negative cases", "skip the
+security ones".
 
-Copy your existing documentation into the `docs/` folder:
+## 5. Check the result
 
-```
-docs/
-├── features/
-│   ├── authentication.md
-│   ├── checkout.md
-│   └── user-profile.md
-├── api/
-│   └── endpoints.md
-└── criteria/
-    └── _criteria_index.yaml
-```
+The agent writes the tests and checks each one against your docs. Its report lists every test with one of these
+results:
 
-## Configure
+- **grounded**: everything in the test is backed by your docs.
+- **partial**: a detail isn't in your docs. The agent tries one repair; tests it can't fix are **flagged** for you.
+- **hallucinated**: the test invents behaviour. It is deleted.
 
-Edit `spectra.config.json` to point to your docs. See [Configuration Reference](configuration.md) for the full schema.
+Your tests are now in `test-cases/checkout/`, one Markdown file per test. Open one: it has a title, steps, an
+expected result and links to the doc sections it came from ([Test format](test-format)).
 
-```json
-{
-  "source": {
-    "mode": "local",
-    "local_dir": "docs/"
-  },
-  "tests": {
-    "dir": "test-cases/"
-  },
-  "ai": {
-    "critic": { "model": "sonnet" }
-  },
-  "generation": {
-    "batch_size": 8
-  }
-}
-```
+## Next steps
 
-> There's no generator model to pick here: the model doing the generation is whatever your Claude Code session is
-> running. `ai.critic.model` is the `spectra-critic` subagent's model (run `spectra update-skills` after changing it),
-> and `generation.batch_size` is the most behaviors per generation batch. See
-> [Configuration Reference](configuration.md).
-
-## First Run
-
-### Option 1: Claude Code (recommended)
-
-Open Claude Code in your project and say:
-- "Generate test cases for the checkout suite"
-- "How's our test case coverage?"
-- "Validate all test cases"
-
-The bundled `.claude/skills/` SKILLs handle CLI invocation automatically, and the generation SKILL runs the `spectra-critic` subagent before accepting tests. See [Skills Integration](skills-integration.md).
-
-### Option 2: CLI directly
-
-Generation itself is **skill-driven** (it runs in your interactive Claude Code session, not as a
-standalone CLI command). The CLI handles the deterministic surrounding steps:
-
-```bash
-# Build the documentation index
-spectra docs index
-
-# Ask Claude Code: "generate test cases for the checkout suite"
-# → the spectra-generate skill drives: compile-analysis-prompt → (you generate in-session)
-#   → ingest-analysis → compile-prompt → ingest-tests → spectra-critic verification
-
-# Validate
-spectra validate
-```
-
-### Option 3: CI/SKILL automation
-
-```bash
-# Coverage check
-spectra ai analyze --coverage --output-format json
-
-# Validation with structured errors
-spectra validate --output-format json --no-interaction
-```
-
-See [CLI Reference](cli-reference.md) for all available commands.
+- [Review flagged tests](review)
+- [Check coverage and build the dashboard](coverage)
+- [Run tests with your agent](execution-agents)
+- [Update tests when your docs change](keep-tests-up-to-date)
+- Not sure what to ask? Say "help" or "help me get started" to your agent.

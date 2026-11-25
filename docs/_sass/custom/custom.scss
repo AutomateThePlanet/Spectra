@@ -1,68 +1,1825 @@
 // =============================================================
-// SPECTRA — additional overrides on top of the spectra color scheme
+// SPECTRA docs — layout and components ("SPECTRA Docs v2" design)
+//
+// This file is compiled into every Just the Docs entry point (including
+// just-the-docs-dark/light.scss, which do not load the spectra color scheme),
+// so it reads design values only from the token module below, never from
+// variables defined in color_schemes/spectra.scss.
+// Values come from the captured design (docs-design-reference/*.styles.json and the
+// rendered DOM's inline styles) or from the design-system tokens in _tokens.scss.
 // =============================================================
 
-.side-bar {
-  .site-header {
-    background-color: transparent;
-    padding: 2rem 1rem 0.75rem;
-    height: auto;
-    min-height: 0;
-    border-bottom: none;
+@use "tokens" as t;
+
+$bp-md: 50rem;        // just-the-docs "md" (800px): mobile header below this
+$bp-nav-full: 1500px; // full ATP nav fits in the header row from here (see REPORT.md)
+$bp-side: 62.5rem;    // 1000px: docs nav beside the content (sticky) from here, below the content under it
+
+// --- Fonts (self-hosted, design system fonts/) ---
+@font-face { font-family: "Nunito"; font-style: normal; font-weight: 400; font-display: swap; src: url("../fonts/nunito-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Nunito"; font-style: italic; font-weight: 400; font-display: swap; src: url("../fonts/nunito-latin-400-italic.woff2") format("woff2"); }
+@font-face { font-family: "Nunito"; font-style: normal; font-weight: 600; font-display: swap; src: url("../fonts/nunito-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Nunito"; font-style: normal; font-weight: 700; font-display: swap; src: url("../fonts/nunito-latin-700-normal.woff2") format("woff2"); }
+
+// =============================================================
+// Page frame
+// =============================================================
+// The design uses a 16px rem at every width; JTD drops the root to 14px below "sm" (with !important).
+html {
+  font-size: 16px !important;
+}
+
+body.spectra-docs {
+  padding-bottom: 0; // JTD reserves 4rem for its fixed search button
+  font-family: t.$font-sans;
+  color: t.$gray-600;
+  background-color: t.$white;
+}
+
+.spectra-page {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+// =============================================================
+// ATP header
+// =============================================================
+.atp-header {
+  position: relative;
+  z-index: 99;
+  display: flex;
+  height: t.$header-height;
+  padding: 0 t.$container-pad;
+  align-items: center;
+  gap: 16px;
+  background-color: t.$white;
+}
+
+.atp-logo {
+  display: flex;
+  flex: 1 0 auto;
+
+  img {
+    display: block;
+    width: auto;
+    height: 60px;
+  }
+}
+
+.atp-header-panel {
+  display: flex;
+  align-items: center;
+}
+
+// --- ATP nav ---
+.atp-nav-list {
+  display: flex;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  align-items: center;
+}
+
+.atp-nav-item {
+  position: relative;
+  margin: 0;
+}
+
+.atp-nav-link {
+  position: relative;
+  display: block;
+  padding: 0 0.75rem;
+  margin-right: 0;
+  font-family: t.$font-sans;
+  font-size: 1.15rem;
+  line-height: 3rem;
+  color: t.$gray-600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color t.$dur-slow linear;
+
+  &::after {
+    position: absolute;
+    right: 0.75rem;
+    bottom: 0.25rem;
+    left: 0.75rem;
+    height: 2px;
+    visibility: hidden;
+    content: "";
+    background: t.$gray-600;
+    transform: scaleX(0);
+    transition: 0.3s ease-in-out;
   }
 
-  .site-title {
-    display: block;
-    padding: 0;
-    width: 100%;
-    height: auto;
-    line-height: 0;
+  &:hover,
+  &:focus-visible {
+    color: t.$black;
+    text-decoration: none;
 
-    &:hover {
-      background-image: none;
-      background-color: transparent;
+    &::after {
+      visibility: visible;
+      transform: scaleX(1);
     }
   }
+}
 
-  // Banner logo — rendered as background-image on an empty div,
-  // so we must set an explicit height via aspect-ratio (1246x389 image).
-  .site-logo {
-    width: 100%;
-    height: 0;
-    padding-bottom: 31.2%; // 389/1246 ≈ 31.2% — preserves aspect ratio
-    background-size: contain;
-    background-position: center center;
-    background-repeat: no-repeat;
+.has-sub > .atp-nav-link {
+  padding-right: 1.5rem;
+  margin-right: 0.5rem;
+  background: url("../images/dropdown-arrow.svg") no-repeat right center / 1rem auto;
+
+  &::after {
+    right: 1.5rem;
+  }
+}
+
+.is-current > .atp-nav-link {
+  color: t.$black;
+
+  &::after {
+    visibility: visible;
+    transform: scaleX(1);
+  }
+}
+
+.atp-sub {
+  position: absolute;
+  top: 100%;
+  left: 0.75rem;
+  z-index: 100;
+  display: none;
+  min-width: 16rem;
+  padding: 0.5rem 0;
+  margin: 0;
+  list-style: none;
+  background: t.$white;
+  box-shadow: t.$shadow-submenu;
+
+  &.atp-sub-wide {
+    min-width: 22rem;
+  }
+
+  li {
     margin: 0;
   }
 
-  // Hide the duplicate text title (logo already says "SPECTRA")
-  .site-title.lh-tight {
+  a {
     display: block;
+    padding: 0.45rem 1rem;
+    font-size: 1rem;
+    line-height: 1.4;
+    color: t.$gray-600;
+    text-decoration: none;
+
+    &:hover,
+    &:focus-visible,
+    &[aria-current="page"] {
+      color: t.$navy-700;
+    }
   }
 }
 
-// Sidebar footer sits on the dark navy sidebar, so the default dark
-// "This site uses Just the Docs" credits are invisible. Force a light
-// color (and matching link color) so the attribution stays readable.
-.site-footer,
-.site-footer p,
-.site-footer .text-grey-dk-000,
-.site-footer .text-grey-dk-100,
-.site-footer .text-grey-dk-200,
-.site-footer .text-grey-dk-300 {
-  color: rgba(255, 255, 255, 0.82) !important;
+.atp-nav-item:hover > .atp-sub,
+.atp-nav-item:focus-within > .atp-sub {
+  display: block;
 }
 
-.site-footer a,
-.site-footer a:link,
-.site-footer a:visited,
-.site-footer a:hover {
-  // Hardcoded (not $spectra-teal-light): this file is compiled into every
-  // Just the Docs color-scheme entry point, including just-the-docs-dark.scss,
-  // which doesn't import our custom "spectra" color scheme — a Sass variable
-  // reference here fails the whole site build with "Undefined variable" on
-  // that entry point.
-  color: #4dd0e1 !important; // == $spectra-teal-light in _sass/color_schemes/spectra.scss
-  text-decoration: underline !important;
+// --- JTD header (#main-header): search + "Get SPECTRA" ---
+.atp-header .main-header {
+  position: relative;
+  display: flex;
+  height: auto;
+  padding-top: 0;
+  margin-left: 0.25rem;
+  background: transparent;
+  border-bottom: 0;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.atp-header .search {
+  position: relative;
+  z-index: 2;
+  width: auto;
+  height: auto;
+  padding: 0.25rem 0.5rem;
+  flex-grow: 0;
+}
+
+.atp-header .search-input-wrap {
+  position: relative;
+  display: flex;
+  width: auto;
+  max-width: none;
+  height: auto !important;
+  overflow: visible;
+  border-radius: 0;
+  box-shadow: none;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.atp-header .search-input {
+  position: static;
+  width: 13rem; // design: 11rem for "Search"; widened so "Search SPECTRA docs" is not clipped
+  height: auto;
+  padding: 0.25rem 0;
+  font-family: t.$font-sans;
+  font-size: 1.125rem;
+  line-height: 1.5rem;
+  color: t.$navy-900;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid t.$gray-600;
+  border-radius: 0;
+  outline: none;
+  transition: none;
+
+  &::placeholder {
+    color: t.$gray-600;
+  }
+
+  &:focus {
+    border-bottom-color: t.$navy-700;
+  }
+}
+
+.atp-header .search-label {
+  position: static;
+  display: flex;
+  order: 2;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+
+  .search-icon {
+    width: 18px;
+    height: 18px;
+    color: t.$navy-700;
+  }
+}
+
+.atp-header .search-results {
+  top: calc(100% + 0.25rem);
+  right: 0;
+  left: auto;
+  z-index: 100;
+  width: min(36rem, 90vw);
+  max-height: 70vh !important;
+  background: t.$white;
+  border-radius: 0 0 t.$radius-img t.$radius-img;
+  box-shadow: t.$shadow-submenu;
+}
+
+html.search-active {
+  .atp-header .search {
+    position: relative;
+    width: auto;
+    height: auto;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .atp-header .search-input-wrap {
+    width: auto;
+    height: auto !important;
+    box-shadow: none;
+  }
+
+  .atp-header .search-input {
+    padding-left: 0;
+    background: transparent;
+  }
+
+  .atp-header .main-header {
+    padding-top: 0;
+  }
+}
+
+.search-result {
+  font-family: t.$font-sans;
+  color: t.$navy-900;
+
+  &:hover,
+  &.active {
+    background-color: t.$sky-50;
+  }
+}
+
+.search-result-highlight {
+  font-weight: 700;
+}
+
+// "Get SPECTRA" (design: red "Download" pill with a dropdown)
+.get-spectra-button {
+  position: relative;
+  display: inline-block;
+  box-sizing: border-box;
+  height: 2.5rem;
+  padding: 0 4rem 0 1.5rem;
+  margin-left: 0.75rem;
+  font-family: t.$font-sans;
+  font-size: t.$fs-button;
+  font-weight: 700;
+  line-height: 2.5rem;
+  color: t.$white;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: t.$ls-button;
+  white-space: nowrap;
+  cursor: pointer;
+  background: t.$red-500 url("../images/dropdown-arrow-white.svg") no-repeat right 22px center / 18px 18px;
+  border-radius: t.$radius-pill;
+  transition: background-color t.$dur-slow ease;
+
+  &:hover,
+  &:focus-visible {
+    background-color: t.$red-600;
+  }
+}
+
+.atp-header .aux-nav {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 100;
+  display: none;
+  height: auto;
+  min-width: 15rem;
+  padding: 0.5rem 0;
+  overflow: visible;
+  font-size: 1rem !important;
+  background: t.$white;
+  box-shadow: t.$shadow-submenu;
+
+  .aux-nav-list {
+    display: block;
+    height: auto;
+  }
+
+  .aux-nav-list-item {
+    display: block;
+    height: auto;
+  }
+
+  .site-button {
+    display: block;
+    height: auto;
+    padding: 0.45rem 1rem;
+    font-family: t.$font-sans;
+    line-height: 1.4;
+    color: t.$gray-600;
+    text-decoration: none;
+
+    &:hover,
+    &:focus-visible {
+      color: t.$navy-700;
+      background-image: none;
+    }
+  }
+}
+
+.get-spectra-button[aria-expanded="true"] ~ .aux-nav {
+  display: block;
+}
+
+// --- Menu button (JTD #menu-button) ---
+.atp-menu-button {
+  display: none;
+  height: auto;
+  padding: 0.5rem;
+  margin-left: 0.25rem;
+
+  .icon {
+    width: 1.75rem;
+    height: 1.75rem;
+    color: t.$navy-700;
+  }
+
+  &:hover {
+    background-image: none;
+  }
+}
+
+// Below the full-nav width the ATP links fold behind the menu button;
+// search and "Get SPECTRA" stay in the header row.
+@media (max-width: #{$bp-nav-full - 0.02px}) {
+  .atp-menu-button {
+    display: flex;
+  }
+
+  .atp-header-panel {
+    position: static;
+  }
+
+  .atp-nav {
+    position: absolute;
+    top: 100%;
+    right: t.$container-pad;
+    display: none;
+    min-width: 18rem;
+    padding: 0.5rem 0;
+    background: t.$white;
+    box-shadow: t.$shadow-submenu;
+  }
+
+  .atp-header:has(#menu-button.nav-open) .atp-nav {
+    display: block;
+  }
+
+  .atp-nav-list {
+    display: block;
+  }
+
+  .atp-nav-link {
+    padding: 0 1rem;
+    line-height: 2.5rem;
+
+    &::after {
+      display: none;
+    }
+  }
+
+  .has-sub > .atp-nav-link {
+    margin-right: 0;
+    background: none;
+  }
+
+  .atp-sub {
+    position: static;
+    display: block;
+    min-width: 0;
+    padding: 0 0 0.5rem 1rem;
+    box-shadow: none;
+
+    a {
+      padding: 0.25rem 1rem;
+    }
+  }
+}
+
+// Mobile: logo + menu button; the panel (ATP links, search, Get SPECTRA) opens below.
+@media (max-width: #{$bp-md - 0.02rem}) {
+  .atp-header-panel {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    display: none;
+    max-height: calc(100vh - #{t.$header-height});
+    padding: 0.5rem t.$container-pad 1.5rem;
+    overflow-y: auto;
+    background: t.$white;
+    box-shadow: 0 6px 10px rgba(0, 0, 0, 0.12);
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .atp-header:has(.nav-open) .atp-header-panel {
+    display: flex;
+  }
+
+  .atp-nav {
+    position: static;
+    min-width: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  .atp-header .main-header {
+    display: none;
+    margin: 0 0 0.75rem;
+    order: -1; // search first in the mobile panel
+    flex-wrap: wrap;
+
+    &.nav-open {
+      display: flex;
+    }
+  }
+
+  .atp-header .search {
+    padding: 0.25rem 0;
+    flex: 1 1 auto;
+  }
+
+  .atp-header .search-input-wrap {
+    width: 100%;
+  }
+
+  .atp-header .search-input {
+    width: 100%;
+  }
+
+  // The panel scrolls (overflow-y: auto), so an absolutely positioned list would be clipped to the panel's
+  // height. In the panel's flow the list makes the panel grow, up to its max-height, and the panel scrolls.
+  .atp-header .search-results {
+    position: static;
+    right: auto;
+    left: 0;
+    width: 100%;
+    max-height: 55vh !important;
+    margin-top: 0.25rem;
+  }
+
+  .get-spectra-button {
+    margin-left: 0;
+  }
+
+  .atp-header .aux-nav {
+    left: 0;
+    right: auto;
+  }
+}
+
+// JTD floating search button: only needed where the header search is folded away.
+.search-button {
+  @media (min-width: $bp-md) {
+    display: none;
+  }
+}
+
+// =============================================================
+// Hero
+// =============================================================
+.spectra-hero {
+  color: t.$white;
+  background: t.$spectra-hero;
+}
+
+.spectra-hero-inner {
+  display: flex;
+  box-sizing: border-box;
+  max-width: t.$layout-max;
+  padding: 72px t.$container-pad 80px;
+  margin: 0 auto;
+  flex-wrap: wrap;
+}
+
+.spectra-hero-text {
+  display: flex;
+  min-width: 0;
+  padding-right: 2rem;
+  flex: 3 1 560px;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.spectra-hero .spectra-hero-title {
+  margin: 0;
+  font-size: clamp(2.5rem, 4.2vw, 4.25rem) !important;
+  font-weight: 400;
+  line-height: 1.09;
+  color: t.$white;
+  letter-spacing: -1px;
+}
+
+.spectra-hero-lead {
+  max-width: 820px;
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.6;
+  color: t.$white;
+}
+
+.spectra-hero-spacer {
+  max-width: t.$aside-max;
+  flex: 1 1 320px;
+}
+
+// =============================================================
+// Content column + docs nav aside
+// =============================================================
+.spectra-layout {
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: t.$layout-max;
+  padding: 0 t.$container-pad;
+  margin: 0 auto;
+  flex: 1 1 0%;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.spectra-content-col {
+  display: flex;
+  min-width: 0;
+  flex: 3 1 560px;
+  flex-direction: column;
+}
+
+.spectra-aside {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  max-width: t.$aside-max;
+  // Pulls up into the hero on wide screens, exactly as the design does.
+  margin-top: clamp(-#{t.$aside-overlap}, 1058940px - 99900vw, 0px);
+  background: t.$sky-50;
+  flex: 1 1 320px;
+  align-self: flex-start;
+}
+
+// Sticky docs nav, only while it sits beside the content.
+// The aside itself is the sticky box: its containing block is .spectra-layout
+// (as tall as the content). The design put `sticky` on the inner wrapper, whose
+// containing block is the aside, which is exactly as tall as the wrapper, so it
+// could never move. The ATP header scrolls away (not fixed), so top is 0.
+@media (min-width: $bp-side) {
+  .spectra-layout {
+    flex-wrap: nowrap;
+  }
+
+  .spectra-aside {
+    position: sticky;
+    top: 0;
+    max-height: 100vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+// Narrower: the aside drops below the content, as designed.
+@media (max-width: #{$bp-side - 0.02rem}) {
+  .spectra-aside {
+    max-width: none;
+    margin-top: 0;
+    flex-basis: 100%;
+  }
+}
+
+.spectra-aside-inner {
+  box-sizing: border-box;
+  display: flex;
+  padding: 0 0 60px;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.spectra-aside .site-nav {
+  display: block; // JTD hides #site-nav on mobile unless the menu is open
+  box-sizing: border-box;
+  width: auto;
+  max-width: 29rem;
+  padding: 30px 2rem;
+  overflow-y: visible;
+  font-family: t.$font-sans;
+  font-size: 1.625rem;
+  line-height: 2.25rem;
+
+  > .nav-list {
+    padding-top: 0.5rem;
+  }
+}
+
+.spectra-aside .nav-list .nav-list-item {
+  font-size: inherit !important;
+  line-height: inherit;
+
+  .nav-list-link {
+    display: block;
+    min-height: 0;
+    padding: 0.3rem 2.5rem 0.3rem 0;
+    line-height: inherit;
+    color: t.$navy-700;
+    text-decoration: none;
+    transition: color t.$dur-slow;
+
+    &:hover {
+      color: t.$blue-hover;
+      background-image: none;
+    }
+
+    &.active {
+      font-weight: 400;
+      color: t.$gray-nav-current;
+      background-image: none;
+    }
+  }
+
+  .nav-list-expander {
+    top: 0.3rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0.5rem;
+    color: t.$navy-700;
+
+    &:hover {
+      background-image: none;
+    }
+  }
+
+  > .nav-list {
+    padding-left: 1rem;
+    margin-bottom: 0.25rem;
+
+    .nav-list-item {
+      font-size: 1.125rem !important;
+      line-height: 1.6875rem;
+
+      .nav-list-link {
+        color: t.$navy-700;
+      }
+
+      .nav-list-link.active {
+        color: t.$gray-nav-current;
+      }
+
+      .nav-list-expander {
+        top: 0.15rem;
+        width: 1.75rem;
+        height: 1.75rem;
+        padding: 0.35rem;
+      }
+    }
+  }
+}
+
+// =============================================================
+// Content typography
+// =============================================================
+.spectra-content-col .breadcrumb-nav {
+  padding: 32px t.$container-pad 0;
+  font-size: 15px !important;
+
+  .breadcrumb-nav-list-item {
+    font-size: 15px !important;
+    color: t.$gray-600;
+  }
+
+  a {
+    color: t.$navy-700;
+  }
+}
+
+.spectra-content-col .breadcrumb-nav + .main-content {
+  padding-top: 24px;
+}
+
+.spectra-content-col .main-content {
+  max-width: none;
+  padding: 48px t.$container-pad 72px;
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.7;
+
+  > main > :first-child {
+    margin-top: 0;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: t.$font-sans;
+    color: t.$navy-900;
+  }
+
+  h1 {
+    margin: 0 0 18px;
+    font-size: 2.25rem !important;
+    font-weight: 400;
+    line-height: 1.2;
+  }
+
+  h2 {
+    margin: 56px 0 18px;
+    font-size: 30px !important;
+    font-weight: 400;
+    line-height: 1.25;
+  }
+
+  h3 {
+    margin: 36px 0 12px;
+    font-size: 24px !important;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  h4 {
+    margin: 28px 0 10px;
+    font-size: 20px !important;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  h5,
+  h6 {
+    margin: 24px 0 8px;
+    font-size: 18px !important;
+    font-weight: 600;
+    line-height: 1.4;
+    text-transform: none;
+  }
+
+  p,
+  ul,
+  ol,
+  dl {
+    margin-top: 0;
+    margin-bottom: 18px;
+  }
+
+  li {
+    margin-bottom: 0.35em;
+  }
+
+  ul > li::before {
+    color: t.$navy-700;
+  }
+
+  a:not([class]) {
+    color: t.$navy-700;
+    text-decoration-color: rgba(39, 68, 146, 0.35);
+
+    &:hover {
+      color: t.$blue-hover;
+      text-decoration-color: currentcolor;
+    }
+  }
+
+  hr {
+    margin: 40px 0;
+    background-color: t.$spectra-divider;
+  }
+
+  // --- Inline code ---
+  :not(pre, figure) > code {
+    padding: 0.1em 0.35em;
+    font-size: 0.85em;
+    color: t.$navy-900;
+    background-color: t.$gray-100;
+    border: 1px solid t.$spectra-divider;
+    border-radius: t.$radius-sm;
+  }
+
+  // --- Code blocks (design: Quick Install block) ---
+  div.highlighter-rouge,
+  div.listingblock > div.content,
+  figure.highlight {
+    margin: 0 0 24px;
+    background-color: t.$gray-100;
+    border-left: 4px solid t.$spectra-code-accent;
+    border-radius: t.$radius-md;
+  }
+
+  pre.highlight,
+  figure.highlight pre {
+    padding: 1.25rem;
+    margin: 0;
+    font-family: t.$font-mono;
+    font-size: 14px;
+    line-height: 1.6;
+    color: t.$gray-600;
+    background-color: transparent;
+  }
+
+  .highlight {
+    color: t.$gray-600;
+    background-color: transparent;
+
+    // Comments: the JTD light syntax colour #6e7781 is 4.24:1 on gray-100 (fails AA).
+    .c,
+    .c1,
+    .cm,
+    .cs,
+    .cd,
+    .ch,
+    .cpf {
+      color: t.$gray-600;
+    }
+  }
+
+  pre.highlight code,
+  figure.highlight code {
+    font-size: 14px;
+  }
+
+  div.highlighter-rouge > button,
+  figure.highlight > button {
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 2rem;
+    height: 2rem;
+    color: t.$gray-500;
+    background: transparent;
+    opacity: 0.6;
+
+    &:hover,
+    &:focus-visible {
+      color: t.$navy-700;
+      opacity: 1;
+    }
+  }
+
+  // --- Blockquotes used as callouts (design-system "note box") ---
+  blockquote {
+    padding: 16px 20px;
+    margin: 0 0 24px;
+    color: t.$gray-600;
+    background: t.$gray-150;
+    border-left: 4px solid t.$amber-600;
+    border-radius: 0 t.$radius-md t.$radius-md 0;
+
+    > :last-child {
+      margin-bottom: 0;
+    }
+
+    a:not([class]) {
+      color: t.$cyan-ink;
+    }
+  }
+
+  // --- Tables ---
+  .table-wrapper {
+    margin: 0 0 24px;
+    border: 1px solid t.$spectra-divider;
+    border-radius: t.$radius-img;
+    box-shadow: none;
+
+    // Three or more columns on a phone: keep the columns readable and scroll the table sideways
+    // (the wrapper scrolls) instead of wrapping every word onto its own line.
+    @media (max-width: #{$bp-md - 0.02rem}) {
+      table:has(tr > :nth-child(3)) {
+        min-width: 36rem;
+      }
+    }
+  }
+
+  th,
+  td {
+    padding: 10px 14px;
+    font-size: 16px !important;
+    line-height: 1.55;
+    background-color: t.$white;
+    border-bottom: 1px solid t.$spectra-divider;
+    border-left: 1px solid t.$spectra-divider;
+
+    &:first-of-type {
+      border-left: 0;
+    }
+  }
+
+  tbody tr:last-of-type th,
+  tbody tr:last-of-type td {
+    border-bottom: 0;
+  }
+
+  thead th {
+    font-weight: 600;
+    color: t.$navy-900;
+    background-color: t.$sky-50;
+    border-bottom: 1px solid t.$spectra-divider;
+  }
+
+  // --- JTD buttons (index "Get Started" / "View on GitHub") ---
+  .btn {
+    height: 2.5rem;
+    padding: 0 1.5rem;
+    font-family: t.$font-sans;
+    font-size: t.$fs-button;
+    font-weight: 700;
+    line-height: 2.5rem;
+    color: t.$navy-700;
+    text-transform: uppercase;
+    letter-spacing: t.$ls-button;
+    background: t.$lavender-200;
+    border-radius: t.$radius-pill;
+    box-shadow: none;
+
+    &:hover,
+    &:focus-visible {
+      background: #c4cad9;
+    }
+  }
+
+  .btn-primary {
+    color: t.$white;
+    background: t.$red-500;
+
+    &:hover,
+    &:focus-visible {
+      background: t.$red-600;
+    }
+  }
+
+  // --- JTD "children" list on parent pages ---
+  .text-delta {
+    font-size: 15px !important;
+    font-weight: 700;
+    color: t.$navy-900;
+    letter-spacing: 0.08em;
+  }
+
+  .anchor-heading svg {
+    color: t.$navy-700;
+  }
+
+  // --- Screenshots: real captures from the demo repository (_includes/screenshot.html) ---
+  // Desktop captures show at most at the content-column width (760px) and never larger than their own
+  // display size (width/height attributes). Phone captures sit in a phone frame, at most 340px wide.
+  .screenshot {
+    max-width: 760px;
+    margin: 0 0 24px;
+
+    .screenshot-link {
+      display: block;
+      cursor: zoom-in;
+      border-radius: t.$radius-img;
+
+      &:focus-visible {
+        outline: 3px solid t.$navy-700;
+        outline-offset: 3px;
+      }
+    }
+
+    img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border: 1px solid t.$spectra-divider;
+      border-radius: t.$radius-img;
+    }
+
+    figcaption {
+      margin-top: 8px;
+      font-size: 15px;
+      line-height: 1.5;
+      color: t.$gray-600;
+    }
+  }
+
+  .screenshot-narrow {
+    max-width: 560px;
+  }
+
+  .screenshot-phone {
+    max-width: 340px;
+
+    .screenshot-link {
+      padding: 10px;
+      background: t.$navy-900;
+      border-radius: 34px;
+      box-shadow: t.$shadow-glow;
+    }
+
+    img {
+      border: 0;
+      border-radius: 24px;
+    }
+
+    figcaption {
+      text-align: center;
+    }
+  }
+
+  // A desktop and a phone capture side by side; stacked on narrow screens.
+  .screenshot-pair {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    align-items: flex-start;
+    margin: 0 0 24px;
+
+    > .screenshot {
+      margin: 0;
+    }
+
+    > .screenshot:not(.screenshot-phone) {
+      flex: 1 1 360px;
+      min-width: 0;
+    }
+
+    > .screenshot-phone {
+      flex: 0 1 240px;
+    }
+  }
+
+  // --- "Under the hood": collapsed detail at the end of a guide ---
+  details {
+    padding: 12px 20px;
+    margin: 0 0 24px;
+    background: t.$gray-150;
+    border-radius: t.$radius-md;
+
+    > summary {
+      font-weight: 700;
+      color: t.$navy-700;
+      cursor: pointer;
+    }
+
+    &[open] > summary {
+      margin-bottom: 12px;
+    }
+
+    > :last-child {
+      margin-bottom: 0;
+    }
+  }
+}
+
+// Footer inside the content column (JTD components/footer.html: back to top)
+.spectra-content-col .main-content > footer {
+  font-size: 15px;
+  color: t.$gray-600;
+
+  a {
+    color: t.$navy-700;
+  }
+}
+
+// =============================================================
+// Index page blocks (_includes/spectra_*.html)
+// =============================================================
+.spectra-block {
+  display: flex;
+  margin: 0 0 18px;
+  flex-direction: column;
+  gap: 18px;
+}
+
+// --- "What Is SPECTRA?" visual (decorative) ---
+.spectra-visual {
+  display: grid;
+  padding: 28px;
+  background: t.$navy-900;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.15fr);
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 18px;
+  line-height: normal;
+}
+
+.spectra-visual-doc {
+  position: relative;
+  display: flex;
+  min-height: 230px;
+  padding: 16px 16px 20px;
+  overflow: hidden;
+  background: t.$white;
+  border-radius: t.$radius-img;
+  flex-direction: column;
+  gap: 9px;
+
+  .spectra-visual-path {
+    margin-bottom: 4px;
+    font-family: t.$font-mono;
+    font-size: 12px;
+    color: t.$gray-600;
+  }
+
+  .bar {
+    height: 6px;
+    background: t.$spectra-divider;
+
+    &.is-title {
+      background: t.$navy-900;
+    }
+  }
+
+  .scan {
+    position: absolute;
+    right: 0;
+    left: 0;
+    top: 62%;
+    height: 2px;
+    background: t.$cyan-600;
+    box-shadow: t.$cyan-600 0 0 14px 2px;
+  }
+}
+
+.spectra-visual-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+
+  img {
+    display: block;
+    width: 88px;
+    height: 88px;
+  }
+
+  .bands {
+    display: flex;
+    width: 64px;
+    flex-direction: column;
+    gap: 4px;
+
+    span {
+      height: 4px;
+
+      &:nth-child(1) { background: t.$spectra-step-1; }
+      &:nth-child(2) { background: t.$spectra-step-2; }
+      &:nth-child(3) { background: t.$spectra-step-3; }
+      &:nth-child(4) { background: t.$spectra-step-4; }
+      &:nth-child(5) { background: t.$spectra-step-5; }
+    }
+  }
+}
+
+.spectra-visual-tests {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.spectra-visual-test {
+  display: flex;
+  padding: 8px 12px;
+  background: t.$navy-950;
+  border-left: 4px solid t.$spectra-step-1;
+  flex-direction: column;
+  gap: 2px;
+
+  &:nth-child(2) { border-left-color: t.$spectra-step-2; }
+  &:nth-child(3) { border-left-color: t.$spectra-step-3; }
+  &:nth-child(4) { border-left-color: t.$spectra-step-4; }
+  &:nth-child(5) { border-left-color: t.$spectra-step-5; }
+
+  .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .id {
+    font-family: t.$font-mono;
+    font-size: 12px;
+    color: t.$gray-400;
+  }
+
+  .verdict {
+    font-size: 11px;
+    font-weight: 700;
+    color: t.$teal-400;
+    letter-spacing: 0.06em;
+  }
+
+  .name {
+    overflow: hidden;
+    font-size: 14px;
+    color: t.$white;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &.is-rejected {
+    .verdict { color: t.$spectra-rejected; }
+    .name { text-decoration: line-through; }
+  }
+}
+
+@media (max-width: 40rem) {
+  .spectra-visual {
+    grid-template-columns: 1fr;
+  }
+
+  .spectra-visual-mark {
+    flex-direction: row;
+  }
+}
+
+// --- How It Works steps ---
+.spectra-steps {
+  display: grid;
+  padding: 0;
+  margin: 10px 0 28px;
+  list-style: none;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  gap: 32px 24px;
+}
+
+.spectra-content-col .main-content .spectra-steps > li {
+  display: flex;
+  margin: 0;
+  flex-direction: column;
+  gap: 12px;
+
+  &::before {
+    content: none;
+  }
+}
+
+.spectra-step-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.spectra-step-icon {
+  display: flex;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+
+  img {
+    width: 30px;
+    height: 30px;
+  }
+
+  .spectra-step:nth-child(5n+1) & { background: t.$spectra-step-1; }
+  .spectra-step:nth-child(5n+2) & { background: t.$spectra-step-2; }
+  .spectra-step:nth-child(5n+3) & { background: t.$spectra-step-3; }
+  .spectra-step:nth-child(5n+4) & { background: t.$spectra-step-4; }
+  .spectra-step:nth-child(5n+5) & { background: t.$spectra-step-5; }
+}
+
+.spectra-step-line {
+  border-top: 2px dashed t.$spectra-connector;
+  flex: 1 1 0%;
+}
+
+.spectra-step-arrow {
+  width: 0;
+  height: 0;
+  margin-left: -12px;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 9px solid t.$spectra-connector;
+  flex: 0 0 auto;
+}
+
+// The last step, and the last step of each wrapped row (marked by assets/js/flow-rows.js), has no arrow.
+.spectra-step:last-child,
+.spectra-step-row-end {
+  .spectra-step-line,
+  .spectra-step-arrow {
+    visibility: hidden;
+  }
+}
+
+.spectra-step-num {
+  margin-top: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.7;
+  color: t.$navy-900;
+  letter-spacing: 0.08em;
+}
+
+.spectra-content-col .main-content .spectra-step h3 {
+  margin: 0;
+  font-size: 24px !important;
+  font-weight: 600;
+  line-height: 1.25;
+
+  a {
+    color: t.$navy-900;
+    text-decoration: none;
+
+    &:hover {
+      color: t.$navy-700;
+      text-decoration: underline;
+    }
+  }
+}
+
+.spectra-content-col .main-content .spectra-step p {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.6;
+  color: t.$gray-600;
+}
+
+// Flow diagrams (_includes/flow.html, _data/flows.yml) reuse the step cards above.
+.spectra-content-col .main-content .spectra-step .spectra-step-title {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: t.$navy-900;
+
+  a {
+    color: t.$navy-900;
+    text-decoration: none;
+
+    &:hover,
+    &:focus-visible {
+      color: t.$navy-700;
+      text-decoration: underline;
+    }
+  }
+}
+
+.spectra-step-icon-num {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  color: t.$white;
+}
+
+.spectra-content-col .main-content .spectra-flow {
+  margin: 8px 0 32px;
+
+  .spectra-steps {
+    margin-bottom: 12px;
+  }
+
+  > figcaption {
+    font-size: 15px;
+    line-height: 1.5;
+    color: t.$gray-600;
+  }
+}
+
+// More than five steps: smaller circles and titles so three fit per row.
+.spectra-content-col .main-content .spectra-steps-long {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 24px 20px;
+
+  .spectra-step-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .spectra-step-icon-num {
+    font-size: 20px;
+  }
+
+  .spectra-step .spectra-step-title {
+    font-size: 19px;
+  }
+
+  .spectra-step p {
+    font-size: 16px;
+  }
+}
+
+// --- Start Here cards ---
+.spectra-cards {
+  display: grid;
+  margin: 6px 0 18px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 20px;
+}
+
+.spectra-content-col .main-content a.spectra-card {
+  display: flex;
+  padding: 24px;
+  text-decoration: none;
+  background: t.$sky-50;
+  flex-direction: column;
+  gap: 8px;
+  transition: box-shadow t.$dur-slow;
+
+  &:hover,
+  &:focus-visible {
+    box-shadow: t.$shadow-glow;
+  }
+
+  .title {
+    font-size: 21px;
+    font-weight: 600;
+    line-height: 1.7;
+    color: t.$navy-900;
+  }
+
+  .desc {
+    font-size: 16px;
+    line-height: 1.55;
+    color: t.$gray-600;
+  }
+}
+
+// --- Terminal mock (index: Quick install) ---
+.spectra-terminal {
+  margin: 16px 0 24px;
+  overflow: hidden;
+  line-height: normal;
+  background: t.$white;
+  border-radius: t.$radius-img;
+  box-shadow: 0 0 0 1px t.$spectra-divider;
+}
+
+.spectra-terminal-head {
+  display: flex;
+  padding: 14px 20px;
+  font-size: 15px;
+  color: t.$navy-900;
+  background: t.$sky-50;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+
+  .cmd {
+    font-weight: 700;
+  }
+
+  .meta {
+    font-family: t.$font-mono;
+    font-size: 13px;
+  }
+}
+
+.spectra-terminal-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+}
+
+.spectra-terminal-files {
+  display: flex;
+  border-right: 1px solid t.$spectra-divider;
+  flex-direction: column;
+}
+
+.spectra-terminal-file {
+  display: grid;
+  padding: 12px 20px;
+  border-top: 1px solid t.$spectra-divider;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+
+  &:first-child {
+    border-top: 0;
+  }
+
+  img {
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+  }
+
+  .path {
+    display: block;
+    overflow: hidden;
+    font-family: t.$font-mono;
+    font-size: 13px;
+    color: t.$navy-900;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .note {
+    display: block;
+    font-size: 13px;
+    line-height: 1.45;
+    color: t.$gray-600;
+  }
+}
+
+.spectra-terminal-statuses {
+  display: flex;
+  padding: 14px 20px;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.spectra-terminal-statuses .sublabel {
+  font-family: t.$font-mono;
+  font-size: 13px;
+  font-weight: 700;
+  color: t.$navy-900;
+}
+
+.spectra-terminal-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+
+  .tag {
+    min-width: 66px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: t.$white;
+    text-align: center;
+    letter-spacing: 0.06em;
+    background: t.$navy-900;
+    border-radius: 1.25rem;
+    flex: 0 0 auto;
+
+    &.is-mid { background: t.$navy-700; }
+    &.is-pale { color: t.$navy-700; background: t.$lavender-200; }
+  }
+
+  .text {
+    font-size: 14px;
+    line-height: 1.45;
+    color: t.$navy-900;
+  }
+}
+
+.spectra-terminal-foot {
+  display: flex;
+  padding: 12px 20px;
+  background: t.$gray-150;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+
+  .chips-label {
+    margin-right: 6px;
+    font-size: 13px;
+    color: t.$gray-600;
+  }
+
+  .chip {
+    padding: 4px 10px;
+    font-family: t.$font-mono;
+    font-size: 13px;
+    font-weight: 700;
+    color: t.$gray-600;
+    background: t.$spectra-divider;
+    border-radius: 1.25rem;
+  }
+}
+
+// =============================================================
+// ATP footer
+// =============================================================
+.atp-footer-frame {
+  padding: 0 t.$frame-padding t.$frame-padding;
+  background: t.$sky-50;
+}
+
+.atp-footer {
+  font-family: t.$font-sans;
+  color: t.$white;
+  background: t.$navy-700;
+}
+
+.atp-footer-grid {
+  display: grid;
+  padding: 2.5rem t.$container-pad;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 2rem;
+
+  img {
+    display: block;
+    max-width: 200px;
+    height: auto;
+  }
+}
+
+.atp-footer-cta {
+  padding-top: 30px;
+}
+
+.atp-button {
+  display: inline-block;
+  box-sizing: border-box;
+  height: 2.5rem;
+  padding: 0 1.5rem;
+  font-family: t.$font-sans;
+  font-size: t.$fs-button;
+  font-weight: 700;
+  line-height: 2.5rem;
+  color: t.$white;
+  text-align: center;
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: t.$ls-button;
+  white-space: nowrap;
+  border-radius: t.$radius-pill;
+  transition: background-color t.$dur-slow;
+}
+
+.atp-button-red {
+  background: t.$red-500;
+
+  &:hover,
+  &:focus-visible {
+    color: t.$white;
+    text-decoration: none;
+    background: t.$red-600;
+  }
+}
+
+.atp-footer-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+
+  li {
+    margin: 0;
+  }
+}
+
+.atp-footer-link {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  font-size: 1.125rem;
+  line-height: 1.5rem;
+  color: t.$white;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    color: t.$white;
+    text-decoration: underline;
+  }
+}
+
+.atp-footer-follow {
+  margin: 0 0 0.75rem;
+  font-size: 24px;
+  line-height: 1.5;
+  color: t.$white;
+}
+
+.atp-social {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.atp-social-link {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 3rem;
+  height: 3.25rem;
+  padding: 0.5rem;
+  border-bottom: 0.25rem solid t.$youtube;
+
+  &.atp-social-tw { border-bottom-color: t.$twitter; }
+  &.atp-social-li { border-bottom-color: t.$linkedin; }
+
+  svg {
+    width: 2rem;
+    height: 2rem;
+  }
+}
+
+.atp-footer-sub {
+  display: flex;
+  min-height: 3.5rem;
+  padding: 0 t.$container-pad;
+  align-items: center;
+
+  small {
+    font-size: 14px;
+    line-height: 1.5;
+    color: t.$lavender-300; // design gray-500 is 2.39:1 on navy-700
+  }
+
+  a {
+    color: t.$white;
+  }
+}
+
+.atp-footer-content {
+  min-height: 0;
+  padding-bottom: 1.25rem;
+}
+
+// --- Screenshot lightbox (assets/js/screenshot-lightbox.js); the dialog sits outside .main-content ---
+.screenshot-lightbox {
+  max-width: min(96vw, 1600px);
+  max-height: 96vh;
+  padding: 16px;
+  background: t.$white;
+  border: 0;
+  border-radius: t.$radius-md;
+
+  &::backdrop {
+    background: rgba(20, 35, 76, 0.75);
+  }
+
+  img {
+    display: block;
+    max-width: 100%;
+    max-height: calc(96vh - 96px);
+    margin: 0 auto;
+  }
+
+  .screenshot-lightbox-caption {
+    margin: 12px 40px 0 0;
+    font-size: 15px;
+    line-height: 1.5;
+    color: t.$gray-600;
+  }
+
+  .screenshot-lightbox-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 40px;
+    height: 40px;
+    font-size: 28px;
+    line-height: 1;
+    color: t.$navy-900;
+    cursor: pointer;
+    background: t.$white;
+    border: 1px solid t.$spectra-divider;
+    border-radius: 50%;
+
+    &:focus-visible {
+      outline: 3px solid t.$navy-700;
+      outline-offset: 2px;
+    }
+  }
+}
+
+.screenshot-lightbox-open {
+  overflow: hidden;
 }

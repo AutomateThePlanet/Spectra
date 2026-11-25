@@ -1,53 +1,41 @@
 // =============================================================
 // SPECTRA color scheme for Just the Docs
-// Matches Automate The Planet "SPECTRA" banner — cream background,
-// dark navy text/sidebar, teal accents.
+// Maps the Automate The Planet design tokens (custom/_tokens.scss,
+// ported from "SPECTRA Docs v2") onto the Just the Docs variables.
+// Layout and component styling lives in custom/custom.scss.
 // =============================================================
 
-// --- ATP / SPECTRA Brand Palette ---
-$spectra-cream:       #f6f0e1;  // banner background
-$spectra-cream-soft:  #fbf7ec;  // slightly lighter for content area
-$spectra-cream-deep:  #ede4cf;  // borders / dividers
-$spectra-navy:        #16213e;  // primary headings, sidebar
-$spectra-navy-light:  #1a2744;
-$spectra-navy-deep:   #0f1628;  // header bar
-$spectra-teal:        #00bcd4;  // accent / buttons
-$spectra-teal-light:  #4dd0e1;
-$spectra-teal-dark:   #0097a7;  // links
-$spectra-orange:      #e8743a;  // logo accent (warm)
-$spectra-text:        #2a2f45;
-$spectra-code-bg:     #efe9d8;
+@use "../custom/tokens" as t;
 
-// --- Sidebar / Navigation ---
-// Use the lighter navy that matches the dashboard banner background
-// so the banner sits flush in the sidebar with no visible seam.
-$sidebar-color:               $spectra-navy-light;
-$nav-width:                   17.5rem;
-$nav-link-color:              rgba(255, 255, 255, 0.92);
-$nav-child-link-color:        rgba(255, 255, 255, 0.78);
-$nav-active-link-color:       $spectra-teal-light;
+// --- Typography ---
+$body-font-family: t.$font-sans;
+$mono-font-family: t.$font-mono;
+$root-font-size: 16px;
 
-// --- Body / Content area ---
-$body-background-color:       $spectra-cream-soft;
-$body-text-color:             $spectra-text;
-$body-heading-color:          $spectra-navy;
+// --- Body / content ---
+$body-background-color: t.$white;
+$body-text-color: t.$gray-600;
+$body-heading-color: t.$navy-900;
 
 // --- Links ---
-$link-color:                  $spectra-teal-dark;
+$link-color: t.$navy-700;
+
+// --- Navigation (docs nav aside) ---
+$sidebar-color: t.$sky-50;
+$nav-child-link-color: t.$navy-700;
+$feedback-color: t.$lavender-100;
 
 // --- Search ---
-$search-background-color:     $spectra-cream;
-$search-result-preview-color: $spectra-text;
+$search-background-color: t.$white;
+$search-result-preview-color: t.$gray-600;
 
 // --- Code ---
-$code-background-color:       $spectra-code-bg;
+$code-background-color: t.$gray-100;
+$code-linenumber-color: t.$gray-500;
 
 // --- Buttons ---
-$btn-primary-color:           $spectra-teal;
+$btn-primary-color: t.$red-500;
 
-// --- Header / Top bar ---
-$header-color:                $spectra-navy-deep;
-$header-text-color:           #ffffff;
-
-// --- Borders ---
-$border-color:                $spectra-cream-deep;
+// --- Borders / tables ---
+$border-color: t.$spectra-divider;
+$table-background-color: t.$white;

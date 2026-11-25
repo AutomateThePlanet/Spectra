@@ -1,10 +1,10 @@
 ---
-title: How Test Case Generation Works
+title: How test case generation works
 parent: Architecture
-nav_order: 2
+nav_order: 3
 ---
 
-# How Test Case Generation Works
+# How test case generation works
 
 SPECTRA generates test cases through a pipeline: read docs → analyze behaviors → generate in your
 Claude Code session → critic verification (a separate subagent call) → write `.md` files.

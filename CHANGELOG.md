@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — Documentation
+
+### Changed
+
+- **Documentation site redesigned** (SPECTRA Docs v2 look, just-the-docs 0.12.0): new header, hero, right-hand nav,
+  footer and design tokens; the nav stays visible while you scroll.
+- **User docs rewritten around what you say to your AI agent.** Every guide follows one pattern: what to say, what you
+  will see (real screenshots from the Windows Calculator demo), where the results are, and a collapsed "Under the
+  hood". `usage.html` is now "Generate test cases"; the long workflow guide still ships in the `USAGE.md` that
+  `spectra init` installs (`src/Spectra.CLI/Templates/USAGE.md`), separate from the website page.
+- New pages: Extract acceptance criteria, Review flagged tests, Update tests when your docs change, Use SPECTRA in CI,
+  Glossary, Coverage reference, AI agent installs. The Quality group is folded into Guides and Architecture;
+  Development is now a short Contributing page. No URL was removed.
+- Docs checked against the 2.7.0 code: generation does not read `spectra.profile.md`; the Testimize generation step is
+  inactive since spec 099; generated tests keep the model's IDs (run `spectra doctor ids`); hallucinated tests are
+  deleted with a drop record.
+- Screenshots are captured at 2× with `docs/scripts/docs-screenshots/capture.js`, sized to the column, with a phone frame
+  for mobile shots and a lightbox. Diagrams are one data-driven component (`_includes/flow.html`) instead of ASCII art.
+- The live verification checklist and the full developer guide moved to `docs/contributing/` (repository only).
+
+### Added
+
+- `docs/scripts/check-rendered-markdown.js`: fails when a built page shows raw Markdown.
+- The docs workflow checks colour contrast with axe-core on every page (warnings only for now).
+- `sitemap.xml` (jekyll-sitemap).
+
 ## [2.7.0] - 2026-10-27 — SPECTRA for the other AI agents (`spectra init --agent`)
 
 ### Added

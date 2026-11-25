@@ -1,13 +1,14 @@
 ---
 title: Deployment
-nav_order: 5
+parent: Guides
+nav_order: 11
 has_children: true
 permalink: /deployment
 ---
 
 # Deployment
 
-Guides for deploying the SPECTRA dashboard and configuring external integrations (Cloudflare Pages).
+How to host the SPECTRA dashboard. The step-by-step guide for Cloudflare Pages: [Cloudflare Pages setup](deployment/cloudflare-pages-setup).
 
 ## Two distinct deployment models that should not be conflated
 
@@ -20,4 +21,4 @@ SPECTRA has two web surfaces with **different** deployment models:
 
 The console is **not** deployed anywhere. It is launched on the engineer's machine and talks straight to
 the local execution database (`.execution/spectra.db`), and it is never committed and never served remotely.
-See `cli-reference.md` (`spectra run console`) and the execution workflow for usage.
+See [Run tests with your agent](execution-agents) for how the console is used.

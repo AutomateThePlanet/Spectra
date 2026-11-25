@@ -1,11 +1,13 @@
 ---
 layout: default
 title: "Migration: Document Index Restructure (v1.51.0)"
-parent: Migration Guides
-nav_order: 40
+parent: Reference
+nav_order: 9
 ---
 
 # Migration: Document Index Restructure (v1.51.0)
+
+> Historical: this page covers the 1.51.0 index change. Current behaviour: [Document index](document-index).
 
 **Affects releases:** 1.51.0 and later
 **Breaking change:** No (auto-migration on first run)
@@ -16,7 +18,7 @@ nav_order: 40
 The single-file `docs/_index.md` has been replaced with a per-suite layout
 under `docs/_index/`:
 
-```
+```text
 docs/_index/
 ├── _manifest.yaml          # always loaded into AI prompts (~2-5K tokens)
 ├── _checksums.json         # never sent to AI; used for incremental detection
@@ -45,7 +47,7 @@ model overflow.
 
 **Nothing.** Run `spectra docs index` once after upgrading and you'll see:
 
-```
+```text
 Migrated 541 docs across 12 suites. Largest suite: SM_GSG_Topics
 (145 docs, ~10,877 tokens). Legacy index preserved as
 docs/_index.md.bak — safe to delete after verification.

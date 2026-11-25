@@ -1,0 +1,44 @@
+<link rel="preload" href="{{ '/assets/fonts/nunito-latin-400-normal.woff2' | relative_url }}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{ '/assets/fonts/nunito-latin-600-normal.woff2' | relative_url }}" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="{{ '/assets/images/spectra-mark.svg' | relative_url }}" type="image/svg+xml">
+<script src="{{ '/assets/js/screenshot-lightbox.js' | relative_url }}" defer></script>
+<script src="{{ '/assets/js/flow-rows.js' | relative_url }}" defer></script>
+<script>
+  // SPECTRA layout rewiring for just-the-docs 0.12.0 (see _layouts/default.html).
+  (function () {
+    // 1. just-the-docs.js scrollNav() calls scrollIntoView() on the current page's nav link.
+    //    JTD's nav is a fixed sidebar, so that only scrolled the sidebar. Here the nav sits in
+    //    the page flow (right aside, or below the content on mobile), so scrollIntoView would
+    //    scroll the whole window on every page load. For links inside #site-nav, scroll only
+    //    the aside's own scroll box, never the window.
+    var nativeScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function () {
+      var nav = this.closest && this.closest('#site-nav');
+      if (!nav) { return nativeScrollIntoView.apply(this, arguments); }
+      var box = nav.closest('.spectra-aside');
+      if (box && box.scrollHeight > box.clientHeight) {
+        var top = this.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+        box.scrollTop = Math.max(0, top - box.clientHeight / 2);
+      }
+    };
+
+    // 2. "Get SPECTRA" menu: the button in header_custom.html opens JTD's aux_nav list.
+    document.addEventListener('DOMContentLoaded', function () {
+      var button = document.querySelector('.get-spectra-button');
+      var menu = document.querySelector('#main-header .aux-nav');
+      if (!button || !menu) { return; }
+      menu.id = 'get-spectra-menu';
+      button.setAttribute('aria-controls', menu.id);
+      function setOpen(open) { button.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+      button.addEventListener('click', function () {
+        setOpen(button.getAttribute('aria-expanded') !== 'true');
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && button.getAttribute('aria-expanded') === 'true') { setOpen(false); button.focus(); }
+      });
+      document.addEventListener('click', function (e) {
+        if (!button.contains(e.target) && !menu.contains(e.target)) { setOpen(false); }
+      });
+    });
+  })();
+</script>

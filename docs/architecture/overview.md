@@ -1,15 +1,15 @@
 ---
-title: Overview
+title: Architecture overview
 parent: Architecture
 nav_order: 1
 ---
 
-# Architecture Overview
+# Architecture overview
 
 How SPECTRA's two subsystems work together, as of the v2 (Claude Code) migration.
 
 Related: [the v2 migration](../claude-code-v2-migration.md) (history: the GitHub Copilot SDK runtime was removed) |
-[How Test Case Generation Works](analysis/cli-vs-chat-generation.md)
+[How Test Case Generation Works](../analysis/cli-vs-chat-generation.md)
 
 ---
 
@@ -26,28 +26,10 @@ a turn (or subagent call) inside your interactive Claude Code session.
 
 ## System Flow
 
-```
-docs/                              <- Source documentation
-  |
-docs/_index/                       <- Per-suite manifest + checksums (v2 layout)
-  |
-spectra ai compile-prompt          <- Deterministic prompt, no model call
-  |
-(a turn in YOUR Claude Code        <- Generation/analysis/criteria/update all run here
- session, driven by a skill)
-  |
-spectra ai ingest-tests            <- Fail-loud validate + persist
-  |
-spectra-critic subagent            <- context: fork verification, per test
-  |
-test-cases/                        <- Markdown + YAML frontmatter test cases
-  |
-spectra run                        <- Deterministic execution state machine (SQLite)
-  |
-spectra run console (optional)     <- Local browser UI for manual verdict recording
-  |
-Azure DevOps / Jira / Teams        <- Bug logging via their own separate MCPs
-```
+{% include flow.html name="system-flow" %}
+
+Bugs found during a run are logged through other tools' own integrations (for example Azure DevOps or Jira MCP
+servers), not through SPECTRA.
 
 ## Tech Stack
 
@@ -64,13 +46,33 @@ Azure DevOps / Jira / Teams        <- Bug logging via their own separate MCPs
 
 ## Project Structure
 
-```
+```text
 src/
 ├── Spectra.CLI/        # CLI: authoring commands (compile-*/ingest-* seam) + spectra run
 ├── Spectra.Core/       # Shared library (parsing, validation, models, coverage)
 ├── Spectra.Execution/  # Transport-neutral execution engine, driven solely by spectra run
 └── Spectra.GitHub/     # GitHub integration (future)
 ```
+
+## What to commit
+
+Commit the files that record results; the rest is scratch that `spectra init` (new workspaces) and
+`spectra update-skills` (existing ones) add to `.gitignore`:
+
+| Path | Committed? |
+|------|-----------|
+| `test-cases/<suite>/*.md`, `_index.json`, `_source-baseline.json` | yes |
+| `docs/criteria/**` (incl. `_criteria_index.yaml`), `docs/_index/**` | yes |
+| `.spectra/source-snapshots/` (lets triage show word diffs) | yes |
+| `.spectra/update-triage.json` | no (scratch) |
+| `.spectra/updates/`, `.spectra/repairs/` | no (scratch) |
+| `.spectra/verdicts/`, `.spectra/dropped-tests.json` | no (scratch) |
+| `.spectra/generation-plan/` | no (scratch) |
+| `.spectra/baseline.lock`, `.spectra/criteria.lock` | no (scratch) |
+| `.execution/spectra.db` (run state; in 2.7.0 `.execution/.execution/spectra.db`, a known issue) | no |
+
+Keep the `# spectra-offered: …` lines in `.gitignore` when you commit it: they record which patterns SPECTRA already
+offered, so one your team removed stays removed in every clone.
 
 ## Key Design Decisions
 

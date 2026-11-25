@@ -1,10 +1,10 @@
 ---
 title: Configuration
-parent: User Guide
+parent: Reference
 nav_order: 2
 ---
 
-# Configuration Reference
+# Configuration
 
 Complete reference for `spectra.config.json`.
 
@@ -67,7 +67,7 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 > generator model; a legacy config with `ai.providers` or old `ai.critic.*` keys still loads (those keys
 > are ignored).
 > See [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) and the
-> [AI Models & Cost Guide](ai-models-cost-guide.md).
+> [AI models and cost](ai-models-cost-guide.md).
 
 ```json
 {
@@ -91,7 +91,7 @@ existing config that still has it loads as before; `spectra init` no longer writ
 To choose a model, pick it the same way you'd pick a model for any other Claude Code work
 (`/model`, or your plan's default), because whatever your session is running when you drive
 `spectra-generate`/`spectra-criteria`/`spectra-update` **is** the model doing that turn. See the
-[AI Models & Cost Guide](ai-models-cost-guide.md#choosing-a-session-model) for guidance on
+[AI models and cost](ai-models-cost-guide.md#choosing-a-session-model) for guidance on
 Haiku/Sonnet/Opus trade-offs.
 
 The critic model is `ai.critic.model`. `spectra init` and `spectra update-skills` write it into the
@@ -103,16 +103,16 @@ because of the config: when it is invalid, it warns, keeps the agent's installed
 An invalid `ai.critic.model` alone doesn't make the config invalid: `update-skills` warns
 `ai.critic.model <value> is not valid (…); using sonnet` and installs `sonnet`.
 
-#### `.spectra-debug.log` — no longer tracks per-call AI timing
+### `.spectra-debug.log` — no longer tracks per-call AI timing
 
 Pre-v2, `.spectra-debug.log` recorded one line per SDK call (`ANALYSIS START/OK`, `BATCH
 START/OK`, `CRITIC START/OK`) with model, provider, and elapsed time, because SPECTRA's own
 process made those calls and could observe them. **SPECTRA doesn't make those
 calls anymore**, since generation/analysis run as turns in your own Claude Code session, invisible to
 the CLI process. There is nothing left for SPECTRA to time or log for those phases; `debug.enabled`
-still exists (see [the `debug` section](#debug)) but the AI-call timing lines it used to produce
+still exists (see [the `debug` section](#debug--debug-logging)) but the AI-call timing lines it used to produce
 no longer apply. Track actual usage/cost through Claude Code's own session/usage indicators. See
-the [AI Models & Cost Guide](ai-models-cost-guide.md#tracking-what-youve-spent).
+the [AI models and cost](ai-models-cost-guide.md#tracking-what-youve-spent).
 
 **Testimize lifecycle lines** are unaffected, because Testimize is an in-process NuGet library (not an
 AI call), so `TESTIMIZE DISABLED/HEALTHY/DISPOSED` etc. still log normally when `debug.enabled` is
@@ -378,17 +378,15 @@ This section currently has no configurable fields. During a run, the execution a
 |----------|------|---------|-------------|
 | `repository_file` | string | `"spectra.profile.md"` | Repository-level profile filename |
 | `suite_file` | string | `"_profile.md"` | Suite-level profile filename |
-| `auto_load` | bool | `true` | Automatically load profiles during generation |
+| `auto_load` | bool | `true` | Meant to load profiles during generation; in 2.7.0 generation doesn't read `spectra.profile.md` ([Known limitation](generation-profiles.md#generation-profiles-spectraprofilemd)) |
 | `validate_on_load` | bool | `true` | Validate profile structure on load |
 | `include_in_validation` | bool | `true` | Include profile validation in `spectra validate` |
 
 ## `testimize` — Testimize Integration (Optional)
 
-Disabled by default. When enabled, SPECTRA runs the Testimize engine
-in-process during test generation to produce algorithmically precise
-boundary values, equivalence partitions, and multi-field combinations.
-See [Testimize Integration](testimize-integration.md) for the full setup
-guide, how-it-works flow, and ABC tuning reference.
+Disabled by default. **In 2.7.0 it no longer changes generated tests:** with `enabled: true` the analysis step
+only asks the AI to list constrained input fields, which nothing uses yet. See
+[Testimize Integration](testimize-integration.md).
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
@@ -396,7 +394,7 @@ guide, how-it-works flow, and ABC tuning reference.
 | `mode` | string | `"exploratory"` | Maps to Testimize's `TestCaseCategory`: `"exploratory"` → All, `"valid"` → Valid only, `"validation"` → Invalid only. |
 | `strategy` | string | `"HybridArtificialBeeColony"` | Algorithm for multi-field suites: `Pairwise`, `OptimizedPairwise`, `Combinatorial`, `OptimizedCombinatorial`, `HybridArtificialBeeColony`. |
 | `settings_file` | string? | `null` | Path to a `testimizeSettings.json` with per-type equivalence classes and ABC tuning. |
-| `abc_settings` | object? | `null` | Optional ABC algorithm tuning. See [Testimize Integration > abc_settings](testimize-integration.md#abc_settings-optional-tuning). |
+| `abc_settings` | object? | `null` | ABC algorithm tuning. Not read in 2.7.0. |
 
 ## `debug` — Debug Logging
 

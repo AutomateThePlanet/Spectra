@@ -3,5 +3,10 @@
     "allow": [
       "mcp__spectra__*"
     ]
+  },
+  "includeCoAuthoredBy": false,
+  "attribution": {
+    "commit": "",
+    "pr": ""
   }
 }

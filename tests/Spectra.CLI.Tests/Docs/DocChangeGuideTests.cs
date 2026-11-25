@@ -5,9 +5,11 @@ using Spectra.CLI.Skills;
 namespace Spectra.CLI.Tests.Docs;
 
 /// <summary>
-/// Spec 100 F2 (FR-005–FR-008, SC-002): docs/usage.md's "When documentation changes" walks the whole doc-change flow
+/// Spec 100 F2 (FR-005–FR-008, SC-002): the "When documentation changes" guide walks the whole doc-change flow
 /// in order, with one worked example whose commands parse, real skill and agent names, the refresh line, a
 /// committed-vs-scratch table that matches what SPECTRA gitignores, and links from README.md and docs/index.md.
+/// The full guide ships in USAGE.md, which <c>spectra init</c> installs (src/Spectra.CLI/Templates/USAGE.md); the
+/// documentation site links to its short task page, keep-tests-up-to-date.html.
 /// </summary>
 public sealed class DocChangeGuideTests
 {
@@ -28,7 +30,7 @@ public sealed class DocChangeGuideTests
 
     private static string Section()
     {
-        var section = RepoFiles.Section(RepoFiles.Read("docs/usage.md"), Heading);
+        var section = RepoFiles.Section(RepoFiles.Read("src/Spectra.CLI/Templates/USAGE.md"), Heading);
         Assert.NotNull(section);
         return section!;
     }
@@ -125,5 +127,5 @@ public sealed class DocChangeGuideTests
     [InlineData("README.md")]
     [InlineData("docs/index.md")]
     public void Guide_IsLinked(string relative) =>
-        Assert.Contains("usage.md#when-documentation-changes", RepoFiles.Read(relative), StringComparison.Ordinal);
+        Assert.Contains("keep-tests-up-to-date.html", RepoFiles.Read(relative), StringComparison.Ordinal);
 }

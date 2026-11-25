@@ -1,10 +1,10 @@
 ---
-title: AI Models & Cost Guide
-parent: User Guide
-nav_order: 11
+title: AI models and cost
+parent: Reference
+nav_order: 8
 ---
 
-# AI Models & Cost Guide
+# AI models and cost
 
 Understanding how SPECTRA spends AI usage since the Claude Code migration (v2), and how to
 control it.
@@ -29,9 +29,7 @@ legacy configs that still carry `ai.providers`/`ai.critic` load cleanly, but the
 **All inference is your interactive Claude Code session.** SPECTRA's CLI only does the
 deterministic bookkeeping either side of a model call:
 
-```
-spectra ai compile-prompt ...   →   you generate the answer, in-session   →   spectra ai ingest-tests ...
-```
+{% include flow.html name="seam" %}
 
 The middle step is an ordinary Claude Code turn (or, for grounding verification, a subagent call).
 There is no separate "SPECTRA AI cost" anymore, since it is exactly your normal Claude Code usage, and

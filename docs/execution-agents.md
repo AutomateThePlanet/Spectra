@@ -1,97 +1,78 @@
 ---
 title: Execution Agents
+hero_title: Run tests with your agent
 nav_order: 4
 permalink: /execution-agents
+description: "Run manual test cases with your AI agent: it starts the run and opens a browser console where you record pass, fail, blocked or skip for each test."
 ---
 
-# Execution Agents
+# Run tests with your agent
 
-How AI-driven test execution works in SPECTRA v2: a native Claude Code skill orchestrates
-`spectra run`, and manual verdicts are recorded through a local browser console — there is no server or
-client-specific setup.
+Your AI agent starts a test run and opens a console in your browser. The console shows one test at a time; you
+perform it and record the result there. The agent stays available in chat for questions about a step.
 
-Related: [CLI Reference](cli-reference.md) (`spectra run …`)
+## What to say
 
----
+> "Run test cases for notification"
+>
+> "Run high priority test cases"
+>
+> "Run the smoke test cases"
+>
+> "Resume the last run"
+>
+> "Show run history"
 
-## There is no MCP server for execution anymore
+All of these use the `spectra-execute` skill. If you don't name a suite, the agent helps you pick tests: ask
+"What should I test?" for a suggestion based on what hasn't run or failed last time.
 
-Pre-v2 SPECTRA shipped a separate `Spectra.MCP` global tool that any MCP-compatible client
-(Claude Desktop, GitHub Copilot CLI/Chat, or a generic MCP client) could connect to over stdio.
-**That server was removed entirely in v2.4.0.** There is nothing to `dotnet tool install`,
-nothing to add to a client's MCP config, and no per-client setup page anymore. Execution is
-CLI-only, and the agent that drives it is a native Claude Code skill
-(`.claude/skills/spectra-execute/`), not something bolted on through MCP.
+## What you'll see
 
-If you have an old `.vscode/mcp.json` entry or `mcp__spectra__*` permission from a pre-v2 install,
-it's dead weight and safe to remove. `spectra init` no longer writes either.
+1. **Active runs first.** If a run is still open, the agent offers to resume or cancel it.
+2. **The console URL.** The agent starts the run and gives you a local address such as `http://127.0.0.1:5081/`.
+3. **One test at a time.** The console shows the preconditions, steps and expected result. You click
+   **PASS**, **FAIL**, **BLOCKED** or **SKIP**. A comment is required for everything except PASS. You can drop or
+   paste a screenshot. The console never moves on by itself.
 
-## How it works now
+   {% include screenshot.html file="run-console" alt="SPECTRA execution console for the standard calculator suite: 3 of 236 executed, the current test TC-775 with steps, PASS, FAIL, BLOCKED and SKIP buttons, and the completed list" caption="The console during a run of the Calculator demo's standard calculator suite." %}
 
-1. You ask, in Claude Code, something like *"Run the checkout suite"* or *"Execute the high-priority auth
-   tests."*
-2. The execution skill/agent orchestrates rather than driving a per-test loop in chat:
-   - Selects the tests (`spectra run start <suite> [--priorities …] [--tags …] [--components …]`)
-   - Launches a local, detached web console (`spectra run console`)
-   - Hands you the console's URL (`http://127.0.0.1:<port>/`) and stays on-call
-3. You record verdicts in the browser (PASS / FAIL / BLOCKED, a comment, a screenshot), and
-   the console's write-back endpoint enforces the same human-in-the-loop guardrails as the CLI
-   (an explicit verdict is required; a comment is required for FAIL/BLOCKED/SKIP; nothing is ever
-   auto-advanced or inferred).
-4. The agent reads current state from `spectra run status` (the SQLite store) when you ask
-   it something mid-run, never from the console page itself, so its answers can't drift from the
-   source of truth.
-5. Finally, `spectra run finalize` generates JSON, Markdown, and HTML reports under
-   `.execution/reports/`.
+4. **Questions in chat.** Ask the agent "what does step 3 mean?" mid-run. It answers from the docs the test was
+   written from. It never records a result for you: results come only from the console.
+5. **Finish.** Say "finalize the run". The agent creates the report and opens it.
 
-SQLite (`.execution/spectra.db`) is the single source of truth throughout. The console is a view
-and a write-back caller, never a store, so refreshing or reopening it loses nothing, and a
-short-lived `spectra run` CLI invocation reconstructs the exact same state losslessly.
+You can close the browser at any time: the run is saved, and refreshing or reopening the console loses nothing.
 
-## Driving it directly from the CLI
+## Where the results are
 
-You don't need the skill or the console at all: every operation is a plain `spectra run`
-subcommand, useful for scripting or CI.
+| What | Where |
+|---|---|
+| Run state | `.execution/.execution/spectra.db` in 2.7.0 (see the note below; keep it out of git) |
+| Reports | `.execution/reports/` (JSON, Markdown and HTML per run) |
 
-```bash
-spectra run list-suites
-spectra run start checkout --priorities high --tags smoke
-spectra run status                              # active run if omitted
-spectra run show                                # full steps/expected for the current test
-spectra run advance --status pass|fail|blocked|skip [--notes "…"]
-spectra run bulk-record --status pass --remaining
-spectra run screenshot --file ./bug.png
-spectra run finalize
-```
+> **Known issue (2.7.0):** `spectra run` stores its database one folder too deep, in `.execution/.execution/`. The
+> dashboard reads `.execution/spectra.db` and the reports in `.execution/reports/`, so a run from 2.7.0 shows up there
+> once it's finalized and has a report. The usual `.gitignore` rule `.execution/*.db` doesn't cover the nested file;
+> add `.execution/.execution/` to `.gitignore`.
 
-See the [CLI Reference](cli-reference.md#spectra-run-) for the full command list, including
-`pause`/`resume`/`cancel`/`cancel-all`, `retest`, `history`/`summary`/`selections`, and
-`spectra run console --stop`.
+The dashboard's **Run History** tab lists the runs it finds and opens each report:
 
-## Answering questions mid-run
+{% include screenshot.html file="dashboard-runs" alt="Dashboard Run History tab: pass-rate trend, pass rate per suite and a table of three runs with their passed, failed, skipped and blocked counts" %}
 
-The agent answers tester questions about a step or expected result by reading the test case's
-`source_refs` documentation directly with the Read tool, with no external service or configuration
-required. It never auto-advances or fabricates a verdict; the human verdict pause is always
-preserved.
+{% include screenshot.html file="dashboard-run-report" alt="Dashboard report of a completed unit converter run: 8 passed, 1 failed, 1 skipped, and the result of each of the 10 tests" %}
 
-## Storage
+## Automated execution
 
-```
-.execution/
-├── spectra.db                # Execution state database (WAL mode)
-├── console.json              # Console pid/port/url marker, when running
-└── reports/
-    └── a1b2c3d4-....json     # Execution reports (+ .md / .html)
-```
+The console is for people. To have an automation tool perform the steps (for example BELLATRIX on a desktop app),
+that tool needs its own skill; SPECTRA only records the results. In the Calculator demo, the
+`bellatrix-desktop-execute-spectra-test` skill does this.
 
-Reports carry per-test enrichment sourced from the test case itself, including `priority`, `tags`,
-`component`, linked acceptance-criteria IDs (`criteria`), and source-doc references
-(`source_refs`), plus a run-level `timing` breakdown. All enrichment fields are optional and
-backward compatible with older reports and JSON consumers (e.g. the dashboard).
+<details markdown="1">
+<summary>Under the hood</summary>
 
-## The SEPARATE BELLATRIX/Nova MCP
+The skill runs `spectra run start <suite>` (filters: `--priorities`, `--tags`, `--components`, `--test-ids`,
+`--selection`) and `spectra run console`. Mid-run it reads `spectra run status` and `spectra run show`, never the
+console page. Every step is also a plain CLI command, for scripts: see
+[CLI reference](cli-reference#spectra-run-). Older versions used an MCP server for execution; it was removed in
+2.4.0 ([Claude Code v2 migration](claude-code-v2-migration)).
 
-None of the above is related to BELLATRIX/Nova, the MCP server that drives your **system under
-test** during automation. That MCP is a peer tool, unaffected by anything in this page; `spectra init`
-never writes or changes `.vscode/mcp.json`, so a BELLATRIX/Nova entry there is left untouched.
+</details>

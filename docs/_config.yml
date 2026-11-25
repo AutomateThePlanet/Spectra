@@ -5,8 +5,8 @@ url: https://automatetheplanet.github.io
 baseurl: /Spectra
 
 # Branding
-logo: /assets/images/spectra_banner_white_transperant.png
-favicon_ico: /assets/images/favicon.png
+logo: /assets/images/spectra-logo.svg
+favicon_ico: /assets/images/spectra-mark.svg
 
 # Color scheme (custom ATP brand)
 color_scheme: spectra
@@ -32,11 +32,14 @@ heading_anchors: true
 footer_content: 'SPECTRA is part of the <a href="https://www.automatetheplanet.com/">Automate The Planet</a> ecosystem. Licensed under the <a href="https://github.com/AutomateThePlanet/Spectra/blob/main/LICENSE">Apache License 2.0</a>.'
 
 # Aux links (top-right of every page)
+# Shown as the "Get SPECTRA" menu in the header (_includes/header_custom.html)
 aux_links:
+  "NuGet (Spectra.CLI)":
+    - "https://www.nuget.org/packages/Spectra.CLI"
   "GitHub":
     - "https://github.com/AutomateThePlanet/Spectra"
-  "NuGet":
-    - "https://www.nuget.org/packages/Spectra.CLI"
+  "GitHub Releases":
+    - "https://github.com/AutomateThePlanet/Spectra/releases"
 
 aux_links_new_tab: true
 
@@ -50,10 +53,21 @@ gh_edit_view_mode: edit
 back_to_top: true
 back_to_top_text: "Back to top"
 
+# Sass: just-the-docs 0.12.0 still uses @import, darken()/lighten() and global built-in
+# functions, which Dart Sass reports as deprecations on every build. Our own SCSS uses @use
+# and the sass:color module, so silencing these three categories hides only the theme gem.
+sass:
+  quiet_deps: true
+  silence_deprecations:
+    - import
+    - global-builtin
+    - color-functions
+
 # Plugins
 plugins:
   - jekyll-seo-tag
   - jekyll-relative-links
+  - jekyll-sitemap
 
 # jekyll-relative-links: rewrite relative *.md links to their built
 # *.html counterparts so cross-doc references work on the deployed site.
@@ -80,3 +94,5 @@ exclude:
   - "Gemfile.lock"
   - "vendor/"
   - "node_modules/"
+  - "scripts/"
+  - "contributing/"

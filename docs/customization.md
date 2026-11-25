@@ -1,15 +1,15 @@
 ---
 title: Customization
-parent: User Guide
-nav_order: 10
+parent: Reference
+nav_order: 7
 ---
 
-# SPECTRA Customization Guide
+# Customization
 
 This guide covers every way you can customize SPECTRA's behavior, from test case
 output format to AI reasoning strategy.
 
-> **Looking for workflow how-tos instead of customization?** See [`USAGE.md`](USAGE.md), the workflow guide for using SPECTRA from Claude Code.
+> **Looking for workflow how-tos instead of customization?** See the [Guides](guides.md).
 
 ---
 
@@ -101,7 +101,7 @@ For example, here's how to add domain focus to behavior analysis:
 
 Open `.spectra/prompts/behavior-analysis.md` and add after the persona section:
 
-```
+```markdown
 ## Domain Focus
 When analyzing documentation, pay special attention to:
 - PCI-DSS compliance implications in payment flows
@@ -228,7 +228,7 @@ This section controls how generation batches are sized and which model verifies 
 > and `ai.providers` were removed; a config that still has them loads, and the keys are ignored.
 > Generation and analysis run as ordinary turns in your own Claude Code session; the model is whatever your session is
 > using (`/model`). See [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) and the
-> [AI Models & Cost Guide](ai-models-cost-guide.md) for the history.
+> [AI models and cost](ai-models-cost-guide.md) for the history.
 
 ```json
 {
@@ -315,19 +315,13 @@ refreshes unmodified files and preserves your edits.
 
 ## Customization Precedence Summary
 
-```
-profiles/_default.yaml (on disk)
-  ↓ fallback (missing or malformed)
-Built-in embedded default
+SPECTRA uses your file when it exists and is valid, and the built-in default otherwise:
 
-.spectra/prompts/{template}.md (on disk)
-  ↓ fallback
-Built-in embedded prompt template
-
-spectra.config.json (user values)
-  ↓ fallback
-Built-in defaults (categories, coverage paths, etc.)
-```
+| Your file | Used when it is missing or malformed |
+|---|---|
+| `profiles/_default.yaml` | the built-in embedded default format |
+| `.spectra/prompts/{template}.md` | the built-in embedded prompt template |
+| `spectra.config.json` (your values) | the built-in defaults (categories, coverage paths, etc.) |
 
 All user files are created by `spectra init` and tracked by
 `spectra update-skills`. You can always restore prompt-template defaults with

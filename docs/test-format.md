@@ -1,10 +1,10 @@
 ---
-title: Test Format
-parent: User Guide
+title: Test format
+parent: Reference
 nav_order: 3
 ---
 
-# Test Case Format
+# Test format
 
 How SPECTRA stores manual test cases as Markdown files with YAML frontmatter.
 
@@ -103,11 +103,12 @@ After the frontmatter, tests use standard Markdown:
 
 ## Test ID Allocation
 
-Test IDs are unique globally across all suites. When generating tests:
+Test IDs must be unique across all suites; `spectra validate` reports duplicates.
 
-1. SPECTRA scans all `_index.json` files to find existing IDs
-2. New tests continue from the global maximum (e.g., if TC-150 exists anywhere, new tests start at TC-151)
-3. This prevents ID collisions when tests are moved between suites
+> **Known issue (2.7.0):** `spectra ai ingest-tests` keeps the IDs the model wrote. It doesn't take new IDs from the
+> allocator below, so a generated test can reuse an ID from another suite. After generating, run
+> `spectra doctor ids`; if it reports duplicates, `spectra doctor ids --fix` renumbers the newer tests, then run
+> `spectra index --suite <suite>` (the fix doesn't update `_index.json`).
 
 ## Suite Index (`_index.json`)
 
@@ -147,11 +148,11 @@ If you have on-disk `.md` files that are missing from `_index.json` (e.g. from a
 
 ## Test ID allocation and the high-water-mark (v1.52.0+)
 
-Test IDs are **globally unique across all suites**. Concurrent generation runs and stale `_index.json` files cannot produce overlapping ID ranges.
+The allocator keeps renumbered IDs globally unique and never reuses a deleted ID.
 
 ### How it works
 
-Test generation (and any other path that allocates new IDs) goes through `Spectra.Core.IdAllocation.PersistentTestIdAllocator`, which:
+`spectra doctor ids --fix` allocates replacement IDs through `Spectra.Core.IdAllocation.PersistentTestIdAllocator` (in 2.7.0 it is the only caller), which:
 
 1. Acquires an exclusive cross-process lock at `.spectra/id-allocator.lock` (10 s timeout).
 2. Reads the persisted high-water-mark from `.spectra/id-allocator.json`.

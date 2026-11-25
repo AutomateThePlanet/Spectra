@@ -1,68 +1,46 @@
 ---
-title: Home
+title: Overview
 layout: home
 nav_order: 0
 permalink: /
+description: "SPECTRA turns your product documentation into manual test cases in your repository. Ask your AI agent; SPECTRA plans, writes and double-checks the tests."
 ---
 
-# SPECTRA
+## What is SPECTRA?
 
-**AI-native test case generation and execution framework.**
-From documentation to verified, grounded test cases, automatically.
-{: .fs-6 .fw-300 }
+SPECTRA turns your product documentation into manual test cases, stored as Markdown files in your repository. You ask
+your AI coding agent, and SPECTRA's skills plan the tests, write them and check each one against your docs. You
+review what it flags, run the tests from a browser console and follow coverage on a dashboard.
 
-[Get Started](getting-started){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
-[View on GitHub](https://github.com/AutomateThePlanet/Spectra){: .btn .fs-5 .mb-4 .mb-md-0 }
-
----
-
-## Why SPECTRA?
-
-| Manual approach | With SPECTRA |
-|----------------|--------------|
-| Write test cases in spreadsheets or Jira | AI generates from your docs |
-| Test cases drift as docs change | Doc changes auto-flag outdated test cases |
-| No systematic boundary/edge coverage | 6 ISTQB techniques applied automatically |
-| Coverage gaps invisible until bugs | Three-dimensional coverage dashboard |
-| Subjective test case reviews | Dual-model grounding verification |
-| Locked into test management tools | Markdown files versioned in Git |
+[Get started](getting-started){: .btn .btn-primary .mr-2 }
+[View on GitHub](https://github.com/AutomateThePlanet/Spectra){: .btn }
 
 ## How it works
 
-```
-Your docs → spectra-generate skill (analysis → batches) → critic verification → test-cases/*.md
-```
+{% include flow.html name="user-journey" %}
 
-Or just say it in Claude Code, or any of eight other AI agents: **"Generate test cases for checkout"**
-
-## Key capabilities
-
-- **AI Test Case Generation** driven from your Claude Code session, with independent critic verification
-- **Works in your AI agent**: Claude Code by default; `spectra init --agent` also installs for Copilot, Cursor, Devin,
-  Codex, Gemini, Antigravity, Kiro and OpenCode — see [AI Agents](ai-agents)
-- **Acceptance Criteria Extraction** using MUST/SHOULD/MAY from docs with SHA-256 change tracking
-- **Three-Dimensional Coverage** spanning docs, criteria, and automation in one dashboard
-- **Doc-Change Updates** that find the tests a doc change touches, edit them and re-verify them — see
-  [When documentation changes](usage.md#when-documentation-changes)
-- **CLI-Native Execution** through `spectra run`, plus an optional local web console for manual verdicts
-- **Testimize Integration** for optional algorithmic test data optimization (BVA, EP, pairwise)
-- **Git-native** storage as Markdown and YAML, with no database and no vendor lock-in
-
-## Quick install
+## Quick start
 
 ```bash
 dotnet tool install -g Spectra.CLI
 spectra init
 ```
 
-Then open Claude Code in your project and ask it to generate test cases. Using another agent? Run
-`spectra init --agent <name>` instead (for example `--agent cursor`); see [AI Agents](ai-agents). See
-[Getting Started](getting-started) for the full walkthrough.
+Then open Claude Code in your repository and say **"Extract acceptance criteria"**, then **"Generate test cases for
+checkout"**. Using Copilot, Cursor or another agent? Run `spectra init --agent <name>`
+([Use other AI agents](ai-agents)). The full walkthrough: [Getting started](getting-started). When your docs change:
+[Update tests when your docs change](keep-tests-up-to-date.html).
 
-## Part of the Automate The Planet ecosystem
+## What you can do
 
-| Tool | Purpose |
-|------|---------|
-| [BELLATRIX](https://bellatrix.solutions) | Test automation framework |
-| [Testimize](https://github.com/AutomateThePlanet/Testimize) | Test data optimization |
-| **SPECTRA** | AI test case generation and execution |
+<div class="spectra-cards">
+{% include spectra_card.html page="getting-started.md" %}
+{% include spectra_card.html page="usage.md" %}
+{% include spectra_card.html page="review.md" %}
+{% include spectra_card.html page="coverage.md" %}
+{% include spectra_card.html page="keep-tests-up-to-date.md" %}
+{% include spectra_card.html page="execution-agents.md" %}
+</div>
+
+SPECTRA is part of the [Automate The Planet](https://www.automatetheplanet.com) tools, with
+[BELLATRIX](https://bellatrix.solutions) for test automation.

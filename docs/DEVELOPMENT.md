@@ -1,150 +1,81 @@
 ---
-title: Development
+title: Contributing
 nav_order: 6
+description: "Build SPECTRA from source, run its tests, preview these docs and refresh their screenshots. Links to the contributing rules and the full developer guide."
 ---
 
-# Development Guide
+# Contributing
 
-Building, testing, and running SPECTRA locally.
+How to build SPECTRA, run its tests and work on this documentation site. The rules for issues and pull requests are
+in [CONTRIBUTING.md](https://github.com/AutomateThePlanet/Spectra/blob/main/CONTRIBUTING.md). The full developer
+guide (project structure, running locally, troubleshooting) is
+[DEVELOPMENT-GUIDE.md](https://github.com/AutomateThePlanet/Spectra/blob/main/docs/contributing/DEVELOPMENT-GUIDE.md)
+on GitHub.
 
-Related: [Getting Started](getting-started.md) | [CLI Reference](cli-reference.md) | [Architecture](architecture/overview.md)
+## Build and test
 
----
-
-> As of v2, the `Spectra.MCP` project was removed entirely, so execution is now CLI-only
-> (`spectra run`). If you're looking for MCP server build/run instructions from an older version of
-> this page, they no longer apply. See
-> [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md).
-
-## Quick Start
+You need the .NET 8 SDK.
 
 ```bash
-# Build and install the tool
-dotnet build -c Release -p:NoWarn=CA1062
-dotnet pack src/Spectra.CLI/Spectra.CLI.csproj -c Release -p:NoWarn=CA1062
-dotnet tool install -g --add-source src/Spectra.CLI/nupkg Spectra.CLI
-
-# Verify
-spectra --help
+dotnet build                                    # warnings are errors
+dotnet test                                     # all test projects
+dotnet run --project src/Spectra.CLI -- --help  # the CLI from source
 ```
 
-## Prerequisites
+Golden tests compare output byte for byte. After an intended change, re-record them with
+`SPECTRA_GOLDEN_RECORD=1 dotnet test` and review the diff.
 
-- .NET 8.0+ SDK
-- Git
-- [Claude Code](https://claude.com/claude-code), which is needed to actually drive generation/analysis/
-  criteria/update/verification turns, since the CLI alone only does the deterministic bookkeeping
+## Preview the documentation
 
-## Project Structure
-
-```
-src/
-├── Spectra.CLI/        # CLI: authoring commands (compile-*/ingest-* seam) + spectra run
-├── Spectra.Core/        # Shared library (parsing, validation, models, coverage)
-├── Spectra.Execution/    # Transport-neutral execution engine, driven solely by spectra run
-└── Spectra.GitHub/       # GitHub integration (future)
-
-tests/
-├── Spectra.CLI.Tests/          # CLI unit/integration tests
-├── Spectra.Core.Tests/         # Core library tests
-├── Spectra.Execution.Tests/    # Execution engine tests
-├── Spectra.Integration.Tests/  # Cross-spec generation→persistence→execution
-└── TestFixtures/                # Sample test data
-    ├── docs/              # Sample documentation
-    └── test-cases/        # Sample test case suites with _index.json
-```
-
-## Building
+The site is Jekyll with the just-the-docs theme, in `docs/`. With Ruby 3.3 and bundler:
 
 ```bash
-dotnet build                                    # Entire solution
-dotnet build src/Spectra.CLI/Spectra.CLI.csproj # Specific project
-dotnet build -c Release                         # Release mode
+cd docs
+bundle install
+bundle exec jekyll serve --baseurl /Spectra      # http://127.0.0.1:4000/Spectra/
 ```
 
-## Running Tests
+Before you commit a docs change, build the site and check that every page's Markdown was converted:
 
 ```bash
-dotnet test                          # All tests
-dotnet test tests/Spectra.CLI.Tests/ # Specific project
-dotnet test -v n                     # Verbose output
+bundle exec jekyll build
+node scripts/check-rendered-markdown.js _site
 ```
 
-## Running Locally
+The check fails on raw `###`, table separators, code fences or `<s>` outside code. The usual cause is a line that
+starts with a tag, such as a code span wrapped so the next line begins with `<path>`.
 
-### CLI (from source)
+The docs workflow also checks colour contrast (axe-core, WCAG AA) on every page at 1440 and 390 px. For now it only
+warns. To run it locally: `cd docs/scripts/a11y && npm ci && npx playwright install chromium`, then
+`node check-contrast.js ../../_site --base /Spectra`.
+
+`spectra init` installs its own copies of `USAGE.md` and `CUSTOMIZATION.md` from `src/Spectra.CLI/Templates/`. The
+website pages are separate; when a workflow changes, update both.
+
+## Refresh the screenshots
+
+The screenshots are real captures from a demo repository; never edit or mock them. To re-create them:
 
 ```bash
-dotnet run --project src/Spectra.CLI -- validate --path tests/TestFixtures
-dotnet run --project src/Spectra.CLI -- dashboard --output ./site
-dotnet run --project src/Spectra.CLI -- run start checkout --priorities high
+cd docs/scripts/docs-screenshots
+npm install
+npx playwright install chromium
+node capture.js --demo <path-to-demo-repo> --spectra <path-to-the-spectra-build-you-document>
 ```
 
-There is no `dotnet run … -- ai generate …` anymore, because generation is skill-driven from inside
-Claude Code, not a standalone CLI command. See
-[Generation (in-session via the `spectra-generate` skill)](cli-reference.md#generation-in-session-via-the-spectra-generate-skill).
+Add `--console` for the run console (it needs an active run) and `--seam <label>` for the generate or criteria
+progress page during a real agent run. Add `--rename "<your name>=demo-user"` so no real name appears in the run screenshots. In a page, always use the include:
 
-### Install as a Global Tool
-
-```bash
-dotnet pack src/Spectra.CLI/Spectra.CLI.csproj -c Release
-dotnet tool uninstall -g Spectra.CLI 2>/dev/null
-dotnet tool install -g --add-source src/Spectra.CLI/nupkg Spectra.CLI
-
-# Run from anywhere
-spectra validate
+```liquid
+{% raw %}{% include screenshot.html file="dashboard-coverage" alt="What the image shows" %}{% endraw %}
 ```
 
-### Dashboard (from source)
+The options (narrow, phone frame, side-by-side pairs) and how sizes are recorded are in the
+[developer guide](https://github.com/AutomateThePlanet/Spectra/blob/main/docs/contributing/DEVELOPMENT-GUIDE.md#documentation-screenshots).
 
-```bash
-# Generate
-dotnet run --project src/Spectra.CLI -- dashboard --output ./site
+## Release check in each AI agent
 
-# Serve
-cd site && python -m http.server 8080
-# or: npx serve site
-# or: dotnet serve -d site -p 8080
-```
-
-## Using TestFixtures
-
-The `tests/TestFixtures/` folder contains ready-to-use sample data:
-
-```bash
-dotnet run --project src/Spectra.CLI -- validate --path tests/TestFixtures
-dotnet run --project src/Spectra.CLI -- run list-suites --path tests/TestFixtures
-```
-
-Available suites in fixtures: auth (3 test cases), checkout (1 test case).
-
-## Troubleshooting
-
-### Build errors (CA1062 warnings)
-
-```bash
-dotnet build -p:NoWarn=CA1062
-```
-
-### "Suite not found"
-
-Ensure your test case folder has `test-cases/` with suite subdirectories containing valid `_index.json` files.
-
-### "Index stale"
-
-```bash
-spectra index --rebuild
-```
-
-### "No spectra.config.json found"
-
-```bash
-spectra init
-```
-
-### A generation/analysis/criteria/update turn doesn't seem to be running
-
-There's no AI provider to check, since SPECTRA makes no model calls of its own. Make sure you're
-actually driving the flow from inside Claude Code (e.g. "generate test cases for the checkout
-suite"), not calling `spectra ai compile-prompt`/`ingest-tests` outside a session with nothing to
-answer the compiled prompt.
+Automated tests check every file `spectra init --agent` writes. Whether each agent actually loads and follows them is
+checked by hand once per release, with the
+[live verification checklist](https://github.com/AutomateThePlanet/Spectra/blob/main/docs/contributing/LIVE-VERIFICATION-CHECKLIST.md)
+on GitHub.

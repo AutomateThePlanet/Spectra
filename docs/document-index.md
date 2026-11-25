@@ -1,10 +1,10 @@
 ---
-title: Document Index
-parent: User Guide
-nav_order: 7
+title: Document index
+parent: Architecture
+nav_order: 4
 ---
 
-# Document Index
+# Document index
 
 Pre-built per-suite documentation index for efficient AI test generation.
 
@@ -16,7 +16,7 @@ Related: [CLI Reference](cli-reference.md) | [Configuration](configuration.md) |
 
 The `spectra docs index` command builds a structured layout under `docs/_index/` that the AI agent reads instead of scanning all documentation at generation time:
 
-```
+```text
 docs/_index/
 ├── _manifest.yaml          # Always loaded into AI prompts (~2-5K tokens)
 ├── _checksums.json         # Hash table for incremental detection (NEVER sent to AI)
@@ -233,7 +233,7 @@ When `spectra ai compile-analysis-prompt` compiles an analysis prompt that inlin
 prompt size before your session sends it to the model. If the estimate exceeds `analysis.max_prompt_tokens` (default
 96,000), the command fails fast with exit code `4` and an actionable message:
 
-```
+```text
 Analyzer prompt would be ~187,234 tokens, exceeding the configured 96,000-token budget.
 Candidate suites (sorted by token cost):
   SM_GSG_Topics       10,877 tokens

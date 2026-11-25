@@ -46,6 +46,21 @@ jobs:
         env:
           JEKYLL_ENV: production
 
+      # Colour contrast (axe-core, WCAG AA) on every page at 1440 and 390 px. Warn only for now:
+      # failures show as warning annotations on the run and never block the deploy.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check colour contrast (warn only)
+        continue-on-error: true
+        working-directory: docs/scripts/a11y
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          node check-contrast.js ../../_site --base "${{ steps.pages.outputs.base_path }}"
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:

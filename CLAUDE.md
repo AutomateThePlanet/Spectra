@@ -100,6 +100,11 @@ spectra run skip|note|screenshot|screenshot-clipboard [<handle>] | spectra run b
 spectra run retest|pause|resume|cancel|finalize [<run-id>] | spectra run cancel-all | spectra run console [--stop]
 ```
 
+## Commits
+
+Never add Co-Authored-By, Claude-Session or 'Generated with Claude Code' lines to commits, tags, releases or PR
+descriptions. Commits are authored only by Anton.
+
 ## Code Style
 - PascalCase types/methods, camelCase locals; nullable reference types enabled.
 - All I/O async with the `Async` suffix.
@@ -134,16 +139,11 @@ that drives the system under test is unrelated to SPECTRA's removed execution ad
 | 092 | Update and criteria skills orchestrate `spectra-updater` / `spectra-repairer` / `spectra-extractor` subagents |
 | 091 | Review fixes for 090: `compiled_at` freshness, `ingest-grounding --ids`, kept hallucinated tests |
 | 090 | Re-verify after update: edits drop the verdict, `VERDICT_STALE`, `failed-<id>.json`, safe delete |
-| 089 | Review fixes for 088: separate repair staging, `unchanged_pending`, exit 8 |
-| 088 | Update prompts with section diffs and linked criteria; `--group` prompts; staged batch ingest |
-| 087 | Review fixes for 086: submodules, git executable and environment, case-insensitive renames |
-| 086 | Read-only git: `relink-sources`, RELINK bucket, history bootstrap, `docs topology` |
-| 085 | Review fixes for 084: one anchor matcher, prune only when all parsed, `--keep-baseline` |
-| 084 | Source-change baseline: `update-triage`, `update-ack`, `source-baseline` |
+| 088–089 | Update prompts with section diffs and linked criteria; `--group` prompts; staged batch ingest (089: separate repair staging, `unchanged_pending`, exit 8) |
+| 086–087 | Read-only git: `relink-sources`, RELINK bucket, history bootstrap, `docs topology` (087: submodules, git env, case-insensitive renames) |
+| 084–085 | Source-change baseline: `update-triage`, `update-ack`, `source-baseline` (085: one anchor matcher, `--keep-baseline`) |
 | 083 | One config rule: no section is ever required; checked against the init template |
-| 082 | Review fixes for 081 (config sections, failure codes) |
-| 081 | Review fixes for 080 (ownership, config, tag whitelist, failure shape) |
-| 080 | Review fixes for 078/079 (own-file writes, source roots, frontmatter layout) |
+| 080–082 | Review fixes for 078/079: own-file writes, source roots, frontmatter layout, ownership, tag whitelist, failure codes |
 | 079 | Stable criterion IDs, per-document criteria files, `docs retire` / `apply-move` |
 | 078 | Lossless test writes, classify-only `ai update`, `SourceRefResolver` |
 

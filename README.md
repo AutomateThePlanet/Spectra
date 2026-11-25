@@ -85,7 +85,7 @@ When documentation changes, SPECTRA tells you which tests are affected and why â
 update-triage` compares each test's referenced doc sections and criteria with their recorded baseline and groups the
 tests by what changed. The `spectra-update` skill then relinks renamed docs, edits the affected tests group by group,
 re-verifies them with the critic, and acknowledges the rest. See
-[When documentation changes](docs/usage.md#when-documentation-changes) for the whole flow with a worked example.
+[Update tests when your docs change](https://automatetheplanet.github.io/Spectra/keep-tests-up-to-date.html); the full flow with a worked example is in the `USAGE.md` that `spectra init` installs.
 
 ### Coverage Analysis
 
@@ -275,7 +275,7 @@ SPECTRA is part of the [Automate The Planet](https://www.automatetheplanet.com/)
 | [Skills Integration](docs/skills-integration.md) | Claude Code skills and subagents |
 | [AI Agents](docs/ai-agents.md) | `spectra init --agent`: SPECTRA in Copilot, Cursor, Devin, Codex, Gemini, Antigravity, Kiro, OpenCode |
 | [Usage (Claude Code)](docs/usage.md) | Workflow-by-workflow guide for driving SPECTRA from Claude Code |
-| [When documentation changes](docs/usage.md#when-documentation-changes) | Bringing tests up to date after a doc change, end to end |
+| [Update tests when your docs change](https://automatetheplanet.github.io/Spectra/keep-tests-up-to-date.html) | Bringing tests up to date after a doc change |
 | [Customization](docs/customization.md) | Every customization knob â€” config, profiles, prompts, palettes |
 | [Testimize Integration](docs/testimize-integration.md) | Optional algorithmic test data optimization (BVA / EP / pairwise / ABC) |
 | [Execution Agents](docs/execution-agents.md) | Driving test execution with `spectra run` |
