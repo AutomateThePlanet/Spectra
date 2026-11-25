@@ -132,15 +132,41 @@ Keep such code spans on one line.
 
 ### USAGE.md and CUSTOMIZATION.md: two separate copies
 
-`spectra init` writes `USAGE.md` and `CUSTOMIZATION.md` into a user's repository (`spectra update-skills` refreshes
-`CUSTOMIZATION.md`), where
-the user's AI agent reads them. Their source is `src/Spectra.CLI/Templates/USAGE.md` and
+`spectra init` writes `USAGE.md` and `CUSTOMIZATION.md` into a user's repository, where the user's AI agent reads
+them (`spectra update-skills` refreshes `CUSTOMIZATION.md`). Their source is `src/Spectra.CLI/Templates/USAGE.md` and
 `src/Spectra.CLI/Templates/CUSTOMIZATION.md`, embedded in the CLI (`Spectra.CLI.csproj`).
 
 The website pages `docs/usage.md` and `docs/customization.md` are separate, shorter pages for people. Editing a
 website page does not change what `init` installs, and the other way round. When a workflow changes, update both.
 The init goldens (`tests/Spectra.CLI.Tests/Golden/`) hash the templates, so a template edit needs a golden
 re-capture (`SPECTRA_GOLDEN_RECORD=1`).
+
+### Documentation screenshots
+
+The images in `docs/assets/images/screenshots/` are real captures from a SPECTRA demo repository (an initialised
+workspace with tests, for example the Windows Calculator demo). Never edit or mock them; re-capture them instead.
+`docs/scripts/docs-screenshots/capture.js` does that with Playwright and saves each image as a cropped WebP of at
+most 200 KB:
+
+```bash
+cd docs/scripts/docs-screenshots
+npm install
+npx playwright install chromium
+node capture.js --demo <path-to-demo-repo> --spectra <path-to-the-spectra-build-you-document>
+```
+
+| Option | What it adds |
+|---|---|
+| (none) | `progress-coverage-done`, and the dashboard: `dashboard-suites`, `-test-detail`, `-coverage`, `-runs`, `-run-report`, `-suites-mobile` |
+| `--test TC-123` | The test shown in the detail panel (default: the first test) |
+| `--console` | `run-console`, the execution web console. Needs an active run (`spectra run start <suite>`) |
+| `--seam <label>` | `progress-<label>`, the generate or criteria progress page in its current state |
+
+The script writes to the demo repository: `ai analyze --coverage --auto-link` updates its coverage files and
+`.spectra-progress.html`; the dashboard is built in a temporary folder. The generate and criteria progress pages
+(`progress-generate-*`, `progress-criteria-*`) change only while an agent runs, so run `--seam` once per phase
+during a real "generate test cases" or "extract criteria" conversation. Write every new image's alt text in the
+page that uses it.
 
 ## Using TestFixtures
 

@@ -1,0 +1,7 @@
+{
+  "name": "spectra-docs-screenshots",
+  "private": true,
+  "description": "Re-creates the SPECTRA documentation screenshots from a demo repository. See docs/DEVELOPMENT.md.",
+  "scripts": { "capture": "node capture.js" },
+  "devDependencies": { "playwright": "1.56.1", "sharp": "0.33.5" }
+}
