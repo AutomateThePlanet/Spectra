@@ -21,7 +21,7 @@ const MAX_WIDTH = 2000;   // px; 1000 CSS px at 2x
 function recordSize(name, width, height) {
   const sizes = {};
   if (fs.existsSync(DATA)) {
-    for (const line of fs.readFileSync(DATA, 'utf8').split('\n')) {
+    for (const line of fs.readFileSync(DATA, 'utf8').split(/\r?\n/)) { // CRLF checkouts too
       const m = line.match(/^([\w-]+): \{ width: (\d+), height: (\d+) \}$/);
       if (m) sizes[m[1]] = [+m[2], +m[3]];
     }
