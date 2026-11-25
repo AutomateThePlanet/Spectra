@@ -5,9 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — Documentation
+## [2.7.1] - Unreleased — fixes found while upgrading the Calculator demo
 
-### Changed
+### Fixed
+
+- **`spectra run` stores its database where the dashboard reads it.** 2.7.0 wrote runs to
+  `.execution/.execution/spectra.db`, so the dashboard's Run History never saw them and the usual `.execution/*.db`
+  gitignore rule did not cover the file. Runs are now stored in `.execution/spectra.db`; the first `spectra run`
+  command moves an existing nested database (with its `-wal`/`-shm` files) once, and leaves both alone with a warning
+  when both exist.
+- **`spectra update-skills --dry-run` writes nothing.** It honours the global `--dry-run` option: it lists what would
+  be updated ("Would update:") and ends with "Dry run — nothing written.". 2.7.0 ignored the option and wrote the
+  files.
+- **Documentation coverage no longer counts SPECTRA's own docs index** (`docs/_index.md`, `docs/_index/**`) as a
+  document, in `ai analyze --coverage`, `docs changed` and the dashboard. A fully covered repository showed 7 of 8
+  (87.5%) instead of 7 of 7.
+
+### Documentation
+
+#### Changed
 
 - **Documentation site redesigned** (SPECTRA Docs v2 look, just-the-docs 0.12.0): new header, hero, right-hand nav,
   footer and design tokens; the nav stays visible while you scroll.
@@ -25,11 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for mobile shots and a lightbox. Diagrams are one data-driven component (`_includes/flow.html`) instead of ASCII art.
 - The live verification checklist and the full developer guide moved to `docs/contributing/` (repository only).
 
-### Added
+#### Added
 
 - `docs/scripts/check-rendered-markdown.js`: fails when a built page shows raw Markdown.
 - The docs workflow checks colour contrast with axe-core on every page (warnings only for now).
 - `sitemap.xml` (jekyll-sitemap).
+- The three 2.7.0 known-issue notes for these fixes were removed from the docs.
 
 ## [2.7.0] - 2026-10-27 — SPECTRA for the other AI agents (`spectra init --agent`)
 

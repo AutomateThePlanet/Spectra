@@ -46,7 +46,7 @@ Click a test to see its priority, tags, preconditions, steps and expected result
 
 The **Coverage** tab shows the three numbers with drill-down lists:
 
-{% include screenshot.html file="dashboard-coverage" alt="Dashboard coverage tab: documentation 87.5 percent (7 of 8), acceptance criteria 98.6 percent, automation 25.2 percent" caption="The Calculator demo on SPECTRA 2.7.0: 7 of 8 documents (see the known issue below), 69 of 70 extracted criteria and 275 of 1,091 automated test cases." %}
+{% include screenshot.html file="dashboard-coverage" alt="Dashboard coverage tab: documentation 100 percent (7 of 7), acceptance criteria 98.6 percent, automation 25.2 percent" caption="The Calculator demo: every doc has tests, 69 of 70 extracted criteria have tests, and 275 of 1,091 test cases are automated." %}
 
 The **Run History** tab lists past test runs ([Run tests with your agent](execution-agents)).
 
@@ -63,10 +63,6 @@ as release notes can be left out of the documentation number: see
 
 > The dashboard's automation number and the number in the agent's coverage summary are counted differently and can
 > differ. This is a known issue.
-
-> **Known issue (2.7.0):** documentation coverage also counts SPECTRA's own index file
-> (`docs/_index/groups/*.index.md`) as a document, so a fully covered repository shows one uncovered document, as in
-> the screenshot above.
 
 <details markdown="1">
 <summary>Under the hood</summary>

@@ -46,15 +46,13 @@ You can close the browser at any time: the run is saved, and refreshing or reope
 
 | What | Where |
 |---|---|
-| Run state | `.execution/.execution/spectra.db` in 2.7.0 (see the note below; keep it out of git) |
+| Run state and history | `.execution/spectra.db` (keep it out of git) |
 | Reports | `.execution/reports/` (JSON, Markdown and HTML per run) |
 
-> **Known issue (2.7.0):** `spectra run` stores its database one folder too deep, in `.execution/.execution/`. The
-> dashboard reads `.execution/spectra.db` and the reports in `.execution/reports/`, so a run from 2.7.0 shows up there
-> once it's finalized and has a report. The usual `.gitignore` rule `.execution/*.db` doesn't cover the nested file;
-> add `.execution/.execution/` to `.gitignore`.
+If you used 2.7.0, the first `spectra run` command moves its run database from `.execution/.execution/` to
+`.execution/spectra.db` once (when both exist, it leaves them and tells you).
 
-The dashboard's **Run History** tab lists the runs it finds and opens each report:
+The dashboard's **Run History** tab lists past runs and opens each report:
 
 {% include screenshot.html file="dashboard-runs" alt="Dashboard Run History tab: pass-rate trend, pass rate per suite and a table of three runs with their passed, failed, skipped and blocked counts" %}
 

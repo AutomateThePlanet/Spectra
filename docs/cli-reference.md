@@ -204,9 +204,6 @@ session, under whichever account is already signed in there. See
 
 Update bundled SKILL and agent files to the latest version.
 
-> **Known issue (2.7.0):** the global `--dry-run` option is ignored by this command: it writes the files anyway.
-> Commit or stash your changes before you run it, so `git diff` shows what changed.
-
 ```bash
 spectra update-skills
 ```

@@ -69,7 +69,7 @@ Commit the files that record results; the rest is scratch that `spectra init` (n
 | `.spectra/verdicts/`, `.spectra/dropped-tests.json` | no (scratch) |
 | `.spectra/generation-plan/` | no (scratch) |
 | `.spectra/baseline.lock`, `.spectra/criteria.lock` | no (scratch) |
-| `.execution/spectra.db` (run state; in 2.7.0 `.execution/.execution/spectra.db`, a known issue) | no |
+| `.execution/spectra.db` (run state) | no |
 
 Keep the `# spectra-offered: …` lines in `.gitignore` when you commit it: they record which patterns SPECTRA already
 offered, so one your team removed stays removed in every clone.
