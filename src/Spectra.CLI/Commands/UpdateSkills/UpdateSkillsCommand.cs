@@ -15,8 +15,9 @@ public sealed class UpdateSkillsCommand : Command
         {
             var verbosity = context.ParseResult.GetValueForOption(GlobalOptions.VerbosityOption);
             var outputFormat = context.ParseResult.GetValueForOption(GlobalOptions.OutputFormatOption);
+            var dryRun = context.ParseResult.GetValueForOption(GlobalOptions.DryRunOption);
 
-            var handler = new UpdateSkillsHandler(verbosity, outputFormat);
+            var handler = new UpdateSkillsHandler(verbosity, outputFormat, dryRun: dryRun);
             context.ExitCode = await handler.ExecuteAsync(context.GetCancellationToken());
         });
     }

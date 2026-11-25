@@ -121,9 +121,10 @@ public static class SpectraGitIgnore
     /// <see cref="Pre090Offered"/> only when neither exists. With no <c>.gitignore</c> nothing is created
     /// (<c>MissingFile</c>). Otherwise a candidate already present or negated is not added, the rest are appended, and
     /// one marker line names every offered pattern not marked yet. Returns what was added and the candidates.
+    /// With <paramref name="write"/> false (dry run) nothing is written; <c>Added</c> is what would be added.
     /// </summary>
     public static async Task<(IReadOnlyList<string> Added, IReadOnlyList<string> Candidates, bool MissingFile)>
-        OfferNewAsync(string root, IReadOnlyList<string>? legacyOffered, CancellationToken ct = default)
+        OfferNewAsync(string root, IReadOnlyList<string>? legacyOffered, CancellationToken ct = default, bool write = true)
     {
         var path = Path.Combine(root, ".gitignore");
         var lines = File.Exists(path) ? Lines(await File.ReadAllTextAsync(path, ct)) : [];
@@ -148,7 +149,11 @@ public static class SpectraGitIgnore
             .Concat(already.Where(p => !Patterns.Contains(p)).Order(StringComparer.Ordinal))
             .Where(p => !markedSet.Contains(p))
             .ToList();
-        await AppendAsync(path, add, toMark, ct);
+        if (write)
+        {
+            await AppendAsync(path, add, toMark, ct);
+        }
+
         return (add, candidates, false);
     }
 

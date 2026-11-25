@@ -16,14 +16,19 @@ public sealed class UpdateSkillsHandler
     private readonly VerbosityLevel _verbosity;
     private readonly OutputFormat _outputFormat;
     private readonly ProgressReporter _progress;
+    private readonly bool _dryRun;
 
+    /// <param name="dryRun">The global <c>--dry-run</c>: report what would change and write nothing (no file, folder,
+    /// <c>.gitignore</c> line or manifest).</param>
     public UpdateSkillsHandler(
         VerbosityLevel verbosity = VerbosityLevel.Normal,
         OutputFormat outputFormat = OutputFormat.Human,
-        Spectre.Console.IAnsiConsole? console = null)
+        Spectre.Console.IAnsiConsole? console = null,
+        bool dryRun = false)
     {
         _verbosity = verbosity;
         _outputFormat = outputFormat;
+        _dryRun = dryRun;
         _progress = new ProgressReporter(console, outputFormat);
     }
 
@@ -50,14 +55,14 @@ public sealed class UpdateSkillsHandler
         foreach (var (name, content) in SkillContent.All)
         {
             var skillPath = SkillInstallLayout.SkillPath(currentDir, name);
-            await ProcessFileAsync(currentDir, skillPath, content, DeleteAdvice, manifest, updated, unchanged, skipped, skippedNoRecord, ct);
+            await ProcessFileAsync(currentDir, skillPath, content, DeleteAdvice, manifest, updated, unchanged, skipped, skippedNoRecord, _dryRun, ct);
         }
 
         // Spec 101 F2: the skills' reference files, under the same 096 rules (an edited one is never overwritten).
         foreach (var (name, content) in SkillReferenceContent.All)
         {
             var referencePath = SkillInstallLayout.ReferencePath(currentDir, name);
-            await ProcessFileAsync(currentDir, referencePath, content, DeleteAdvice, manifest, updated, unchanged, skipped, skippedNoRecord, ct);
+            await ProcessFileAsync(currentDir, referencePath, content, DeleteAdvice, manifest, updated, unchanged, skipped, skippedNoRecord, _dryRun, ct);
         }
 
         // Process agent files. Spec 097 (FR-022, FR-022a): the critic is rendered with ai.critic.model; the config is
@@ -66,7 +71,7 @@ public sealed class UpdateSkillsHandler
         foreach (var (name, content) in AgentContent.Rendered(criticModel))
         {
             var agentPath = SkillInstallLayout.AgentPath(currentDir, name);
-            await ProcessFileAsync(currentDir, agentPath, content, DeleteAdvice, manifest, updated, unchanged, skipped, skippedNoRecord, ct);
+            await ProcessFileAsync(currentDir, agentPath, content, DeleteAdvice, manifest, updated, unchanged, skipped, skippedNoRecord, _dryRun, ct);
         }
 
         // Process prompt templates
@@ -78,7 +83,7 @@ public sealed class UpdateSkillsHandler
             var relativePath = Path.Combine(".spectra", "prompts", $"{templateId}.md");
             var templatePath = Path.Combine(currentDir, relativePath);
             await ProcessFileAsync(currentDir, templatePath, content, $"run spectra prompts reset {templateId} or {DeleteAdvice}",
-                manifest, updated, unchanged, skipped, skippedNoRecord, ct);
+                manifest, updated, unchanged, skipped, skippedNoRecord, _dryRun, ct);
         }
 
         // Process default profile (profiles/_default.yaml)
@@ -88,7 +93,7 @@ public sealed class UpdateSkillsHandler
             defaultProfilePath,
             ProfileFormatLoader.LoadEmbeddedDefaultYaml(),
             DeleteAdvice,
-            manifest, updated, unchanged, skipped, skippedNoRecord, ct);
+            manifest, updated, unchanged, skipped, skippedNoRecord, _dryRun, ct);
 
         // Process customization guide (CUSTOMIZATION.md at project root)
         var customizationPath = Path.Combine(currentDir, "CUSTOMIZATION.md");
@@ -97,24 +102,27 @@ public sealed class UpdateSkillsHandler
             customizationPath,
             ProfileFormatLoader.LoadEmbeddedCustomizationGuide(),
             DeleteAdvice,
-            manifest, updated, unchanged, skipped, skippedNoRecord, ct);
+            manifest, updated, unchanged, skipped, skippedNoRecord, _dryRun, ct);
 
         // Spec 089 (F6) / Spec 090 (FR-D1): existing workspaces get new gitignore patterns here — only ones never offered
         // before, never by creating a .gitignore. Spec 096 (FR-009): the record is the .gitignore's marker lines; the
         // old per-clone record in the manifest is migrated into them once and then no longer kept.
-        var offer = await Init.SpectraGitIgnore.OfferNewAsync(currentDir, manifest.GitIgnoreOffered, ct);
+        var offer = await Init.SpectraGitIgnore.OfferNewAsync(currentDir, manifest.GitIgnoreOffered, ct, write: !_dryRun);
         if (!offer.MissingFile)
         {
             manifest.GitIgnoreOffered = null;
         }
 
-        // Save updated manifest
-        await manifestStore.SaveAsync(manifest, ct);
+        // Save updated manifest (never in a dry run)
+        if (!_dryRun)
+        {
+            await manifestStore.SaveAsync(manifest, ct);
+        }
 
         // Report results
         if (updated.Count > 0)
         {
-            _progress.Success("Updated:");
+            _progress.Success(_dryRun ? "Would update:" : "Updated:");
             foreach (var f in updated)
                 _progress.Info($"  {Path.GetRelativePath(currentDir, f)}");
         }
@@ -129,7 +137,9 @@ public sealed class UpdateSkillsHandler
         // Spec 090 (FR-D1): name the patterns added, or the ones to add by hand when there is no .gitignore.
         if (offer.Added.Count > 0)
         {
-            _progress.Success($"Updated: .gitignore (added: {string.Join(", ", offer.Added)})");
+            _progress.Success(_dryRun
+                ? $"Would update: .gitignore (add: {string.Join(", ", offer.Added)})"
+                : $"Updated: .gitignore (added: {string.Join(", ", offer.Added)})");
         }
         else if (offer.MissingFile && offer.Candidates.Count > 0)
         {
@@ -154,6 +164,11 @@ public sealed class UpdateSkillsHandler
         if (manifest.DroppedForeignKeys > 0)
         {
             _progress.Warning($"{manifest.DroppedForeignKeys} manifest entries from another location were dropped (was the workspace moved?)");
+        }
+
+        if (_dryRun)
+        {
+            _progress.Info("Dry run — nothing written.");
         }
 
         return ExitCodes.Success;
@@ -220,6 +235,7 @@ public sealed class UpdateSkillsHandler
         List<string> unchanged,
         List<string> skipped,
         List<(string Path, string Advice)> skippedNoRecord,
+        bool dryRun,
         CancellationToken ct)
     {
         var key = ManifestKey.For(root, filePath);
@@ -227,11 +243,15 @@ public sealed class UpdateSkillsHandler
 
         if (!File.Exists(filePath))
         {
-            var dir = Path.GetDirectoryName(filePath)!;
-            if (!Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
+            if (!dryRun)
+            {
+                var dir = Path.GetDirectoryName(filePath)!;
+                if (!Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
 
-            await File.WriteAllTextAsync(filePath, bundledContent, ct);
+                await File.WriteAllTextAsync(filePath, bundledContent, ct);
+            }
+
             manifest.Record(key, bundledHash);
             updated.Add(filePath);
             return;
@@ -266,7 +286,11 @@ public sealed class UpdateSkillsHandler
             return;
         }
 
-        await File.WriteAllTextAsync(filePath, bundledContent, ct);
+        if (!dryRun)
+        {
+            await File.WriteAllTextAsync(filePath, bundledContent, ct);
+        }
+
         manifest.Record(key, bundledHash);
         updated.Add(filePath);
     }
