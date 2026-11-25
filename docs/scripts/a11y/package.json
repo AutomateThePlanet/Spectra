@@ -1,0 +1,7 @@
+{
+  "name": "spectra-docs-a11y",
+  "private": true,
+  "description": "Colour-contrast check of the built documentation site (axe-core). See docs/contributing/DEVELOPMENT-GUIDE.md.",
+  "scripts": { "contrast": "node check-contrast.js ../../_site --base /Spectra" },
+  "devDependencies": { "axe-core": "4.10.2", "playwright": "1.56.1" }
+}

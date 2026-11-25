@@ -45,6 +45,10 @@ node scripts/check-rendered-markdown.js _site
 The check fails on raw `###`, table separators, code fences or `<s>` outside code. The usual cause is a line that
 starts with a tag, such as a code span wrapped so the next line begins with `<path>`.
 
+The docs workflow also checks colour contrast (axe-core, WCAG AA) on every page at 1440 and 390 px. For now it only
+warns. To run it locally: `cd docs/scripts/a11y && npm ci && npx playwright install chromium`, then
+`node check-contrast.js ../../_site --base /Spectra`.
+
 `spectra init` installs its own copies of `USAGE.md` and `CUSTOMIZATION.md` from `src/Spectra.CLI/Templates/`. The
 website pages are separate; when a workflow changes, update both.
 
