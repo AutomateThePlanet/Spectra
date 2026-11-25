@@ -67,6 +67,7 @@ sass:
 plugins:
   - jekyll-seo-tag
   - jekyll-relative-links
+  - jekyll-sitemap
 
 # jekyll-relative-links: rewrite relative *.md links to their built
 # *.html counterparts so cross-doc references work on the deployed site.

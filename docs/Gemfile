@@ -4,6 +4,7 @@ gem "jekyll", "~> 4.3"
 gem "just-the-docs", "~> 0.10"
 gem "jekyll-seo-tag", "~> 2.8"
 gem "jekyll-relative-links", "~> 0.6"
+gem "jekyll-sitemap", "~> 1.4"
 
 # Windows / JRuby support (no-op on Linux runners)
 platforms :mingw, :x64_mingw, :mswin, :jruby do
