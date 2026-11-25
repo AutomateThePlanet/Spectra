@@ -1350,7 +1350,9 @@ html.search-active {
   flex: 0 0 auto;
 }
 
-.spectra-step:last-child {
+// The last step, and the last step of each wrapped row (marked by assets/js/flow-rows.js), has no arrow.
+.spectra-step:last-child,
+.spectra-step-row-end {
   .spectra-step-line,
   .spectra-step-arrow {
     visibility: hidden;
