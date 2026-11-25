@@ -96,6 +96,26 @@ public sealed class DocumentIndexService
         return Path.Combine(basePath, config.LocalDir.TrimEnd('/', '\\'), "_index.md");
     }
 
+    /// <summary>
+    /// Files SPECTRA itself writes into the documentation folder: the legacy single-file index (<c>docs/_index.md</c>)
+    /// and everything under the v2 index folder (<c>docs/_index/</c>: manifest, checksums, per-suite group files).
+    /// They are not product documentation, so coverage and change detection must not count them as documents.
+    /// Takes a path relative to <paramref name="basePath"/> (either separator).
+    /// </summary>
+    public static Func<string, bool> GeneratedIndexMatcher(string basePath, SourceConfig config)
+    {
+        var legacyRelative = Path.GetRelativePath(basePath, ResolveIndexPath(basePath, config)).Replace('\\', '/');
+        var indexDirPrefix = Path.GetRelativePath(basePath, LegacyIndexMigrator.ResolveIndexDir(basePath, config))
+            .Replace('\\', '/')
+            .TrimEnd('/') + "/";
+        return relativePath =>
+        {
+            var path = relativePath.Replace('\\', '/');
+            return string.Equals(path, legacyRelative, StringComparison.OrdinalIgnoreCase)
+                   || path.StartsWith(indexDirPrefix, StringComparison.OrdinalIgnoreCase);
+        };
+    }
+
     private static List<(string AbsolutePath, string RelativePath)> DiscoverFiles(
         string basePath, SourceConfig config, string indexPath)
     {

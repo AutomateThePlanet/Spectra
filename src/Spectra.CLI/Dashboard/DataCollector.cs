@@ -705,12 +705,22 @@ public sealed class DataCollector
                     catch { /* use defaults */ }
                 }
 
+                // SPECTRA's own docs index (docs/_index.md, docs/_index/**) is not documentation; the same rule as
+                // `ai analyze --coverage` (DocumentIndexService.GeneratedIndexMatcher), with the configured index folder.
+                var isGeneratedIndex = Source.DocumentIndexService.GeneratedIndexMatcher(
+                    _basePath, await ReadSourceConfigAsync(configPath2));
+
                 var docFiles = Directory.GetFiles(docsDir, "*.md", SearchOption.AllDirectories);
                 foreach (var docFile in docFiles)
                 {
                     var relativePath = SourceRefNormalizer.NormalizePath(
                         Path.GetRelativePath(_basePath, docFile));
                     var fileName = Path.GetFileName(docFile);
+
+                    if (isGeneratedIndex(Path.GetRelativePath(_basePath, docFile)))
+                    {
+                        continue;
+                    }
 
                     // Check exclude patterns
                     var excluded = excludePatterns.Any(pattern =>
@@ -1002,5 +1012,33 @@ public sealed class DataCollector
         public int Failed { get; set; }
         public int Skipped { get; set; }
         public int Blocked { get; set; }
+    }
+
+    /// <summary>
+    /// The <c>source</c> section of <c>spectra.config.json</c> (index locations), or the defaults when the file or the
+    /// section is missing or unreadable.
+    /// </summary>
+    private static async Task<SourceConfig> ReadSourceConfigAsync(string configPath)
+    {
+        if (!File.Exists(configPath))
+        {
+            return new SourceConfig();
+        }
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(configPath);
+            var doc = JsonSerializer.Deserialize<JsonElement>(json, s_jsonOptions);
+            if (doc.TryGetProperty("source", out var sourceEl) && sourceEl.ValueKind == JsonValueKind.Object)
+            {
+                return sourceEl.Deserialize<SourceConfig>(s_jsonOptions) ?? new SourceConfig();
+            }
+        }
+        catch (JsonException)
+        {
+            // use defaults
+        }
+
+        return new SourceConfig();
     }
 }

@@ -9,11 +9,13 @@ namespace Spectra.CLI.Source;
 /// </summary>
 public sealed class DocumentMapBuilder
 {
+    private readonly SourceConfig _config;
     private readonly SourceDiscovery _discovery;
     private readonly DocumentMapExtractor _extractor;
 
     public DocumentMapBuilder(SourceConfig? config = null)
     {
+        _config = config ?? new SourceConfig();
         _discovery = new SourceDiscovery(config);
         _extractor = new DocumentMapExtractor();
     }
@@ -26,10 +28,18 @@ public sealed class DocumentMapBuilder
         ArgumentException.ThrowIfNullOrWhiteSpace(basePath);
 
         var entries = new List<DocumentEntry>();
+        // SPECTRA's own docs index (docs/_index.md, docs/_index/**) is not documentation: counting it inflated the
+        // coverage denominator and listed it as a "new" document in docs changed.
+        var isGeneratedIndex = DocumentIndexService.GeneratedIndexMatcher(basePath, _config);
 
         foreach (var (absolutePath, relativePath) in _discovery.DiscoverWithRelativePaths(basePath))
         {
             ct.ThrowIfCancellationRequested();
+
+            if (isGeneratedIndex(relativePath))
+            {
+                continue;
+            }
 
             try
             {

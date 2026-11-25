@@ -5,18 +5,12 @@ Analyzing test coverage...
 {
   "generated_at": "<mask:timestamp>",
   "documentation_coverage": {
-    "total_docs": 4,
+    "total_docs": 3,
     "covered_docs": 3,
-    "percentage": 75,
+    "percentage": 100,
     "undocumented_test_count": 0,
     "undocumented_test_ids": [],
     "details": [
-      {
-        "doc": "docs/_index/groups/payments.index.md",
-        "test_count": 0,
-        "covered": false,
-        "test_ids": []
-      },
       {
         "doc": "docs/payments/checkout.md",
         "test_count": 4,
@@ -141,7 +135,7 @@ Analyzing test coverage...
   }
 }
 
-Documentation Coverage:        75.0% (3/4 documents)
+Documentation Coverage:        100.0% (3/3 documents)
 Acceptance Criteria Coverage:  100.0% (3/3 acceptance criteria)
 Automation Coverage:           0.0% (0/7 tests)
 
