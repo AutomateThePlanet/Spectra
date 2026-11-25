@@ -346,8 +346,8 @@ spectra ai update-triage --all-suites                  # changes since 2026-03-0
 Relink first, so the bootstrap follows each doc back through its renames to the old content. Add
 `--min-similarity 60` (50–100) to follow renames that came with heavier edits; if git's history can't be read, the
 affected refs stay unbaselined with `git history unavailable: …` instead of being read from the wrong path.
-`--from-date` uses each repository's (and submodule's) last commit at or before the date; `--from-ref <rev> --owner
-<path>` pins one repository to a commit instead. It only fills missing entries; refs whose file or section didn't
+`--from-date` uses each repository's (and submodule's) last commit at or before the date;
+`--from-ref <rev> --owner <path>` pins one repository to a commit instead. It only fills missing entries; refs whose file or section didn't
 exist then stay unbaselined, with the reason.
 
 **Where are my docs?** `spectra docs topology` lists the repositories (including submodules) that own the referenced

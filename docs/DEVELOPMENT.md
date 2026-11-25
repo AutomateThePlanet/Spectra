@@ -108,6 +108,28 @@ cd site && python -m http.server 8080
 # or: dotnet serve -d site -p 8080
 ```
 
+### Documentation site (from source)
+
+The docs are a Jekyll site in `docs/` (theme just-the-docs). With Ruby 3.3 and bundler installed:
+
+```bash
+cd docs
+bundle install
+bundle exec jekyll serve --baseurl /Spectra   # http://127.0.0.1:4000/Spectra/
+```
+
+After a build, check that every page's Markdown was converted:
+
+```bash
+bundle exec jekyll build
+node scripts/check-rendered-markdown.js _site
+```
+
+The check fails when a page shows raw `###`, table separators, code fences or `<s>` strikethrough
+outside code. The usual cause is a line that starts with an HTML-like tag, for example a code span
+wrapped so the next line begins with `<path>`. kramdown then treats the rest of the block as raw HTML.
+Keep such code spans on one line.
+
 ## Using TestFixtures
 
 The `tests/TestFixtures/` folder contains ready-to-use sample data:
