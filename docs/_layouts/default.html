@@ -43,7 +43,7 @@ layout: table_wrappers
     {%- if spectra_first3 == "<h1" -%}
       {%- assign spectra_h1_html = spectra_trimmed | split: "</h1>" | first | append: "</h1>" -%}
       {%- assign spectra_h1_text = spectra_h1_html | strip_html | strip | downcase -%}
-      {%- assign spectra_title_text = page.title | strip_html | strip | downcase -%}
+      {%- assign spectra_title_text = page.hero_title | default: page.title | strip_html | strip | downcase -%}
       {%- if spectra_h1_text == spectra_title_text -%}
         {%- assign spectra_content = spectra_trimmed | remove_first: spectra_h1_html -%}
       {%- endif -%}

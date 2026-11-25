@@ -1,5 +1,5 @@
 ---
-title: How SPECTRA double-checks tests
+title: How SPECTRA double-checks your tests
 parent: Architecture
 nav_order: 2
 description: "How the critic checks each generated test against the doc sections it cites, what grounded, partial, hallucinated, flagged and unverified mean."

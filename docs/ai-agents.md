@@ -5,7 +5,7 @@ nav_order: 7
 description: "Use SPECTRA with GitHub Copilot, Cursor, Devin, Codex, Gemini, Antigravity, Kiro or OpenCode. Install once per agent; the prompts and the results stay the same."
 ---
 
-# Use SPECTRA with other AI agents
+# Use other AI agents
 
 SPECTRA's skills and subagents work in nine AI coding agents. Claude Code is the default. You install SPECTRA once
 for each agent your team uses; the prompts, test cases and coverage are the same whichever agent you use.

@@ -1,10 +1,10 @@
 ---
-title: Overview
+title: Architecture overview
 parent: Architecture
 nav_order: 1
 ---
 
-# Architecture Overview
+# Architecture overview
 
 How SPECTRA's two subsystems work together, as of the v2 (Claude Code) migration.
 
@@ -46,7 +46,7 @@ servers), not through SPECTRA.
 
 ## Project Structure
 
-```
+```text
 src/
 ├── Spectra.CLI/        # CLI: authoring commands (compile-*/ingest-* seam) + spectra run
 ├── Spectra.Core/       # Shared library (parsing, validation, models, coverage)

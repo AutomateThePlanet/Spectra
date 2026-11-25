@@ -4,7 +4,7 @@ parent: Reference
 nav_order: 2
 ---
 
-# Configuration Reference
+# Configuration
 
 Complete reference for `spectra.config.json`.
 
@@ -67,7 +67,7 @@ SPECTRA is configured via `spectra.config.json` at the repository root. Run `spe
 > generator model; a legacy config with `ai.providers` or old `ai.critic.*` keys still loads (those keys
 > are ignored).
 > See [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) and the
-> [AI Models & Cost Guide](ai-models-cost-guide.md).
+> [AI models and cost](ai-models-cost-guide.md).
 
 ```json
 {
@@ -91,7 +91,7 @@ existing config that still has it loads as before; `spectra init` no longer writ
 To choose a model, pick it the same way you'd pick a model for any other Claude Code work
 (`/model`, or your plan's default), because whatever your session is running when you drive
 `spectra-generate`/`spectra-criteria`/`spectra-update` **is** the model doing that turn. See the
-[AI Models & Cost Guide](ai-models-cost-guide.md#choosing-a-session-model) for guidance on
+[AI models and cost](ai-models-cost-guide.md#choosing-a-session-model) for guidance on
 Haiku/Sonnet/Opus trade-offs.
 
 The critic model is `ai.critic.model`. `spectra init` and `spectra update-skills` write it into the
@@ -103,7 +103,7 @@ because of the config: when it is invalid, it warns, keeps the agent's installed
 An invalid `ai.critic.model` alone doesn't make the config invalid: `update-skills` warns
 `ai.critic.model <value> is not valid (…); using sonnet` and installs `sonnet`.
 
-#### `.spectra-debug.log` — no longer tracks per-call AI timing
+### `.spectra-debug.log` — no longer tracks per-call AI timing
 
 Pre-v2, `.spectra-debug.log` recorded one line per SDK call (`ANALYSIS START/OK`, `BATCH
 START/OK`, `CRITIC START/OK`) with model, provider, and elapsed time, because SPECTRA's own
@@ -112,7 +112,7 @@ calls anymore**, since generation/analysis run as turns in your own Claude Code 
 the CLI process. There is nothing left for SPECTRA to time or log for those phases; `debug.enabled`
 still exists (see [the `debug` section](#debug--debug-logging)) but the AI-call timing lines it used to produce
 no longer apply. Track actual usage/cost through Claude Code's own session/usage indicators. See
-the [AI Models & Cost Guide](ai-models-cost-guide.md#tracking-what-youve-spent).
+the [AI models and cost](ai-models-cost-guide.md#tracking-what-youve-spent).
 
 **Testimize lifecycle lines** are unaffected, because Testimize is an in-process NuGet library (not an
 AI call), so `TESTIMIZE DISABLED/HEALTHY/DISPOSED` etc. still log normally when `debug.enabled` is

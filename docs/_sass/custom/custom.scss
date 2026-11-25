@@ -513,10 +513,15 @@ html.search-active {
     width: 100%;
   }
 
+  // The panel scrolls (overflow-y: auto), so an absolutely positioned list would be clipped to the panel's
+  // height. In the panel's flow the list makes the panel grow, up to its max-height, and the panel scrolls.
   .atp-header .search-results {
+    position: static;
     right: auto;
     left: 0;
     width: 100%;
+    max-height: 55vh !important;
+    margin-top: 0.25rem;
   }
 
   .get-spectra-button {
@@ -936,6 +941,14 @@ html.search-active {
     border: 1px solid t.$spectra-divider;
     border-radius: t.$radius-img;
     box-shadow: none;
+
+    // Three or more columns on a phone: keep the columns readable and scroll the table sideways
+    // (the wrapper scrolls) instead of wrapping every word onto its own line.
+    @media (max-width: #{$bp-md - 0.02rem}) {
+      table:has(tr > :nth-child(3)) {
+        min-width: 36rem;
+      }
+    }
   }
 
   th,

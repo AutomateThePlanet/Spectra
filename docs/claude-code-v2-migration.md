@@ -16,7 +16,7 @@ because there is no destructive migration and old config keys are simply ignored
 This page compares day-to-day usage and functionality between pre-v2 SPECTRA (which ran its own
 embedded GitHub Copilot SDK session) and v2 (which runs entirely inside your interactive Claude
 Code session). For the cost/billing side specifically, see the
-[AI Models & Cost Guide](ai-models-cost-guide.md).
+[AI models and cost](ai-models-cost-guide.md).
 
 ---
 
@@ -140,7 +140,7 @@ The GitHub Copilot premium-request multiplier table from the v1 guide no longer 
 anything, because there is no `ai.providers` left to route against. Cost is now exactly your normal
 Claude Code usage (subscription plan limits, or API/Console token billing), because the model turns
 that used to run inside SPECTRA's own SDK session now run inside yours. Full detail in the
-[AI Models & Cost Guide](ai-models-cost-guide.md).
+[AI models and cost](ai-models-cost-guide.md).
 
 ---
 

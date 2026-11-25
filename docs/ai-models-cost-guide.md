@@ -1,10 +1,10 @@
 ---
-title: AI Models & Cost Guide
+title: AI models and cost
 parent: Reference
 nav_order: 8
 ---
 
-# AI Models & Cost Guide
+# AI models and cost
 
 Understanding how SPECTRA spends AI usage since the Claude Code migration (v2), and how to
 control it.

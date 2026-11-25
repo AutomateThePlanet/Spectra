@@ -1,5 +1,6 @@
 ---
 title: Execution Agents
+hero_title: Run tests with your agent
 nav_order: 4
 permalink: /execution-agents
 description: "Run manual test cases with your AI agent: it starts the run and opens a browser console where you record pass, fail, blocked or skip for each test."

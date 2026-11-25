@@ -1,10 +1,10 @@
 ---
-title: CLI Reference
+title: CLI reference
 parent: Reference
 nav_order: 1
 ---
 
-# CLI Reference
+# CLI reference
 
 All SPECTRA CLI commands organized by function.
 
@@ -1556,7 +1556,7 @@ baseline; on a baseline write failure none is deleted, so a re-run picks them up
 `unchanged_pending` and `results` (`[{test, file, outcome[, error_code, errors][, bucket, why]}]`). The per-test summary
 is printed in every mode (stderr in JSON mode):
 
-```
+```text
 Batch update-ingest for suite 'storage': written=1 unchanged=1 unchanged_pending=1 skipped_no_original=0 errors=1
   TC-101: updated
   TC-102: unchanged (reviewed, no edit needed)

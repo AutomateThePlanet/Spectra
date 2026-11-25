@@ -1,10 +1,10 @@
 ---
-title: Test Format
+title: Test format
 parent: Reference
 nav_order: 3
 ---
 
-# Test Case Format
+# Test format
 
 How SPECTRA stores manual test cases as Markdown files with YAML frontmatter.
 

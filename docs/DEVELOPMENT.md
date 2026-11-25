@@ -4,7 +4,7 @@ parent: Architecture
 nav_order: 6
 ---
 
-# Development Guide
+# Development
 
 Building, testing, and running SPECTRA locally.
 
@@ -38,7 +38,7 @@ spectra --help
 
 ## Project Structure
 
-```
+```text
 src/
 ├── Spectra.CLI/        # CLI: authoring commands (compile-*/ingest-* seam) + spectra run
 ├── Spectra.Core/        # Shared library (parsing, validation, models, coverage)

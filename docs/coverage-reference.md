@@ -270,7 +270,7 @@ Full coverage settings in `spectra.config.json`:
 }
 ```
 
-See [Configuration Reference](configuration.md) for all coverage options.
+See [Configuration](configuration.md) for all coverage options.
 
 ## Dashboard Visualizations
 

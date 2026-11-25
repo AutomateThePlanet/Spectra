@@ -11,5 +11,5 @@ description: "The Quality section was folded into Guides and Architecture. Find 
 This section moved:
 
 - [Check coverage and build the dashboard](coverage) is a guide.
-- [How SPECTRA double-checks tests](grounding-verification) is under Architecture.
+- [How SPECTRA double-checks your tests](grounding-verification) is under Architecture.
 - The live verification checklist for maintainers is in [Development](DEVELOPMENT.md#live-verification-in-each-ai-agent-maintainers).

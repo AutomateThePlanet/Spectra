@@ -23,7 +23,7 @@ coverage
 
 critic
 : The AI step that checks one test case against the doc sections it cites and gives it a label. It runs in its own
-  context and never sees how the test was written. See [How SPECTRA double-checks tests](grounding-verification).
+  context and never sees how the test was written. See [How SPECTRA double-checks your tests](grounding-verification).
 
 dashboard
 : A static website built from your repository: suites, test cases, coverage and run history.

@@ -4,7 +4,7 @@ parent: Reference
 nav_order: 7
 ---
 
-# SPECTRA Customization Guide
+# Customization
 
 This guide covers every way you can customize SPECTRA's behavior, from test case
 output format to AI reasoning strategy.
@@ -101,7 +101,7 @@ For example, here's how to add domain focus to behavior analysis:
 
 Open `.spectra/prompts/behavior-analysis.md` and add after the persona section:
 
-```
+```markdown
 ## Domain Focus
 When analyzing documentation, pay special attention to:
 - PCI-DSS compliance implications in payment flows
@@ -228,7 +228,7 @@ This section controls how generation batches are sized and which model verifies 
 > and `ai.providers` were removed; a config that still has them loads, and the keys are ignored.
 > Generation and analysis run as ordinary turns in your own Claude Code session; the model is whatever your session is
 > using (`/model`). See [Claude Code v2 vs. the GitHub Copilot SDK v1](claude-code-v2-migration.md) and the
-> [AI Models & Cost Guide](ai-models-cost-guide.md) for the history.
+> [AI models and cost](ai-models-cost-guide.md) for the history.
 
 ```json
 {
