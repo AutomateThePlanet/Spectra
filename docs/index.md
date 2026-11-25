@@ -28,7 +28,8 @@ spectra init
 
 Then open Claude Code in your repository and say **"Extract acceptance criteria"**, then **"Generate test cases for
 checkout"**. Using Copilot, Cursor or another agent? Run `spectra init --agent <name>`
-([Use other AI agents](ai-agents)). The full walkthrough: [Getting started](getting-started).
+([Use other AI agents](ai-agents)). The full walkthrough: [Getting started](getting-started). When your docs change:
+[Update tests when your docs change](keep-tests-up-to-date.html).
 
 ## What you can do
 

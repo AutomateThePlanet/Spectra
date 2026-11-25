@@ -77,6 +77,6 @@ The critic is the `spectra-critic` subagent. Its model is `ai.critic.model` in `
 `sonnet`; also an alias such as `opus`, a full model ID, or `inherit` for your session's model). `spectra init` and
 `spectra update-skills` write it into `.claude/agents/spectra-critic.agent.md`; a copy you edited is never
 overwritten. To change what the critic is told, edit `.spectra/prompts/critic-verification.md`
-([Tune how tests are written](generation-profiles)). Older `ai.critic` and `ai.providers` settings are ignored.
+([Tune how tests are written](generation-profiles)).
 
 Related: [Skills and agents](skills-integration) · [Configuration](configuration) · [Test format](test-format)
