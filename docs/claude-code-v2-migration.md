@@ -31,29 +31,14 @@ SPECTRA then validates and persists whatever comes back.
 
 ## Architecture: before / after
 
-**v1 (in-process SDK session — removed in v2.4.0):**
+**v1 (in-process SDK session, removed in v2.4.0):**
 
-```
-spectra ai generate checkout --count 20
-  └─ one long-running CLI process
-       ├─ authenticates via spectra auth / gh auth login
-       ├─ opens a Copilot SDK session against ai.providers[0]
-       ├─ runs behavior analysis, generation, and (optionally) an in-process critic
-       │  entirely inside that one process
-       └─ writes test files + index when the process exits
-```
+{% include flow.html name="v1-generate" %}
 
-**v2 (compile → in-session turn → ingest seam):**
+**v2 (compile → in-session turn → ingest seam):** the `spectra-generate` skill orchestrates, calling SPECTRA CLI
+commands that never talk to a model themselves.
 
-```
-"generate 20 tests for checkout"  (you, in conversation with Claude Code)
-  └─ the spectra-generate SKILL orchestrates, calling SPECTRA CLI commands
-     that never talk to a model themselves:
-       spectra ai compile-analysis-prompt  → (a turn in YOUR session) → spectra ai ingest-analysis
-       spectra ai compile-prompt           → (a turn in YOUR session) → spectra ai ingest-tests
-       spectra ai compile-critic-prompt    → (the spectra-critic subagent, a fresh context) → spectra ai ingest-verdict
-       spectra ai ingest-grounding --all   (durable verdict write-back)
-```
+{% include flow.html name="v2-generate" %}
 
 Every "AI-touching" flow in v2 (bulk generation, from-description generation, behavior analysis,
 criteria extraction, and targeted updates) follows the same three-step shape: a `compile-*`

@@ -10,6 +10,10 @@ description: "Install SPECTRA, set up your repository and ask your AI agent for 
 In this tutorial you install SPECTRA, set up a repository and get your first test cases from your AI agent. It takes
 about ten minutes plus the agent's working time.
 
+{% include flow.html name="user-journey" %}
+
+This tutorial covers the first two steps. The guides linked at the end cover the rest.
+
 ## Before you start
 
 - The [.NET 8 SDK](https://dotnet.microsoft.com/download) or later.

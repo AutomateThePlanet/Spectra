@@ -1,0 +1,104 @@
+# Diagrams rendered by _includes/flow.html: {% include flow.html name="<key>" %}
+# Each flow: caption (figure caption, also the accessible name), steps (title, text: one plain line, optional icon
+# index|generate|verify|execute|cover, optional href). Steps run left to right, top to bottom.
+
+user-journey:
+  caption: "What you do with SPECTRA, from your docs to coverage"
+  steps:
+    - title: Your docs
+      icon: index
+      href: /criteria.html
+      text: "Keep your product docs in docs/. Your agent pulls out the testable requirements."
+    - title: Test cases
+      icon: generate
+      href: /usage.html
+      text: "Ask for test cases. You approve the plan; your agent writes one file per test."
+    - title: Review
+      icon: verify
+      href: /review.html
+      text: "Every test is checked against your docs. You decide on the ones that are flagged."
+    - title: Run
+      icon: execute
+      href: /execution-agents
+      text: "Ask to run a suite and record each result in a console in your browser."
+    - title: Coverage
+      icon: cover
+      href: /coverage.html
+      text: "See which docs, criteria and tests are covered, on a dashboard you can publish."
+
+system-flow:
+  caption: "How a request flows through SPECTRA"
+  steps:
+    - title: Your docs
+      text: "Markdown files in docs/, the source of every test case."
+    - title: Docs index
+      text: "spectra docs index summarises the docs in docs/_index/, so prompts stay small."
+    - title: Skill
+      text: "A skill in your AI agent, for example spectra-generate, runs the steps in order."
+    - title: Prompt
+      text: "spectra ai compile-… builds a prompt from your docs and criteria. No model is called."
+    - title: Your agent answers
+      text: "A turn or a subagent in your own session (analyst, generator, updater) answers it."
+    - title: Validate and save
+      text: "spectra ai ingest-… checks the answer and writes the test files."
+    - title: Critic
+      text: "The spectra-critic subagent checks each test against the doc sections it cites."
+    - title: Run
+      text: "spectra run and the browser console record results in .execution/spectra.db."
+    - title: Dashboard
+      text: "spectra dashboard builds a static site with suites, coverage and runs."
+
+seam:
+  caption: "Every AI step: SPECTRA builds the prompt, your agent answers, SPECTRA checks and saves"
+  steps:
+    - title: Build the prompt
+      text: "spectra ai compile-… writes a prompt from your docs. No model is called."
+    - title: Your agent answers
+      text: "An ordinary turn or subagent call in your session, on your session's model."
+    - title: Check and save
+      text: "spectra ai ingest-… validates the answer and writes the files, or refuses with an error."
+
+double-check:
+  caption: "How each generated test is checked"
+  steps:
+    - title: A test is written
+      icon: generate
+      text: "Your agent writes the test from the doc sections it cites."
+    - title: The critic reads the docs
+      icon: verify
+      text: "A separate AI step compares every step and expected result with those sections."
+    - title: It gives a label
+      icon: index
+      text: "grounded, partial or hallucinated, with a score and the details it couldn't find."
+    - title: Partial tests get one repair
+      icon: execute
+      text: "The test is fixed and checked again. Still partial: flagged for you."
+    - title: The result is saved
+      icon: cover
+      text: "Kept, flagged for review, or deleted with the reason recorded."
+
+v1-generate:
+  caption: "Up to 2.3: one CLI process did everything"
+  steps:
+    - title: spectra ai generate
+      text: "One long-running CLI process, started from the terminal."
+    - title: Sign in
+      text: "It authenticated with spectra auth or gh auth login."
+    - title: Copilot SDK session
+      text: "It opened a session against ai.providers[0] and ran analysis, generation and an optional critic."
+    - title: Write files
+      text: "It wrote the test files and the index when the process ended."
+
+v2-generate:
+  caption: "From 2.4: your agent runs the skill; SPECTRA's CLI never calls a model"
+  steps:
+    - title: You ask
+      text: "“Generate 20 tests for checkout”, in a conversation with your agent."
+    - title: Analysis
+      text: "compile-analysis-prompt, a turn in your session, ingest-analysis."
+    - title: Generation
+      text: "compile-prompt, a turn in your session, ingest-tests."
+    - title: Critic
+      text: "compile-critic-prompt, the spectra-critic subagent, ingest-verdict."
+    - title: Write-back
+      text: "ingest-grounding --all writes the result into each test."

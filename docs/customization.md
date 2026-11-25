@@ -315,19 +315,13 @@ refreshes unmodified files and preserves your edits.
 
 ## Customization Precedence Summary
 
-```
-profiles/_default.yaml (on disk)
-  ↓ fallback (missing or malformed)
-Built-in embedded default
+SPECTRA uses your file when it exists and is valid, and the built-in default otherwise:
 
-.spectra/prompts/{template}.md (on disk)
-  ↓ fallback
-Built-in embedded prompt template
-
-spectra.config.json (user values)
-  ↓ fallback
-Built-in defaults (categories, coverage paths, etc.)
-```
+| Your file | Used when it is missing or malformed |
+|---|---|
+| `profiles/_default.yaml` | the built-in embedded default format |
+| `.spectra/prompts/{template}.md` | the built-in embedded prompt template |
+| `spectra.config.json` (your values) | the built-in defaults (categories, coverage paths, etc.) |
 
 All user files are created by `spectra init` and tracked by
 `spectra update-skills`. You can always restore prompt-template defaults with

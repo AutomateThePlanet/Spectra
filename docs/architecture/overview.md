@@ -26,28 +26,10 @@ a turn (or subagent call) inside your interactive Claude Code session.
 
 ## System Flow
 
-```
-docs/                              <- Source documentation
-  |
-docs/_index/                       <- Per-suite manifest + checksums (v2 layout)
-  |
-spectra ai compile-prompt          <- Deterministic prompt, no model call
-  |
-(a turn in YOUR Claude Code        <- Generation/analysis/criteria/update all run here
- session, driven by a skill)
-  |
-spectra ai ingest-tests            <- Fail-loud validate + persist
-  |
-spectra-critic subagent            <- context: fork verification, per test
-  |
-test-cases/                        <- Markdown + YAML frontmatter test cases
-  |
-spectra run                        <- Deterministic execution state machine (SQLite)
-  |
-spectra run console (optional)     <- Local browser UI for manual verdict recording
-  |
-Azure DevOps / Jira / Teams        <- Bug logging via their own separate MCPs
-```
+{% include flow.html name="system-flow" %}
+
+Bugs found during a run are logged through other tools' own integrations (for example Azure DevOps or Jira MCP
+servers), not through SPECTRA.
 
 ## Tech Stack
 

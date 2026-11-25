@@ -17,13 +17,7 @@ review what it flags, run the tests from a browser console and follow coverage o
 
 ## How it works
 
-<ol class="spectra-steps">
-{% include spectra_step.html n="01" icon="index" title="Criteria" href="/criteria.html" text="Say **“Extract acceptance criteria”**. SPECTRA finds the MUST, SHOULD and MAY requirements in your docs." %}
-{% include spectra_step.html n="02" icon="generate" title="Generate" href="/usage.html" text="Say **“Generate test cases for checkout”**. The agent proposes what to test and waits for your OK." %}
-{% include spectra_step.html n="03" icon="verify" title="Review" href="/review.html" text="A separate check compares every test with your docs. You decide on the ones it flags." %}
-{% include spectra_step.html n="04" icon="execute" title="Run" href="/execution-agents" text="Say **“Run the smoke test cases”**. You record each result in a local browser console." %}
-{% include spectra_step.html n="05" icon="cover" title="Cover" href="/coverage.html" text="See which docs, criteria and tests are covered, on a dashboard you can publish." %}
-</ol>
+{% include flow.html name="user-journey" %}
 
 ## Quick start
 

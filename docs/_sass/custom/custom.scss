@@ -1315,11 +1315,11 @@ html.search-active {
     height: 30px;
   }
 
-  .spectra-step:nth-child(1) & { background: t.$spectra-step-1; }
-  .spectra-step:nth-child(2) & { background: t.$spectra-step-2; }
-  .spectra-step:nth-child(3) & { background: t.$spectra-step-3; }
-  .spectra-step:nth-child(4) & { background: t.$spectra-step-4; }
-  .spectra-step:nth-child(5) & { background: t.$spectra-step-5; }
+  .spectra-step:nth-child(5n+1) & { background: t.$spectra-step-1; }
+  .spectra-step:nth-child(5n+2) & { background: t.$spectra-step-2; }
+  .spectra-step:nth-child(5n+3) & { background: t.$spectra-step-3; }
+  .spectra-step:nth-child(5n+4) & { background: t.$spectra-step-4; }
+  .spectra-step:nth-child(5n+5) & { background: t.$spectra-step-5; }
 }
 
 .spectra-step-line {
@@ -1375,6 +1375,69 @@ html.search-active {
   font-size: 17px;
   line-height: 1.6;
   color: t.$gray-600;
+}
+
+// Flow diagrams (_includes/flow.html, _data/flows.yml) reuse the step cards above.
+.spectra-content-col .main-content .spectra-step .spectra-step-title {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: t.$navy-900;
+
+  a {
+    color: t.$navy-900;
+    text-decoration: none;
+
+    &:hover,
+    &:focus-visible {
+      color: t.$navy-700;
+      text-decoration: underline;
+    }
+  }
+}
+
+.spectra-step-icon-num {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  color: t.$white;
+}
+
+.spectra-content-col .main-content .spectra-flow {
+  margin: 8px 0 32px;
+
+  .spectra-steps {
+    margin-bottom: 12px;
+  }
+
+  > figcaption {
+    font-size: 15px;
+    line-height: 1.5;
+    color: t.$gray-600;
+  }
+}
+
+// More than five steps: smaller circles and titles so three fit per row.
+.spectra-content-col .main-content .spectra-steps-long {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 24px 20px;
+
+  .spectra-step-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .spectra-step-icon-num {
+    font-size: 20px;
+  }
+
+  .spectra-step .spectra-step-title {
+    font-size: 19px;
+  }
+
+  .spectra-step p {
+    font-size: 16px;
+  }
 }
 
 // --- Start Here cards ---

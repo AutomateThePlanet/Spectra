@@ -1,0 +1,17 @@
+{%- comment -%}
+  A flow diagram (SPECTRA Docs v2 step cards): {% include flow.html name="user-journey" %}
+  The steps come from _data/flows.yml. The diagram is a figure whose caption names it, wrapping an ordered list,
+  so screen readers get the same steps as a list. Arrows and colours are decoration (aria-hidden / CSS only).
+  Steps without an icon show their number in the circle.
+{%- endcomment -%}
+{%- assign flow = site.data.flows[include.name] -%}
+{%- if flow -%}
+<figure class="spectra-flow" aria-labelledby="flow-{{ include.name }}">
+<ol class="spectra-steps{% if flow.steps.size > 5 %} spectra-steps-long{% endif %}">
+{%- for step in flow.steps %}
+<li class="spectra-step"><div class="spectra-step-head" aria-hidden="true"><span class="spectra-step-icon">{% if step.icon %}<img src="{{ '/assets/images/process/spectra-' | append: step.icon | append: '.svg' | relative_url }}" alt="" width="30" height="30">{% else %}<span class="spectra-step-icon-num">{{ forloop.index }}</span>{% endif %}</span><span class="spectra-step-line"></span><span class="spectra-step-arrow"></span></div>{% if step.icon %}<span class="spectra-step-num" aria-hidden="true">{% if forloop.index < 10 %}0{% endif %}{{ forloop.index }}</span>{% endif %}<p class="spectra-step-title">{% if step.href %}<a href="{{ step.href | relative_url }}">{{ step.title }}</a>{% else %}{{ step.title }}{% endif %}</p><p>{{ step.text }}</p></li>
+{%- endfor %}
+</ol>
+<figcaption id="flow-{{ include.name }}">{{ flow.caption }}</figcaption>
+</figure>
+{%- endif -%}
