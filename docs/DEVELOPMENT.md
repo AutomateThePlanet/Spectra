@@ -60,7 +60,7 @@ node capture.js --demo <path-to-demo-repo> --spectra <path-to-the-spectra-build-
 ```
 
 Add `--console` for the run console (it needs an active run) and `--seam <label>` for the generate or criteria
-progress page during a real agent run. In a page, always use the include:
+progress page during a real agent run. Add `--rename "<your name>=demo-user"` so no real name appears in the run screenshots. In a page, always use the include:
 
 ```liquid
 {% raw %}{% include screenshot.html file="dashboard-coverage" alt="What the image shows" %}{% endraw %}

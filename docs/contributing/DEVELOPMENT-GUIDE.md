@@ -157,6 +157,7 @@ node capture.js --demo <path-to-demo-repo> --spectra <path-to-the-spectra-build-
 | `--test TC-123` | The test shown in the detail panel (default: the first test) |
 | `--console` | `run-console`, the execution web console. Needs an active run (`spectra run start <suite>`) |
 | `--seam <label>` | `progress-<label>`, the generate or criteria progress page in its current state |
+| `--rename "<a>=<b>"` | Replaces the text `<a>` with `<b>` on every captured page, for privacy. The published images use `--rename "<maintainer name>=demo-user"` so no real name appears in the runs' "Executed By" |
 
 The script writes to the demo repository: `ai analyze --coverage --auto-link` updates its coverage files and
 `.spectra-progress.html`; the dashboard is built in a temporary folder. The generate and criteria progress pages

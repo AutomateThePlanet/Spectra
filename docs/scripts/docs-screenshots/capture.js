@@ -10,6 +10,8 @@
 //   --test <id>        test case for the detail panel                                         [default: first test]
 //   --console          also capture the execution web console (run-console.webp). Needs an active run
 //                      (`spectra run start <suite>`); the console is started and stopped by the script.
+//   --rename <a>=<b>   replace the text <a> with <b> in every captured page before the screenshot, for
+//                      privacy (for example a real name in the runs' "Executed By"). Nothing else changes.
 //   --seam <label>     also capture the generate/criteria progress page (.spectra/seam-progress.html)
 //                      in its current state as progress-<label>.webp. That page only changes during a
 //                      real agent run, so run this option while one is in progress.
@@ -42,6 +44,19 @@ if (!demo || !fs.existsSync(path.join(demo, 'spectra.config.json'))) {
 const spectra = arg('spectra', 'spectra');
 const testId = arg('test');
 const seamLabel = arg('seam');
+const rename = arg('rename') ? arg('rename').split('=') : null;
+
+/** Replaces the --rename text in the page (text nodes and input values) right before a screenshot. */
+async function applyRename(page) {
+  if (!rename) return;
+  await page.evaluate(([from, to]) => {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      if (walker.currentNode.nodeValue.includes(from)) walker.currentNode.nodeValue = walker.currentNode.nodeValue.split(from).join(to);
+    }
+    document.querySelectorAll('input, textarea').forEach(e => { if (e.value.includes(from)) e.value = e.value.split(from).join(to); });
+  }, rename);
+}
 
 const run = cmd => execSync(`${spectra.includes(' ') ? `"${spectra}"` : spectra} ${cmd}`, { cwd: demo, stdio: 'pipe' }).toString();
 
@@ -60,6 +75,7 @@ function serve(root) {
 
 /** Captures one element, at most maxHeight CSS px tall. belowHeader: start under the page's sticky .header. */
 async function shot(page, selector, name, maxHeight = 1000, belowHeader = false) {
+  await applyRename(page);
   const el = await page.$(selector);
   if (!el) { console.warn(`skipped ${name}: ${selector} not found`); return; }
   const box = await el.boundingBox();
@@ -126,6 +142,7 @@ const newPage = (browser, width, height) => browser.newPage({ viewport: { width,
 
   const mobile = await newPage(browser, 390, 844);
   await mobile.goto(base, { waitUntil: 'networkidle' });
+  await applyRename(mobile);
   await saveWebp(await mobile.screenshot(), 'dashboard-suites-mobile');
   server.close();
 
