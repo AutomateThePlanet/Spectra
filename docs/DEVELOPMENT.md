@@ -130,6 +130,18 @@ outside code. The usual cause is a line that starts with an HTML-like tag, for e
 wrapped so the next line begins with `<path>`. kramdown then treats the rest of the block as raw HTML.
 Keep such code spans on one line.
 
+### USAGE.md and CUSTOMIZATION.md: two separate copies
+
+`spectra init` writes `USAGE.md` and `CUSTOMIZATION.md` into a user's repository (`spectra update-skills` refreshes
+`CUSTOMIZATION.md`), where
+the user's AI agent reads them. Their source is `src/Spectra.CLI/Templates/USAGE.md` and
+`src/Spectra.CLI/Templates/CUSTOMIZATION.md`, embedded in the CLI (`Spectra.CLI.csproj`).
+
+The website pages `docs/usage.md` and `docs/customization.md` are separate, shorter pages for people. Editing a
+website page does not change what `init` installs, and the other way round. When a workflow changes, update both.
+The init goldens (`tests/Spectra.CLI.Tests/Golden/`) hash the templates, so a template edit needs a golden
+re-capture (`SPECTRA_GOLDEN_RECORD=1`).
+
 ## Using TestFixtures
 
 The `tests/TestFixtures/` folder contains ready-to-use sample data:
