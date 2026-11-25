@@ -52,3 +52,6 @@ dist/
 
 # Local design capture and redesign report (not deployed)
 docs-design-reference/
+
+# Claude Code local settings (per machine, never committed)
+.claude/settings.local.json
