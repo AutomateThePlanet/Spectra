@@ -22,7 +22,8 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Pinned: Playwright 1.56.1 (contrast check) cannot install Chromium on ubuntu-latest (26.04).
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: docs
@@ -53,13 +54,17 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Check colour contrast (warn only)
-        continue-on-error: true
+      # Installing the checker must work: a failure here fails the job.
+      - name: Install contrast checker and Chromium
         working-directory: docs/scripts/a11y
         run: |
           npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
-          node check-contrast.js ../../_site --base "${{ steps.pages.outputs.base_path }}"
+
+      - name: Check colour contrast (warn only)
+        continue-on-error: true
+        working-directory: docs/scripts/a11y
+        run: node check-contrast.js ../../_site --base "${{ steps.pages.outputs.base_path }}"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
