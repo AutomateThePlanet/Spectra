@@ -22,6 +22,9 @@ search:
   rel_url: true
   button: true
 
+# Code blocks: copy button, collapse and colours come from the shared assets/js/codeblock.js
+enable_copy_code_button: false
+
 # Navigation
 nav_sort: case_insensitive
 
@@ -32,7 +35,7 @@ heading_anchors: true
 footer_content: 'SPECTRA is part of the <a href="https://www.automatetheplanet.com/">Automate The Planet</a> ecosystem. Licensed under the <a href="https://github.com/AutomateThePlanet/Spectra/blob/main/LICENSE">Apache License 2.0</a>.'
 
 # Aux links (top-right of every page)
-# Shown as the "Get SPECTRA" menu in the header (_includes/header_custom.html)
+# Shown as the "Get SPECTRA" menu in the header (_includes/header_custom.html), and as links in the home page band
 aux_links:
   "NuGet (Spectra.CLI)":
     - "https://www.nuget.org/packages/Spectra.CLI"

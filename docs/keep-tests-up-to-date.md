@@ -13,11 +13,15 @@ the docs again.
 
 ## What to say
 
-> "Update test cases for notification"
->
-> "Update all"
->
-> "Stop updating"
+```prompt
+Update test cases for notification
+```
+```prompt
+Update all
+```
+```prompt
+Stop updating
+```
 
 All three use the `spectra-update` skill. "Update all" checks every suite. "Stop updating" finishes the test in
 progress and stops; the rest are listed again next time.

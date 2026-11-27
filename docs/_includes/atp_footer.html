@@ -1,7 +1,8 @@
 {%- comment -%}
   Automate The Planet site footer for the SPECTRA docs.
-  Layout: "SPECTRA Docs v2" design. Links, phone and social URLs: the live ATP footer
-  (Automate-The-Planet-Website-v2/src/components/layout/Footer.astro), made absolute.
+  Layout: "SPECTRA Docs v2" design. Links, phone and social URLs: the ATP footer
+  (Automate-The-Planet-Website-v2/src/components/layout/Footer.astro), made absolute,
+  same link set and final URLs (trailing slash, no redirect hop).
   The live footer has no e-mail address or postal address, so none is shown.
   Bottom row: site.footer_content from _config.yml (ecosystem + Apache 2.0 licence).
 {%- endcomment -%}
@@ -14,7 +15,7 @@
           <img src="{{ '/assets/images/atp-logo.svg' | relative_url }}" alt="Automate The Planet" width="200" height="50">
         </a>
         <div class="atp-footer-cta">
-          <a class="atp-button atp-button-red" href="{{ atp }}/contact-us">Contact Us</a>
+          <a class="atp-button atp-button-red" href="{{ atp }}/contact-us/">Contact Us</a>
         </div>
       </div>
       <div>
@@ -24,21 +25,23 @@
           <li><a class="atp-footer-link" href="{{ atp }}/services/api-automation/">API Automation</a></li>
           <li><a class="atp-footer-link" href="{{ atp }}/services/mobile-automation/">Mobile Automation</a></li>
           <li><a class="atp-footer-link" href="{{ atp }}/services/desktop-automation/">Desktop Automation</a></li>
-          <li><a class="atp-footer-link" href="{{ atp }}/services/private-training/">Private Trainings</a></li>
+          <li><a class="atp-footer-link" href="{{ atp }}/trainings/">Private Trainings</a></li>
         </ul>
       </div>
       <div>
         <ul class="atp-footer-list">
-          <li><a class="atp-footer-link" href="{{ atp }}/reviving-windows-app-automation-novawindows-driver-for-appium-2">Tools</a></li>
-          <li><a class="atp-footer-link" href="{{ atp }}/resources">Resources</a></li>
-          <li><a class="atp-footer-link" href="{{ atp }}/resources">Books</a></li>
-          <li><a class="atp-footer-link" href="{{ atp }}/blog">Blog</a></li>
+          <li><a class="atp-footer-link" href="{{ atp }}/bellatrix/">BELLATRIX</a></li>
+          <li><a class="atp-footer-link" href="{{ atp }}/spectra/">SPECTRA</a></li>
+          <li><a class="atp-footer-link" href="{{ atp }}/testimize/">Testimize</a></li>
+          <li><a class="atp-footer-link" href="{{ atp }}/resources/">Resources</a></li>
+          <li><a class="atp-footer-link" href="{{ atp }}/resources/">Books</a></li>
+          <li><a class="atp-footer-link" href="{{ atp }}/blog/">Blog</a></li>
         </ul>
       </div>
       <div>
         <ul class="atp-footer-list">
-          <li><a class="atp-footer-link" href="{{ atp }}/about-us">About Us</a></li>
-          <li><a class="atp-footer-link" href="{{ atp }}/careers">Careers</a></li>
+          <li><a class="atp-footer-link" href="{{ atp }}/about-us/">About Us</a></li>
+          <li><a class="atp-footer-link" href="{{ atp }}/careers/">Careers</a></li>
           <li><a class="atp-footer-link" href="tel:+15096434300">+1 509 643 4300</a></li>
         </ul>
       </div>

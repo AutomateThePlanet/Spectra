@@ -13,19 +13,27 @@ own.
 
 ## What to say
 
-> "Review the flagged tests in checkout"
+```prompt
+Review the flagged tests in checkout
+```
 
 Then, for each test the agent shows you:
 
-> "Looks fine, accept it"
->
-> "Accept it — I checked the runbook and the interval is right"
->
-> "Regenerate this one"
->
-> "The step about the retry limit is wrong, fix it"
->
-> "This one's redundant, remove it"
+```prompt
+Looks fine, accept it
+```
+```prompt
+Accept it — I checked the runbook and the interval is right
+```
+```prompt
+Regenerate this one
+```
+```prompt
+The step about the retry limit is wrong, fix it
+```
+```prompt
+This one's redundant, remove it
+```
 
 All of these use the `spectra-review-flagged` skill.
 

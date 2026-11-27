@@ -48,7 +48,9 @@ SPECTRA asks one question: where your automated test code lives, so it can link 
 
 Open Claude Code in the repository and say:
 
-> "Extract acceptance criteria"
+```prompt
+Extract acceptance criteria
+```
 
 The agent reads each document and saves the testable requirements it finds. Test generation needs them.
 More: [Extract acceptance criteria](criteria).
@@ -57,7 +59,9 @@ More: [Extract acceptance criteria](criteria).
 
 Pick a name for your first suite, for example `checkout`, and say:
 
-> "Generate test cases for checkout"
+```prompt
+Generate test cases for checkout
+```
 
 A progress page opens in your browser. After a minute or two the agent shows what it would test and how many tests
 it recommends, then asks "Shall I proceed?":

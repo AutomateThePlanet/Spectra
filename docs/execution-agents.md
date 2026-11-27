@@ -13,15 +13,21 @@ perform it and record the result there. The agent stays available in chat for qu
 
 ## What to say
 
-> "Run test cases for notification"
->
-> "Run high priority test cases"
->
-> "Run the smoke test cases"
->
-> "Resume the last run"
->
-> "Show run history"
+```prompt
+Run test cases for notification
+```
+```prompt
+Run high priority test cases
+```
+```prompt
+Run the smoke test cases
+```
+```prompt
+Resume the last run
+```
+```prompt
+Show run history
+```
 
 All of these use the `spectra-execute` skill. If you don't name a suite, the agent helps you pick tests: ask
 "What should I test?" for a suggestion based on what hasn't run or failed last time.

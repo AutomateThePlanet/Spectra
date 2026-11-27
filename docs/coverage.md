@@ -13,13 +13,18 @@ static website.
 
 ## What to say
 
-> "Show test coverage"
->
-> "What areas don't have test cases?"
->
-> "Which acceptance criteria aren't tested?"
->
-> "Generate the dashboard"
+```prompt
+Show test coverage
+```
+```prompt
+What areas don't have test cases?
+```
+```prompt
+Which acceptance criteria aren't tested?
+```
+```prompt
+Generate the dashboard
+```
 
 The first three use the `spectra-coverage` skill; the last one uses `spectra-dashboard`.
 

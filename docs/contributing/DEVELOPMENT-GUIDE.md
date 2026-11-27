@@ -126,6 +126,22 @@ outside code. The usual cause is a line that starts with an HTML-like tag, for e
 wrapped so the next line begins with `<path>`. kramdown then treats the rest of the block as raw HTML.
 Keep such code spans on one line.
 
+The page follows the layout of the BELLATRIX docs (docs.bellatrix.solutions): green heading band, the docs nav on
+the right from 1280 px (a collapsed "Documentation menu" above the band on smaller screens). Two parts come from
+other repositories; do not edit them by hand:
+
+- The header is a copy of the automatetheplanet.com header. `node docs/scripts/sync-atp-header.mjs` regenerates
+  `_includes/atp_header.html` and `assets/css/atp-header.css` from the Automate-The-Planet-Website-v2 repository.
+- Code blocks (`assets/css/codeblock.css`, `assets/js/codeblock.js`) are the same files on automatetheplanet.com,
+  bellatrix.solutions and the BELLATRIX docs: copy button, "Show more" for blocks over 20 lines, AA colours.
+  Their test checks every built page that has a code block, at 1440 and 390 px, and fails on any block without that
+  behaviour:
+
+  ```bash
+  cd docs/scripts/code-blocks && npm ci && npx playwright install chromium
+  node check-code-blocks.mjs ../../_site --base /Spectra --full   # every page; without --full: a representative set
+  ```
+
 ### USAGE.md and CUSTOMIZATION.md: two separate copies
 
 `spectra init` writes `USAGE.md` and `CUSTOMIZATION.md` into a user's repository, where the user's AI agent reads
@@ -183,9 +199,10 @@ Use the include, never a bare `<img>`:
 ```
 
 Desktop images show at most 760 px wide (`narrow`: 560 px); phone captures (`phone=true`) at most 340 px, in a phone
-frame; a `screenshot-pair` puts them side by side and stacks them on small screens. Each image links to its full-size
-file, which `assets/js/screenshot-lightbox.js` opens in a lightbox (Esc or the close button closes it). Write every
-new image's alt text in the page that uses it.
+frame; a `screenshot-pair` shows the phone capture below the desktop one, centred, so nothing reaches beyond the
+content column. Each image links to its full-size file, which `assets/js/screenshot-lightbox.js` opens in a lightbox
+(Esc or the close button closes it); other content images at least 200 px wide open the same way (click, Enter or
+Space). Write every new image's alt text in the page that uses it.
 
 ## Using TestFixtures
 

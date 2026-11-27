@@ -1,70 +1,18 @@
 {%- comment -%}
   Automate The Planet site header for the SPECTRA docs.
-  Items and order: "ATP Home v2" design nav. URLs: the live ATP site header
-  (Automate-The-Planet-Website-v2/src/components/layout/Header.astro), made absolute.
-  "AI Agent Adoption" (Services) is left out: the ATP site has no page for it yet.
+  SPECTRA logo, the automatetheplanet.com menu and the docs search / "Get SPECTRA" menu.
+  The menu (_includes/atp_nav.html) is GENERATED from the ATP website's header by
+  docs/scripts/sync-atp-header.mjs, so its items always match automatetheplanet.com.
   The search box and the "Get SPECTRA" menu are Just the Docs' own header component
   (#main-header: search input, header_custom.html, aux_nav from _config.yml aux_links).
 {%- endcomment -%}
-{%- assign atp = "https://www.automatetheplanet.com" -%}
 <header class="atp-header">
   <a class="atp-logo" href="{{ '/' | relative_url }}" aria-label="{{ site.title }} documentation home">
     <img src="{{ site.logo | relative_url }}" alt="{{ site.title }}" width="263" height="60">
   </a>
 
   <div class="atp-header-panel">
-    <nav class="atp-nav" aria-label="Automate The Planet">
-      <ul class="atp-nav-list">
-        <li class="atp-nav-item has-sub">
-          <a class="atp-nav-link" href="{{ atp }}/services/">Services</a>
-          <ul class="atp-sub">
-            <li><a href="{{ atp }}/services/web-automation/">Web Automation</a></li>
-            <li><a href="{{ atp }}/services/api-automation/">Api Automation</a></li>
-            <li><a href="{{ atp }}/services/desktop-automation/">Desktop Automation</a></li>
-            <li><a href="{{ atp }}/services/mobile-automation/">Mobile Automation</a></li>
-          </ul>
-        </li>
-        <li class="atp-nav-item has-sub">
-          <a class="atp-nav-link" href="{{ atp }}/trainings/">Trainings</a>
-          <ul class="atp-sub">
-            <li><a href="{{ atp }}/trainings/#programmes">Advanced Track</a></li>
-            <li><a href="{{ atp }}/trainings/#programmes">QA Automation Academy</a></li>
-            <li><a href="{{ atp }}/trainings/#ai-in-qa">AI in QA Modules</a></li>
-            <li><a href="{{ atp }}/trainings/#assessment">Readiness Assessment</a></li>
-          </ul>
-        </li>
-        <li class="atp-nav-item has-sub is-current">
-          <button type="button" class="atp-nav-link btn-reset" aria-haspopup="true">Tools</button>
-          <ul class="atp-sub">
-            <li><a href="{{ atp }}/bellatrix/">BELLATRIX</a></li>
-            <li><a href="{{ atp }}/spectra/" aria-current="page">SPECTRA</a></li>
-            <li><a href="{{ atp }}/testimize/">Testimize</a></li>
-            <li><a href="{{ atp }}/reviving-windows-app-automation-novawindows-driver-for-appium-2">NovaWindows Driver</a></li>
-            <li><a href="{{ atp }}/servicenow-app-automation-bellatrix-servicenow-integration">ServiceNow Test Integration</a></li>
-            <li><a href="{{ atp }}/bellatrix-mobile-cloud-platform/">BELLATRIX Mobile Cloud Platform</a></li>
-          </ul>
-        </li>
-        <li class="atp-nav-item has-sub">
-          <a class="atp-nav-link" href="{{ atp }}/resources">Books</a>
-          <ul class="atp-sub atp-sub-wide">
-            <li><a href="{{ atp }}/resources/automated-testing-unleashed-the-complete-handbook/">Automated Testing Unleashed : The Complete Handbook</a></li>
-            <li><a href="{{ atp }}/resources/design-patterns-for-high-quality-automated-tests-clean-code-for-bulletproof-tests-java-edition/">Design Patterns for High-Quality Automated Tests: JAVA Edition</a></li>
-            <li><a href="{{ atp }}/resources/design-patterns-for-high-quality-automated-tests-high-quality-test-attributes-and-best-practices/">Design Patterns for High-Quality Automated Tests: C# Edition</a></li>
-            <li><a href="{{ atp }}/resources/testing-in-the-galaxy-107th-orion-testing-symposium/">Testing in the Galaxy</a></li>
-          </ul>
-        </li>
-        <li class="atp-nav-item"><a class="atp-nav-link" href="{{ atp }}/blog/">Blog</a></li>
-        <li class="atp-nav-item"><a class="atp-nav-link" href="{{ atp }}/resources">Resources</a></li>
-        <li class="atp-nav-item has-sub">
-          <button type="button" class="atp-nav-link btn-reset" aria-haspopup="true">Company</button>
-          <ul class="atp-sub">
-            <li><a href="{{ atp }}/about-us">About Us</a></li>
-            <li><a href="{{ atp }}/careers">Careers</a></li>
-          </ul>
-        </li>
-        <li class="atp-nav-item"><a class="atp-nav-link" href="{{ atp }}/contact-us">Contact Us</a></li>
-      </ul>
-    </nav>
+    {% include atp_nav.html %}
 
     {% include components/header.html %}
   </div>

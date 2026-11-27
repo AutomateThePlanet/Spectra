@@ -11,7 +11,14 @@
       {%- if spectra_hero_lead %}
       <p class="spectra-hero-lead">{{ spectra_hero_lead }}</p>
       {%- endif %}
+      {%- comment -%} Home page: the download links (aux_links in _config.yml); the ATP header has no download menu. {%- endcomment -%}
+      {%- if page.url == "/" and site.aux_links %}
+      <p class="spectra-hero-get"><span class="spectra-hero-get-label">Get SPECTRA</span>
+        {%- for link in site.aux_links %}
+        <a href="{{ link.last | first }}"{% if site.aux_links_new_tab %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ link.first }}</a>
+        {%- endfor %}
+      </p>
+      {%- endif %}
     </div>
-    <div class="spectra-hero-spacer" aria-hidden="true"></div>
   </div>
 </div>

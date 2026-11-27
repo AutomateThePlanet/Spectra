@@ -49,6 +49,12 @@ The docs workflow also checks colour contrast (axe-core, WCAG AA) on every page 
 warns. To run it locally: `cd docs/scripts/a11y && npm ci && npx playwright install chromium`, then
 `node check-contrast.js ../../_site --base /Spectra`.
 
+Search: `cd docs/scripts/code-blocks && npm ci && npx playwright install chromium`, then
+`node check-search.mjs ../../_site --base /Spectra --runs 20`. It types a query in the header search and expects
+results, also when the first `lunr.min.js` request fails and when the query is typed before the index has loaded.
+Both are handled by `assets/js/just-the-docs.js`, a copy of the theme file (just-the-docs 0.12.0) with two changes
+marked "SPECTRA" / `withLunr`; copy it again when the theme is updated.
+
 `spectra init` installs its own copies of `USAGE.md` and `CUSTOMIZATION.md` from `src/Spectra.CLI/Templates/`. The
 website pages are separate; when a workflow changes, update both.
 

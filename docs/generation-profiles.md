@@ -18,11 +18,15 @@ the output doesn't fit your team.
 
 ## What to say
 
-> "Show me the test generation prompt template"
->
-> "Reset the prompt templates to the defaults"
->
-> "Create a test generation profile for our API team"
+```prompt
+Show me the test generation prompt template
+```
+```prompt
+Reset the prompt templates to the defaults
+```
+```prompt
+Create a test generation profile for our API team
+```
 
 The first two use the `spectra-prompts` skill; the last one uses `spectra-init-profile`.
 

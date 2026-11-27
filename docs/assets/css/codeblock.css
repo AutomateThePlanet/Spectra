@@ -1,0 +1,151 @@
+/*
+ * Shared code blocks (v1) — automatetheplanet.com, bellatrix.solutions, SPECTRA docs, BELLATRIX docs.
+ * The same file in every repo; change it in one, copy it to all (see codeblock.js for the behaviour).
+ * Palette = the ATP blog syntax theme (atp-code-theme.json for Shiki), darkened where needed for
+ * WCAG AA (>= 4.5:1 on #f7f7f7). Shiki colours its tokens inline from the theme; Rouge (Jekyll) token
+ * classes are mapped to the same roles below.
+ */
+:root {
+  --cb-bg: #f7f7f7;
+  --cb-text: #61687c;
+  --cb-accent: #2b7bb5;
+  --cb-radius: 8px;
+  --cb-pad: 1.25rem;
+  --cb-font: "JetBrains Mono", "Cascadia Code", Consolas, Monaco, "Courier New", monospace;
+  --cb-size: 15px;            /* with line-height 1.6 = 24px: the character width and line of the live docs (16px Courier New) */
+  --cb-line: 1.6;
+  --cb-lines: 20;              /* blocks with more lines start collapsed */
+  --cb-ui: #274492;
+  --cb-c-comment: #717171;
+  --cb-c-keyword: #2975ad;
+  --cb-c-type: #008167;
+  --cb-c-string: #9a6700;
+  --cb-c-number: #30689a;
+  --cb-c-namespace: #3270c5;
+  --cb-c-builtin: #1f7d88;
+  --cb-c-decorator: #9e6600;
+}
+
+/* ===== block ===== */
+.cb {
+  position: relative; display: block; box-sizing: border-box; max-width: 100%; min-width: 0;
+  margin: 0 0 24px; background: var(--cb-bg); border-left: 4px solid var(--cb-accent); border-radius: var(--cb-radius);
+  text-align: left;
+  padding: 0 3rem 0 0; /* right column for the copy button: the pre scrolls only left of it, so the button never covers code */
+}
+.cb > pre, .cb > div.highlight > pre, .cb pre.highlight {
+  display: block; box-sizing: border-box; margin: 0 !important; max-width: 100%;
+  padding: var(--cb-pad) !important;
+  background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important;
+  color: var(--cb-text); font-size: var(--cb-size) !important; line-height: var(--cb-line) !important;
+  white-space: pre !important; word-wrap: normal !important; overflow-wrap: normal !important;
+  overflow-x: auto !important; overflow-y: hidden !important; max-height: none !important; tab-size: 4;
+}
+/* monospace everywhere inside a block, whatever the host theme sets on pre/span (Thrive sets Nunito !important) */
+.cb pre, .cb pre *, .cb code { font-family: var(--cb-font) !important; font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
+.cb pre code { display: block; background: none !important; padding: 0 !important; border: 0 !important; border-radius: 0 !important;
+  color: inherit; font-size: inherit !important; line-height: inherit !important; white-space: inherit !important; }
+.cb pre span { font-size: inherit !important; line-height: inherit !important; }
+.cb > div.highlighter-rouge, .cb div.highlight { margin: 0 !important; padding: 0 !important; background: none !important; border: 0 !important; }
+.cb pre::-webkit-scrollbar { display: block !important; height: 8px; }
+.cb pre::-webkit-scrollbar-thumb { background: rgba(20, 35, 76, .25); border-radius: 4px; }
+.cb pre::-webkit-scrollbar-thumb:hover { background: rgba(20, 35, 76, .55); }
+.cb pre { scrollbar-width: thin; scrollbar-color: rgba(20, 35, 76, .25) transparent; }
+.cb pre:focus-visible { outline: 3px solid var(--cb-ui); outline-offset: -3px; }
+
+/* ===== copy button (top-right, in the block's own 3rem right column, never over code) ===== */
+.cb-copy {
+  position: absolute; top: .6rem; right: .6rem; z-index: 2; display: flex; align-items: center; justify-content: center;
+  width: 2rem; height: 2rem; margin: 0; padding: 0; border: 0; border-radius: 4px; background: var(--cb-bg);
+  color: var(--cb-ui); cursor: pointer; box-shadow: none; line-height: 1;
+}
+.cb-copy:hover { background: #e6ebed; }
+.cb-copy:focus-visible { outline: 3px solid var(--cb-ui); outline-offset: 1px; }
+.cb-copy svg { width: 18px; height: 18px; display: block; }
+.cb-copy.is-copied { color: #11703a; }
+.cb-sr { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ===== expand / collapse ===== */
+.cb.is-collapsible { padding-bottom: 2rem; }
+.cb.is-collapsed > pre, .cb.is-collapsed div.highlight > pre {
+  max-height: calc(var(--cb-lines) * var(--cb-line) * var(--cb-size) + 2 * var(--cb-pad)) !important;
+}
+.cb.is-collapsed::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 2rem; height: 4.5rem; pointer-events: none;
+  background: linear-gradient(to bottom, rgba(247, 247, 247, 0), var(--cb-bg) 85%); border-radius: 0;
+}
+.cb-toggle {
+  position: absolute; left: 50%; bottom: .35rem; transform: translateX(-50%); z-index: 3;
+  display: inline-flex; align-items: center; gap: .3rem; margin: 0; padding: .15rem .6rem; min-height: 0; height: auto; width: auto;
+  border: 0; border-radius: 4px; background: transparent; box-shadow: none; text-transform: none; letter-spacing: 0;
+  color: var(--cb-ui); font: 600 13px/1.4 Nunito, "Segoe UI", Arial, sans-serif; cursor: pointer;
+}
+.cb-toggle:hover { text-decoration: underline; background: rgba(39, 68, 146, .06); color: var(--cb-ui); }
+.cb-toggle:focus-visible { outline: 3px solid var(--cb-ui); outline-offset: 1px; }
+.cb-toggle::before, .cb-toggle::after { content: none !important; }
+
+/* ===== syntax colours: Rouge / Pygments classes (Jekyll, bellatrix.solutions feature pages) =====
+   same roles as atp-code-theme.json (Shiki). Colours of the host theme are overridden. No bold tokens anywhere
+   (normal weight, like the live docs); only comments are italic. */
+.cb .highlight [class] { font-weight: 400 !important; }
+.cb .highlight, .cb .highlight * { background: none; }
+.cb .highlight .c, .cb .highlight .c1, .cb .highlight .cm, .cb .highlight .cs, .cb .highlight .cp, .cb .highlight .cpf,
+.cb .highlight .cd, .cb .highlight .ch { color: var(--cb-c-comment) !important; font-style: italic; font-weight: 400; }
+.cb .highlight .k, .cb .highlight .kc, .cb .highlight .kd, .cb .highlight .kn, .cb .highlight .kp, .cb .highlight .kr,
+.cb .highlight .kt, .cb .highlight .kv, .cb .highlight .nt, .cb .highlight .ow { color: var(--cb-c-keyword) !important; font-weight: 400; font-style: normal; }
+.cb .highlight .nc, .cb .highlight .nf, .cb .highlight .ne, .cb .highlight .fm, .cb .highlight .na, .cb .highlight .nl,
+.cb .highlight .no { color: var(--cb-c-type) !important; font-weight: 400; font-style: normal; }
+.cb .highlight .s, .cb .highlight .s1, .cb .highlight .s2, .cb .highlight .sa, .cb .highlight .sb, .cb .highlight .sc,
+.cb .highlight .dl, .cb .highlight .sd, .cb .highlight .se, .cb .highlight .sh, .cb .highlight .si, .cb .highlight .sx,
+.cb .highlight .sr, .cb .highlight .ss { color: var(--cb-c-string) !important; font-weight: 400; font-style: normal; }
+.cb .highlight .m, .cb .highlight .mi, .cb .highlight .mf, .cb .highlight .mh, .cb .highlight .mo, .cb .highlight .mb,
+.cb .highlight .il { color: var(--cb-c-number) !important; font-weight: 400; }
+.cb .highlight .nn { color: var(--cb-c-namespace) !important; font-weight: 400; }
+.cb .highlight .nb, .cb .highlight .bp, .cb .highlight .vg { color: var(--cb-c-builtin) !important; font-weight: 400; }
+/* Shell, terminal and command-prompt blocks are plain monospace: no token colours, no italics (owner decision).
+   Syntax colouring is for real code only (C#, Java, TypeScript/JS, JSON, YAML, XML, Gherkin, …).
+   :not(#cb-none) adds ID weight over the Rouge class map above (.cb .highlight .nb { … !important }). */
+.cb[data-lang="bash"] pre *:not(#cb-none), .cb[data-lang="sh"] pre *:not(#cb-none), .cb[data-lang="shell"] pre *:not(#cb-none), .cb[data-lang="zsh"] pre *:not(#cb-none), .cb[data-lang="powershell"] pre *:not(#cb-none), .cb[data-lang="ps"] pre *:not(#cb-none), .cb[data-lang="ps1"] pre *:not(#cb-none), .cb[data-lang="pwsh"] pre *:not(#cb-none), .cb[data-lang="cmd"] pre *:not(#cb-none), .cb[data-lang="bat"] pre *:not(#cb-none), .cb[data-lang="batch"] pre *:not(#cb-none), .cb[data-lang="console"] pre *:not(#cb-none), .cb[data-lang="shellsession"] pre *:not(#cb-none), .cb[data-lang="shell-session"] pre *:not(#cb-none), .cb[data-lang="terminal"] pre *:not(#cb-none) {
+  color: var(--cb-text) !important; font-style: normal !important; font-weight: 400 !important;
+}
+/* variables: $VAR in shells, values in YAML front matter (Shiki: the same colour for shell/PowerShell variables) */
+.cb .highlight .nv { color: var(--cb-c-builtin) !important; font-weight: 400; font-style: normal; }
+.cb .highlight .nd { color: var(--cb-c-decorator) !important; font-weight: 400; }
+.cb .highlight .n, .cb .highlight .o, .cb .highlight .p, .cb .highlight .w, .cb .highlight .nx,
+.cb .highlight .vi, .cb .highlight .vc, .cb .highlight .py, .cb .highlight .ni,
+.cb .highlight .x { color: var(--cb-text) !important; font-weight: 400; font-style: normal; background: none !important; }
+/* text the Rouge lexer cannot parse (comments in JSON, "..." placeholders, embedded markup): shown like a comment,
+   never as plain text and never with the theme's red error background */
+.cb .highlight .err { color: var(--cb-c-comment) !important; font-style: italic; font-weight: 400; background: none !important; }
+/* Markdown: list markers and the front-matter rule are punctuation in Rouge; highlighted like the Shiki theme */
+.cb[data-lang="markdown"] .highlight .p, .cb[data-lang="md"] .highlight .p { color: var(--cb-c-keyword) !important; font-weight: 400; }
+
+/* ===== inline code in running text ===== */
+.cb-inline, :not(pre) > code.cb-inline {
+  /* colour inherits the text (works on light pages and on the ATP blog's dark theme) */
+  font-family: var(--cb-font) !important; font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0;
+  font-size: .875em; color: inherit; background: rgba(128, 128, 128, .08); /* .08: AA for #61687c text even on grey callouts */
+  padding: 1px 5px; border-radius: 3px; border: 0; overflow-wrap: anywhere;
+}
+
+/* ===== prompts to an AI agent (```prompt fences, or figure.cb-prompt rendered by the page) =====
+   Not code: the sentence in the page's body font, no highlighting; the agent-prompt card of the bellatrix.solutions
+   /agent/ docs (light background, teal bar) with a "You → agent" label and the shared copy button. */
+.cb-prompt {
+  position: relative; box-sizing: border-box; max-width: 100%; margin: 0 0 24px; padding: 12px 3rem 14px 18px;
+  background: #f5f8ff; border: 1px solid #dbe1f0; border-left: 4px solid #4ec9b0; border-radius: 8px; text-align: left;
+}
+.cb-prompt-label {
+  display: block; margin: 0 0 4px; padding: 0; font: 700 12px/1.4 Nunito, "Segoe UI", Arial, sans-serif;
+  letter-spacing: .06em; text-transform: uppercase; color: #11703a;
+}
+/* !important + ID weight (:not(#cb-none) matches every element): page prose rules such as
+   `#page-content p { color: … !important }` (ATP blog, dark theme) must not reach the prompt on its own light panel */
+.cb-prompt .cb-prompt-text:not(#cb-none) {
+  margin: 0 !important; padding: 0 !important; font-family: inherit; font-size: 1.0625rem !important; line-height: 1.6 !important;
+  font-style: normal; font-weight: 400; color: #14234c !important; white-space: pre-line; overflow-wrap: anywhere;
+}
+.cb-prompt .cb-prompt-text::before { content: "\201C"; }
+.cb-prompt .cb-prompt-text::after { content: "\201D"; }
+.cb-prompt > .cb-copy { top: 50%; transform: translateY(-50%); background: transparent; }
+.cb-prompt > .cb-copy:hover { background: #e6ebed; }

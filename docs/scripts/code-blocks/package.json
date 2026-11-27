@@ -1,0 +1,13 @@
+{
+  "name": "code-blocks-check",
+  "private": true,
+  "type": "module",
+  "description": "Code-block test of the built documentation site: every page with a <pre> uses the shared code blocks (copy, Show more, monospace, no clipping).",
+  "scripts": {
+    "test": "node check-code-blocks.mjs",
+    "test:full": "node check-code-blocks.mjs --full"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}

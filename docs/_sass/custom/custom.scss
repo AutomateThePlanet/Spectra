@@ -13,7 +13,8 @@
 
 $bp-md: 50rem;        // just-the-docs "md" (800px): mobile header below this
 $bp-nav-full: 1500px; // full ATP nav fits in the header row from here (see REPORT.md)
-$bp-side: 62.5rem;    // 1000px: docs nav beside the content (sticky) from here, below the content under it
+$bp-side: 62.5rem;    // 1000px
+$docs-green: #378371; // heading band of the BELLATRIX docs: production #3d917d darkened in the same hue to 4.52:1 with white (AA)
 
 // --- Fonts (self-hosted, design system fonts/) ---
 @font-face { font-family: "Nunito"; font-style: normal; font-weight: 400; font-display: swap; src: url("../fonts/nunito-latin-400-normal.woff2") format("woff2"); }
@@ -542,197 +543,417 @@ html.search-active {
 }
 
 // =============================================================
-// Hero
+// Page: the production layout of docs.bellatrix.solutions (measured on /web-automation/layout-testing/):
+// 32px frame (16px below 48em); green heading band; content column 60% of the inner 90%; from 80em the docs
+// nav sits on the right, 56px below the header inside the band, 35% of the inner width (max 29rem); below
+// 80em it is a collapsed menu above the band.
 // =============================================================
-.spectra-hero {
-  color: t.$white;
-  background: t.$spectra-hero;
+.spectra-main {
+  position: relative;
+  display: flex;
+  margin: 0 1rem;
+  flex: 1 1 auto;
+  flex-direction: column;
+
+  @media screen and (min-width: 48em) {
+    margin: 0 2rem;
+  }
 }
 
+.spectra-hero {
+  color: t.$white;
+  background: $docs-green;
+}
+
+// Production docs.bellatrix.solutions container: #page-heading .container (max-width 98rem, 5% sides, 2rem from
+// 102em) + .padded-60 (20 / 40 / 48 / 64px) + the text column tat-u-xl-3-5 tat-u-xxl-2-3 (60% / 66.6667%)
 .spectra-hero-inner {
-  display: flex;
   box-sizing: border-box;
-  max-width: t.$layout-max;
-  padding: 72px t.$container-pad 80px;
+  max-width: 98rem;
   margin: 0 auto;
-  flex-wrap: wrap;
+  padding: 20px 5%;
+
+  @media screen and (min-width: 48em) {
+    padding: 40px 5%;
+  }
+
+  @media screen and (min-width: 80em) {
+    padding: 48px 5%;
+  }
+
+  @media screen and (min-width: 102em) {
+    padding: 64px 2rem;
+  }
 }
 
 .spectra-hero-text {
   display: flex;
-  min-width: 0;
-  padding-right: 2rem;
-  flex: 3 1 560px;
   flex-direction: column;
-  gap: 18px;
+
+  @media screen and (min-width: 80em) {
+    width: 60%;
+  }
+
+  @media screen and (min-width: 102em) {
+    width: 66.6667%;
+  }
 }
 
 .spectra-hero .spectra-hero-title {
-  margin: 0;
-  font-size: clamp(2.5rem, 4.2vw, 4.25rem) !important;
+  margin: 0 0 16px;
+  font-family: t.$font-sans;
+  font-size: 32px !important;
   font-weight: 400;
-  line-height: 1.09;
+  line-height: 1.075;
   color: t.$white;
-  letter-spacing: -1px;
+  letter-spacing: normal;
+
+  @media screen and (min-width: 48em) {
+    font-size: 60px !important;
+    line-height: 1.08;
+  }
+
+  @media screen and (min-width: 80em) {
+    font-size: 70px !important;
+    line-height: 76px;
+  }
 }
 
 .spectra-hero-lead {
-  max-width: 820px;
-  margin: 0;
-  font-size: 1.5rem;
-  line-height: 1.6;
+  margin: 0 0 10px;
+  font-size: 18px;
+  line-height: 27px;
   color: t.$white;
+
+  @media screen and (min-width: 48em) {
+    font-size: 24px;
+    line-height: 1.4;
+  }
+
+  @media screen and (min-width: 80em) {
+    font-size: 26px;
+    line-height: 36px;
+  }
 }
 
-.spectra-hero-spacer {
-  max-width: t.$aside-max;
-  flex: 1 1 320px;
-}
-
-// =============================================================
-// Content column + docs nav aside
-// =============================================================
-.spectra-layout {
+// "Get SPECTRA" links (NuGet, GitHub, Releases) on the home page: the ATP header has no download menu
+.spectra-hero-get {
   display: flex;
-  box-sizing: border-box;
-  width: 100%;
-  max-width: t.$layout-max;
-  padding: 0 t.$container-pad;
-  margin: 0 auto;
-  flex: 1 1 0%;
+  margin: 8px 0 0;
   flex-wrap: wrap;
-  align-items: flex-start;
+  gap: 10px 18px;
+  align-items: center;
+  font-size: 19px; // with bold: "large text" (>= 14pt bold), so white on the production green passes AA (3:1)
+  font-weight: 700;
+
+  .spectra-hero-get-label {
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  a {
+    color: t.$white;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+
+    &:hover {
+      text-decoration-thickness: 2px;
+    }
+
+    &:focus-visible {
+      outline: 3px solid t.$white;
+      outline-offset: 2px;
+    }
+  }
+}
+
+// same container as the hero (production .container): 98rem max, 5% sides, 2rem from 102em
+.spectra-layout {
+  display: block;
+  box-sizing: border-box;
+  width: 100%; // a flex item with auto margins would otherwise shrink-wrap its content
+  max-width: 98rem;
+  margin: 0 auto;
+  padding: 20px 5% 0;
+
+  @media screen and (min-width: 102em) {
+    padding-right: 2rem;
+    padding-left: 2rem;
+  }
+
+  @media screen and (min-width: 48em) {
+    padding-top: 32px;
+  }
+
+  @media screen and (min-width: 80em) {
+    padding-top: 40px;
+  }
 }
 
 .spectra-content-col {
-  display: flex;
   min-width: 0;
-  flex: 3 1 560px;
-  flex-direction: column;
+
+  @media screen and (min-width: 80em) {
+    width: 60%;
+  }
+
+  @media screen and (min-width: 102em) {
+    width: 66.6667%;
+  }
 }
 
+// ----- docs nav -----
 .spectra-aside {
-  position: relative;
-  z-index: 1;
-  min-width: 0;
-  max-width: t.$aside-max;
-  // Pulls up into the hero on wide screens, exactly as the design does.
-  margin-top: clamp(-#{t.$aside-overlap}, 1058940px - 99900vw, 0px);
+  box-sizing: border-box;
   background: t.$sky-50;
-  flex: 1 1 320px;
-  align-self: flex-start;
 }
 
-// Sticky docs nav, only while it sits beside the content.
-// The aside itself is the sticky box: its containing block is .spectra-layout
-// (as tall as the content). The design put `sticky` on the inner wrapper, whose
-// containing block is the aside, which is exactly as tall as the wrapper, so it
-// could never move. The ATP header scrolls away (not fixed), so top is 0.
-@media (min-width: $bp-side) {
-  .spectra-layout {
-    flex-wrap: nowrap;
+.spectra-nav-toggle {
+  display: flex;
+  width: 100%;
+  padding: 0;
+  font-family: t.$font-sans;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 27px;
+  color: t.$navy-700;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  align-items: center;
+  justify-content: space-between;
+
+  &::after {
+    width: 0.6rem;
+    height: 0.6rem;
+    margin-right: 0.3rem;
+    content: "";
+    border-right: 2px solid currentcolor;
+    border-bottom: 2px solid currentcolor;
+    transform: rotate(45deg);
+  }
+
+  &[aria-expanded="true"]::after {
+    transform: rotate(-135deg);
+  }
+
+  &:focus-visible {
+    outline: 3px solid t.$navy-700;
+    outline-offset: 2px;
+  }
+}
+
+@media screen and (max-width: 79.99em) {
+  // production #page-nav below 80em: 20px (32px top / 40px bottom from 48em) inside, 1.5rem gap before the hero
+  .spectra-aside {
+    order: -1;
+    margin-bottom: 1.5rem;
+    padding: 20px 5%;
+  }
+
+  @media screen and (min-width: 48em) {
+    .spectra-aside {
+      padding: 32px 5% 40px;
+    }
+  }
+
+  .spectra-aside:not(.is-open) .site-nav {
+    display: none !important;
+  }
+
+  .spectra-aside .site-nav {
+    padding-top: 12px !important;
+  }
+}
+
+@media screen and (min-width: 80em) {
+  .spectra-nav-toggle {
+    display: none;
   }
 
   .spectra-aside {
-    position: sticky;
-    top: 0;
-    max-height: 100vh;
+    // production #page-nav: top 3.5rem, right 5% of (100vw - 4rem), width 35% of 90% of it, max 29rem;
+    // from 102em centred in a 102rem frame, 27.5rem wide
+    position: absolute;
+    top: 3.5rem;
+    right: calc((100vw - 4rem) * 0.05);
+    z-index: 2;
+    width: calc((100vw - 4rem) * 0.9 * 0.35);
+    max-width: 29rem;
+    max-height: calc(100vh - 11rem);
+    padding: 2rem 2rem 3rem;
     overflow-y: auto;
     overscroll-behavior: contain;
   }
+
+  // assets/js/spectra-docs.js: stuck 24px below the viewport top (scrolls inside when taller), parked at the end
+  .spectra-aside.is-stuck {
+    position: fixed;
+    top: 24px;
+    max-height: calc(100vh - 48px);
+  }
+
+  .spectra-aside.is-parked {
+    top: auto;
+    bottom: 0;
+  }
 }
 
-// Narrower: the aside drops below the content, as designed.
-@media (max-width: #{$bp-side - 0.02rem}) {
+@media screen and (min-width: 102em) {
   .spectra-aside {
+    right: calc(((100vw - 102rem) / 2) + 2rem);
+    width: 27.5rem;
     max-width: none;
-    margin-top: 0;
-    flex-basis: 100%;
   }
 }
 
-.spectra-aside-inner {
-  box-sizing: border-box;
-  display: flex;
-  padding: 0 0 60px;
-  flex-direction: column;
-  gap: 12px;
-}
-
+// nav typography = production #page-nav: 26/36 top level, 20/27 pages (2rem indent), 18 sub-pages (4rem);
+// below 80em 18/27 and 16/24 (1rem indent). Current page: link colour, semibold, arrow, never grey.
 .spectra-aside .site-nav {
-  display: block; // JTD hides #site-nav on mobile unless the menu is open
-  box-sizing: border-box;
+  display: block;
   width: auto;
-  max-width: 29rem;
-  padding: 30px 2rem;
-  overflow-y: visible;
+  max-width: none;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
   font-family: t.$font-sans;
-  font-size: 1.625rem;
-  line-height: 2.25rem;
+  font-size: 18px;
+  line-height: 27px;
 
-  > .nav-list {
-    padding-top: 0.5rem;
+  @media screen and (min-width: 80em) {
+    font-size: 26px;
+    line-height: 36px;
   }
-}
 
-.spectra-aside .nav-list .nav-list-item {
-  font-size: inherit !important;
-  line-height: inherit;
+  .nav-list {
+    padding: 0;
+    margin: 0;
+  }
 
-  .nav-list-link {
-    display: block;
-    min-height: 0;
-    padding: 0.3rem 2.5rem 0.3rem 0;
+  .nav-list .nav-list-item {
+    position: relative;
+    margin: 0;
+    font-size: inherit !important;
     line-height: inherit;
-    color: t.$navy-700;
-    text-decoration: none;
-    transition: color t.$dur-slow;
 
-    &:hover {
-      color: t.$blue-hover;
-      background-image: none;
-    }
+    .nav-list-link {
+      display: block;
+      min-height: 0;
+      padding: 0.3rem 2.5rem 0.3rem 0;
+      font-size: inherit !important;
+      line-height: inherit;
+      color: t.$navy-700;
+      text-decoration: none;
+      background: none;
 
-    &.active {
-      font-weight: 400;
-      color: t.$gray-nav-current;
-      background-image: none;
-    }
-  }
+      &:hover {
+        color: t.$blue-hover;
+        background: none;
+      }
 
-  .nav-list-expander {
-    top: 0.3rem;
-    width: 2.25rem;
-    height: 2.25rem;
-    padding: 0.5rem;
-    color: t.$navy-700;
+      &:focus-visible {
+        outline: 3px solid t.$navy-700;
+        outline-offset: 2px;
+      }
 
-    &:hover {
-      background-image: none;
-    }
-  }
-
-  > .nav-list {
-    padding-left: 1rem;
-    margin-bottom: 0.25rem;
-
-    .nav-list-item {
-      font-size: 1.125rem !important;
-      line-height: 1.6875rem;
-
-      .nav-list-link {
+      &.active {
+        position: relative;
+        font-weight: 600;
         color: t.$navy-700;
+        background: none;
+
+        &::before {
+          position: absolute;
+          top: 50%;
+          left: -1.75rem;
+          width: 1.5rem;
+          height: 1.25rem;
+          content: "";
+          background: url("../images/nav-anchor.svg") left center / contain no-repeat;
+          transform: translateY(-50%);
+        }
+      }
+    }
+
+    .nav-list-expander {
+      top: 0.3rem;
+      right: 0;
+      width: 2.25rem;
+      height: 2.25rem;
+      padding: 0.5rem;
+      color: t.$navy-700;
+      background: none;
+
+      &:hover {
+        background: none;
       }
 
-      .nav-list-link.active {
-        color: t.$gray-nav-current;
+      &:focus-visible {
+        outline: 3px solid t.$navy-700;
+        outline-offset: 2px;
       }
+    }
 
-      .nav-list-expander {
-        top: 0.15rem;
-        width: 1.75rem;
-        height: 1.75rem;
-        padding: 0.35rem;
+    > .nav-list {
+      padding-left: 0;
+      margin-bottom: 0.25rem;
+
+      .nav-list-item {
+        font-size: 16px !important;
+        line-height: 24px;
+
+        @media screen and (min-width: 80em) {
+          font-size: 20px !important;
+          line-height: 27px;
+        }
+
+        .nav-list-link {
+          padding: 0.2rem 2.5rem 0.2rem 1rem;
+
+          @media screen and (min-width: 80em) {
+            padding-left: 2rem;
+          }
+
+          &.active::before {
+            left: -0.5rem;
+
+            @media screen and (min-width: 80em) {
+              left: 0.25rem;
+            }
+          }
+        }
+
+        .nav-list-expander {
+          top: 0.1rem;
+          width: 1.75rem;
+          height: 1.75rem;
+          padding: 0.35rem;
+        }
+
+        > .nav-list .nav-list-item {
+          font-size: 16px !important;
+
+          @media screen and (min-width: 80em) {
+            font-size: 18px !important;
+          }
+
+          .nav-list-link {
+            padding-left: 2rem;
+
+            @media screen and (min-width: 80em) {
+              padding-left: 4rem;
+            }
+
+            &.active::before {
+              left: 0.5rem;
+
+              @media screen and (min-width: 80em) {
+                left: 2.25rem;
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -742,7 +963,7 @@ html.search-active {
 // Content typography
 // =============================================================
 .spectra-content-col .breadcrumb-nav {
-  padding: 32px t.$container-pad 0;
+  padding: 0 0 16px;
   font-size: 15px !important;
 
   .breadcrumb-nav-list-item {
@@ -756,12 +977,12 @@ html.search-active {
 }
 
 .spectra-content-col .breadcrumb-nav + .main-content {
-  padding-top: 24px;
+  padding-top: 0;
 }
 
 .spectra-content-col .main-content {
   max-width: none;
-  padding: 48px t.$container-pad 72px;
+  padding: 0 0 72px; // the column itself sits at the production position (.spectra-layout)
   margin: 0;
   font-size: 18px;
   line-height: 1.7;
@@ -848,74 +1069,8 @@ html.search-active {
     background-color: t.$spectra-divider;
   }
 
-  // --- Inline code ---
-  :not(pre, figure) > code {
-    padding: 0.1em 0.35em;
-    font-size: 0.85em;
-    color: t.$navy-900;
-    background-color: t.$gray-100;
-    border: 1px solid t.$spectra-divider;
-    border-radius: t.$radius-sm;
-  }
-
-  // --- Code blocks (design: Quick Install block) ---
-  div.highlighter-rouge,
-  div.listingblock > div.content,
-  figure.highlight {
-    margin: 0 0 24px;
-    background-color: t.$gray-100;
-    border-left: 4px solid t.$spectra-code-accent;
-    border-radius: t.$radius-md;
-  }
-
-  pre.highlight,
-  figure.highlight pre {
-    padding: 1.25rem;
-    margin: 0;
-    font-family: t.$font-mono;
-    font-size: 14px;
-    line-height: 1.6;
-    color: t.$gray-600;
-    background-color: transparent;
-  }
-
-  .highlight {
-    color: t.$gray-600;
-    background-color: transparent;
-
-    // Comments: the JTD light syntax colour #6e7781 is 4.24:1 on gray-100 (fails AA).
-    .c,
-    .c1,
-    .cm,
-    .cs,
-    .cd,
-    .ch,
-    .cpf {
-      color: t.$gray-600;
-    }
-  }
-
-  pre.highlight code,
-  figure.highlight code {
-    font-size: 14px;
-  }
-
-  div.highlighter-rouge > button,
-  figure.highlight > button {
-    top: 0.5rem;
-    right: 0.5rem;
-    width: 2rem;
-    height: 2rem;
-    color: t.$gray-500;
-    background: transparent;
-    opacity: 0.6;
-
-    &:hover,
-    &:focus-visible {
-      color: t.$navy-700;
-      opacity: 1;
-    }
-  }
+  // Inline code and code blocks: the shared assets/css/codeblock.css + assets/js/codeblock.js
+  // (same files as automatetheplanet.com, bellatrix.solutions and the BELLATRIX docs).
 
   // --- Blockquotes used as callouts (design-system "note box") ---
   blockquote {
@@ -1078,25 +1233,38 @@ html.search-active {
     }
   }
 
-  // A desktop and a phone capture side by side; stacked on narrow screens.
+  // A desktop and a phone capture: the phone goes below the desktop image, centred and at most 360px wide,
+  // so nothing ever reaches beyond the content column (side by side, the phone frame overflowed toward the nav).
   .screenshot-pair {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 24px;
-    align-items: flex-start;
+    align-items: center;
     margin: 0 0 24px;
 
     > .screenshot {
+      width: 100%;
       margin: 0;
     }
 
-    > .screenshot:not(.screenshot-phone) {
-      flex: 1 1 360px;
-      min-width: 0;
-    }
-
     > .screenshot-phone {
-      flex: 0 1 240px;
+      width: auto;
+      max-width: min(360px, 100%);
+    }
+  }
+
+  // No content image is ever wider than the column; plain images open in the lightbox
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  img.content-zoom {
+    cursor: zoom-in;
+
+    &:focus-visible {
+      outline: 3px solid t.$navy-700;
+      outline-offset: 3px;
     }
   }
 

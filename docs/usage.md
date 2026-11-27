@@ -16,13 +16,18 @@ the docs you want to test ([Extract acceptance criteria](criteria)). Without cri
 
 ## What to say
 
-> "Generate test cases for payments"
->
-> "Generate negative test cases for payments"
->
-> "Generate 50 test cases for gdpr-compliance"
->
-> "Generate more test cases for authentication"
+```prompt
+Generate test cases for payments
+```
+```prompt
+Generate negative test cases for payments
+```
+```prompt
+Generate 50 test cases for gdpr-compliance
+```
+```prompt
+Generate more test cases for authentication
+```
 
 `payments` is the name of a *suite*: a folder under `test-cases/`. A new name creates a new suite. All four requests
 use the `spectra-generate` skill.
