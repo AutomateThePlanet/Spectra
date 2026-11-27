@@ -8,7 +8,7 @@
 // "Copied"; more than 20 lines: collapsed with a fade and "Show more ▾", Enter expands ("Show less ▴", no fade,
 // aria-expanded="true"), Space collapses again; 20 lines or fewer: no button, no fade; monospace font; long lines
 // scroll inside the block; the block is not wider than the viewport; no old controls (Expand buttons, theme copy
-// buttons) anywhere on the page.
+// buttons) anywhere on the page; a block in a known language has highlighted tokens; no token is bold.
 
 export async function installClipboardSpy(context) {
   await context.addInitScript(() => {
@@ -61,7 +61,42 @@ function structural() {
       if (hasFade) problems.push(`${at}: short block has a fade`);
     }
     if (pre.scrollWidth > pre.clientWidth + 1 && !/auto|scroll/.test(getComputedStyle(pre).overflowX)) problems.push(`${at}: long lines clipped`);
+    // highlighting: a block in a known language has coloured tokens; no token is bold
+    const lang = (pre.getAttribute('data-language') || ((pre.closest('[class*="language-"]') || pre.querySelector('code[class*="language-"]') || {}).className || '').match(/language-([\w#+-]+)/)?.[1] || '').toLowerCase();
+    const plainLangs = ['', 'text', 'txt', 'plaintext', 'plain', 'none', 'console', 'output', 'log'];
+    const base = getComputedStyle(pre).color;
+    const spans = [...pre.querySelectorAll('span')].filter((s) => s.textContent.trim());
+    if (!lang) problems.push(`${at}: code block without a language`);
+    if (lang === 'prompt') problems.push(`${at}: prompt left as a code block`);
+    // tokenized = the highlighter split the code into tokens: a coloured token, or (code that is only names and
+    // punctuation, e.g. `[TestFixture]`) a line of 2+ token spans (Shiki) / token spans at all (Rouge). Fails for raw
+    // <pre> text and for Shiki's plain fallback (one span per line).
+    const lineEls = [...pre.querySelectorAll('.line')];
+    const tokenized = spans.some((s) => getComputedStyle(s).color !== base) || (lineEls.length
+      ? lineEls.some((l) => [...l.querySelectorAll('span')].filter((s) => s.textContent.trim()).length >= 2)
+      : spans.some((s) => s.className));
+    if (!plainLangs.includes(lang) && lang !== 'prompt' && !tokenized) problems.push(`${at}: ${lang} block without highlighted tokens`);
+    if (spans.some((s) => parseInt(getComputedStyle(s).fontWeight, 10) >= 600)) problems.push(`${at}: bold tokens`);
     if (cb.getBoundingClientRect().right > vw + 1) problems.push(`${at}: wider than the viewport`);
+  });
+  // prompts to an AI agent: the prompt style, body font, no code tokens, a copy button
+  document.querySelectorAll('figure.cb-prompt').forEach((fig, n) => {
+    const at = `prompt ${n + 1}`;
+    const text = fig.querySelector('.cb-prompt-text');
+    if (!fig.querySelector('.cb-prompt-label')) problems.push(`${at}: no "You → agent" label`);
+    if (!text || !text.textContent.trim()) problems.push(`${at}: empty`);
+    if ([...fig.querySelectorAll('pre, code, span[class], span[style]')].some((e) => !e.closest('.cb-copy'))) problems.push(`${at}: contains code markup or tokens`);
+    if (text && MONO.test(getComputedStyle(text).fontFamily.split(',')[0])) problems.push(`${at}: monospace font`);
+    if (!fig.querySelector(':scope > .cb-copy')) problems.push(`${at}: no copy button`);
+    // readable on its own panel (page prose colours, e.g. a dark theme's light-grey <p>, must not leak in)
+    const lum = (c) => { const [r, g, b] = (c.match(/[\d.]+/g) || [0, 0, 0]).slice(0, 3).map((v) => { v = +v / 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+    const panel = getComputedStyle(fig).backgroundColor;
+    [['text', text], ['label', fig.querySelector('.cb-prompt-label')]].forEach(([what, el]) => {
+      if (!el) return;
+      const k = ratio(getComputedStyle(el).color, panel);
+      if (k < 4.5) problems.push(`${at}: ${what} contrast ${k.toFixed(2)}:1 (needs 4.5)`);
+    });
   });
   return { problems, blocks };
 }
@@ -98,6 +133,21 @@ export async function checkCodeBlocks(page) {
     } catch (e) {
       problems.push(`${at}: ${String(e.message).split('\n')[0].slice(0, 120)}`);
     }
+  }
+  // prompt copy buttons copy the prompt text
+  const prompts = page.locator('figure.cb-prompt');
+  for (let k = 0; k < await prompts.count(); k++) {
+    const fig = prompts.nth(k);
+    try {
+      await fig.scrollIntoViewIfNeeded();
+      const copy = fig.locator(':scope > .cb-copy');
+      if (!(await copy.count())) continue;
+      await copy.click({ timeout: 4000 });
+      await page.waitForTimeout(50);
+      const got = await page.evaluate(() => (window.__cbCopied || []).slice(-1)[0]);
+      const want = (await fig.locator('.cb-prompt-text').textContent()).trim();
+      if (got !== want) problems.push(`prompt ${k + 1}: copy button copied different text`);
+    } catch (e) { problems.push(`prompt ${k + 1}: ${String(e.message).split('\n')[0].slice(0, 120)}`); }
   }
   return problems;
 }

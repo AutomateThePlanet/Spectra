@@ -12,7 +12,7 @@
   --cb-radius: 8px;
   --cb-pad: 1.25rem;
   --cb-font: "JetBrains Mono", "Cascadia Code", Consolas, Monaco, "Courier New", monospace;
-  --cb-size: 14px;
+  --cb-size: 15px;            /* with line-height 1.6 = 24px: the character width and line of the live docs (16px Courier New) */
   --cb-line: 1.6;
   --cb-lines: 20;              /* blocks with more lines start collapsed */
   --cb-ui: #274492;
@@ -85,24 +85,30 @@
 .cb-toggle::before, .cb-toggle::after { content: none !important; }
 
 /* ===== syntax colours: Rouge / Pygments classes (Jekyll, bellatrix.solutions feature pages) =====
-   same roles and weights as atp-code-theme.json (Shiki). Colours of the host theme are overridden. */
+   same roles as atp-code-theme.json (Shiki). Colours of the host theme are overridden. No bold tokens anywhere
+   (normal weight, like the live docs); only comments are italic. */
+.cb .highlight [class] { font-weight: 400 !important; }
 .cb .highlight, .cb .highlight * { background: none; }
 .cb .highlight .c, .cb .highlight .c1, .cb .highlight .cm, .cb .highlight .cs, .cb .highlight .cp, .cb .highlight .cpf,
 .cb .highlight .cd, .cb .highlight .ch { color: var(--cb-c-comment) !important; font-style: italic; font-weight: 400; }
 .cb .highlight .k, .cb .highlight .kc, .cb .highlight .kd, .cb .highlight .kn, .cb .highlight .kp, .cb .highlight .kr,
-.cb .highlight .kt, .cb .highlight .kv, .cb .highlight .nt, .cb .highlight .ow { color: var(--cb-c-keyword) !important; font-weight: 700; font-style: normal; }
+.cb .highlight .kt, .cb .highlight .kv, .cb .highlight .nt, .cb .highlight .ow { color: var(--cb-c-keyword) !important; font-weight: 400; font-style: normal; }
 .cb .highlight .nc, .cb .highlight .nf, .cb .highlight .ne, .cb .highlight .fm, .cb .highlight .na, .cb .highlight .nl,
-.cb .highlight .no { color: var(--cb-c-type) !important; font-weight: 700; font-style: normal; }
+.cb .highlight .no { color: var(--cb-c-type) !important; font-weight: 400; font-style: normal; }
 .cb .highlight .s, .cb .highlight .s1, .cb .highlight .s2, .cb .highlight .sa, .cb .highlight .sb, .cb .highlight .sc,
 .cb .highlight .dl, .cb .highlight .sd, .cb .highlight .se, .cb .highlight .sh, .cb .highlight .si, .cb .highlight .sx,
-.cb .highlight .sr, .cb .highlight .ss { color: var(--cb-c-string) !important; font-weight: 700; font-style: normal; }
+.cb .highlight .sr, .cb .highlight .ss { color: var(--cb-c-string) !important; font-weight: 400; font-style: normal; }
 .cb .highlight .m, .cb .highlight .mi, .cb .highlight .mf, .cb .highlight .mh, .cb .highlight .mo, .cb .highlight .mb,
 .cb .highlight .il { color: var(--cb-c-number) !important; font-weight: 400; }
 .cb .highlight .nn { color: var(--cb-c-namespace) !important; font-weight: 400; }
-.cb .highlight .nb, .cb .highlight .bp, .cb .highlight .vg { color: var(--cb-c-builtin) !important; font-weight: 700; }
+.cb .highlight .nb, .cb .highlight .bp, .cb .highlight .vg { color: var(--cb-c-builtin) !important; font-weight: 400; }
+/* shell commands and flags marked by codeblock.js on Rouge bash/sh blocks (Shiki colours them through the theme) */
+.cb .cb-sh-cmd { color: var(--cb-c-type); }
+.cb .cb-sh-flag { color: var(--cb-c-keyword); }
+.cb .cb-sh-arg { color: var(--cb-c-string); }
 /* variables: $VAR in shells, values in YAML front matter (Shiki: the same colour for shell/PowerShell variables) */
 .cb .highlight .nv { color: var(--cb-c-builtin) !important; font-weight: 400; font-style: normal; }
-.cb .highlight .nd { color: var(--cb-c-decorator) !important; font-weight: 700; }
+.cb .highlight .nd { color: var(--cb-c-decorator) !important; font-weight: 400; }
 .cb .highlight .n, .cb .highlight .o, .cb .highlight .p, .cb .highlight .w, .cb .highlight .nx,
 .cb .highlight .vi, .cb .highlight .vc, .cb .highlight .py, .cb .highlight .ni,
 .cb .highlight .x { color: var(--cb-text) !important; font-weight: 400; font-style: normal; background: none !important; }
@@ -110,7 +116,7 @@
    never as plain text and never with the theme's red error background */
 .cb .highlight .err { color: var(--cb-c-comment) !important; font-style: italic; font-weight: 400; background: none !important; }
 /* Markdown: list markers and the front-matter rule are punctuation in Rouge; highlighted like the Shiki theme */
-.cb[data-lang="markdown"] .highlight .p, .cb[data-lang="md"] .highlight .p { color: var(--cb-c-keyword) !important; font-weight: 700; }
+.cb[data-lang="markdown"] .highlight .p, .cb[data-lang="md"] .highlight .p { color: var(--cb-c-keyword) !important; font-weight: 400; }
 
 /* ===== inline code in running text ===== */
 .cb-inline, :not(pre) > code.cb-inline {
@@ -119,3 +125,25 @@
   font-size: .875em; color: inherit; background: rgba(128, 128, 128, .08); /* .08: AA for #61687c text even on grey callouts */
   padding: 1px 5px; border-radius: 3px; border: 0; overflow-wrap: anywhere;
 }
+
+/* ===== prompts to an AI agent (```prompt fences, or figure.cb-prompt rendered by the page) =====
+   Not code: the sentence in the page's body font, no highlighting; the agent-prompt card of the bellatrix.solutions
+   /agent/ docs (light background, teal bar) with a "You → agent" label and the shared copy button. */
+.cb-prompt {
+  position: relative; box-sizing: border-box; max-width: 100%; margin: 0 0 24px; padding: 12px 3rem 14px 18px;
+  background: #f5f8ff; border: 1px solid #dbe1f0; border-left: 4px solid #4ec9b0; border-radius: 8px; text-align: left;
+}
+.cb-prompt-label {
+  display: block; margin: 0 0 4px; padding: 0; font: 700 12px/1.4 Nunito, "Segoe UI", Arial, sans-serif;
+  letter-spacing: .06em; text-transform: uppercase; color: #11703a;
+}
+/* !important + ID weight (:not(#cb-none) matches every element): page prose rules such as
+   `#page-content p { color: … !important }` (ATP blog, dark theme) must not reach the prompt on its own light panel */
+.cb-prompt .cb-prompt-text:not(#cb-none) {
+  margin: 0 !important; padding: 0 !important; font-family: inherit; font-size: 1.0625rem !important; line-height: 1.6 !important;
+  font-style: normal; font-weight: 400; color: #14234c !important; white-space: pre-line; overflow-wrap: anywhere;
+}
+.cb-prompt .cb-prompt-text::before { content: "\201C"; }
+.cb-prompt .cb-prompt-text::after { content: "\201D"; }
+.cb-prompt > .cb-copy { top: 50%; transform: translateY(-50%); background: transparent; }
+.cb-prompt > .cb-copy:hover { background: #e6ebed; }

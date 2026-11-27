@@ -13,13 +13,18 @@ and coverage shows which ones have tests.
 
 ## What to say
 
-> "Extract acceptance criteria"
->
-> "Import criteria from jira-export.csv"
->
-> "List acceptance criteria"
->
-> "Show criteria for payments"
+```prompt
+Extract acceptance criteria
+```
+```prompt
+Import criteria from jira-export.csv
+```
+```prompt
+List acceptance criteria
+```
+```prompt
+Show criteria for payments
+```
 
 All four use the `spectra-criteria` skill.
 

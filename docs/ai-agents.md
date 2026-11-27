@@ -36,11 +36,15 @@ Commit the files it writes, so everyone on the team gets the same skills.
 
 The same as in Claude Code:
 
-> "Extract acceptance criteria"
->
-> "Generate test cases for checkout"
->
-> "Review the flagged tests in checkout"
+```prompt
+Extract acceptance criteria
+```
+```prompt
+Generate test cases for checkout
+```
+```prompt
+Review the flagged tests in checkout
+```
 
 See [Generate test cases](usage) and the other guides. Each agent gets the same 16 skills and 6 subagents in its own
 folders ([AI agent installs](ai-agents-reference)).
