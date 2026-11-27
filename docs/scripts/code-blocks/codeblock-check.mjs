@@ -63,7 +63,9 @@ function structural() {
     if (pre.scrollWidth > pre.clientWidth + 1 && !/auto|scroll/.test(getComputedStyle(pre).overflowX)) problems.push(`${at}: long lines clipped`);
     // highlighting: a block in a known language has coloured tokens; no token is bold
     const lang = (pre.getAttribute('data-language') || ((pre.closest('[class*="language-"]') || pre.querySelector('code[class*="language-"]') || {}).className || '').match(/language-([\w#+-]+)/)?.[1] || '').toLowerCase();
-    const plainLangs = ['', 'text', 'txt', 'plaintext', 'plain', 'none', 'console', 'output', 'log'];
+    const plainLangs = ['', 'text', 'txt', 'plaintext', 'plain', 'none', 'output', 'log'];
+    // shell, terminal and command-prompt blocks: plain monospace by owner decision (no token colours, no italics)
+    const shellLangs = ['bash', 'sh', 'shell', 'zsh', 'powershell', 'ps', 'ps1', 'pwsh', 'cmd', 'bat', 'batch', 'console', 'shellsession', 'shell-session', 'terminal'];
     const base = getComputedStyle(pre).color;
     const spans = [...pre.querySelectorAll('span')].filter((s) => s.textContent.trim());
     if (!lang) problems.push(`${at}: code block without a language`);
@@ -75,7 +77,8 @@ function structural() {
     const tokenized = spans.some((s) => getComputedStyle(s).color !== base) || (lineEls.length
       ? lineEls.some((l) => [...l.querySelectorAll('span')].filter((s) => s.textContent.trim()).length >= 2)
       : spans.some((s) => s.className));
-    if (!plainLangs.includes(lang) && lang !== 'prompt' && !tokenized) problems.push(`${at}: ${lang} block without highlighted tokens`);
+    if (shellLangs.includes(lang) && spans.some((t) => getComputedStyle(t).color !== base || getComputedStyle(t).fontStyle === 'italic')) problems.push(`${at}: ${lang} block has token colours (shell blocks are plain)`);
+    if (!plainLangs.includes(lang) && !shellLangs.includes(lang) && lang !== 'prompt' && !tokenized) problems.push(`${at}: ${lang} block without highlighted tokens`);
     if (spans.some((s) => parseInt(getComputedStyle(s).fontWeight, 10) >= 600)) problems.push(`${at}: bold tokens`);
     if (cb.getBoundingClientRect().right > vw + 1) problems.push(`${at}: wider than the viewport`);
   });

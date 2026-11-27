@@ -102,10 +102,12 @@
 .cb .highlight .il { color: var(--cb-c-number) !important; font-weight: 400; }
 .cb .highlight .nn { color: var(--cb-c-namespace) !important; font-weight: 400; }
 .cb .highlight .nb, .cb .highlight .bp, .cb .highlight .vg { color: var(--cb-c-builtin) !important; font-weight: 400; }
-/* shell commands and flags marked by codeblock.js on Rouge bash/sh blocks (Shiki colours them through the theme) */
-.cb .cb-sh-cmd { color: var(--cb-c-type); }
-.cb .cb-sh-flag { color: var(--cb-c-keyword); }
-.cb .cb-sh-arg { color: var(--cb-c-string); }
+/* Shell, terminal and command-prompt blocks are plain monospace: no token colours, no italics (owner decision).
+   Syntax colouring is for real code only (C#, Java, TypeScript/JS, JSON, YAML, XML, Gherkin, …).
+   :not(#cb-none) adds ID weight over the Rouge class map above (.cb .highlight .nb { … !important }). */
+.cb[data-lang="bash"] pre *:not(#cb-none), .cb[data-lang="sh"] pre *:not(#cb-none), .cb[data-lang="shell"] pre *:not(#cb-none), .cb[data-lang="zsh"] pre *:not(#cb-none), .cb[data-lang="powershell"] pre *:not(#cb-none), .cb[data-lang="ps"] pre *:not(#cb-none), .cb[data-lang="ps1"] pre *:not(#cb-none), .cb[data-lang="pwsh"] pre *:not(#cb-none), .cb[data-lang="cmd"] pre *:not(#cb-none), .cb[data-lang="bat"] pre *:not(#cb-none), .cb[data-lang="batch"] pre *:not(#cb-none), .cb[data-lang="console"] pre *:not(#cb-none), .cb[data-lang="shellsession"] pre *:not(#cb-none), .cb[data-lang="shell-session"] pre *:not(#cb-none), .cb[data-lang="terminal"] pre *:not(#cb-none) {
+  color: var(--cb-text) !important; font-style: normal !important; font-weight: 400 !important;
+}
 /* variables: $VAR in shells, values in YAML front matter (Shiki: the same colour for shell/PowerShell variables) */
 .cb .highlight .nv { color: var(--cb-c-builtin) !important; font-weight: 400; font-style: normal; }
 .cb .highlight .nd { color: var(--cb-c-decorator) !important; font-weight: 400; }

@@ -565,7 +565,12 @@ html.search-active {
   background: $docs-green;
 }
 
+// Production docs.bellatrix.solutions container: #page-heading .container (max-width 98rem, 5% sides, 2rem from
+// 102em) + .padded-60 (20 / 40 / 48 / 64px) + the text column tat-u-xl-3-5 tat-u-xxl-2-3 (60% / 66.6667%)
 .spectra-hero-inner {
+  box-sizing: border-box;
+  max-width: 98rem;
+  margin: 0 auto;
   padding: 20px 5%;
 
   @media screen and (min-width: 48em) {
@@ -575,6 +580,10 @@ html.search-active {
   @media screen and (min-width: 80em) {
     padding: 48px 5%;
   }
+
+  @media screen and (min-width: 102em) {
+    padding: 64px 2rem;
+  }
 }
 
 .spectra-hero-text {
@@ -582,7 +591,11 @@ html.search-active {
   flex-direction: column;
 
   @media screen and (min-width: 80em) {
-    max-width: 60%;
+    width: 60%;
+  }
+
+  @media screen and (min-width: 102em) {
+    width: 66.6667%;
   }
 }
 
@@ -655,9 +668,19 @@ html.search-active {
   }
 }
 
+// same container as the hero (production .container): 98rem max, 5% sides, 2rem from 102em
 .spectra-layout {
   display: block;
+  box-sizing: border-box;
+  width: 100%; // a flex item with auto margins would otherwise shrink-wrap its content
+  max-width: 98rem;
+  margin: 0 auto;
   padding: 20px 5% 0;
+
+  @media screen and (min-width: 102em) {
+    padding-right: 2rem;
+    padding-left: 2rem;
+  }
 
   @media screen and (min-width: 48em) {
     padding-top: 32px;
@@ -673,6 +696,10 @@ html.search-active {
 
   @media screen and (min-width: 80em) {
     width: 60%;
+  }
+
+  @media screen and (min-width: 102em) {
+    width: 66.6667%;
   }
 }
 
@@ -718,9 +745,17 @@ html.search-active {
 }
 
 @media screen and (max-width: 79.99em) {
+  // production #page-nav below 80em: 20px (32px top / 40px bottom from 48em) inside, 1.5rem gap before the hero
   .spectra-aside {
     order: -1;
+    margin-bottom: 1.5rem;
     padding: 20px 5%;
+  }
+
+  @media screen and (min-width: 48em) {
+    .spectra-aside {
+      padding: 32px 5% 40px;
+    }
   }
 
   .spectra-aside:not(.is-open) .site-nav {
@@ -738,11 +773,13 @@ html.search-active {
   }
 
   .spectra-aside {
+    // production #page-nav: top 3.5rem, right 5% of (100vw - 4rem), width 35% of 90% of it, max 29rem;
+    // from 102em centred in a 102rem frame, 27.5rem wide
     position: absolute;
-    top: 56px;
-    right: 5%;
+    top: 3.5rem;
+    right: calc((100vw - 4rem) * 0.05);
     z-index: 2;
-    width: 31.5%;
+    width: calc((100vw - 4rem) * 0.9 * 0.35);
     max-width: 29rem;
     max-height: calc(100vh - 11rem);
     padding: 2rem 2rem 3rem;
@@ -760,6 +797,14 @@ html.search-active {
   .spectra-aside.is-parked {
     top: auto;
     bottom: 0;
+  }
+}
+
+@media screen and (min-width: 102em) {
+  .spectra-aside {
+    right: calc(((100vw - 102rem) / 2) + 2rem);
+    width: 27.5rem;
+    max-width: none;
   }
 }
 
