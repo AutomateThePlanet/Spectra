@@ -2,18 +2,21 @@
 // Code-block test for a built Jekyll site: every page with a <pre>, at 1440 and 390 px, must use the shared code
 // blocks correctly (see codeblock-check.mjs). Exits 1 when any block fails.
 //   npm ci && npx playwright install chromium           (once, in this folder)
-//   node check-code-blocks.mjs <path-to-_site> [--base /Spectra] [--workers 4]
+//   node check-code-blocks.mjs <path-to-_site> [--base /Spectra] [--workers 4] [--full]
+// Default: a representative set of pages (one per page type, plus pages until every block kind is covered);
+// --full: every page with a <pre>.
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { chromium } from 'playwright';
-import { checkCodeBlocks, installClipboardSpy } from './codeblock-check.mjs';
+import { checkCodeBlocks, installClipboardSpy, pickRepresentative } from './codeblock-check.mjs';
 
 const args = process.argv.slice(2);
 const site = path.resolve(args.find((a) => !a.startsWith('--') && !/^\d+$/.test(a)) || '_site');
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const base = (opt('--base', '') || '').replace(/\/$/, '');
 const workers = Number(opt('--workers', 4));
+const full = args.includes('--full');
 const types = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.mjs': 'text/javascript', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.woff2': 'font/woff2', '.json': 'application/json' };
 
 const server = http.createServer((req, res) => {
@@ -29,7 +32,7 @@ const server = http.createServer((req, res) => {
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const origin = `http://127.0.0.1:${server.address().port}`;
 
-const pages = [];
+let pages = [];
 (function walk(d) {
   for (const f of fs.readdirSync(d)) {
     const p = path.join(d, f);
@@ -38,9 +41,11 @@ const pages = [];
     const html = fs.readFileSync(p, 'utf8').replace(/<!--[\s\S]*?-->|<script[\s\S]*?<\/script>/g, '');
     if (!/<pre[\s>]/.test(html)) continue;
     const rel = '/' + path.relative(site, p).split(path.sep).join('/');
-    pages.push(base + rel.replace(/index\.html$/, ''));
+    pages.push({ url: base + rel.replace(/index\.html$/, ''), html: fs.readFileSync(p, 'utf8') });
   }
 })(site);
+const allCount = pages.length;
+pages = full ? pages.map((p) => p.url) : pickRepresentative(pages);
 
 const browser = await chromium.launch();
 const queue = [];
@@ -72,5 +77,5 @@ await Promise.all(Array.from({ length: workers }, async () => {
 await browser.close();
 server.close();
 failures.forEach((f) => console.log(f));
-console.log(`code blocks: ${pages.length} pages with code, ${checked} page checks (1440 + 390), ${failures.length} problem(s)`);
+console.log(`code blocks (${full ? 'full' : 'representative'}): ${pages.length} of ${allCount} pages with code, ${checked} page checks (1440 + 390), ${failures.length} problem(s)`);
 process.exit(failures.length ? 1 : 0);

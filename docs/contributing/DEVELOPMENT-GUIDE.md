@@ -139,7 +139,7 @@ other repositories; do not edit them by hand:
 
   ```bash
   cd docs/scripts/code-blocks && npm ci && npx playwright install chromium
-  node check-code-blocks.mjs ../../_site --base /Spectra
+  node check-code-blocks.mjs ../../_site --base /Spectra --full   # every page; without --full: a representative set
   ```
 
 ### USAGE.md and CUSTOMIZATION.md: two separate copies

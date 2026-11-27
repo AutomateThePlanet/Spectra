@@ -101,3 +101,47 @@ export async function checkCodeBlocks(page) {
   }
   return problems;
 }
+
+// Fast mode: a representative set of pages instead of every page with code. At least one page per page type, then
+// more pages until every kind of block is covered: each language, blocks over 20 lines (collapse), long lines
+// (horizontal scroll), Mermaid sources, [data-cb-skip] listings, inline code. Input: [{ url, html }] of the built pages
+// that have a <pre>; output: the urls to check. The full crawl (every page) stays available in every repo.
+export function pickRepresentative(pages) {
+  const featuresOf = ({ url, html }) => {
+    const f = new Set();
+    const clean = html.replace(/<!--[\s\S]*?-->|<script[\s\S]*?<\/script>/g, '');
+    const type = /class="[^"]*\bblog-prose\b/.test(clean) ? 'blog-post'
+      : /class="atp2[\s"]/.test(clean) ? 'atp2-page'
+      : (url.split('/').filter(Boolean).length > 1 ? url.split('/').filter(Boolean)[0] : 'top-level');
+    f.add('type:' + type);
+    for (const m of clean.matchAll(/data-language="([^"]+)"|\blanguage-([\w#+-]+)/g)) f.add('lang:' + (m[1] || m[2]));
+    for (const m of clean.matchAll(/<pre\b[^>]*>([\s\S]*?)<\/pre>/g)) {
+      const text = m[1].replace(/<[^>]+>/g, '');
+      const lines = text.split('\n');
+      if (lines.length > 21) f.add('collapsible');
+      if (lines.some((l) => l.length > 110)) f.add('long-lines');
+    }
+    if (/data-language="mermaid"|class="mermaid/.test(clean)) f.add('mermaid');
+    if (/data-cb-skip/.test(clean)) f.add('bespoke');
+    if (/<(p|li|td)[^>]*>[^<]*<code/.test(clean)) f.add('inline-code');
+    return { type, f };
+  };
+  const all = pages.map((p) => ({ url: p.url, ...featuresOf(p) }));
+  const chosen = []; const covered = new Set();
+  const take = (p) => { chosen.push(p.url); p.f.forEach((x) => covered.add(x)); };
+  // most-featured page of every type first
+  const types = [...new Set(all.map((p) => p.type))];
+  for (const t of types) take(all.filter((p) => p.type === t).sort((a, b) => b.f.size - a.f.size)[0]);
+  // then greedily until every feature seen anywhere is covered
+  for (;;) {
+    let best = null, gain = 0;
+    for (const p of all) {
+      if (chosen.includes(p.url)) continue;
+      const g = [...p.f].filter((x) => !covered.has(x)).length;
+      if (g > gain) { gain = g; best = p; }
+    }
+    if (!best) break;
+    take(best);
+  }
+  return chosen.sort();
+}
