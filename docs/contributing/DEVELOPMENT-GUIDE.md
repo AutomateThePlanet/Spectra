@@ -134,6 +134,13 @@ other repositories; do not edit them by hand:
   `_includes/atp_header.html` and `assets/css/atp-header.css` from the Automate-The-Planet-Website-v2 repository.
 - Code blocks (`assets/css/codeblock.css`, `assets/js/codeblock.js`) are the same files on automatetheplanet.com,
   bellatrix.solutions and the BELLATRIX docs: copy button, "Show more" for blocks over 20 lines, AA colours.
+  Their test checks every built page that has a code block, at 1440 and 390 px, and fails on any block without that
+  behaviour:
+
+  ```bash
+  cd docs/scripts/code-blocks && npm ci && npx playwright install chromium
+  node check-code-blocks.mjs ../../_site --base /Spectra
+  ```
 
 ### USAGE.md and CUSTOMIZATION.md: two separate copies
 

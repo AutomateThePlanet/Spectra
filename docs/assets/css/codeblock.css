@@ -100,10 +100,17 @@
 .cb .highlight .il { color: var(--cb-c-number) !important; font-weight: 400; }
 .cb .highlight .nn { color: var(--cb-c-namespace) !important; font-weight: 400; }
 .cb .highlight .nb, .cb .highlight .bp, .cb .highlight .vg { color: var(--cb-c-builtin) !important; font-weight: 700; }
+/* variables: $VAR in shells, values in YAML front matter (Shiki: the same colour for shell/PowerShell variables) */
+.cb .highlight .nv { color: var(--cb-c-builtin) !important; font-weight: 400; font-style: normal; }
 .cb .highlight .nd { color: var(--cb-c-decorator) !important; font-weight: 700; }
-.cb .highlight .n, .cb .highlight .o, .cb .highlight .p, .cb .highlight .w, .cb .highlight .nx, .cb .highlight .nv,
+.cb .highlight .n, .cb .highlight .o, .cb .highlight .p, .cb .highlight .w, .cb .highlight .nx,
 .cb .highlight .vi, .cb .highlight .vc, .cb .highlight .py, .cb .highlight .ni,
-.cb .highlight .err, .cb .highlight .x { color: var(--cb-text) !important; font-weight: 400; font-style: normal; background: none !important; }
+.cb .highlight .x { color: var(--cb-text) !important; font-weight: 400; font-style: normal; background: none !important; }
+/* text the Rouge lexer cannot parse (comments in JSON, "..." placeholders, embedded markup): shown like a comment,
+   never as plain text and never with the theme's red error background */
+.cb .highlight .err { color: var(--cb-c-comment) !important; font-style: italic; font-weight: 400; background: none !important; }
+/* Markdown: list markers and the front-matter rule are punctuation in Rouge; highlighted like the Shiki theme */
+.cb[data-lang="markdown"] .highlight .p, .cb[data-lang="md"] .highlight .p { color: var(--cb-c-keyword) !important; font-weight: 700; }
 
 /* ===== inline code in running text ===== */
 .cb-inline, :not(pre) > code.cb-inline {
