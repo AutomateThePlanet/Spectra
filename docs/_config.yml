@@ -20,7 +20,10 @@ search:
   preview_words_after: 3
   tokenizer_separator: /[\s\-/]+/
   rel_url: true
-  button: true
+  button: false   # the search lives in the ATP header (_includes/atp_header.html)
+
+# Code blocks: copy button, collapse and colours come from the shared assets/js/codeblock.js
+enable_copy_code_button: false
 
 # Navigation
 nav_sort: case_insensitive
@@ -31,8 +34,7 @@ heading_anchors: true
 # Footer
 footer_content: 'SPECTRA is part of the <a href="https://www.automatetheplanet.com/">Automate The Planet</a> ecosystem. Licensed under the <a href="https://github.com/AutomateThePlanet/Spectra/blob/main/LICENSE">Apache License 2.0</a>.'
 
-# Aux links (top-right of every page)
-# Shown as the "Get SPECTRA" menu in the header (_includes/header_custom.html)
+# Download links: shown as "Get SPECTRA" in the home page heading band (_includes/spectra_hero.html)
 aux_links:
   "NuGet (Spectra.CLI)":
     - "https://www.nuget.org/packages/Spectra.CLI"

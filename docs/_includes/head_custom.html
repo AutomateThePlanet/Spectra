@@ -1,6 +1,11 @@
 <link rel="preload" href="{{ '/assets/fonts/nunito-latin-400-normal.woff2' | relative_url }}" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="{{ '/assets/fonts/nunito-latin-600-normal.woff2' | relative_url }}" as="font" type="font/woff2" crossorigin>
 <link rel="icon" href="{{ '/assets/images/spectra-mark.svg' | relative_url }}" type="image/svg+xml">
+<!-- automatetheplanet.com header (GENERATED, docs/scripts/sync-atp-header.mjs) and the shared code blocks -->
+<link rel="stylesheet" href="{{ '/assets/css/atp-header.css' | relative_url }}">
+<link rel="stylesheet" href="{{ '/assets/css/codeblock.css' | relative_url }}">
+<script src="{{ '/assets/js/codeblock.js' | relative_url }}" data-cb-roots="#main-content main" defer></script>
+<script src="{{ '/assets/js/spectra-docs.js' | relative_url }}" defer></script>
 <script src="{{ '/assets/js/screenshot-lightbox.js' | relative_url }}" defer></script>
 <script src="{{ '/assets/js/flow-rows.js' | relative_url }}" defer></script>
 <script>
@@ -22,23 +27,5 @@
       }
     };
 
-    // 2. "Get SPECTRA" menu: the button in header_custom.html opens JTD's aux_nav list.
-    document.addEventListener('DOMContentLoaded', function () {
-      var button = document.querySelector('.get-spectra-button');
-      var menu = document.querySelector('#main-header .aux-nav');
-      if (!button || !menu) { return; }
-      menu.id = 'get-spectra-menu';
-      button.setAttribute('aria-controls', menu.id);
-      function setOpen(open) { button.setAttribute('aria-expanded', open ? 'true' : 'false'); }
-      button.addEventListener('click', function () {
-        setOpen(button.getAttribute('aria-expanded') !== 'true');
-      });
-      document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && button.getAttribute('aria-expanded') === 'true') { setOpen(false); button.focus(); }
-      });
-      document.addEventListener('click', function (e) {
-        if (!button.contains(e.target) && !menu.contains(e.target)) { setOpen(false); }
-      });
-    });
   })();
 </script>
