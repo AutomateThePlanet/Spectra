@@ -3,6 +3,7 @@ title: Cloudflare Pages setup
 grand_parent: Guides
 parent: Deployment
 nav_order: 1
+description: "Step-by-step guide to deploying the SPECTRA dashboard to Cloudflare Pages with optional GitHub OAuth authentication. The Cloudflare free tier works."
 ---
 
 # Cloudflare Pages setup

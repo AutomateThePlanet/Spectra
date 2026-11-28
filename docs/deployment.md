@@ -4,6 +4,7 @@ parent: Guides
 nav_order: 11
 has_children: true
 permalink: /deployment
+description: "How to host the SPECTRA dashboard as a static site, and why the execution console is never deployed: it runs only as a local server on 127.0.0.1."
 ---
 
 # Deployment

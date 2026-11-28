@@ -2,6 +2,7 @@
 title: How test case generation works
 parent: Architecture
 nav_order: 3
+description: "The SPECTRA generation pipeline: read docs, analyze behaviors, generate in your Claude Code session, verify each test with the critic, write .md files."
 ---
 
 # How test case generation works

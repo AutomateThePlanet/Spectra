@@ -2,6 +2,7 @@
 title: AI models and cost
 parent: Reference
 nav_order: 8
+description: "How SPECTRA spends AI usage since the Claude Code migration (v2): it makes no model calls of its own, so all usage runs in your Claude Code session."
 ---
 
 # AI models and cost

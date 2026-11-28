@@ -2,6 +2,7 @@
 title: Customization
 parent: Reference
 nav_order: 7
+description: "Every way to customize SPECTRA's behavior, from the test case format in profiles/_default.yaml to the prompt templates that steer AI reasoning."
 ---
 
 # Customization

@@ -2,6 +2,7 @@
 title: CLI reference
 parent: Reference
 nav_order: 1
+description: "All SPECTRA CLI commands organized by function, with their options, the global options such as --output-format json and --dry-run, and exit codes."
 ---
 
 # CLI reference

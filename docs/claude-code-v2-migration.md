@@ -2,6 +2,7 @@
 title: "Claude Code v2 vs. the GitHub Copilot SDK v1"
 parent: Reference
 nav_order: 10
+description: "Historical: how pre-v2 SPECTRA, which ran its own GitHub Copilot SDK session, compares with v2, which runs entirely inside your Claude Code session."
 ---
 
 # Claude Code v2 vs. the GitHub Copilot SDK v1

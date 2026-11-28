@@ -2,6 +2,7 @@
 title: Document index
 parent: Architecture
 nav_order: 4
+description: "The per-suite documentation index that spectra docs index builds under docs/_index/, which the AI agent reads instead of scanning every doc."
 ---
 
 # Document index

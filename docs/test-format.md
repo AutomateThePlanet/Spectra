@@ -2,6 +2,7 @@
 title: Test format
 parent: Reference
 nav_order: 3
+description: "How SPECTRA stores manual test cases as Markdown files with YAML frontmatter: ID, priority, tags, component, preconditions, steps and expected result."
 ---
 
 # Test format

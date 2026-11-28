@@ -2,6 +2,7 @@
 title: Architecture overview
 parent: Architecture
 nav_order: 1
+description: "How SPECTRA's two subsystems, authoring (generate, update, analyze) and execution (spectra run), work together since the v2 Claude Code migration."
 ---
 
 # Architecture overview

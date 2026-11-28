@@ -2,6 +2,7 @@
 title: Configuration
 parent: Reference
 nav_order: 2
+description: "Complete reference for spectra.config.json at the repository root, created by spectra init: every section and key with its type, default and meaning."
 ---
 
 # Configuration

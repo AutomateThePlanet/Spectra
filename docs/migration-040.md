@@ -3,6 +3,7 @@ layout: default
 title: "Migration: Document Index Restructure (v1.51.0)"
 parent: Reference
 nav_order: 9
+description: "Historical: the SPECTRA 1.51.0 change that replaced the single docs/_index.md file with a per-suite docs/_index/ layout, migrated on first run."
 ---
 
 # Migration: Document Index Restructure (v1.51.0)
