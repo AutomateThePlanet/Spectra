@@ -3,6 +3,13 @@ description: AI-native test generation and execution framework
 theme: just-the-docs
 url: https://automatetheplanet.github.io
 baseurl: /Spectra
+lang: en-US
+
+# jekyll-seo-tag: social preview image (og:image / twitter:image) for every page, and the Twitter account
+# linked from the ATP footer. The image is used only in <head>; nothing on the page changes.
+twitter:
+  username: automateplanet
+  card: summary_large_image
 
 # Branding
 logo: /assets/images/spectra-logo.svg
@@ -84,6 +91,7 @@ defaults:
       path: ""
     values:
       layout: default
+      image: /assets/images/spectra-logo.png
 
 # Exclude machine-generated files & build artifacts from the site
 exclude:
