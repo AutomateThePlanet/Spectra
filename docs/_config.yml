@@ -107,3 +107,7 @@ exclude:
   - "node_modules/"
   - "scripts/"
   - "contributing/"
+  # Internal working notes (no front matter, not linked from any page): keep them off the published site.
+  - "investigation/"
+  - "specs/"
+  - "architecture/ARCHITECTURE-v2.md"
