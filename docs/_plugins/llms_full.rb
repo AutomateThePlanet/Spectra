@@ -39,7 +39,7 @@ module SpectraLlmsFull
     private
 
     def doc_page?(page)
-      page.ext == '.md' && page.data['title'] && !page.data['nav_exclude'] && page.html?
+      page.ext == '.md' && page.data['title'] && !page.data['nav_exclude'] && page.data['sitemap'] != false && page.html?
     end
 
     def order_key(page)
