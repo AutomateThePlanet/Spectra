@@ -94,7 +94,7 @@ The relevant files are `.spectra/prompts/*.md`.
 | `test-update.md` | How existing test cases are edited after a doc change | `spectra ai compile-update-prompt` (the `spectra-update` skill) |
 
 To customize, edit any `.md` file directly. The prompt body uses
-`{{placeholders}}` for dynamic content injected at runtime, and available
+`{% raw %}{{placeholders}}{% endraw %}` for dynamic content injected at runtime, and available
 placeholders are listed in each file's YAML frontmatter.
 
 For example, here's how to add domain focus to behavior analysis:
@@ -111,7 +111,7 @@ When analyzing documentation, pay special attention to:
 ```
 
 For coverage-aware analysis, the `behavior-analysis.md` template includes a
-`{{coverage_context}}` placeholder. When an existing suite has
+`{% raw %}{{coverage_context}}{% endraw %}` placeholder. When an existing suite has
 coverage data, this resolves to a markdown block listing covered/uncovered
 criteria and doc sections, directing the AI to focus on gaps. If your custom
 template omits this placeholder, coverage context is simply not injected.

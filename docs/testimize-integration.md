@@ -45,8 +45,8 @@ cases) to your docs. To push it further, edit the `behavior-analysis` and `test-
 <summary>Under the hood</summary>
 
 `testimize.enabled` sets the `testimize_enabled` block of the `behavior-analysis` template (it asks for
-`field_specs`). The `test-generation` template still has `{{testimize_dataset}}` and
-`{{testimize_strategy_name}}`, but `spectra ai compile-prompt` always fills them with empty values
+`field_specs`). The `test-generation` template still has `{% raw %}{{testimize_dataset}}{% endraw %}` and
+`{% raw %}{{testimize_strategy_name}}{% endraw %}`, but `spectra ai compile-prompt` always fills them with empty values
 (`PromptCompiler.cs`). `mode`, `strategy` and `settings_file` are only shown by `spectra testimize check`;
 `abc_settings` isn't read. See [Configuration](configuration).
 

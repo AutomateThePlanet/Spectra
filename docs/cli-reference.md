@@ -476,7 +476,7 @@ The prompt goes to stdout. stderr carries the mode and any warnings — in JSON 
 |---|---|---|
 | `batch` | a numbered batch | the batch prompt above |
 | `count` | `--batch unsourced` (behaviours whose source didn't resolve) | count mode, focus = the unsourced titles |
-| `count_fallback` | `.spectra/prompts/test-generation.md` is from an older version (no `{{source_sections}}`) and was customised, or has no skills-manifest record (e.g. a fresh clone) | count mode with your template, focus = the batch's titles and refs, plus a warning naming `spectra prompts reset test-generation` |
+| `count_fallback` | `.spectra/prompts/test-generation.md` is from an older version (no `{% raw %}{{source_sections}}{% endraw %}`) and was customised, or has no skills-manifest record (e.g. a fresh clone) | count mode with your template, focus = the batch's titles and refs, plus a warning naming `spectra prompts reset test-generation` |
 
 An unedited older copy (its hash equals the skills manifest's record) compiles in `batch` mode with the bundled
 template and the warning "using the bundled test-generation template; run spectra update-skills to refresh your
@@ -551,7 +551,7 @@ spectra ai compile-extraction-prompt --doc docs/payment.md --component payment
 - The prompt lists the document's **existing criteria** (`id`, `text`, `source_section`, as compact JSON)
   and asks the model to return an existing `id` when a criterion expresses the same requirement, so IDs stay
   stable across rewordings. They are found through the document's `_criteria_index.yaml` entry, in either
-  storage layout. A customised `.spectra/prompts/criteria-extraction.md` without `{{existing_criteria}}` still
+  storage layout. A customised `.spectra/prompts/criteria-extraction.md` without `{% raw %}{{existing_criteria}}{% endraw %}` still
   compiles, with a warning to run `spectra prompts reset criteria-extraction`.
 - When the document shares its criteria file with another document (a pre-2.6 collision), only the criteria whose
   `source_doc` is this document are offered, which are the only IDs `ingest-criteria` accepts for it.
@@ -1480,7 +1480,7 @@ baselined, unchanged). Only criteria the tests link appear — never a suite-wid
 | `TRIAGE_MISSING` / `GROUP_NOT_FOUND` / `TRIAGE_STALE` | As for `update-ack --group` |
 | `NOTHING_TO_RECONCILE` | A test with no resolvable ref and no existing linked criterion (names the tests) |
 | `PROMPT_TOO_LARGE` | The prompt's estimated tokens exceed `analysis.max_prompt_tokens` (default 96,000); names the size; compile the tests one by one with `--test-id`, or lower `update.group_size` and triage again |
-| `TEMPLATE_OUTDATED` | `--group` (or more than one test) with a customised `.spectra/prompts/test-update.md` that lacks `{{tests}}` or `{{source_diff}}`; run `spectra update-skills` (refreshes a copy never edited) or `spectra prompts reset test-update` (replaces a customised one) |
+| `TEMPLATE_OUTDATED` | `--group` (or more than one test) with a customised `.spectra/prompts/test-update.md` that lacks `{% raw %}{{tests}}{% endraw %}` or `{% raw %}{{source_diff}}{% endraw %}`; run `spectra update-skills` (refreshes a copy never edited) or `spectra prompts reset test-update` (replaces a customised one) |
 
 With such an outdated custom template, `--test-id` still works: the template gets the test through `test_case` and the
 sections through `current_source`, and a warning names `spectra prompts reset test-update`. `compile-update-prompt`

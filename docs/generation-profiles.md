@@ -65,7 +65,7 @@ the answers in `spectra.profile.md` (or `test-cases/<suite>/_profile.md` for one
 <summary>Under the hood</summary>
 
 `spectra ai compile-prompt` fills the `test-generation` template and inserts the `format` from
-`profiles/_default.yaml` as `{{profile_format}}`. Template commands: `spectra prompts list|show|validate|reset`.
+`profiles/_default.yaml` as `{% raw %}{{profile_format}}{% endraw %}`. Template commands: `spectra prompts list|show|validate|reset`.
 Profile commands: `spectra init-profile` and `spectra profile show`. All flags: [CLI reference](cli-reference).
 Every setting in one place: [Customization](customization).
 
