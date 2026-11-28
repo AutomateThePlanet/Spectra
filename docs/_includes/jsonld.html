@@ -1,0 +1,53 @@
+{%- comment -%}
+  Structured data (JSON-LD) for search engines and AI assistants. Included from head_custom.html; renders nothing visible.
+  jekyll-seo-tag already emits a WebSite (home) or WebPage node; this adds one @graph next to it:
+    - Organization: Automate The Planet Ltd (same @id as automatetheplanet.com)
+    - home page: SoftwareApplication for SPECTRA
+    - every other page: TechArticle about SPECTRA, plus a BreadcrumbList built from parent / grand_parent front matter
+  No WebSite node here (jekyll-seo-tag owns it); isPartOf repeats its name and url.
+  softwareVersion is left out on purpose: Directory.Build.props says 2.7.1, the CHANGELOG marks 2.7.1 "Unreleased" and
+  the latest GitHub release is v2.7.0. Add it when they agree.
+  Facts: license (LICENSE, Spectra.CLI.csproj PackageLicenseExpression), .NET 8.0+ (README; getting-started.md: ".NET 8 SDK or later"), install command
+  (README "dotnet tool install -g Spectra.CLI"), Windows/macOS/Linux behaviour (cli-reference.md).
+{%- endcomment -%}
+{%- assign ld_base = site.url | append: site.baseurl -%}
+{%- assign ld_home = ld_base | append: "/" -%}
+{%- assign ld_url = page.url | absolute_url -%}
+{%- assign ld_lang = site.lang | default: "en-US" -%}
+{%- assign ld_software_id = ld_home | append: "#software" -%}
+{%- capture ld_org -%}{"@type":"Organization","@id":"https://www.automatetheplanet.com/#organization","name":"Automate The Planet Ltd","url":"https://www.automatetheplanet.com/"}{%- endcapture -%}
+{%- capture ld_org_ref -%}{"@id":"https://www.automatetheplanet.com/#organization"}{%- endcapture -%}
+{%- capture ld_website -%}{"@type":"WebSite","name":{{ site.title | jsonify }},"url":{{ ld_home | jsonify }}}{%- endcapture -%}
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[
+{{ ld_org }},
+{%- if page.url == "/" %}
+{"@type":"SoftwareApplication","@id":{{ ld_software_id | jsonify }},"name":"SPECTRA","alternateName":"Spectra.CLI","description":{{ page.description | default: site.description | jsonify }},"url":{{ ld_home | jsonify }},"applicationCategory":"DeveloperApplication","applicationSubCategory":"Test case generation","operatingSystem":"Windows, macOS, Linux","softwareRequirements":".NET 8 SDK or later","license":"https://www.apache.org/licenses/LICENSE-2.0","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"installUrl":"https://www.nuget.org/packages/Spectra.CLI","downloadUrl":"https://www.nuget.org/packages/Spectra.CLI","codeRepository":"https://github.com/AutomateThePlanet/Spectra","programmingLanguage":"C#","releaseNotes":"https://github.com/AutomateThePlanet/Spectra/blob/main/CHANGELOG.md","image":{{ "/assets/images/spectra-logo.png" | absolute_url | jsonify }},"sameAs":["https://www.automatetheplanet.com/spectra/","https://github.com/AutomateThePlanet/Spectra","https://www.nuget.org/packages/Spectra.CLI"],"author":{{ ld_org_ref }},"publisher":{{ ld_org_ref }},"mainEntityOfPage":{{ ld_home | jsonify }}}
+{%- else %}
+{"@type":"TechArticle","@id":{{ ld_url | append: "#article" | jsonify }},"headline":{{ page.hero_title | default: page.title | jsonify }},{% if page.description %}"description":{{ page.description | jsonify }},{% endif %}"url":{{ ld_url | jsonify }},"mainEntityOfPage":{{ ld_url | jsonify }},"inLanguage":{{ ld_lang | jsonify }},"image":{{ "/assets/images/spectra-logo.png" | absolute_url | jsonify }},"author":{{ ld_org_ref }},"publisher":{{ ld_org_ref }},"about":{"@type":"SoftwareApplication","@id":{{ ld_software_id | jsonify }},"name":"SPECTRA","url":{{ ld_home | jsonify }}},"isPartOf":{{ ld_website }}}
+{%- if page.parent %}
+{%- assign ld_parent = nil -%}
+{%- assign ld_grand = nil -%}
+{%- if page.grand_parent -%}
+{%- assign ld_grand = site.html_pages | where: "title", page.grand_parent | first -%}
+{%- assign ld_parent_candidates = site.html_pages | where: "title", page.parent -%}
+{%- for ld_candidate in ld_parent_candidates -%}{%- if ld_candidate.parent == page.grand_parent -%}{%- assign ld_parent = ld_candidate -%}{%- endif -%}{%- endfor -%}
+{%- else -%}
+{%- assign ld_parent = site.html_pages | where: "title", page.parent | first -%}
+{%- endif %},
+{"@type":"BreadcrumbList","@id":{{ ld_url | append: "#breadcrumb" | jsonify }},"itemListElement":[
+{"@type":"ListItem","position":1,"name":{{ site.title | jsonify }},"item":{{ ld_home | jsonify }}}
+{%- assign ld_pos = 1 -%}
+{%- if ld_grand -%}{%- assign ld_pos = ld_pos | plus: 1 -%},
+{"@type":"ListItem","position":{{ ld_pos }},"name":{{ ld_grand.title | jsonify }},"item":{{ ld_grand.url | absolute_url | jsonify }}}
+{%- endif -%}
+{%- if ld_parent -%}{%- assign ld_pos = ld_pos | plus: 1 -%},
+{"@type":"ListItem","position":{{ ld_pos }},"name":{{ ld_parent.title | jsonify }},"item":{{ ld_parent.url | absolute_url | jsonify }}}
+{%- endif -%}
+{%- assign ld_pos = ld_pos | plus: 1 -%},
+{"@type":"ListItem","position":{{ ld_pos }},"name":{{ page.title | jsonify }},"item":{{ ld_url | jsonify }}}
+]}
+{%- endif %}
+{%- endif %}
+]}
+</script>
