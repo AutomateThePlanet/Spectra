@@ -50,7 +50,7 @@ jobs:
       # Colour contrast (axe-core, WCAG AA) on every page at 1440 and 390 px. Warn only for now:
       # failures show as warning annotations on the run and never block the deploy.
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '20'
 
