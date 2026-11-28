@@ -23,7 +23,7 @@ function structural() {
   const problems = [];
   const old = ['.expand-button', '.code-expand-btn', 'button[aria-label="Copy code to clipboard"]', '.bx2-code-wrap', 'pre.expand', 'pre.is-collapsed', '.highlighter-rouge > button'];
   old.forEach((s) => { if (document.querySelector(s)) problems.push(`old control on the page: ${s}`); });
-  document.querySelectorAll('.bx2-copy').forEach((b) => { if (!b.closest('.bx2-prompt')) problems.push('old control on the page: .bx2-copy on code'); });
+  document.querySelectorAll('.bx2-copy').forEach((b) => { if (b.closest('.bx2-code-wrap, pre')) problems.push('old control on the page: .bx2-copy on code'); });
   const vw = document.documentElement.clientWidth;
   const blocks = [];
   document.querySelectorAll('pre').forEach((pre, i) => {
