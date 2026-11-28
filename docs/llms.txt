@@ -1,0 +1,70 @@
+# SPECTRA
+
+> SPECTRA is an open-source (Apache-2.0) AI-native test case generation and execution tool by Automate The Planet Ltd (Sofia, Bulgaria). It turns your product documentation into manual test cases stored as Markdown files in your repository: you ask your AI agent (Claude Code, or GitHub Copilot, Cursor, Devin, Codex, Gemini, Antigravity, Kiro or OpenCode), and SPECTRA plans, writes and double-checks each test against the doc sections it cites, extracts acceptance criteria, reports documentation, criteria and automation coverage, and records manual test runs. It ships as the .NET global tool Spectra.CLI (`dotnet tool install -g Spectra.CLI`, requires the .NET 8 SDK or later); no separate API key is needed, since all inference runs in your own agent session.
+
+Full text of every documentation page in one file: https://automatetheplanet.github.io/Spectra/llms-full.txt
+
+## Getting started
+
+- [Overview](https://automatetheplanet.github.io/Spectra/): what SPECTRA does, from your docs to coverage
+- [Getting started](https://automatetheplanet.github.io/Spectra/getting-started.html): install SPECTRA, set up your repository and ask your AI agent for your first test cases
+- [Guides](https://automatetheplanet.github.io/Spectra/guides.html): index of the task guides
+
+## How-to guides
+
+- [Generate test cases](https://automatetheplanet.github.io/Spectra/usage.html): ask your agent for test cases; approve the plan; one Markdown file per test, each checked against your docs
+- [Extract acceptance criteria](https://automatetheplanet.github.io/Spectra/criteria.html): turn MUST/SHOULD/MAY statements into criteria, or import them from CSV, YAML or JSON
+- [Review flagged tests](https://automatetheplanet.github.io/Spectra/review.html): accept, fix, regenerate or delete tests SPECTRA could not fully confirm from your docs
+- [Update tests when your docs change](https://automatetheplanet.github.io/Spectra/keep-tests-up-to-date.html): find the tests a doc change affects and edit them after your OK
+- [Tune how tests are written](https://automatetheplanet.github.io/Spectra/generation-profiles.html): test fields, prompt templates and where each setting lives
+- [Testimize integration](https://automatetheplanet.github.io/Spectra/testimize-integration.html): what the optional Testimize setting does today
+- [Use SPECTRA in CI](https://automatetheplanet.github.io/Spectra/ci.html): validate test case files and publish the dashboard on every push, no AI agent needed
+- [Deployment](https://automatetheplanet.github.io/Spectra/deployment): how to host the SPECTRA dashboard
+- [Cloudflare Pages setup](https://automatetheplanet.github.io/Spectra/deployment/cloudflare-pages-setup.html): deploy the dashboard to Cloudflare Pages with optional GitHub OAuth
+
+## AI agents and test execution
+
+- [Use other AI agents](https://automatetheplanet.github.io/Spectra/ai-agents.html): GitHub Copilot, Cursor, Devin, Codex, Gemini, Antigravity, Kiro, OpenCode
+- [AI agent installs](https://automatetheplanet.github.io/Spectra/ai-agents-reference.html): what `spectra init --agent` installs for each supported agent, and use next to BELLATRIX Agent
+- [Skills and agents](https://automatetheplanet.github.io/Spectra/skills-integration.html): the skills and subagents SPECTRA installs into your AI agent
+- [Run tests with your agent](https://automatetheplanet.github.io/Spectra/execution-agents): run manual test cases and record pass, fail, blocked or skip in a browser console
+- [AI models and cost](https://automatetheplanet.github.io/Spectra/ai-models-cost-guide.html): how SPECTRA spends AI usage and how to control it
+
+## Coverage
+
+- [Check coverage and build the dashboard](https://automatetheplanet.github.io/Spectra/coverage.html): documentation, acceptance-criteria and automation coverage, published as a static dashboard
+- [Coverage reference](https://automatetheplanet.github.io/Spectra/coverage-reference.html): how each coverage number is computed, JSON output, exclusions and scan patterns
+
+## Reference
+
+- [Reference index](https://automatetheplanet.github.io/Spectra/user-guide): CLI, configuration, test format, coverage, skills, agents, costs and migrations
+- [CLI reference](https://automatetheplanet.github.io/Spectra/cli-reference.html): every `spectra` command, option and exit code
+- [Configuration](https://automatetheplanet.github.io/Spectra/configuration.html): complete reference for `spectra.config.json`
+- [Test format](https://automatetheplanet.github.io/Spectra/test-format.html): Markdown test case files with YAML frontmatter
+- [Customization](https://automatetheplanet.github.io/Spectra/customization.html): every way to customize SPECTRA's output and behaviour
+- [Claude Code v2 vs. the GitHub Copilot SDK v1](https://automatetheplanet.github.io/Spectra/claude-code-v2-migration.html): historical, the move to 2.0.0 and the execution changes in 2.4.0
+- [Migration: Document Index Restructure (v1.51.0)](https://automatetheplanet.github.io/Spectra/migration-040.html): historical, the 1.51.0 index change
+
+## Architecture
+
+- [Architecture](https://automatetheplanet.github.io/Spectra/architecture): how a request flows through skills, the CLI and your files
+- [Architecture overview](https://automatetheplanet.github.io/Spectra/architecture/overview.html): how SPECTRA's subsystems work together
+- [How SPECTRA double-checks your tests](https://automatetheplanet.github.io/Spectra/grounding-verification.html): the critic and the grounded, partial, hallucinated, flagged and unverified verdicts
+- [How test case generation works](https://automatetheplanet.github.io/Spectra/analysis/cli-vs-chat-generation.html): the generation pipeline from docs to verified test files
+- [Document index](https://automatetheplanet.github.io/Spectra/document-index.html): the per-suite documentation index used for generation
+- [Glossary](https://automatetheplanet.github.io/Spectra/glossary.html): every SPECTRA term defined once
+
+## Releases and source
+
+- [Changelog](https://github.com/AutomateThePlanet/Spectra/blob/main/CHANGELOG.md): all notable changes, per version (Keep a Changelog format)
+- [GitHub releases](https://github.com/AutomateThePlanet/Spectra/releases): release notes and tags
+- [Spectra.CLI on NuGet](https://www.nuget.org/packages/Spectra.CLI): the installable .NET global tool
+- [Source code on GitHub](https://github.com/AutomateThePlanet/Spectra): repository, issues and license
+- [Contributing](https://automatetheplanet.github.io/Spectra/DEVELOPMENT.html): build SPECTRA from source, run its tests and preview these docs
+
+## Related
+
+- [SPECTRA product page](https://www.automatetheplanet.com/spectra/): product overview on automatetheplanet.com
+- [What is SPECTRA? AI-native test case generation](https://www.automatetheplanet.com/what-is-spectra-ai-native-test-case-generation/): launch article
+- [BELLATRIX](https://bellatrix.solutions): open-source test automation framework; BELLATRIX Agent links automated tests to SPECTRA test case IDs
+- [Automate The Planet](https://www.automatetheplanet.com): the company behind SPECTRA and BELLATRIX
