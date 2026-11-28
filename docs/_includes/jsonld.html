@@ -2,11 +2,11 @@
   Structured data (JSON-LD) for search engines and AI assistants. Included from head_custom.html; renders nothing visible.
   jekyll-seo-tag already emits a WebSite (home) or WebPage node; this adds one @graph next to it:
     - Organization: Automate The Planet Ltd (same @id as automatetheplanet.com)
-    - home page: SoftwareApplication for SPECTRA
+    - home page: SoftwareApplication for SPECTRA, and SoftwareSourceCode (repository, C#) whose targetProduct is it
     - every other page: TechArticle about SPECTRA, plus a BreadcrumbList built from parent / grand_parent front matter
   No WebSite node here (jekyll-seo-tag owns it); isPartOf repeats its name and url.
-  softwareVersion is left out on purpose: Directory.Build.props says 2.7.1, the CHANGELOG marks 2.7.1 "Unreleased" and
-  the latest GitHub release is v2.7.0. Add it when they agree.
+  softwareVersion: the latest release on NuGet / GitHub (v2.7.0). Directory.Build.props already says 2.7.1, which is
+  not released yet; change this when 2.7.1 is on NuGet.
   Facts: license (LICENSE, Spectra.CLI.csproj PackageLicenseExpression), .NET 8.0+ (README; getting-started.md: ".NET 8 SDK or later"), install command
   (README "dotnet tool install -g Spectra.CLI"), Windows/macOS/Linux behaviour (cli-reference.md).
 {%- endcomment -%}
@@ -22,7 +22,8 @@
 {"@context":"https://schema.org","@graph":[
 {{ ld_org }},
 {%- if page.url == "/" %}
-{"@type":"SoftwareApplication","@id":{{ ld_software_id | jsonify }},"name":"SPECTRA","alternateName":"Spectra.CLI","description":{{ page.description | default: site.description | jsonify }},"url":{{ ld_home | jsonify }},"applicationCategory":"DeveloperApplication","applicationSubCategory":"Test case generation","operatingSystem":"Windows, macOS, Linux","softwareRequirements":".NET 8 SDK or later","license":"https://www.apache.org/licenses/LICENSE-2.0","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"installUrl":"https://www.nuget.org/packages/Spectra.CLI","downloadUrl":"https://www.nuget.org/packages/Spectra.CLI","codeRepository":"https://github.com/AutomateThePlanet/Spectra","programmingLanguage":"C#","releaseNotes":"https://github.com/AutomateThePlanet/Spectra/blob/main/CHANGELOG.md","image":{{ "/assets/images/spectra-logo.png" | absolute_url | jsonify }},"sameAs":["https://www.automatetheplanet.com/spectra/","https://github.com/AutomateThePlanet/Spectra","https://www.nuget.org/packages/Spectra.CLI"],"author":{{ ld_org_ref }},"publisher":{{ ld_org_ref }},"mainEntityOfPage":{{ ld_home | jsonify }}}
+{"@type":"SoftwareApplication","@id":{{ ld_software_id | jsonify }},"name":"SPECTRA","alternateName":"Spectra.CLI","description":{{ page.description | default: site.description | jsonify }},"url":{{ ld_home | jsonify }},"applicationCategory":"DeveloperApplication","applicationSubCategory":"Test case generation","operatingSystem":"Windows, macOS, Linux","softwareRequirements":".NET 8 SDK or later","license":"https://www.apache.org/licenses/LICENSE-2.0","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"installUrl":"https://www.nuget.org/packages/Spectra.CLI","downloadUrl":"https://www.nuget.org/packages/Spectra.CLI","softwareVersion":"2.7.0","releaseNotes":"https://github.com/AutomateThePlanet/Spectra/blob/main/CHANGELOG.md","image":{{ "/assets/images/spectra-logo.png" | absolute_url | jsonify }},"sameAs":["https://www.automatetheplanet.com/spectra/","https://github.com/AutomateThePlanet/Spectra","https://www.nuget.org/packages/Spectra.CLI"],"author":{{ ld_org_ref }},"publisher":{{ ld_org_ref }},"mainEntityOfPage":{{ ld_home | jsonify }}},
+{"@type":"SoftwareSourceCode","@id":{{ ld_home | append: "#source" | jsonify }},"name":"SPECTRA source code","codeRepository":"https://github.com/AutomateThePlanet/Spectra","programmingLanguage":"C#","runtimePlatform":".NET 8","license":"https://www.apache.org/licenses/LICENSE-2.0","targetProduct":{"@id":{{ ld_software_id | jsonify }}},"author":{{ ld_org_ref }},"publisher":{{ ld_org_ref }}}
 {%- else %}
 {"@type":"TechArticle","@id":{{ ld_url | append: "#article" | jsonify }},"headline":{{ page.hero_title | default: page.title | jsonify }},{% if page.description %}"description":{{ page.description | jsonify }},{% endif %}"url":{{ ld_url | jsonify }},"mainEntityOfPage":{{ ld_url | jsonify }},"inLanguage":{{ ld_lang | jsonify }},"image":{{ "/assets/images/spectra-logo.png" | absolute_url | jsonify }},"author":{{ ld_org_ref }},"publisher":{{ ld_org_ref }},"about":{"@type":"SoftwareApplication","@id":{{ ld_software_id | jsonify }},"name":"SPECTRA","url":{{ ld_home | jsonify }}},"isPartOf":{{ ld_website }}}
 {%- if page.parent %}
